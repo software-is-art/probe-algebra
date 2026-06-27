@@ -104,7 +104,7 @@ fn discarding_residual_keeps_the_output() {
 // ===== nesting: a parent boundary composed of private child boundaries =====
 
 mod nesting {
-    use crate::boundary::{probe, run};
+    use crate::boundary::{probe, run, Perturbation};
     use crate::pipeline::boundary::{Bucket, Ingest, NudgeSample, Sample};
 
     // The child intermediate is UNREACHABLE from here: naming
@@ -145,6 +145,13 @@ mod nesting {
         );
         assert!(pr.residual_complete());
     }
+
+    /// The sample nudge moves the input by exactly one unit.
+    #[test]
+    fn nudge_moves_the_sample_by_one() {
+        let nudged = Perturbation::<Ingest>::perturb(&NudgeSample, &Sample::new(2345).unwrap());
+        assert_eq!(nudged, Some(Sample::new(2346).unwrap()));
+    }
 }
 
 // ===== state: a stateful update is a lossy morphism (residual = prior) =====
@@ -155,6 +162,16 @@ mod state {
 
     fn reg(n: i64) -> Register {
         Register::new(n).unwrap()
+    }
+
+    /// The register accessor reports the real value, and `Add` is invertible on
+    /// its own (the composed test can't see this — `Set::backward` discards it).
+    #[test]
+    fn add_round_trips_and_register_reads_back() {
+        assert_eq!(reg(7).get(), 7);
+        let carried = run(&Add::by(reg(5)), &reg(7));
+        assert_eq!(carried.out(), &reg(12));
+        assert_eq!(carried.invert(&Add::by(reg(5))).as_ref(), Some(&reg(7)));
     }
 
     /// A `Set` overwrites the state; its residual is exactly the prior it forgot,
@@ -184,6 +201,12 @@ mod state {
         assert!(!buggy.residual_responds, "the residual ignores the prior");
         assert!(!buggy.round_trips, "so it cannot rewind");
         assert!(!buggy.residual_complete());
+        // the bug rewinds to the WRONG value, not to None
+        let op = SetForgetsPrior::to(reg(10));
+        let (out, residual) = op.forward(&s);
+        let recovered = op.backward(&out, &residual);
+        assert!(recovered.is_some());
+        assert_ne!(recovered, Some(s));
     }
 
     /// Composing updates threads the state and accumulates the priors into a
@@ -217,8 +240,10 @@ mod state {
 // ===== effect: a morphism made pure relative to a handler ==================
 
 mod effect {
-    use crate::boundary::{Morphism, Pair};
-    use crate::effect::boundary::{Clock, Demand, Entry, Message, Stamp, Stamped};
+    use crate::boundary::{Morphism, Pair, Perturbation};
+    use crate::effect::boundary::{
+        Clock, Demand, Entry, IgnoresClock, Message, NudgeReading, Stamp, Stamped,
+    };
     use crate::effect::handler::{run_stamp, RecordingHandler};
 
     /// Pure relative to a handler: the recording handler scripts the reading and
@@ -253,5 +278,20 @@ mod effect {
         // deterministic relative to a fixed handler (unlike a live clock)
         let mut again = RecordingHandler::new(Clock::new(100).unwrap());
         assert_eq!(run_stamp(&mut again, &Demand, &msg), a);
+    }
+
+    /// `NudgeReading` moves the world reading by exactly one tick (and only the
+    /// reading); the over-declared `IgnoresClock` still reconstructs something.
+    #[test]
+    fn perturbation_and_degenerate_operator_are_pinned() {
+        let env = Pair(Message::new(5).unwrap(), Clock::new(100).unwrap());
+        let nudged = Perturbation::<Stamp>::perturb(&NudgeReading, &env).unwrap();
+        assert_eq!(
+            nudged,
+            Pair(Message::new(5).unwrap(), Clock::new(101).unwrap())
+        );
+        assert!(IgnoresClock
+            .backward(&Stamped::new(5).unwrap(), &Entry::new(0).unwrap())
+            .is_some());
     }
 }

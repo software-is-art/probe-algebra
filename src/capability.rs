@@ -142,6 +142,28 @@ mod tests {
         );
     }
 
+    /// A source where BOTH output and residual move is not a clean lost dimension
+    /// (the output is not invariant), so it does not count as Lossy.
+    #[test]
+    fn both_moving_is_not_a_clean_lost_dimension() {
+        let both = Response {
+            output_moved: true,
+            residual_moved: true,
+        };
+        assert_eq!(
+            source_capability(Source::LostInput, &both),
+            Capability::Pure
+        );
+    }
+
+    /// Not over-declared when the declared ceiling matches or sits below the
+    /// observed behaviour.
+    #[test]
+    fn matched_or_higher_behaviour_is_not_over_declared() {
+        assert!(!over_declared(Capability::Lossy, Capability::Lossy));
+        assert!(!over_declared(Capability::Pure, Capability::Effectful));
+    }
+
     /// Aggregation: perturbing the lost dimension leaves the output invariant and
     /// moves the residual → Lossy.
     #[test]

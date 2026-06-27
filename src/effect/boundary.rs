@@ -143,13 +143,3 @@ impl<M: Morphism<In = Pair<Message, Clock>>> Perturbation<M> for NudgeReading {
         Some(Pair(input.0, Clock::new(input.1.get() + 1)?))
     }
 }
-
-/// Perturb the PURE input (the message) while holding the world reading fixed.
-pub struct NudgeMessage;
-crate::value_operator!(NudgeMessage);
-
-impl<M: Morphism<In = Pair<Message, Clock>>> Perturbation<M> for NudgeMessage {
-    fn perturb(&self, input: &Pair<Message, Clock>) -> Option<Pair<Message, Clock>> {
-        Some(Pair(Message::new(input.0.get() + 1)?, input.1))
-    }
-}

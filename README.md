@@ -136,6 +136,30 @@ the accumulated residual is kept — the basis for migration data-validation
 **Composition validation is the open frontier** (single-transform is validated
 here; a bug living only in `A∘B`'s interaction is the next experiment).
 
+## The capability chain (least power)
+
+The same residual machinery places every module on one chain of increasing
+capability and *decreasing* verifiability:
+
+```text
+effect  ⊃  state  ⊃  pure-with-loss  ⊃  pure
+```
+
+- **pure** — `Out = f(In)`; every probe applies. Max assurance.
+- **+loss** — invertible only if the residual is retained (`src/ledger/`).
+- **+state** — a state update is a lossy morphism whose residual is the prior it
+  overwrote; composing updates accumulates the priors into the undo history
+  (`src/journal/`). Replayable, not undoable.
+- **+effect** — touches a world it does not own; made pure *relative to a handler*
+  by treating the read as input and the write as residual (`src/effect/`). The
+  live (I/O) handler is the one seam the method cannot probe — the program edge.
+
+The rule: keep each operator as far RIGHT (as close to pure) as its behaviour
+allows; **composition takes the join** (a path is as capable as its most-capable
+stage). `src/capability.rs` makes this measurable — it perturbs each declared
+capability *source* and observes whether the output/residual respond; a declared
+source the morphism ignores is capability-slop it can drop (over-declaration).
+
 ## Enforcement (build tooling)
 
 `build.rs` parses the source with `syn` and **fails the build** on two tiers.
@@ -162,7 +186,10 @@ module interior.
 | `src/boundary.rs` | the grammar: sealed markers + `Morphism` / `probe` / `commutes` / `coefficient_holds` / `Compose` / retention typestate |
 | `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
+| `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |
+| `src/effect/` | effect as a pure morphism relative to a handler (read = input, write = residual) |
 | `src/pipeline/` | nested module: a parent boundary composing two private child boundaries into one narrowed operator |
+| `src/capability.rs` | capability probe: classify a morphism on the chain and flag over-declaration |
 | `src/select.rs` | kill-matrix set-cover selection |
 | `src/synth.rs` | type-driven DOF coverage / operator synthesis |
 | `src/blindspot.rs` | the blind-spot map as tests |
