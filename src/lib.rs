@@ -11,6 +11,7 @@ pub mod boundary;
 pub mod ledger;
 pub mod linear;
 pub mod select;
+pub mod synth;
 
 #[cfg(test)]
 mod blindspot;
