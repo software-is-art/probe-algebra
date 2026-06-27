@@ -94,7 +94,21 @@ fn parse(path: &Path) -> Result<syn::File, String> {
 fn check_boundary(loc: &str, file: &syn::File, out: &mut Vec<String>) {
     for item in &file.items {
         match item {
-            Item::Use(_) | Item::Impl(_) | Item::Macro(_) | Item::Type(_) | Item::Const(_) => {}
+            // A boundary may IMPORT privately (to implement its citizens) but may
+            // not RE-EXPORT: `pub use` forwards another module's citizen as if it
+            // were this boundary's own, defeating "one place to look" and letting
+            // a parent's surface silently become its whole subtree. A parent must
+            // instead DEFINE a narrower citizen that delegates inward.
+            Item::Use(u) => {
+                if !matches!(u.vis, Visibility::Inherited) {
+                    out.push(format!(
+                        "{loc}: re-export (`pub use`) — a boundary must DEFINE its citizens, \
+                         not forward another module's; collapse the child surface into an \
+                         operator or value object owned here"
+                    ));
+                }
+            }
+            Item::Impl(_) | Item::Macro(_) | Item::Type(_) | Item::Const(_) => {}
             Item::Struct(s) => check_fields(loc, &s.ident.to_string(), &s.fields, out),
             Item::Enum(e) => {
                 for v in &e.variants {

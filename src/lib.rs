@@ -23,6 +23,7 @@
 pub mod boundary;
 pub mod ledger;
 pub mod linear;
+pub mod pipeline;
 pub mod select;
 pub mod synth;
 

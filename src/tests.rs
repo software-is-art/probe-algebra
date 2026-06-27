@@ -100,3 +100,49 @@ fn discarding_residual_keeps_the_output() {
     // discarded.invert(&Aggregate) would not compile — invert is not in scope
     // for Carried<_, Discarded>. That is the typestate guarantee.
 }
+
+// ===== nesting: a parent boundary composed of private child boundaries =====
+
+mod nesting {
+    use crate::boundary::{probe, run};
+    use crate::pipeline::boundary::{Bucket, Ingest, NudgeSample, Sample};
+
+    // The child intermediate is UNREACHABLE from here: naming
+    // `crate::pipeline::calibrate::boundary::Reading` does not compile, because
+    // `calibrate` is a private child of `pipeline`. Only `pipeline::boundary` is
+    // public — that is "one place to look", recursing.
+
+    /// The parent operator round-trips through TWO nested child stages while
+    /// exposing only its own types; the intermediate `Reading` never surfaces.
+    #[test]
+    fn nested_pipeline_round_trips() {
+        let x = Sample::new(2345).unwrap();
+        let carried = run(&Ingest, &x);
+        // the output is the parent's own Bucket type (2345 -> reading 3345 -> 334)
+        assert_eq!(carried.out(), &Bucket::new(334).unwrap());
+        assert_eq!(carried.invert(&Ingest).as_ref(), Some(&x));
+    }
+
+    /// The SAME altitude-agnostic `probe` that tests leaf operators tests the
+    /// parent composite: it perturbs the sub-ten dimension and checks the
+    /// COMPOSITE residual `Pair<Unit, Leftover>` is complete.
+    #[test]
+    fn parent_probe_sees_the_composite_residual() {
+        // 2345 -> reading 3345, leftover 5; +1 stays in bucket 334.
+        let x = Sample::new(2345).unwrap();
+        let pr = probe(&Ingest, &NudgeSample, &x).unwrap();
+        assert!(
+            pr.output_invariant,
+            "the bucket must not flip under a sub-ten nudge"
+        );
+        assert!(
+            pr.residual_responds,
+            "the composite residual records the nudge"
+        );
+        assert!(
+            pr.round_trips,
+            "the composite residual reconstructs the sample"
+        );
+        assert!(pr.residual_complete());
+    }
+}

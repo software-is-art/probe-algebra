@@ -141,8 +141,11 @@ here; a bug living only in `A∘B`'s interaction is the next experiment).
 `build.rs` parses the source with `syn` and **fails the build** on two tiers.
 
 **Tier 1 — boundary files (`src/<module>/boundary.rs`):** the strict grammar. No
-free functions, global `static`s, submodules, traits, public fields, or any
-`unsafe` / I/O.
+free functions, global `static`s, submodules, traits, public fields, any
+`unsafe` / I/O, **or `pub use` re-exports** — a boundary must *define* its
+citizens, not forward a child's. (Re-export would let a parent's surface silently
+become its whole subtree, destroying "one place to look"; a parent narrows by
+defining an operator that delegates inward — see `src/pipeline/`.)
 
 **Tier 2 — module-internal files (e.g. `internal.rs`):** the "workshop", where
 mutation and raw collections are fine — but a function may not **return a raw
@@ -159,6 +162,7 @@ module interior.
 | `src/boundary.rs` | the grammar: sealed markers + `Morphism` / `probe` / `commutes` / `coefficient_holds` / `Compose` / retention typestate |
 | `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
+| `src/pipeline/` | nested module: a parent boundary composing two private child boundaries into one narrowed operator |
 | `src/select.rs` | kill-matrix set-cover selection |
 | `src/synth.rs` | type-driven DOF coverage / operator synthesis |
 | `src/blindspot.rs` | the blind-spot map as tests |
