@@ -133,6 +133,26 @@ impl Morphism for IgnoresClock {
     }
 }
 
+/// Behaves exactly like `Stamp` — its output depends on the clock — but will be
+/// DECLARED pure. An under-claim: a hidden world dependency that makes a
+/// "deterministic" call secretly non-deterministic. The audit catches it.
+pub struct SecretStamp;
+crate::value_operator!(SecretStamp);
+
+impl Morphism for SecretStamp {
+    type In = Pair<Message, Clock>;
+    type Out = Stamped;
+    type Residual = Entry;
+
+    fn forward(&self, input: &Pair<Message, Clock>) -> (Stamped, Entry) {
+        Stamp.forward(input)
+    }
+
+    fn backward(&self, out: &Stamped, emission: &Entry) -> Option<Pair<Message, Clock>> {
+        Stamp.backward(out, emission)
+    }
+}
+
 /// Perturb the WORLD reading (the clock) while holding the pure input fixed —
 /// used by the capability probe to confirm the output depends on the world.
 pub struct NudgeReading;

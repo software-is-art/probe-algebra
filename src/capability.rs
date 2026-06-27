@@ -24,6 +24,8 @@
 //! Crate-level tooling (like `select`/`synth`), exempt from the boundary discipline.
 
 use crate::boundary::{Morphism, Perturbation};
+use crate::effect::boundary::{IgnoresClock, SecretStamp, Stamp};
+use crate::journal::boundary::Add;
 
 /// The capability chain, least-power first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,22 +89,32 @@ pub enum Source {
     World,
 }
 
-/// The capability a source contributes given what its perturbation moved. A
-/// source that moved nothing is not live → it contributes `Pure` (it is slop).
-pub fn source_capability(source: Source, r: &Response) -> Capability {
-    let live = match source {
+/// Whether a source is LIVE given what its perturbation moved.
+fn is_live(source: Source, r: &Response) -> bool {
+    match source {
         // a genuine lost dimension: the residual must keep what the output drops
         Source::LostInput => !r.output_moved && r.residual_moved,
         // reads/forgets carried state, or depends on the world
         Source::State | Source::World => r.output_moved || r.residual_moved,
-    };
-    if !live {
-        return Capability::Pure;
     }
+}
+
+/// The capability a live source contributes.
+fn cap_of(source: Source) -> Capability {
     match source {
         Source::LostInput => Capability::Lossy,
         Source::State => Capability::Stateful,
         Source::World => Capability::Effectful,
+    }
+}
+
+/// The capability a source contributes given what its perturbation moved. A
+/// source that moved nothing is not live → it contributes `Pure` (it is slop).
+pub fn source_capability(source: Source, r: &Response) -> Capability {
+    if is_live(source, r) {
+        cap_of(source)
+    } else {
+        Capability::Pure
     }
 }
 
@@ -112,11 +124,119 @@ pub fn over_declared(declared: Capability, actual: Capability) -> bool {
     actual.rank() < declared.rank()
 }
 
+// ===== claim vs behaviour: detect over- AND under-claiming ================
+
+/// A capability CLAIM bound to an operator: the sources it declares it uses.
+/// Comparing the claim to the probed behaviour catches BOTH error directions:
+///   - over-claiming (declared but unused) → slop: needless guards and tests;
+///   - under-claiming (used but undeclared) → a hidden dependency, a latent bug
+///     (e.g. a "pure" call that secretly reads the world).
+pub trait Declares {
+    fn declared_sources(&self) -> &'static [Source];
+}
+
+impl Declares for Stamp {
+    fn declared_sources(&self) -> &'static [Source] {
+        &[Source::World] // honest: it reads the clock
+    }
+}
+impl Declares for IgnoresClock {
+    fn declared_sources(&self) -> &'static [Source] {
+        &[Source::World] // OVER-claim: demands a clock it never uses
+    }
+}
+impl Declares for SecretStamp {
+    fn declared_sources(&self) -> &'static [Source] {
+        &[] // UNDER-claim: hides that it reads the clock
+    }
+}
+impl Declares for Add {
+    fn declared_sources(&self) -> &'static [Source] {
+        &[Source::State] // honest: it reads the carried state
+    }
+}
+
+/// One audited channel: a source, whether the operator CLAIMED it, and whether the
+/// behaviour shows it LIVE.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Channel {
+    pub source: Source,
+    pub claimed: bool,
+    pub live: bool,
+}
+
+/// Audit one channel: observe the operator along the source's perturbation and
+/// record the operator's own claim for that source.
+pub fn audit_channel<M, P>(source: Source, m: &M, p: &P, x: &M::In) -> Option<Channel>
+where
+    M: Morphism + Declares,
+    P: Perturbation<M>,
+{
+    let r = observe(m, p, x)?;
+    Some(Channel {
+        source,
+        claimed: m.declared_sources().contains(&source),
+        live: is_live(source, &r),
+    })
+}
+
+/// A capability audit over an operator's candidate channels: it reconciles the
+/// operator's claim with its probed behaviour.
+pub struct Audit {
+    channels: Vec<Channel>,
+}
+impl Audit {
+    pub fn new(channels: Vec<Channel>) -> Self {
+        Audit { channels }
+    }
+
+    /// Sources declared but not used — capability-slop (over-testing, needless
+    /// guards, false barriers to composition). Move right by dropping them.
+    pub fn over_claimed(&self) -> Vec<Source> {
+        self.channels
+            .iter()
+            .filter(|c| c.claimed && !c.live)
+            .map(|c| c.source)
+            .collect()
+    }
+
+    /// Sources used but not declared — a hidden dependency. The dangerous case: a
+    /// declared-pure operator that actually reads state or the world.
+    pub fn under_claimed(&self) -> Vec<Source> {
+        self.channels
+            .iter()
+            .filter(|c| c.live && !c.claimed)
+            .map(|c| c.source)
+            .collect()
+    }
+
+    /// True iff the claim matches the behaviour exactly (no slop, no hidden deps).
+    pub fn is_honest(&self) -> bool {
+        self.over_claimed().is_empty() && self.under_claimed().is_empty()
+    }
+
+    /// The capability the behaviour actually exhibits.
+    pub fn observed(&self) -> Capability {
+        self.channels
+            .iter()
+            .filter(|c| c.live)
+            .fold(Capability::Pure, |acc, c| acc.join(cap_of(c.source)))
+    }
+
+    /// The capability the declaration claims.
+    pub fn declared(&self) -> Capability {
+        self.channels
+            .iter()
+            .filter(|c| c.claimed)
+            .fold(Capability::Pure, |acc, c| acc.join(cap_of(c.source)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::boundary::{Compose, Pair};
-    use crate::effect::boundary::{Clock, IgnoresClock, Message, NudgeReading, Stamp};
+    use crate::effect::boundary::{Clock, IgnoresClock, Message, NudgeReading, SecretStamp, Stamp};
     use crate::journal::boundary::{Add, NudgeState, Register};
     use crate::ledger::boundary::{Account, Aggregate, Cents, Posting, Round, Split, Transaction};
 
@@ -206,6 +326,79 @@ mod tests {
             over_declared(Capability::Effectful, actual),
             "it can move right: drop the clock demand"
         );
+    }
+
+    fn env() -> Pair<Message, Clock> {
+        Pair(Message::new(5).unwrap(), Clock::new(100).unwrap())
+    }
+
+    /// An honest claim matches the behaviour: no over-claim, no under-claim.
+    #[test]
+    fn honest_claim_passes_the_audit() {
+        let audit = Audit::new(vec![audit_channel(
+            Source::World,
+            &Stamp,
+            &NudgeReading,
+            &env(),
+        )
+        .unwrap()]);
+        assert!(audit.is_honest());
+        assert_eq!(audit.declared(), Capability::Effectful);
+        assert_eq!(audit.observed(), Capability::Effectful);
+    }
+
+    /// OVER-claim: IgnoresClock declares the world but ignores it. Flagged as
+    /// over-claimed (slop); declared sits above observed.
+    #[test]
+    fn over_claim_is_detected() {
+        let audit = Audit::new(vec![audit_channel(
+            Source::World,
+            &IgnoresClock,
+            &NudgeReading,
+            &env(),
+        )
+        .unwrap()]);
+        assert_eq!(audit.over_claimed(), vec![Source::World]);
+        assert!(audit.under_claimed().is_empty());
+        assert!(!audit.is_honest());
+        assert_eq!(audit.declared(), Capability::Effectful);
+        assert_eq!(audit.observed(), Capability::Pure);
+    }
+
+    /// UNDER-claim: SecretStamp reads the clock but declares nothing. Flagged as
+    /// under-claimed (a hidden dependency); observed sits above declared.
+    #[test]
+    fn under_claim_is_detected() {
+        let audit = Audit::new(vec![audit_channel(
+            Source::World,
+            &SecretStamp,
+            &NudgeReading,
+            &env(),
+        )
+        .unwrap()]);
+        assert_eq!(audit.under_claimed(), vec![Source::World]);
+        assert!(audit.over_claimed().is_empty());
+        assert!(!audit.is_honest());
+        assert_eq!(audit.declared(), Capability::Pure);
+        assert_eq!(audit.observed(), Capability::Effectful);
+        // the hidden dependency is real: SecretStamp behaves like Stamp and
+        // round-trips (it is not a no-op that merely looks effectful).
+        let (out, emission) = SecretStamp.forward(&env());
+        assert_eq!(SecretStamp.backward(&out, &emission), Some(env()));
+    }
+
+    /// The audit is not effect-specific: Add honestly declares and uses State.
+    #[test]
+    fn audit_generalizes_across_domains() {
+        let audit = Audit::new(vec![audit_channel(
+            Source::State,
+            &Add::by(Register::new(5).unwrap()),
+            &NudgeState,
+            &Register::new(7).unwrap(),
+        )
+        .unwrap()]);
+        assert!(audit.is_honest());
+        assert_eq!(audit.observed(), Capability::Stateful);
     }
 
     /// Composition takes the join: a two-stage lossy path is Lossy, and probing

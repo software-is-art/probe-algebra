@@ -157,8 +157,21 @@ effect  ⊃  state  ⊃  pure-with-loss  ⊃  pure
 The rule: keep each operator as far RIGHT (as close to pure) as its behaviour
 allows; **composition takes the join** (a path is as capable as its most-capable
 stage). `src/capability.rs` makes this measurable — it perturbs each declared
-capability *source* and observes whether the output/residual respond; a declared
-source the morphism ignores is capability-slop it can drop (over-declaration).
+capability *source* and observes whether the output/residual respond.
+
+An operator carries its capability claim (`Declares`), and the `Audit` reconciles
+the claim with the probed behaviour per source, catching BOTH error directions —
+each a real cost:
+
+- **over-claiming** (declared but unused) → capability-slop: needless guards,
+  over-testing, false barriers to composition. Move right by dropping it.
+- **under-claiming** (used but undeclared) → a hidden dependency, a latent bug —
+  e.g. a declared-pure operator that secretly reads the world, so a call believed
+  deterministic is not.
+
+The audit verifies a *declared* channel (it cannot infer a channel's role from
+the type), so it catches taking the wrong amount of power once the channels are
+named — the same perturb-and-observe machinery as every other probe.
 
 ## Enforcement (build tooling)
 
