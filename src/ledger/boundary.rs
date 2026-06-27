@@ -87,13 +87,6 @@ impl Transaction {
     pub fn postings(&self) -> &[Posting] {
         &self.postings
     }
-    /// Lower the value object to the primitive pairs the internal algorithm eats.
-    fn to_pairs(&self) -> Vec<(String, i64)> {
-        self.postings
-            .iter()
-            .map(|p| (p.account.get().to_string(), p.amount.get()))
-            .collect()
-    }
 }
 
 /// OUTPUT value object: per-account totals. Multiplicity is GONE (each account
@@ -103,6 +96,16 @@ pub struct AccountSummary {
     totals: BTreeMap<String, i64>,
 }
 impl AccountSummary {
+    /// Module-scoped constructor: the internal aggregation hands back
+    /// `Account`-keyed totals; the summary stores plain labels for its public view.
+    pub(in crate::ledger) fn from_totals(totals: BTreeMap<Account, i64>) -> Self {
+        Self {
+            totals: totals
+                .into_iter()
+                .map(|(a, t)| (a.get().to_string(), t))
+                .collect(),
+        }
+    }
     pub fn totals(&self) -> &BTreeMap<String, i64> {
         &self.totals
     }
@@ -111,10 +114,19 @@ impl AccountSummary {
 /// RESIDUAL value object for aggregation: the MULTIPLICITY that aggregation
 /// collapsed — the original per-account breakdown of each total into its
 /// constituent posting amounts (sorted). Summary + this residual reconstructs
-/// the transaction.
+/// the transaction. The breakdown keeps VALUE OBJECTS (`Account` / `Cents`), so
+/// reconstruction needs no re-validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MultiplicityResidual {
-    breakdown: BTreeMap<String, Vec<i64>>,
+    breakdown: BTreeMap<Account, Vec<Cents>>,
+}
+impl MultiplicityResidual {
+    pub(in crate::ledger) fn from_breakdown(breakdown: BTreeMap<Account, Vec<Cents>>) -> Self {
+        Self { breakdown }
+    }
+    pub(in crate::ledger) fn breakdown(&self) -> &BTreeMap<Account, Vec<Cents>> {
+        &self.breakdown
+    }
 }
 
 /// RESIDUAL value object for rounding: the sub-dollar cents removed from each
@@ -157,23 +169,14 @@ impl Morphism for Aggregate {
     type Out = AccountSummary;
     type Residual = MultiplicityResidual;
 
+    // The boundary operator is a thin adapter over the internal morphism, which
+    // holds the actual (probeable) aggregation logic.
     fn forward(&self, input: &Transaction) -> (AccountSummary, MultiplicityResidual) {
-        let (totals, breakdown) = super::internal::fold(&input.to_pairs());
-        (
-            AccountSummary { totals },
-            MultiplicityResidual { breakdown },
-        )
+        super::internal::Aggregation.forward(input)
     }
 
-    fn backward(&self, _out: &AccountSummary, r: &MultiplicityResidual) -> Option<Transaction> {
-        let mut postings = Vec::new();
-        for (acct, amts) in &r.breakdown {
-            let a = Account::new(acct)?;
-            for &amt in amts {
-                postings.push(Posting::new(a.clone(), Cents::new(amt)?));
-            }
-        }
-        Transaction::new(postings)
+    fn backward(&self, out: &AccountSummary, r: &MultiplicityResidual) -> Option<Transaction> {
+        super::internal::Aggregation.backward(out, r)
     }
 }
 
@@ -183,22 +186,23 @@ impl Morphism for AggregateDropsAmounts {
     type Residual = MultiplicityResidual;
 
     fn forward(&self, input: &Transaction) -> (AccountSummary, MultiplicityResidual) {
-        let (totals, breakdown) = super::internal::fold(&input.to_pairs());
+        let (summary, full) = super::internal::Aggregation.forward(input);
         // BUG: keep only the COUNT of postings per account, not their amounts.
-        let lossy = breakdown
-            .into_iter()
-            .map(|(k, amts)| (k, vec![amts.len() as i64]))
+        let lossy = full
+            .breakdown()
+            .iter()
+            .map(|(account, amounts)| {
+                let count = Cents::new(amounts.len() as i64).expect("posting count fits in Cents");
+                (account.clone(), vec![count])
+            })
             .collect();
-        (
-            AccountSummary { totals },
-            MultiplicityResidual { breakdown: lossy },
-        )
+        (summary, MultiplicityResidual::from_breakdown(lossy))
     }
 
     fn backward(&self, out: &AccountSummary, r: &MultiplicityResidual) -> Option<Transaction> {
-        // Same reconstruction logic as Aggregate — it just has too little to work
-        // with, so the round-trip will not match.
-        Aggregate.backward(out, r)
+        // Same reconstruction logic — it just has too little to work with, so the
+        // round-trip will not match.
+        super::internal::Aggregation.backward(out, r)
     }
 }
 

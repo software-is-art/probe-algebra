@@ -1,25 +1,103 @@
 //! internal — PRIVATE implementation detail of the ledger module.
 //!
-//! Nothing here is part of any boundary; other modules cannot name it. The
-//! boundary delegates the raw, primitive-typed algorithm to this module and
-//! wraps the result back up in value objects. This is where "messy" code is
-//! allowed to live — behind the interface, not at it.
+//! Other modules cannot name anything here; this is the module's "workshop"
+//! where mutation and raw collections are allowed. The INWARD rule still holds,
+//! though: no function returns a raw domain string (parse-don't-validate), and
+//! the information-losing aggregation is modelled as a `Morphism` so the SAME
+//! generic `probe` reaches it (see the tests) even though it never crosses a
+//! boundary.
 
 use std::collections::BTreeMap;
 
-/// Raw fold: `(account, amount)` pairs -> (per-account totals, per-account
-/// sorted breakdown of the amounts that summed to each total).
-pub(super) fn fold(
-    postings: &[(String, i64)],
-) -> (BTreeMap<String, i64>, BTreeMap<String, Vec<i64>>) {
-    let mut totals: BTreeMap<String, i64> = BTreeMap::new();
-    let mut breakdown: BTreeMap<String, Vec<i64>> = BTreeMap::new();
-    for (acct, amt) in postings {
-        *totals.entry(acct.clone()).or_insert(0) += *amt;
-        breakdown.entry(acct.clone()).or_default().push(*amt);
+use crate::boundary::Morphism;
+use crate::ledger::boundary::{
+    Account, AccountSummary, Cents, MultiplicityResidual, Posting, Transaction,
+};
+
+/// Fold postings into per-account totals and the per-account sorted breakdown of
+/// the amounts that summed to each total. Returns DOMAIN-TYPED maps (`Account` /
+/// `Cents`) — never raw strings, so the validated identity is carried through.
+fn fold(postings: &[Posting]) -> (BTreeMap<Account, i64>, BTreeMap<Account, Vec<Cents>>) {
+    let mut totals: BTreeMap<Account, i64> = BTreeMap::new();
+    let mut breakdown: BTreeMap<Account, Vec<Cents>> = BTreeMap::new();
+    for p in postings {
+        *totals.entry(p.account().clone()).or_insert(0) += p.amount().get();
+        breakdown
+            .entry(p.account().clone())
+            .or_default()
+            .push(*p.amount());
     }
-    for v in breakdown.values_mut() {
-        v.sort();
+    for amounts in breakdown.values_mut() {
+        amounts.sort();
     }
     (totals, breakdown)
+}
+
+/// The aggregation core, as an INTERNAL morphism. It is never exported from the
+/// ledger, yet because it is a `Morphism` over value objects the generic `probe`
+/// applies to it directly. And because the residual keeps value objects (not raw
+/// primitives), `backward` is total — there is nothing left to re-validate.
+pub(super) struct Aggregation;
+crate::value_operator!(Aggregation);
+
+impl Morphism for Aggregation {
+    type In = Transaction;
+    type Out = AccountSummary;
+    type Residual = MultiplicityResidual;
+
+    fn forward(&self, input: &Transaction) -> (AccountSummary, MultiplicityResidual) {
+        let (totals, breakdown) = fold(input.postings());
+        (
+            AccountSummary::from_totals(totals),
+            MultiplicityResidual::from_breakdown(breakdown),
+        )
+    }
+
+    fn backward(&self, _out: &AccountSummary, r: &MultiplicityResidual) -> Option<Transaction> {
+        let mut postings = Vec::new();
+        for (account, amounts) in r.breakdown() {
+            for &amount in amounts {
+                // value objects in, value objects out — no re-parsing, no failure
+                postings.push(Posting::new(account.clone(), amount));
+            }
+        }
+        Transaction::new(postings)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Aggregation;
+    use crate::boundary::{probe, Morphism};
+    use crate::ledger::boundary::{Account, Cents, Posting, Split, Transaction};
+
+    fn sample() -> Transaction {
+        Transaction::new(vec![
+            Posting::new(Account::new("Cash").unwrap(), Cents::new(6000).unwrap()),
+            Posting::new(Account::new("Cash").unwrap(), Cents::new(4000).unwrap()),
+            Posting::new(
+                Account::new("Revenue").unwrap(),
+                Cents::new(-10000).unwrap(),
+            ),
+        ])
+        .unwrap()
+    }
+
+    /// The SAME generic probe that tests boundary operators also tests this
+    /// private, never-exported internal morphism. The algebra reaches inward.
+    #[test]
+    fn probe_reaches_the_internal_morphism() {
+        let x = sample();
+        let pr = probe(&Aggregation, &Split, &x).unwrap();
+        assert!(pr.residual_complete());
+    }
+
+    /// Keeping value objects in the residual makes reconstruction infallible.
+    #[test]
+    fn internal_backward_is_total() {
+        let x = sample();
+        let (summary, residual) = Aggregation.forward(&x);
+        let recovered = Aggregation.backward(&summary, &residual);
+        assert_eq!(recovered.as_ref(), Some(&x));
+    }
 }

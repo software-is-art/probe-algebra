@@ -53,19 +53,41 @@ cargo test    # invariants as unit tests + property tests
 
 ## Enforcement (build tooling)
 
-`build.rs` parses every domain boundary file (`src/<module>/boundary.rs`) with
-`syn` and **fails the build** if it contains anything outside the grammar: free
-functions, global `static`s, submodules, traits, public fields, or any `unsafe`
-/ I/O (boundaries are a pure value layer). The universal grammar file
-`src/boundary.rs` is exempt — it *defines* the vocabulary. Sealed marker traits
-keep the citizen set closed in the type system; the build script keeps each
-boundary file structurally honest. A violation looks like:
+`build.rs` parses the source with `syn` and **fails the build** on two tiers of
+violation. Sealed marker traits keep the citizen set closed in the type system;
+the build script keeps each file structurally honest.
+
+**Tier 1 — domain boundary files (`src/<module>/boundary.rs`):** the strict
+grammar. No free functions, global `static`s, submodules, traits, public fields,
+or any `unsafe` / I/O (boundaries are a pure value layer).
+
+**Tier 2 — module-internal files (e.g. `internal.rs`):** the "workshop", where
+mutation and raw collections are fine — but the *inward* rule
+(parse-don't-validate) still holds: a function may not **return a raw
+`String`/`&str`**, because in this domain a string is always a validated concept
+(an `Account`) and returning it raw drops the invariant. Bare scalars (`i64`,
+`usize`) are allowed — they carry no invariant. Files directly under `src/` (the
+grammar `boundary.rs`, `main.rs`, tests) are exempt.
 
 ```
 warning: src/ledger/boundary.rs: free function `helper` — value operators must
          be types implementing ValueOperator; put pure helpers in a private module
-error: boundary grammar enforcement failed: 1 violation(s)
+warning: src/ledger/internal.rs: `account_label` returns a raw String/str —
+         parse-don't-validate: a domain string is a validated value object...
+error: boundary discipline enforcement failed: 2 violation(s)
 ```
+
+### Tier 2 in practice: morphisms reach inward
+
+The ledger's aggregation logic now lives in a private `internal::Aggregation`
+that is itself a `Morphism` over value objects — so the **same generic `probe`
+tests it directly**, even though it never crosses a boundary (`Aggregate` is a
+thin boundary adapter over it). Because the residual keeps value objects
+(`Account` / `Cents`) instead of raw primitives, `backward` is *total*: there is
+nothing left to re-validate. That is the payoff of pushing the discipline inward
+— not blanket newtype-wrapping (a `struct Count(pub usize)` would fail the
+value-object test anyway), but extending the algebra's reach and removing a
+class of reconstruction failures.
 
 ## Property testing
 

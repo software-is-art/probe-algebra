@@ -1,33 +1,32 @@
-//! build.rs — enforces the boundary grammar at COMPILE time.
+//! build.rs — enforces the boundary discipline at COMPILE time, in two tiers.
 //!
-//! Every per-module boundary file (`src/<module>/boundary.rs`) is parsed with
-//! `syn` and checked against the discipline: it may contain ONLY value objects,
-//! typestates, and value operators — no free functions, no global state, no
-//! submodules, no traits, no public fields, and no I/O / `unsafe` (boundaries
-//! are pure). A violation fails the build with a pointed message.
+//! TIER 1 — domain boundary files (`src/<module>/boundary.rs`): the strict
+//! grammar. May contain ONLY value objects, typestates, and value operators —
+//! no free functions, no global state, no submodules, no traits, no public
+//! fields, no I/O / `unsafe`.
 //!
-//! The universal grammar file `src/boundary.rs` is exempt — it DEFINES the
-//! vocabulary (traits, the generic `probe`/`run` operators), so it is not a
-//! domain boundary and is skipped.
+//! TIER 2 — module-internal files (any other `.rs` inside a module directory,
+//! e.g. `internal.rs`): the "workshop". Mutation and raw collections are fine
+//! here, but the INWARD rule (parse-don't-validate) still holds: a function may
+//! not RETURN a raw `String` / `&str`, because in this domain a string is always
+//! a validated concept (an account) and returning it raw drops the invariant.
+//! Bare scalars (`i64`, `usize`, `bool`) are allowed — they carry no invariant.
+//!
+//! EXEMPT — files directly under `src/` (`main.rs`, the grammar `boundary.rs`,
+//! test files): the crate root / vocabulary definition, not a module interior.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Fields, Item, Visibility};
+use syn::{Fields, Item, ReturnType, Signature, Type, Visibility};
 
 fn main() {
     let root = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
     let src = Path::new(&root).join("src");
     println!("cargo:rerun-if-changed={}", src.display());
 
-    let mut boundaries = Vec::new();
-    collect_boundaries(&src, &src, &mut boundaries);
-
     let mut violations = Vec::new();
-    for path in &boundaries {
-        println!("cargo:rerun-if-changed={}", path.display());
-        check_file(path, &mut violations);
-    }
+    walk(&src, &src, &root, &mut violations);
 
     if !violations.is_empty() {
         violations.sort();
@@ -36,15 +35,13 @@ fn main() {
             println!("cargo:warning={}", v);
         }
         panic!(
-            "boundary grammar enforcement failed: {} violation(s) — see warnings above",
+            "boundary discipline enforcement failed: {} violation(s) — see warnings above",
             violations.len()
         );
     }
 }
 
-/// Collect `boundary.rs` files belonging to a module (i.e. NOT the top-level
-/// `src/boundary.rs`, which is the grammar definition).
-fn collect_boundaries(dir: &Path, src_root: &Path, out: &mut Vec<PathBuf>) {
+fn walk(dir: &Path, src_root: &Path, manifest: &str, out: &mut Vec<String>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -52,49 +49,56 @@ fn collect_boundaries(dir: &Path, src_root: &Path, out: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            collect_boundaries(&path, src_root, out);
-        } else if path.file_name().and_then(|n| n.to_str()) == Some("boundary.rs") {
-            // skip the universal grammar file (parent == src root)
-            if path.parent() != Some(src_root) {
-                out.push(path);
+            walk(&path, src_root, manifest, out);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        // files directly under src/ are exempt (crate root / grammar / tests)
+        if path.parent() == Some(src_root) {
+            continue;
+        }
+        println!("cargo:rerun-if-changed={}", path.display());
+
+        let loc = path
+            .strip_prefix(manifest)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        let file = match parse(&path) {
+            Ok(f) => f,
+            Err(msg) => {
+                out.push(format!("{loc}: {msg}"));
+                continue;
             }
+        };
+
+        if path.file_name().and_then(|n| n.to_str()) == Some("boundary.rs") {
+            check_boundary(&loc, &file, out); // tier 1
+        } else {
+            check_internal(&loc, &file, out); // tier 2
         }
     }
 }
 
-fn check_file(path: &Path, out: &mut Vec<String>) {
-    let loc = path
-        .strip_prefix(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-        .unwrap_or(path)
-        .display()
-        .to_string();
+fn parse(path: &Path) -> Result<syn::File, String> {
+    let source = std::fs::read_to_string(path).map_err(|e| format!("cannot read ({e})"))?;
+    syn::parse_file(&source).map_err(|e| format!("parse error ({e})"))
+}
 
-    let source = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(e) => {
-            out.push(format!("{loc}: cannot read ({e})"));
-            return;
-        }
-    };
-    let file = match syn::parse_file(&source) {
-        Ok(f) => f,
-        Err(e) => {
-            out.push(format!("{loc}: parse error ({e})"));
-            return;
-        }
-    };
+// ===== tier 1: the strict boundary grammar ===============================
 
+fn check_boundary(loc: &str, file: &syn::File, out: &mut Vec<String>) {
     for item in &file.items {
         match item {
-            // allowed boundary citizens & supporting items
             Item::Use(_) | Item::Impl(_) | Item::Macro(_) | Item::Type(_) | Item::Const(_) => {}
-            Item::Struct(s) => check_fields(&loc, &s.ident.to_string(), &s.fields, out),
+            Item::Struct(s) => check_fields(loc, &s.ident.to_string(), &s.fields, out),
             Item::Enum(e) => {
                 for v in &e.variants {
-                    check_fields(&loc, &format!("{}::{}", e.ident, v.ident), &v.fields, out);
+                    check_fields(loc, &format!("{}::{}", e.ident, v.ident), &v.fields, out);
                 }
             }
-            // disallowed at a domain boundary
             Item::Fn(f) => out.push(format!(
                 "{loc}: free function `{}` — value operators must be types implementing \
                  ValueOperator; put pure helpers in a private module",
@@ -124,12 +128,11 @@ fn check_file(path: &Path, out: &mut Vec<String>) {
         }
     }
 
-    // cross-cutting purity scan over the whole file
     let mut purity = PurityVisitor {
-        loc: loc.clone(),
+        loc: loc.to_string(),
         hits: Vec::new(),
     };
-    purity.visit_file(&file);
+    purity.visit_file(file);
     out.extend(purity.hits);
 }
 
@@ -159,7 +162,74 @@ fn describe(item: &Item) -> &'static str {
     }
 }
 
-/// Flags I/O, `unsafe`, and other impurity anywhere in a boundary file.
+// ===== tier 2: the inward rule (parse-don't-validate) ====================
+
+fn check_internal(loc: &str, file: &syn::File, out: &mut Vec<String>) {
+    let mut v = RuleAVisitor {
+        loc: loc.to_string(),
+        hits: Vec::new(),
+    };
+    v.visit_file(file);
+    out.extend(v.hits);
+}
+
+struct RuleAVisitor {
+    loc: String,
+    hits: Vec<String>,
+}
+
+impl<'ast> Visit<'ast> for RuleAVisitor {
+    fn visit_signature(&mut self, sig: &'ast Signature) {
+        if let ReturnType::Type(_, ty) = &sig.output {
+            let mut finder = StringFinder { found: false };
+            finder.visit_type(ty);
+            if finder.found {
+                self.hits.push(format!(
+                    "{}: `{}` returns a raw String/str — parse-don't-validate: a domain string \
+                     is a validated value object (e.g. Account); don't return it un-typed",
+                    self.loc, sig.ident
+                ));
+            }
+        }
+        visit::visit_signature(self, sig);
+    }
+}
+
+/// Detects `String` / `&str` anywhere within a return type (incl. inside
+/// generics such as `BTreeMap<String, _>` and tuples).
+struct StringFinder {
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for StringFinder {
+    fn visit_path(&mut self, p: &'ast syn::Path) {
+        if p.segments
+            .last()
+            .map(|s| s.ident == "String")
+            .unwrap_or(false)
+        {
+            self.found = true;
+        }
+        visit::visit_path(self, p);
+    }
+
+    fn visit_type_reference(&mut self, r: &'ast syn::TypeReference) {
+        if let Type::Path(tp) = &*r.elem {
+            if tp
+                .path
+                .segments
+                .last()
+                .map(|s| s.ident == "str")
+                .unwrap_or(false)
+            {
+                self.found = true;
+            }
+        }
+        visit::visit_type_reference(self, r);
+    }
+}
+
+/// Flags I/O and `unsafe` anywhere in a boundary file (tier 1 only).
 struct PurityVisitor {
     loc: String,
     hits: Vec<String>,
