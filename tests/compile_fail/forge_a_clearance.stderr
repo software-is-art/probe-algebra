@@ -1,0 +1,11 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+  --> tests/compile_fail/forge_a_clearance.rs:15:34
+   |
+15 |     let _forged: Cleared<Name> = Cleared(PhantomData);
+   |                                  ^^^^^^^
+   |
+note: constructor is not visible here due to private fields
+  --> src/lifecycle/boundary.rs
+   |
+   | pub struct Cleared<N>(PhantomData<N>);
+   |                       ^^^^^^^^^^^^^^ private field

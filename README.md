@@ -108,7 +108,7 @@ Mutation testing certifies the suite and *discovers* missing checks. Wired with
 cargo mutants        # plant bugs; every survivor is a missing relation/DOF
 ```
 
-A full-crate run kills **213 of 217** viable mutants (a further one is a timeout —
+A full-crate run kills **248 of 252** viable mutants (a further one is a timeout —
 an infinite loop, effectively caught); the three survivors are provably
 **equivalent** mutants, which no test can kill: an empty-source declaration
 replaced by another empty (`SecretStamp` genuinely declares none), a monotonic
@@ -228,6 +228,34 @@ its occurrence (a witness). For `Scale` the witness even rejects a `skew`-scaled
 value at compile time on the honest path — the provenance complement to the
 runtime quantitative probe.
 
+## A typestate lifecycle (where logic lives)
+
+`src/lifecycle/` answers the open question of *where the logic lives* and how
+**sequencing is made un-screw-up-able**. A ledger `Entry<S>` is one transaction
+indexed by its protocol position; it moves `Draft -> Submitted -> Posted`, and
+the order is encoded in the transition operators' `In`/`Out` types so an
+out-of-order step does not compile. Two transition kinds fall out:
+
+- **`Submit: Entry<Draft> -> Entry<Submitted>`** is a plain *reversible*
+  `Morphism` — no precondition, `Unit` residual — so it round-trips and probes
+  like every other morphism. The typestate alone gates its order.
+- **`Post: Entry<Submitted> -> Entry<Posted>`** is *not* a plain morphism: its
+  balance **precondition** cannot fit `In -> (Out, Residual)`. It is carried as a
+  GDP proof `Cleared<N>`, minted only by the real check in `Validate::clear` and
+  branded with the entry's unique name. The GDP brand is what lifts the
+  transition out of the morphism algebra — and ties the precondition to a
+  *specific* entry, so "validate A, post B" cannot unify.
+
+The illegal sequences are pinned **negatively** by a `trybuild` compile-fail
+suite (`tests/compile_fail/`) — the typestate analog of a perturbation probe,
+one fixture per illegal transition: submitting twice (order), validating before
+submitting (order), forging a clearance (precondition, `E0423`), and posting an
+entry with another's proof (relational, `E0308`). A green run means each illegal
+transition is still a compile error, not a runtime slip. So the typestate gives
+ordering for free, GDP supplies the one relational precondition, and the residual
+keeps the reversible step probeable — the features built around the `Morphism`
+reappear here because a typestate transition *is* a morphism.
+
 ## Enforcement (build tooling)
 
 `build.rs` parses the source with `syn` and **fails the build** on two tiers.
@@ -266,6 +294,7 @@ module interior.
 | `src/capability.rs` | capability probe: classify a morphism on the chain and flag over-declaration |
 | `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam |
 | `src/composition.rs` | composition validation: an interaction bug invisible to per-module probes, closed by a GDP shared-name seam contract |
+| `src/lifecycle/` | typestate lifecycle `Draft → Submitted → Posted`: order encoded in transition types, one precondition carried as a GDP proof, illegal sequences pinned by `tests/compile_fail/` |
 | `src/select.rs` | kill-matrix set-cover selection |
 | `src/synth.rs` | type-driven DOF coverage / operator synthesis |
 | `src/blindspot.rs` | the blind-spot map as tests |
