@@ -262,6 +262,7 @@ module interior.
 | `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |
 | `src/effect/` | effect as a pure morphism relative to a handler (read = input, write = residual) |
 | `src/pipeline/` | nested module: a parent boundary composing two private child boundaries into one narrowed operator |
+| `src/money/` + `boundary::Qty` | tagged-primitive substrate: one operator set per *kind* — a full-domain concept costs a tag (near-zero boilerplate), a partitioning one adds only a validity rule |
 | `src/capability.rs` | capability probe: classify a morphism on the chain and flag over-declaration |
 | `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam |
 | `src/composition.rs` | composition validation: an interaction bug invisible to per-module probes, closed by a GDP shared-name seam contract |

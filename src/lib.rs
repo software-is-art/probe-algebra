@@ -28,6 +28,7 @@ pub mod gdp;
 pub mod journal;
 pub mod ledger;
 pub mod linear;
+pub mod money;
 pub mod pipeline;
 pub mod select;
 pub mod synth;
