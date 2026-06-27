@@ -3,9 +3,11 @@
 //! VALUE OBJECTS   : Message (pure input), Clock (a fulfilled read / Demand
 //!                   result), Stamped (output), Entry (an emission / write),
 //!                   Demand (a read request)
-//! VALUE OPERATORS : Stamp (a pure Morphism over (Message, Clock)); NudgeReading
-//!                   / NudgeMessage (perturbations along the world vs the pure
-//!                   input)
+//! VALUE OPERATORS : Stamp (a pure Morphism over (Message, Clock)); IgnoresClock
+//!                   (demands a clock it ignores — over-claim demo) and SecretStamp
+//!                   (reads the clock but declares nothing — under-claim demo), both
+//!                   for the capability audit; NudgeReading (a perturbation along
+//!                   the world reading)
 
 use crate::boundary::{Capability, Morphism, Pair, Perturbation};
 
@@ -126,7 +128,9 @@ impl Morphism for IgnoresClock {
     type Residual = Entry;
 
     fn forward(&self, input: &Pair<Message, Clock>) -> (Stamped, Entry) {
-        // ignores input.1 (the clock) entirely
+        // ignores input.1 (the clock) entirely; the CONSTANT Entry(0) residual is
+        // load-bearing — being non-responsive to the clock is exactly why the
+        // capability audit observes this operator as Pure despite its Effectful claim.
         (
             Stamped::new(input.0.get()).expect("message in stamped range"),
             Entry::new(0).expect("zero is a valid entry"),

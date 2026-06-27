@@ -40,9 +40,6 @@ impl<N, T> Named<N, T> {
     pub fn value(&self) -> &T {
         &self.0
     }
-    pub fn into_value(self) -> T {
-        self.0
-    }
 }
 
 /// Two values sharing ONE name — e.g. an output and its residual from a single
@@ -50,12 +47,6 @@ impl<N, T> Named<N, T> {
 /// their original partner, because the shared name will not unify with any other.
 pub struct Paired<N, A, B>(Named<N, A>, Named<N, B>);
 impl<N, A, B> Paired<N, A, B> {
-    pub fn left(&self) -> &Named<N, A> {
-        &self.0
-    }
-    pub fn right(&self) -> &Named<N, B> {
-        &self.1
-    }
     pub fn split(self) -> (Named<N, A>, Named<N, B>) {
         (self.0, self.1)
     }
@@ -145,12 +136,6 @@ pub fn quarantine_unbalanced<N>(
 /// output together with a witness of the operation that produced it.
 pub struct Witnessed<N, T, P>(Named<N, T>, Proof<N, P>);
 impl<N, T, P> Witnessed<N, T, P> {
-    pub fn named(&self) -> &Named<N, T> {
-        &self.0
-    }
-    pub fn proof(&self) -> &Proof<N, P> {
-        &self.1
-    }
     pub fn split(self) -> (Named<N, T>, Proof<N, P>) {
         (self.0, self.1)
     }

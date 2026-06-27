@@ -303,18 +303,34 @@ pub struct Retained;
 pub struct Discarded;
 crate::typestate!(Retained, Discarded);
 
+/// How a retention state STORES the residual: `Retained` keeps it, `Discarded`
+/// drops it. This makes "Retained always carries a residual" a STRUCTURAL fact —
+/// there is no `Option` and no runtime `expect` re-asserting an invariant the
+/// typestate is meant to guarantee. (The typestate as its own proof, not a
+/// runtime check — the whole point of the project, applied to itself.)
+pub trait Retention: Typestate {
+    type Carry<R>;
+}
+impl Retention for Retained {
+    type Carry<R> = R;
+}
+impl Retention for Discarded {
+    type Carry<R> = ();
+}
+
 /// The output of a morphism, INDEXED by whether its residual is retained.
 ///
 /// `Carried<M, Retained>` can `invert`; `Carried<M, Discarded>` structurally
 /// cannot — there is no such method, so discarding then inverting will not
-/// compile. The typestate makes irreversibility a fact the compiler enforces.
-pub struct Carried<M: Morphism, S: Typestate> {
+/// compile. The retention state also decides whether the residual is even stored
+/// (`Retained` keeps `M::Residual`; `Discarded` keeps `()`).
+pub struct Carried<M: Morphism, S: Retention> {
     out: M::Out,
-    residual: Option<M::Residual>,
+    residual: S::Carry<M::Residual>,
     _state: PhantomData<S>,
 }
 
-impl<M: Morphism, S: Typestate> Carried<M, S> {
+impl<M: Morphism, S: Retention> Carried<M, S> {
     /// The forward output is available regardless of retention state.
     pub fn out(&self) -> &M::Out {
         &self.out
@@ -325,21 +341,19 @@ impl<M: Morphism> Carried<M, Retained> {
     fn new(out: M::Out, residual: M::Residual) -> Self {
         Carried {
             out,
-            residual: Some(residual),
+            residual,
             _state: PhantomData,
         }
     }
 
-    /// The retained residual.
+    /// The retained residual — structurally present, so no runtime check.
     pub fn residual(&self) -> &M::Residual {
-        self.residual
-            .as_ref()
-            .expect("Retained always carries a residual")
+        &self.residual
     }
 
     /// Reconstruct the input — only available while the residual is retained.
     pub fn invert(&self, m: &M) -> Option<M::In> {
-        m.backward(&self.out, self.residual())
+        m.backward(&self.out, &self.residual)
     }
 
     /// Irreversibly drop the residual, moving to the `Discarded` typestate.
@@ -347,7 +361,7 @@ impl<M: Morphism> Carried<M, Retained> {
     pub fn discard(self) -> Carried<M, Discarded> {
         Carried {
             out: self.out,
-            residual: None,
+            residual: (),
             _state: PhantomData,
         }
     }

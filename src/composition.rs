@@ -125,7 +125,7 @@ mod tests {
             assert_eq!(reconcile(&summary, &residual).as_ref(), Some(&t));
 
             // Negative (compile-checked by hand): with a second run under another
-            // name, `reconcile(&summary, &other.right())` is a type error — the two
+            // name, `reconcile(&summary, &other_residual)` is a type error — the two
             // names do not unify, so a mismatched pair cannot even be expressed.
         });
     }

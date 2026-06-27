@@ -8,11 +8,16 @@ transformation against a *layered* suite.
 Two constraints are under study together:
 
 1. **Every primitive that means something in the domain is a value object, and
-   every operation on it a value operator** — no raw primitive arithmetic at a
-   call site. Money is `Cents` (an amount) and `Balance` (a sum); account names
-   are `Account`; a scalar is `Quantity`. The only place a raw `i64`/`String`
-   appears is inside a value object's own operator or accessor (the sanctioned
-   exit hatch).
+   every operation on it a value operator.** Money is `Cents` (an amount) and
+   `Balance` (a sum); account names are `Account`; a scalar is `Quantity`. The
+   strict form of the discipline — *no raw arithmetic at a call site; a raw
+   `i64`/`String` appears only inside a value object's own operator or accessor* —
+   is held by the domain modules `ledger/` and `linear/` (e.g. `Round` rounds via
+   `Balance::split_dollar`, never a bare `%`). The illustrative modules `effect/`
+   and `pipeline/` keep arithmetic inside their `Morphism` operator bodies (still
+   value operators, the broad principle) rather than minting a value-object
+   operator for every cross-type combination — a deliberate, looser bar noted in
+   their module docs.
 2. **A transformation is checked by a layered probe suite, not a single check** —
    because no single check is highest-assurance (see the blind-spot map below).
 
@@ -103,12 +108,15 @@ Mutation testing certifies the suite and *discovers* missing checks. Wired with
 cargo mutants        # plant bugs; every survivor is a missing relation/DOF
 ```
 
-The suite kills **109 of 111** viable mutants; the two survivors are provably
-equivalent mutants (a monotonic tie-break in the selector; an always-true
-demonstration helper). Several survivors in the first run revealed genuinely weak
-laws — e.g. `Cents::negate` could be *deleted* because `negate(negate(c)) == c`
-holds for the identity too — which were then closed by stronger properties
-(`src/properties.rs`).
+A full-crate run kills **213 of 217** viable mutants (a further one is a timeout —
+an infinite loop, effectively caught); the three survivors are provably
+**equivalent** mutants, which no test can kill: an empty-source declaration
+replaced by another empty (`SecretStamp` genuinely declares none), a monotonic
+tie-break in the selector (`-` vs `/` induce the same ordering), and an
+always-true demonstration helper. Several survivors in the *first* run revealed
+genuinely weak laws — e.g. `Cents::negate` could be *deleted* because
+`negate(negate(c)) == c` holds for the identity too — which were then closed by
+stronger properties (`src/properties.rs`).
 
 ## The worked example
 
