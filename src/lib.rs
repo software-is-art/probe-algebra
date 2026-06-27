@@ -27,6 +27,7 @@ pub mod effect;
 pub mod gdp;
 pub mod journal;
 pub mod ledger;
+pub mod lifecycle;
 pub mod linear;
 pub mod money;
 pub mod pipeline;
