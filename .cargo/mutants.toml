@@ -9,3 +9,11 @@
 # carries the algebra and is exercised by the unit + property suites, so that is
 # where mutation testing earns its keep.
 exclude_globs = ["src/main.rs"]
+
+# Mutation testing certifies the LIBRARY against the unit + property suites, so
+# run only those. The `tests/compile_fail` (trybuild) suite is the NEGATIVE
+# specification of the lifecycle state machine — it asserts illegal transitions
+# fail to COMPILE, never executing `src` runtime code, so it kills no `src`
+# mutant. It is also excluded because trybuild's `.stderr` matching is sensitive
+# to the build environment and is unstable inside cargo-mutants' copied tree.
+additional_cargo_test_args = ["--lib"]

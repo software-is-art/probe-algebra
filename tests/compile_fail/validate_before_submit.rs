@@ -18,7 +18,7 @@ fn main() {
     with_seed(|seed| {
         let draft = Entry::<Draft>::draft(tx());
         let named = seed.new_named(draft);
-        // `named` wraps an `Entry<Draft>`; `clear` requires `Entry<Submitted>`.
-        let _proof = Validate.clear(&named);
+        // `named` wraps an `Entry<Draft>`; `classify` requires `Entry<Submitted>`.
+        let _verdict = Validate.classify(&named);
     });
 }

@@ -27,7 +27,7 @@ fn main() {
         let (submitted_b, _ub) = Submit.forward(&Entry::<Draft>::draft(tx()));
         let named_b = seed_b.new_named(submitted_b);
 
-        let proof_a = Validate.clear(&named_a).unwrap();
+        let proof_a = Validate.classify(&named_a).unwrap();
         // `proof_a` is branded with A's name; committing B with it cannot unify.
         let _posted = Post.commit(&named_b, &proof_a);
     });

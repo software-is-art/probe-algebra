@@ -1,26 +1,38 @@
-//! lifecycle::boundary — a TYPESTATE lifecycle protocol for a ledger entry.
+//! lifecycle::boundary — a ledger entry's lifecycle as a NON-LINEAR state machine.
 //!
-//! This module answers a question the rest of the crate left open: where does
-//! the LOGIC live, and how is SEQUENCING made un-screw-up-able? A ledger entry
-//! moves `Draft -> Submitted -> Posted`. Each position is a typestate, the entry
-//! is the same value object indexed by its position, and each transition is a
-//! value operator whose `In`/`Out` types pin the only legal orderings:
+//! This module is the architectural reading of the whole crate made explicit: a
+//! boundary IS a state machine. Its STATES are value-object types (here, the same
+//! `Transaction` phantom-indexed by where it sits), its TRANSITIONS are the value
+//! operators, and the type graph makes an illegal transition UNCALLABLE. The
+//! `ledger` boundary already works this way over distinct value-object types
+//! (`Round: Summary -> Summary` cannot be applied to a `Transaction`); the phantom
+//! typestate `Entry<S>` is the tool for the one case a structural type change
+//! cannot express — the data shape is INVARIANT but the PERMISSIONS change.
 //!
-//!   - `Submit : Entry<Draft> -> Entry<Submitted>` is a plain `Morphism` — it has
-//!     no precondition and loses nothing, so it fits `In -> (Out, Residual)` with
-//!     a `Unit` residual, which makes it REVERSIBLE (`backward` returns to Draft)
-//!     and probeable like any other morphism.
-//!   - `Post : Entry<Submitted> -> Entry<Posted>` is NOT a plain morphism: it has
-//!     a PRECONDITION (the entry must balance) that the pure `In -> (Out,
-//!     Residual)` shape cannot express. The precondition is carried as a GDP
-//!     proof, `Cleared<N>`, minted only by the real check in `Validate::clear` and
-//!     branded with the entry's unique name `N`.
+//! The graph, deliberately non-linear to stress how the pattern scales:
 //!
-//! Two failure classes are made compile errors. ORDER (post a draft, submit a
-//! posted entry) is killed by the typestate `In`/`Out` types. The RELATIONAL
-//! precondition — "validate entry A, then post entry B" — is killed by the GDP
-//! name: a `Cleared<N>` minted for A will not unify with B. Both are pinned by the
-//! `tests/compile_fail` suite. The illegal sequence never reaches the test bench.
+//! ```text
+//!                      ┌──────────── Amend ◀────────────┐
+//!                      ▼                                 │
+//!   ▶ Draft ─Submit─▶ Submitted ─classify─▶ Cleared ─Post──▶ Posted ─Void─▶ Voided
+//!                          │                                                   │
+//!                          └─classify─▶ Flagged ─Reject─▶ Rejected ──Amend─────┘ (cycle)
+//! ```
+//!
+//! Four transition SHAPES appear, and only the first is a plain `Morphism`:
+//!   - REVERSIBLE (`Submit`, `Amend`, `Void`): data invariant, `Unit` residual, so
+//!     `backward` returns to the prior state — phantom transitions that round-trip
+//!     and probe like any morphism. (Note the three near-identical impls: that
+//!     repetition is the signal a first-class `Transition<From, To>` could be
+//!     lifted into the grammar.)
+//!   - BRANCHING (`Validate::classify`): one input, one of SEVERAL next states. It
+//!     is the GDP total-`classify` lesson AS a transition — the failure case is a
+//!     `Flagged` STATE-proof, not a discarded `None`.
+//!   - GUARDED (`Post`, `Reject`): each needs a name-branded proof for THIS entry
+//!     (`Cleared<N>` / `Flagged<N>`), so you cannot post an unbalanced entry NOR
+//!     reject a balanced one, and a proof for entry A will not discharge entry B.
+//!
+//! The illegal transitions are pinned negatively by `tests/compile_fail`.
 
 use core::marker::PhantomData;
 
@@ -28,23 +40,26 @@ use crate::boundary::{sealed, Capability, Morphism, Unit, ValueObject};
 use crate::gdp::Named;
 use crate::ledger::boundary::{Balance, Transaction};
 
-// ===== typestates: the protocol positions ================================
+// ===== typestates: the protocol positions (the STATES) ===================
 
-/// Lifecycle position: a freshly entered, not-yet-submitted entry.
+/// A freshly entered, not-yet-submitted entry — the only entrance.
 pub struct Draft;
-/// Lifecycle position: submitted, awaiting validation and posting.
+/// Submitted, awaiting classification.
 pub struct Submitted;
-/// Lifecycle position: committed to the ledger (terminal).
+/// Cleared and committed to the ledger.
 pub struct Posted;
-crate::typestate!(Draft, Submitted, Posted);
+/// Classified as unbalanced and rejected — awaiting amendment.
+pub struct Rejected;
+/// A posted entry that has been reversed (terminal).
+pub struct Voided;
+crate::typestate!(Draft, Submitted, Posted, Rejected, Voided);
 
 // ===== the value object carried through the protocol =====================
 
 /// A ledger entry INDEXED by its lifecycle position `S`. The data never changes —
 /// it is always one `Transaction` — but the type records WHERE in the protocol the
-/// entry sits, so a transition out of order does not type-check (`Post` wants an
-/// `Entry<Submitted>`; an `Entry<Draft>` will not do). `S` is phantom: the index
-/// is erased at runtime, so the protocol costs nothing.
+/// entry sits, so a transition out of order does not type-check. `S` is phantom:
+/// the index is erased at runtime, so the state machine costs nothing.
 pub struct Entry<S>(Transaction, PhantomData<S>);
 
 // Manual impls (no `S: Trait` bounds): the value-object markers delegate to the
@@ -78,23 +93,27 @@ impl<S> Entry<S> {
 
 impl Entry<Draft> {
     /// Enter a new transaction into the protocol at its ONLY start point. There is
-    /// no constructor for `Submitted` or `Posted`, so an entry can be born only as
-    /// a `Draft` — the protocol has a single entrance.
+    /// no constructor for any other state, so an entry can be born only as a
+    /// `Draft` — every other state is reachable only through a transition.
     pub fn draft(tx: Transaction) -> Self {
         Entry(tx, PhantomData)
     }
 }
 
-// ===== the transition expressible as a plain Morphism ====================
+// ===== reversible transitions (plain Morphisms; data invariant) ==========
 
-/// `Draft -> Submitted`. Submission carries no precondition and loses nothing, so
-/// it fits the pure `Morphism` shape with a `Unit` residual — which makes it
-/// REVERSIBLE: `backward` returns to `Draft`, so the step round-trips and is
-/// probeable like every other morphism in the crate. The typestate is what gates
-/// ORDER: `Submit::In` is `Entry<Draft>`, so it cannot apply to an entry that is
-/// already submitted or posted.
+/// `Draft -> Submitted`. No precondition, `Unit` residual, so it is a reversible
+/// `Morphism`: `backward` returns to `Draft`. The typestate gates ORDER —
+/// `Submit::In` is `Entry<Draft>`, so an already-submitted entry has the wrong type.
 pub struct Submit;
-crate::value_operator!(Submit);
+/// `Rejected -> Draft` (the CYCLE). Reopens a rejected entry for amendment; the
+/// only legal way back to `Draft`, and only from `Rejected`. Reversible like
+/// `Submit` — the same phantom-transition shape.
+pub struct Amend;
+/// `Posted -> Voided` (the REVERSAL). Reverses a committed entry; `backward`
+/// restores it to `Posted`, so the undo is the morphism's own inverse.
+pub struct Void;
+crate::value_operator!(Submit, Amend, Void);
 
 impl Morphism for Submit {
     const CAPABILITY: Capability = Capability::Pure;
@@ -111,17 +130,47 @@ impl Morphism for Submit {
     }
 }
 
-// ===== the proof-gated transition: a GDP relational precondition =========
+impl Morphism for Amend {
+    const CAPABILITY: Capability = Capability::Pure;
+    type In = Entry<Rejected>;
+    type Out = Entry<Draft>;
+    type Residual = Unit;
 
-/// A proof that the entry named `N` is BALANCED (double entry holds). It is a GDP
-/// "ghost" realized as a value object: zero data, minted ONLY by `Validate::clear`
-/// (its field is private to this boundary), and branded with the entry's unique
-/// name `N`. Because it is tied to `N`, a proof minted for entry A cannot discharge
-/// `Post::commit` on entry B — "validate one, post another" is a COMPILE error, not
-/// a runtime slip. A balance is a single-value fact, but WHICH entry it is a fact
-/// ABOUT is relational, which is exactly what the name carries and a value object
-/// cannot.
+    fn forward(&self, input: &Entry<Rejected>) -> (Entry<Draft>, Unit) {
+        (Entry(input.0.clone(), PhantomData), Unit)
+    }
+
+    fn backward(&self, out: &Entry<Draft>, _residual: &Unit) -> Option<Entry<Rejected>> {
+        Some(Entry(out.0.clone(), PhantomData))
+    }
+}
+
+impl Morphism for Void {
+    const CAPABILITY: Capability = Capability::Pure;
+    type In = Entry<Posted>;
+    type Out = Entry<Voided>;
+    type Residual = Unit;
+
+    fn forward(&self, input: &Entry<Posted>) -> (Entry<Voided>, Unit) {
+        (Entry(input.0.clone(), PhantomData), Unit)
+    }
+
+    fn backward(&self, out: &Entry<Voided>, _residual: &Unit) -> Option<Entry<Posted>> {
+        Some(Entry(out.0.clone(), PhantomData))
+    }
+}
+
+// ===== the branch proofs (GDP tokens, realized as value objects) =========
+
+/// A proof that the entry named `N` is BALANCED (double entry holds). A GDP "ghost"
+/// realized as a value object: zero data, minted ONLY by `Validate::classify` (its
+/// field is private to this boundary), and branded with the entry's unique name
+/// `N`. Tied to `N`, a proof for entry A cannot discharge `Post::commit` on B.
 pub struct Cleared<N>(PhantomData<N>);
+/// A proof that the entry named `N` is UNBALANCED — the NEGATIVE witness, kept (not
+/// thrown away as a `None`) so the reject path is a first-class branch. It gates
+/// `Reject`, so a balanced entry cannot be rejected.
+pub struct Flagged<N>(PhantomData<N>);
 
 impl<N> Clone for Cleared<N> {
     fn clone(&self) -> Self {
@@ -131,10 +180,7 @@ impl<N> Clone for Cleared<N> {
 impl<N> Copy for Cleared<N> {}
 impl<N> PartialEq for Cleared<N> {
     fn eq(&self, _other: &Self) -> bool {
-        // Two clearances of the SAME name are the same fact; there is no data to
-        // differ on. (Clearances of different names have different types and never
-        // reach this comparison.)
-        true
+        true // two clearances of the same name are the same fact; no data to differ on.
     }
 }
 impl<N> core::fmt::Debug for Cleared<N> {
@@ -145,49 +191,89 @@ impl<N> core::fmt::Debug for Cleared<N> {
 impl<N> sealed::Sealed for Cleared<N> {}
 impl<N> ValueObject for Cleared<N> {}
 
-/// The validator. `clear` performs the REAL balance check and, only on success,
-/// mints a `Cleared<N>` branded with the entry's name — the one place the proof is
-/// earned. (A statistical probe must never mint such a proof; this is a total,
-/// exact check, per the GDP discipline that a proof is only as true as its mint.)
+impl<N> Clone for Flagged<N> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<N> Copy for Flagged<N> {}
+impl<N> PartialEq for Flagged<N> {
+    fn eq(&self, _other: &Self) -> bool {
+        true // likewise: a flag of a given name carries no distinguishing data.
+    }
+}
+impl<N> core::fmt::Debug for Flagged<N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Flagged")
+    }
+}
+impl<N> sealed::Sealed for Flagged<N> {}
+impl<N> ValueObject for Flagged<N> {}
+
+// ===== the branching + guarded transitions ===============================
+
+/// The classifier — the BRANCH. `classify` performs the REAL balance check and
+/// mints the proof for whichever branch holds, branded with the entry's name. The
+/// branch carrier is a `Result<Cleared<N>, Flagged<N>>` — a std two-armed sum like
+/// `Morphism::backward`'s `Option`, so it needs no boundary citizen of its own —
+/// but unlike a bare `Option<Cleared>` it KEEPS the negative witness in the `Err`
+/// arm: rejection is a legitimate outcome whose proof is as load-bearing as the
+/// clearance's, the paper's total `classify` rather than a `Maybe`. (A statistical
+/// probe must never mint such a proof; this is an exact check, per the GDP
+/// discipline that a proof is only as true as its mint.)
 pub struct Validate;
-crate::value_operator!(Validate);
+/// The poster — a GUARDED transition `Submitted -> Posted`. Not a plain `Morphism`:
+/// its balance precondition cannot fit `In -> (Out, Residual)`, so it is supplied a
+/// `Cleared<N>` for the SAME name.
+pub struct Post;
+/// The rejecter — a GUARDED transition `Submitted -> Rejected`. Symmetric to
+/// `Post`: it needs a `Flagged<N>` for the same name, so a balanced entry (which
+/// has no `Flagged`) cannot be rejected.
+pub struct Reject;
+crate::value_operator!(Validate, Post, Reject);
 
 impl Validate {
-    /// Mint a clearance proof iff the named, submitted entry's postings sum to
-    /// zero. `None` (not a panic, not a defaulted proof) when it does not balance —
-    /// the negative case simply yields no proof, so `Post::commit` stays unreachable.
-    pub fn clear<N>(&self, entry: &Named<N, Entry<Submitted>>) -> Option<Cleared<N>> {
+    /// Classify a named, submitted entry, minting the proof for the branch that
+    /// holds. Both branches carry a proof — the unbalanced case is a `Flagged`
+    /// state-proof, never a silent `None`.
+    pub fn classify<N>(
+        &self,
+        entry: &Named<N, Entry<Submitted>>,
+    ) -> Result<Cleared<N>, Flagged<N>> {
         let mut total = Balance::zero();
         for posting in entry.value().tx().postings() {
             total = total.add_cents(*posting.amount());
         }
         if total == Balance::zero() {
-            Some(Cleared(PhantomData))
+            Ok(Cleared(PhantomData))
         } else {
-            None
+            Err(Flagged(PhantomData))
         }
     }
 }
 
-/// The committer. `commit` is the `Submitted -> Posted` transition, but unlike
-/// `Submit` it is NOT a plain `Morphism`: it has a PRECONDITION that the pure
-/// `In -> (Out, Residual)` shape cannot express. The precondition is supplied as a
-/// `Cleared<N>` for the SAME name, so the only route to `Posted` is through a real,
-/// matching clearance — the GDP proof is what lifts the transition out of the
-/// plain morphism algebra.
-pub struct Post;
-crate::value_operator!(Post);
-
 impl Post {
-    /// Commit a cleared, submitted entry, advancing it to `Posted`. Requires a
-    /// `Cleared<N>` for the same name `N`: a proof about another entry will not
-    /// unify, so ORDER (typestate) AND the PRECONDITION (proof) are both enforced
-    /// at compile time. There is no other constructor of `Entry<Posted>`.
+    /// Commit a cleared, submitted entry to `Posted`. Requires a `Cleared<N>` for
+    /// the same name `N`: ORDER (typestate) AND the PRECONDITION (proof) are both
+    /// enforced at compile time, and there is no other constructor of `Entry<Posted>`.
     pub fn commit<N>(
         &self,
         entry: &Named<N, Entry<Submitted>>,
         _proof: &Cleared<N>,
     ) -> Entry<Posted> {
+        Entry(entry.value().tx().clone(), PhantomData)
+    }
+}
+
+impl Reject {
+    /// Move a flagged, submitted entry to `Rejected`. Requires a `Flagged<N>` for
+    /// the same name, so only an entry actually found unbalanced can be rejected —
+    /// the negative witness is what authorizes the transition.
+    pub fn apply<N>(
+        &self,
+        entry: &Named<N, Entry<Submitted>>,
+        _proof: &Flagged<N>,
+    ) -> Entry<Rejected> {
         Entry(entry.value().tx().clone(), PhantomData)
     }
 }
