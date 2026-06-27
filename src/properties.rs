@@ -115,6 +115,16 @@ proptest! {
         prop_assert!(!pr.residual_complete());
     }
 
+    /// The SAME bug is caught with NO perturbation operator at all — a plain
+    /// round-trip over randomly generated inputs already witnesses the
+    /// incompleteness. (Contrast `honest_aggregate_round_trips`, which holds.)
+    #[test]
+    fn buggy_fails_plain_round_trip(x in tx_substantial()) {
+        let (summary, residual) = AggregateDropsAmounts.forward(&x);
+        let recovered = AggregateDropsAmounts.backward(&summary, &residual);
+        prop_assert_ne!(recovered.as_ref(), Some(&x));
+    }
+
     // ----- Cents operator laws -----
 
     /// `split` is loss-free: the two parts always sum back to the original.
