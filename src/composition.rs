@@ -18,6 +18,24 @@
 //! `with_seed`. Across a persistence/serialization boundary the brand cannot
 //! travel, so there you fall back to the runtime `explains` check — exactly where
 //! a carried compile-time proof would be unsound anyway.
+//!
+//! METAMORPHIC RELATIONS under composition (the second §7 question) do NOT compose
+//! for free, in two dual ways (see the tests).
+//!
+//! First, a relation does not LIFT through a stage that does not preserve it:
+//! `DoublePostings` (doubling) holds for `Aggregate`, but FAILS for the honest
+//! `Aggregate ∘ Round` on sub-dollar input, because rounding is non-linear
+//! (round-then-double ≠ double-then-round). Both stages are correct, so naively
+//! reusing a stage's relation on the composite is a FALSE POSITIVE; a relation
+//! survives only where every intervening stage preserves it.
+//!
+//! Second, dually, a downstream stage can MASK an upstream bug: `Round` absorbs
+//! `AggregateOffsetsTotals`'s sub-dollar offset, so the composite's output is
+//! identical to the honest one AND still round-trips — even though the component is
+//! wrong (its own commutation probe catches it).
+//!
+//! Conclusion: you need BOTH per-module and composite-level checks; neither
+//! subsumes the other.
 
 use crate::boundary::Morphism;
 use crate::gdp::{Name, Named, Paired, Seed};
@@ -59,9 +77,11 @@ pub fn reconcile<N>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::boundary::probe;
+    use crate::boundary::{commutes, probe, Compose};
     use crate::gdp::with_seed;
-    use crate::ledger::boundary::{Account, Cents, Posting, Split};
+    use crate::ledger::boundary::{
+        Account, AggregateOffsetsTotals, Cents, DoublePostings, Posting, Round, Split,
+    };
 
     fn tx(cash: i64) -> Transaction {
         Transaction::new(vec![Posting::new(
@@ -108,5 +128,81 @@ mod tests {
             // name, `reconcile(&summary, &other.right())` is a type error — the two
             // names do not unify, so a mismatched pair cannot even be expressed.
         });
+    }
+
+    // ----- metamorphic relations under composition -----
+
+    /// FINDING 1: a relation does NOT lift through a stage that doesn't preserve
+    /// it. `DoublePostings` holds for `Aggregate` alone, but FAILS for the honest
+    /// `Aggregate ∘ Round` on sub-dollar input — rounding is non-linear. Both
+    /// stages are correct, so lifting a stage's relation to the composite is a
+    /// false positive.
+    #[test]
+    fn relation_does_not_survive_a_nonlinear_stage() {
+        let subdollar = tx(150); // $1.50 — rounding is not the identity here
+        assert_eq!(
+            commutes(&Aggregate, &DoublePostings, &subdollar),
+            Some(true),
+            "the relation holds for the stage alone"
+        );
+        let composite = Compose {
+            f: Aggregate,
+            g: Round,
+        };
+        assert_eq!(
+            commutes(&composite, &DoublePostings, &subdollar),
+            Some(false),
+            "but it does not survive composition through the non-linear Round"
+        );
+    }
+
+    /// ...and it DOES survive on the sub-domain the stage preserves: whole dollars,
+    /// where `Round` is the identity. A relation lifts exactly where every
+    /// intervening stage preserves it.
+    #[test]
+    fn relation_survives_where_the_stage_preserves_it() {
+        let whole = tx(10_000); // $100.00 — Round is a no-op
+        let composite = Compose {
+            f: Aggregate,
+            g: Round,
+        };
+        assert_eq!(commutes(&composite, &DoublePostings, &whole), Some(true));
+    }
+
+    /// FINDING 2 (the dual): a downstream stage MASKS an upstream bug, so an
+    /// end-to-end check is blind to it. The offset bug is caught at its own
+    /// boundary, but `Round` absorbs the sub-dollar offset — the composite's output
+    /// equals the honest composite's AND still round-trips. Per-module checking is
+    /// therefore necessary; end-to-end is not sufficient.
+    #[test]
+    fn a_downstream_stage_masks_an_upstream_bug() {
+        let t = tx(10_000); // $100.00
+
+        // caught at the module boundary by commutation:
+        assert_eq!(
+            commutes(&AggregateOffsetsTotals, &DoublePostings, &t),
+            Some(false)
+        );
+
+        // but masked at the composite — identical output, and it round-trips:
+        let honest = Compose {
+            f: Aggregate,
+            g: Round,
+        };
+        let buggy = Compose {
+            f: AggregateOffsetsTotals,
+            g: Round,
+        };
+        let (honest_out, _) = honest.forward(&t);
+        let (buggy_out, buggy_res) = buggy.forward(&t);
+        assert_eq!(
+            honest_out, buggy_out,
+            "Round absorbs the sub-dollar offset — outputs identical"
+        );
+        assert_eq!(
+            buggy.backward(&buggy_out, &buggy_res).as_ref(),
+            Some(&t),
+            "and the composite still round-trips, so end-to-end is blind to the bug"
+        );
     }
 }
