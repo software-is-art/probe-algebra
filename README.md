@@ -256,7 +256,7 @@ module interior.
 
 | Path | Role |
 | --- | --- |
-| `src/boundary.rs` | the grammar: sealed markers + `Morphism` / `probe` / `commutes` / `coefficient_holds` / `Compose` / retention typestate |
+| `src/boundary.rs` | the grammar: sealed markers + `Morphism` / `probe` / `commutes` / `coefficient_holds` / `Compose` / retention typestate / `Qty` tagged primitives / `Meter`+`Profiled` instrumentation seam |
 | `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
 | `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |

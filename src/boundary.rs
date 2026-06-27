@@ -465,3 +465,97 @@ pub fn run<M: Morphism>(m: &M, input: &M::In) -> Carried<M, Retained> {
     let (out, residual) = m.forward(input);
     Carried::new(out, residual)
 }
+
+// ===== instrumentation: the morphism as the annotation point =============
+
+/// A hook called around every metered morphism step. The default (`NoMeter`) does
+/// nothing and costs nothing; a causal profiler (e.g. Coz) implements it to open
+/// latency scopes and mark throughput progress points.
+///
+/// The usual friction with a causal profiler is deciding *which* methods to
+/// annotate. The `Morphism` answers that: every dataflow step is one, so the
+/// annotation set is DETERMINED by the algebra and labelled by the operator's
+/// type — you never hand-pick instrumentation points. A Coz adapter is one impl,
+/// behind a feature so the `coz` dependency stays optional:
+///
+/// ```ignore
+/// pub struct CozMeter;
+/// impl Meter for CozMeter {
+///     fn measured<R>(&self, label: &'static str, body: impl FnOnce() -> R) -> R {
+///         coz::scope!(label); // RAII latency region for this stage
+///         body()
+///     }
+///     fn progress(&self, label: &'static str) { coz::progress!(label); }
+/// }
+/// ```
+pub trait Meter {
+    /// Run `body` as a measured region labelled `label`.
+    fn measured<R>(&self, label: &'static str, body: impl FnOnce() -> R) -> R;
+    /// Mark a unit of end-to-end progress (throughput) labelled `label`.
+    fn progress(&self, label: &'static str);
+}
+
+/// Instrumentation off: zero cost, fully transparent.
+pub struct NoMeter;
+impl Meter for NoMeter {
+    fn measured<R>(&self, _label: &'static str, body: impl FnOnce() -> R) -> R {
+        body()
+    }
+    fn progress(&self, _label: &'static str) {}
+}
+
+impl<T: Meter + ?Sized> Meter for &T {
+    fn measured<R>(&self, label: &'static str, body: impl FnOnce() -> R) -> R {
+        (**self).measured(label, body)
+    }
+    fn progress(&self, label: &'static str) {
+        (**self).progress(label)
+    }
+}
+
+/// Wrap any morphism so each `forward` / `backward` is metered, labelled by the
+/// operator's TYPE. Because every dataflow step is a `Morphism`, ONE wrapper
+/// instruments the whole graph (including nested `Compose`s) at uniform
+/// granularity — the same altitude-agnosticism that lets one `probe` test every
+/// level. Metering is pure overhead, so the capability ceiling is unchanged, and
+/// with `NoMeter` it compiles to the bare morphism.
+pub struct Profiled<M, T = NoMeter> {
+    inner: M,
+    meter: T,
+}
+impl<M> Profiled<M, NoMeter> {
+    pub fn new(inner: M) -> Self {
+        Profiled {
+            inner,
+            meter: NoMeter,
+        }
+    }
+}
+impl<M, T> Profiled<M, T> {
+    pub fn metered(inner: M, meter: T) -> Self {
+        Profiled { inner, meter }
+    }
+}
+impl<M, T> sealed::Sealed for Profiled<M, T> {}
+impl<M, T> ValueOperator for Profiled<M, T> {}
+impl<M: Morphism, T: Meter> Morphism for Profiled<M, T> {
+    const CAPABILITY: Capability = M::CAPABILITY;
+    type In = M::In;
+    type Out = M::Out;
+    type Residual = M::Residual;
+
+    fn forward(&self, input: &Self::In) -> (Self::Out, Self::Residual) {
+        let label = core::any::type_name::<M>();
+        let out = self.meter.measured(label, || self.inner.forward(input));
+        // a completed forward is a unit of this stage's throughput; a coarser
+        // end-to-end progress point can be marked by the caller at the run boundary.
+        self.meter.progress(label);
+        out
+    }
+
+    fn backward(&self, out: &Self::Out, residual: &Self::Residual) -> Option<Self::In> {
+        self.meter.measured(core::any::type_name::<M>(), || {
+            self.inner.backward(out, residual)
+        })
+    }
+}

@@ -295,3 +295,63 @@ mod effect {
             .is_some());
     }
 }
+
+// ===== instrumentation: causal-profiling seam over the morphism ===========
+
+mod instrumentation {
+    use crate::boundary::{probe, run, Compose, Meter, Morphism, Profiled};
+    use crate::ledger::boundary::{Aggregate, Round, Split};
+    use std::cell::RefCell;
+
+    /// A test `Meter` that records the labels it sees (a Coz adapter would instead
+    /// open coz scopes / mark coz progress points).
+    struct RecordingMeter {
+        log: RefCell<Vec<String>>,
+    }
+    impl Meter for RecordingMeter {
+        fn measured<R>(&self, label: &'static str, body: impl FnOnce() -> R) -> R {
+            self.log.borrow_mut().push(format!("scope:{label}"));
+            body()
+        }
+        fn progress(&self, label: &'static str) {
+            self.log.borrow_mut().push(format!("progress:{label}"));
+        }
+    }
+
+    /// `NoMeter` is transparent: a `Profiled` morphism behaves exactly like the
+    /// bare one — round-trips and probes identically. Instrumentation is free and
+    /// invisible when off.
+    #[test]
+    fn no_meter_is_transparent() {
+        let x = super::sample();
+        let profiled = Profiled::new(Aggregate);
+        assert_eq!(run(&profiled, &x).invert(&profiled).as_ref(), Some(&x));
+        assert!(probe(&profiled, &Split, &x).unwrap().residual_complete());
+    }
+
+    /// One wrapper instruments a whole composed dataflow: each stage's `forward`
+    /// becomes a scope labelled by its TYPE — the annotation points are determined
+    /// by the algebra, not hand-picked. (The usual Coz question, "what do I
+    /// annotate?", answered by the morphism boundary.)
+    #[test]
+    fn metering_records_a_scope_per_stage_labelled_by_type() {
+        let x = super::sample();
+        let meter = RecordingMeter {
+            log: RefCell::new(Vec::new()),
+        };
+        let pipeline = Compose {
+            f: Profiled::metered(Aggregate, &meter),
+            g: Profiled::metered(Round, &meter),
+        };
+        let (_out, _res) = pipeline.forward(&x);
+
+        let log = meter.log.borrow();
+        let has = |kind: &str, op: &str| log.iter().any(|e| e.starts_with(kind) && e.contains(op));
+        // each stage records a scope AND a per-stage progress point, both labelled
+        // by the operator's type — no hand-placed annotations.
+        assert!(has("scope:", "Aggregate"));
+        assert!(has("scope:", "Round"));
+        assert!(has("progress:", "Aggregate"));
+        assert!(has("progress:", "Round"));
+    }
+}
