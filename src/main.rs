@@ -8,6 +8,8 @@ mod boundary;
 mod ledger;
 
 #[cfg(test)]
+mod properties;
+#[cfg(test)]
 mod tests;
 
 use boundary::{probe, run, Compose, Morphism};

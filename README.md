@@ -48,5 +48,32 @@ it (round-trip fails) where the type checker cannot.
 
 ```
 cargo run     # narrated walk-through
-cargo test    # the algebra's invariants as tests
+cargo test    # invariants as unit tests + property tests
 ```
+
+## Enforcement (build tooling)
+
+`build.rs` parses every domain boundary file (`src/<module>/boundary.rs`) with
+`syn` and **fails the build** if it contains anything outside the grammar: free
+functions, global `static`s, submodules, traits, public fields, or any `unsafe`
+/ I/O (boundaries are a pure value layer). The universal grammar file
+`src/boundary.rs` is exempt — it *defines* the vocabulary. Sealed marker traits
+keep the citizen set closed in the type system; the build script keeps each
+boundary file structurally honest. A violation looks like:
+
+```
+warning: src/ledger/boundary.rs: free function `helper` — value operators must
+         be types implementing ValueOperator; put pure helpers in a private module
+error: boundary grammar enforcement failed: 1 violation(s)
+```
+
+## Property testing
+
+`src/properties.rs` turns the single-sample probe into coverage with `proptest`:
+strategies generate transactions (through the public smart constructors only) and
+the algebra's laws are checked over hundreds of inputs — honest aggregation always
+round-trips, composition round-trips through two lossy stages, the honest residual
+is always complete under perturbation, and the count-only residual is *always*
+caught. A failing probe is real evidence of an incomplete residual; the property
+suite is what lets a *passing* probe stand for "complete across the input space"
+rather than "complete for one example".

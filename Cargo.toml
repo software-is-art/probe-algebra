@@ -6,3 +6,9 @@ edition = "2021"
 [[bin]]
 name = "demo"
 path = "src/main.rs"
+
+[dev-dependencies]
+proptest = "1"
+
+[build-dependencies]
+syn = { version = "2", features = ["full", "visit"] }
