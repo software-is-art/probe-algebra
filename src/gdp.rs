@@ -21,6 +21,7 @@ use core::marker::PhantomData;
 
 use crate::boundary::Morphism;
 use crate::ledger::boundary::{AccountSummary, Balance, Round, Transaction};
+use crate::linear::boundary::{Quantity, Scale};
 
 // ===== the name machinery (mononym's technique, hand-rolled) ==============
 
@@ -185,6 +186,40 @@ pub fn whole_dollars<N>(summary: &Named<N, AccountSummary>, _proof: &Proof<N, Ro
     summary.value().totals().len()
 }
 
+/// Witness: this quantity is the output of the REFERENCE scaling (`Scale::honest`).
+///
+/// `Scale: Quantity -> Quantity` is the other endo-map from the audit, so "scaled"
+/// is invisible in the type — and (the decisive negative result) a wrong-rate
+/// `skew` output is indistinguishable from a right one. A value obtains this
+/// witness ONLY by passing through `scale_witnessed`, which runs the honest rate;
+/// the library offers no skew-witnessing counterpart, so a skew-scaled value can
+/// never carry it. A consumer that requires `Scaled` therefore rejects skew (and
+/// raw, un-scaled quantities) at COMPILE time — the provenance complement to the
+/// runtime quantitative probe. (Sound because the witness is minted only on the
+/// honest path; it is provenance, not verification of an arbitrary input.)
+///
+/// Together with `Scale::CAPABILITY` this captures BOTH facts an endo-operation
+/// hides: its capability (`Pure`, a static const) and its having-occurred (this
+/// witness).
+pub struct Scaled;
+
+/// Run the reference scaling, capturing a witness — tied to the output's name —
+/// that it occurred at the honest rate.
+pub fn scale_witnessed<N: Name>(
+    // consumed for its unique name `N` (affine), used to brand the output below.
+    _seed: Seed<N>,
+    quantity: &Quantity,
+) -> Witnessed<impl Name, Quantity, Scaled> {
+    let (scaled, _unit) = Scale::honest().forward(quantity);
+    Witnessed(Named::<N, _>(scaled, PhantomData), Proof(PhantomData))
+}
+
+/// A consumer requiring its input to be a reference-scaled figure. It cannot be
+/// called on a raw quantity or a skew-scaled one — neither carries `Scaled`.
+pub fn report_scaled<N>(quantity: &Named<N, Quantity>, _proof: &Proof<N, Scaled>) -> i64 {
+    quantity.value().get()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,6 +302,23 @@ mod tests {
             assert_eq!(whole_dollars(&named, &proof), 2);
             // whole_dollars(&some_unrounded_named, ...) — impossible: no Rounded
             // proof exists for a summary that did not pass round_witnessed.
+        });
+    }
+
+    /// The other endo-map: `scale_witnessed` records that reference scaling ran,
+    /// `report_scaled` requires the witness, and the witnessed op's capability is
+    /// `Pure` — both type-invisible facts of the endo-operation now captured.
+    #[test]
+    fn scaling_witness_gates_consumer_and_pairs_with_capability() {
+        use crate::boundary::Capability;
+        use crate::linear::boundary::Scale;
+        with_seed(|seed| {
+            let q = Quantity::new(7).unwrap();
+            let (named, proof) = scale_witnessed(seed, &q).split();
+            // 7 * honest rate 3; report_scaled on a raw or skew-scaled Quantity is
+            // impossible — neither carries a Scaled proof.
+            assert_eq!(report_scaled(&named, &proof), 21);
+            assert_eq!(<Scale as Morphism>::CAPABILITY, Capability::Pure);
         });
     }
 }

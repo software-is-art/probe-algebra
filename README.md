@@ -204,6 +204,22 @@ proofs are never minted from the statistical probes — those stay runtime. This
 the type-level *carrier* for facts the probe or a boundary check has established,
 not a replacement for either.
 
+`gdp.rs` also carries two further GDP forms. A **total `classify`**
+(`classify_balance -> Balanced | Unbalanced`, both branded) keeps the negative
+witness the paper warns against discarding with `Option`. And an **operation
+witness** captures a fact an operation otherwise erases: an operation's
+having-occurred is invisible in the type system exactly when it is an *endo-map*
+(input and output the same type) — `Round: Summary -> Summary`,
+`Scale: Quantity -> Quantity` — whereas a type-changing op
+(`Calibrate: Sample -> Reading`) witnesses itself. `round_witnessed` / `scale_witnessed`
+brand the output with a `Rounded` / `Scaled` proof, so a consumer can *require*
+that the operation ran (e.g. `whole_dollars` needs `Rounded`; `report_scaled`
+needs `Scaled`). Together with `Morphism::CAPABILITY` this captures *both*
+type-invisible facts of an endo-operation: its capability (a static const) and
+its occurrence (a witness). For `Scale` the witness even rejects a `skew`-scaled
+value at compile time on the honest path — the provenance complement to the
+runtime quantitative probe.
+
 ## Enforcement (build tooling)
 
 `build.rs` parses the source with `syn` and **fails the build** on two tiers.
