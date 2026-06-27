@@ -10,6 +10,7 @@
 pub mod boundary;
 pub mod ledger;
 pub mod linear;
+pub mod select;
 
 #[cfg(test)]
 mod blindspot;

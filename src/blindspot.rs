@@ -134,4 +134,49 @@ mod ledger {
             "the residual bug leaves the output correct, so commutation is blind"
         );
     }
+
+    /// The generation+selection loop end to end: run the candidate relations
+    /// against the candidate mutants to build a REAL kill matrix, then let the
+    /// selector pick the suite. The two bugs are complementary, so both relations
+    /// are selected — neither alone covers both — and nothing is left uncovered.
+    #[test]
+    fn set_cover_selects_both_complementary_relations() {
+        use crate::select::KillMatrix;
+
+        let x = sample();
+
+        // soundness guard: neither relation may flag the honest morphism.
+        assert!(probe(&Aggregate, &Split, &x).unwrap().residual_complete());
+        assert_eq!(commutes(&Aggregate, &DoublePostings, &x), Some(true));
+
+        // a cell is `true` iff the relation (row) KILLS the mutant (column).
+        let residual_kills = |complete: bool| !complete;
+        let commute_kills = |c: Option<bool>| c == Some(false);
+
+        // rows = [residual probe, commutation]; cols = [DropsAmounts, OffsetsTotals]
+        let matrix = KillMatrix::new(vec![
+            vec![
+                residual_kills(
+                    probe(&AggregateDropsAmounts, &Split, &x)
+                        .unwrap()
+                        .residual_complete(),
+                ),
+                residual_kills(
+                    probe(&AggregateOffsetsTotals, &Split, &x)
+                        .unwrap()
+                        .residual_complete(),
+                ),
+            ],
+            vec![
+                commute_kills(commutes(&AggregateDropsAmounts, &DoublePostings, &x)),
+                commute_kills(commutes(&AggregateOffsetsTotals, &DoublePostings, &x)),
+            ],
+        ]);
+
+        assert_eq!(matrix.select(), vec![0, 1], "both relations are required");
+        assert!(
+            matrix.uncoverable().is_empty(),
+            "no mutant survives the selected suite"
+        );
+    }
 }
