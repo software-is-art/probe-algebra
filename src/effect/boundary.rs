@@ -109,6 +109,30 @@ impl Morphism for Stamp {
     }
 }
 
+/// An operator that DEMANDS a clock reading but never uses it: declared effectful,
+/// actually pure. The capability probe detects this over-declaration — it can move
+/// right by dropping the demand.
+pub struct IgnoresClock;
+crate::value_operator!(IgnoresClock);
+
+impl Morphism for IgnoresClock {
+    type In = Pair<Message, Clock>;
+    type Out = Stamped;
+    type Residual = Entry;
+
+    fn forward(&self, input: &Pair<Message, Clock>) -> (Stamped, Entry) {
+        // ignores input.1 (the clock) entirely
+        (
+            Stamped::new(input.0.get()).expect("message in stamped range"),
+            Entry::new(0).expect("zero is a valid entry"),
+        )
+    }
+
+    fn backward(&self, out: &Stamped, _emission: &Entry) -> Option<Pair<Message, Clock>> {
+        Some(Pair(Message::new(out.get())?, Clock::new(0)?))
+    }
+}
+
 /// Perturb the WORLD reading (the clock) while holding the pure input fixed —
 /// used by the capability probe to confirm the output depends on the world.
 pub struct NudgeReading;
