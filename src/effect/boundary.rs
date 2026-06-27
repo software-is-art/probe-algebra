@@ -7,7 +7,7 @@
 //!                   / NudgeMessage (perturbations along the world vs the pure
 //!                   input)
 
-use crate::boundary::{Morphism, Pair, Perturbation};
+use crate::boundary::{Capability, Morphism, Pair, Perturbation};
 
 /// A pure caller-supplied input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,6 +89,8 @@ pub struct Stamp;
 crate::value_operator!(Stamp);
 
 impl Morphism for Stamp {
+    const CAPABILITY: Capability = Capability::Effectful;
+
     type In = Pair<Message, Clock>;
     type Out = Stamped;
     type Residual = Entry;
@@ -116,6 +118,9 @@ pub struct IgnoresClock;
 crate::value_operator!(IgnoresClock);
 
 impl Morphism for IgnoresClock {
+    // declares Effectful (demands a clock) — the behavioural audit shows it unused
+    const CAPABILITY: Capability = Capability::Effectful;
+
     type In = Pair<Message, Clock>;
     type Out = Stamped;
     type Residual = Entry;
@@ -140,6 +145,9 @@ pub struct SecretStamp;
 crate::value_operator!(SecretStamp);
 
 impl Morphism for SecretStamp {
+    // UNDER-claims Pure though it reads the clock — the audit catches the lie
+    const CAPABILITY: Capability = Capability::Pure;
+
     type In = Pair<Message, Clock>;
     type Out = Stamped;
     type Residual = Entry;

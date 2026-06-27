@@ -5,7 +5,7 @@
 //! is the type the parent must NOT leak. `Sample` is the parent's input type,
 //! imported here privately (an import, not a re-export).
 
-use crate::boundary::{Morphism, Unit};
+use crate::boundary::{Capability, Morphism, Unit};
 use crate::pipeline::boundary::Sample;
 
 /// The calibrated reading — the intermediate that flows between the two stages
@@ -31,6 +31,8 @@ pub struct Calibrate;
 crate::value_operator!(Calibrate);
 
 impl Morphism for Calibrate {
+    const CAPABILITY: Capability = Capability::Pure;
+
     type In = Sample;
     type Out = Reading;
     type Residual = Unit;

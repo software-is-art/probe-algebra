@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::boundary::{Metamorphic, Morphism, Perturbation};
+use crate::boundary::{Capability, Metamorphic, Morphism, Perturbation};
 
 // ===== value objects =====================================================
 
@@ -251,6 +251,8 @@ crate::value_operator!(
 );
 
 impl Morphism for Aggregate {
+    const CAPABILITY: Capability = Capability::Lossy;
+
     type In = Transaction;
     type Out = AccountSummary;
     type Residual = MultiplicityResidual;
@@ -267,6 +269,8 @@ impl Morphism for Aggregate {
 }
 
 impl Morphism for AggregateDropsAmounts {
+    const CAPABILITY: Capability = Capability::Lossy;
+
     type In = Transaction;
     type Out = AccountSummary;
     type Residual = MultiplicityResidual;
@@ -293,6 +297,8 @@ impl Morphism for AggregateDropsAmounts {
 }
 
 impl Morphism for AggregateOffsetsTotals {
+    const CAPABILITY: Capability = Capability::Lossy;
+
     type In = Transaction;
     type Out = AccountSummary;
     type Residual = MultiplicityResidual;
@@ -319,6 +325,8 @@ impl Morphism for AggregateOffsetsTotals {
 }
 
 impl Morphism for Round {
+    const CAPABILITY: Capability = Capability::Lossy;
+
     type In = AccountSummary;
     type Out = AccountSummary;
     type Residual = RoundingResidual;

@@ -23,38 +23,22 @@
 //!
 //! Crate-level tooling (like `select`/`synth`), exempt from the boundary discipline.
 
-use crate::boundary::{Morphism, Perturbation};
+use crate::boundary::{Capability, Compose, Morphism, Perturbation};
 use crate::effect::boundary::{IgnoresClock, SecretStamp, Stamp};
 use crate::journal::boundary::Add;
+use crate::ledger::boundary::{Aggregate, Round};
 
-/// The capability chain, least-power first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Capability {
-    Pure,
-    Lossy,
-    Stateful,
-    Effectful,
-}
+// `Capability` (the chain, with `rank`/`join`) now lives in the grammar
+// (`crate::boundary`), because a morphism declares it as `Morphism::CAPABILITY`.
+// This module keeps the behavioural side: probing sources and auditing claims.
 
-impl Capability {
-    fn rank(self) -> u8 {
-        match self {
-            Capability::Pure => 0,
-            Capability::Lossy => 1,
-            Capability::Stateful => 2,
-            Capability::Effectful => 3,
-        }
-    }
-
-    /// The class of a composition: as capable as the most-capable stage.
-    pub fn join(self, other: Capability) -> Capability {
-        if self.rank() >= other.rank() {
-            self
-        } else {
-            other
-        }
-    }
-}
+/// COMPILE-TIME ceiling. The ledger pipeline (`Aggregate` then `Round`) is a lossy
+/// transform that never reaches state or the world. Its statically composed
+/// capability — `Compose` joins the stages' `CAPABILITY` at compile time — must
+/// stay at most `Lossy`. Promote any stage to `Stateful`/`Effectful` and this
+/// stops compiling: an exceeded ceiling is a BUILD error, not a test failure.
+const _: () =
+    assert!(<Compose<Aggregate, Round> as Morphism>::CAPABILITY.rank() <= Capability::Lossy.rank());
 
 /// Whether perturbing a source moved the output and/or the residual.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -385,6 +369,25 @@ mod tests {
         // round-trips (it is not a no-op that merely looks effectful).
         let (out, emission) = SecretStamp.forward(&env());
         assert_eq!(SecretStamp.backward(&out, &emission), Some(env()));
+    }
+
+    /// The grammar `CAPABILITY` const records each operator's declared ceiling,
+    /// and `Compose` joins them at compile time — so a path's capability is a type
+    /// fact. (The const and the per-source `Declares` are two views of the same
+    /// claim; the audit is what checks either against behaviour.)
+    #[test]
+    fn grammar_ceiling_and_static_join() {
+        assert_eq!(<Stamp as Morphism>::CAPABILITY, Capability::Effectful);
+        assert_eq!(<Add as Morphism>::CAPABILITY, Capability::Stateful);
+        assert_eq!(<Aggregate as Morphism>::CAPABILITY, Capability::Lossy);
+        // SecretStamp's declared ceiling agrees with its (empty) source claim —
+        // both say Pure — yet the audit shows both are wrong vs behaviour.
+        assert_eq!(<SecretStamp as Morphism>::CAPABILITY, Capability::Pure);
+        // the composite's capability is the join of its stages, computed statically
+        assert_eq!(
+            <Compose<Aggregate, Round> as Morphism>::CAPABILITY,
+            Capability::Lossy
+        );
     }
 
     /// The audit is not effect-specific: Add honestly declares and uses State.

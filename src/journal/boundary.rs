@@ -5,7 +5,7 @@
 //!                   SetForgetsPrior (a buggy Set whose residual is incomplete);
 //!                   NudgeState (a perturbation along the carried-state dimension)
 
-use crate::boundary::{Morphism, Perturbation, Unit};
+use crate::boundary::{Capability, Morphism, Perturbation, Unit};
 
 // ===== value object: the state ===========================================
 
@@ -51,6 +51,8 @@ impl Add {
 crate::value_operator!(Add);
 
 impl Morphism for Add {
+    const CAPABILITY: Capability = Capability::Stateful;
+
     type In = Register;
     type Out = Register;
     type Residual = Unit;
@@ -79,6 +81,8 @@ impl Set {
 crate::value_operator!(Set);
 
 impl Morphism for Set {
+    const CAPABILITY: Capability = Capability::Stateful;
+
     type In = Register;
     type Out = Register;
     type Residual = Register;
@@ -106,6 +110,8 @@ impl SetForgetsPrior {
 crate::value_operator!(SetForgetsPrior);
 
 impl Morphism for SetForgetsPrior {
+    const CAPABILITY: Capability = Capability::Stateful;
+
     type In = Register;
     type Out = Register;
     type Residual = Register;

@@ -155,9 +155,13 @@ effect  ⊃  state  ⊃  pure-with-loss  ⊃  pure
   live (I/O) handler is the one seam the method cannot probe — the program edge.
 
 The rule: keep each operator as far RIGHT (as close to pure) as its behaviour
-allows; **composition takes the join** (a path is as capable as its most-capable
-stage). `src/capability.rs` makes this measurable — it perturbs each declared
-capability *source* and observes whether the output/residual respond.
+allows. Each `Morphism` declares a `CAPABILITY` ceiling in the grammar, and
+**`Compose` joins the stages' ceilings at compile time** — a path's capability is
+a *type fact*, so a `const` assertion that a pipeline stays "at most Lossy" is a
+BUILD error if any stage is promoted to `Stateful`/`Effectful` (see the const in
+`src/capability.rs`). `src/capability.rs` also makes the claim *measurable* — it
+perturbs each declared capability *source* and observes whether the
+output/residual respond.
 
 An operator carries its capability claim (`Declares`), and the `Audit` reconciles
 the claim with the probed behaviour per source, catching BOTH error directions —

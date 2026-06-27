@@ -11,7 +11,7 @@
 //! Because `probe` / `run` are altitude-agnostic generics, the parent's composite
 //! is probed for residual completeness exactly as a leaf operator is.
 
-use crate::boundary::{Compose, Morphism, Pair, Perturbation, Unit};
+use crate::boundary::{Capability, Compose, Morphism, Pair, Perturbation, Unit};
 use crate::pipeline::bucketize::boundary::Bucketize;
 use crate::pipeline::calibrate::boundary::Calibrate;
 
@@ -77,6 +77,11 @@ pub struct Ingest;
 crate::value_operator!(Ingest);
 
 impl Morphism for Ingest {
+    // the parent derives its ceiling from the children it composes — narrowing the
+    // surface, never the capability: Pure (calibrate) join Lossy (bucketize) = Lossy.
+    const CAPABILITY: Capability =
+        <Calibrate as Morphism>::CAPABILITY.join(<Bucketize as Morphism>::CAPABILITY);
+
     type In = Sample;
     type Out = Bucket;
     type Residual = Pair<Unit, Leftover>;

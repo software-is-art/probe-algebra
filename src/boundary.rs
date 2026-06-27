@@ -71,10 +71,50 @@ macro_rules! value_operator {
 
 // ===== generic morphism: In -> (Out, Residual) ===========================
 
+/// The capability chain, least-power first: each step adds a capability and
+/// subtracts a verification guarantee. A morphism declares its `CAPABILITY` as a
+/// compile-time ceiling; `Compose` joins the ceilings of its stages, so a path's
+/// capability is computed by the type system. (The behavioural audit in
+/// `crate::capability` verifies a declared ceiling against actual behaviour.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Capability {
+    Pure,
+    Lossy,
+    Stateful,
+    Effectful,
+}
+
+impl Capability {
+    /// Position on the chain (higher = more capable). `const` so it composes and
+    /// can be asserted at compile time.
+    pub const fn rank(self) -> u8 {
+        match self {
+            Capability::Pure => 0,
+            Capability::Lossy => 1,
+            Capability::Stateful => 2,
+            Capability::Effectful => 3,
+        }
+    }
+
+    /// The capability of a composition: as capable as the most-capable stage.
+    pub const fn join(self, other: Capability) -> Capability {
+        if self.rank() >= other.rank() {
+            self
+        } else {
+            other
+        }
+    }
+}
+
 /// A possibly-lossy morphism whose `Residual` value object witnesses EXACTLY
 /// what the forward map collapsed. Retaining the residual restores
 /// invertibility: `backward(forward(x)) == x`.
 pub trait Morphism: ValueOperator {
+    /// The declared capability ceiling — the furthest-LEFT class on the chain this
+    /// operator claims (see `Capability`). The behavioural audit checks it; the
+    /// type system composes it.
+    const CAPABILITY: Capability;
+
     type In: ValueObject;
     type Out: ValueObject;
     type Residual: ValueObject;
@@ -235,6 +275,10 @@ where
     F: Morphism,
     G: Morphism<In = F::Out>,
 {
+    // the composite is as capable as its most-capable stage — the static join,
+    // computed by the type system at compile time.
+    const CAPABILITY: Capability = F::CAPABILITY.join(G::CAPABILITY);
+
     type In = F::In;
     type Out = G::Out;
     type Residual = Pair<F::Residual, G::Residual>;
