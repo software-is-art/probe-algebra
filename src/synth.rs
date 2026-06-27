@@ -47,12 +47,16 @@ pub struct Coverage {
     pub residual_check_covers: bool,
 }
 
-/// Analyse the MULTIPLICITY DOF for aggregation, reached by the synthesized
+/// Analyse the MULTIPLICITY DOF for a morphism `m`, reached by the synthesized
 /// `Split` operator. Reuses the generic `probe`: `output_invariant` is exactly
-/// "the output-only check is blind to this dimension", while a responding
-/// residual that still round-trips is the dimension-appropriate coverage.
-pub fn multiplicity_coverage(x: &Transaction) -> Option<Coverage> {
-    let pr = probe(&Aggregate, &Split, x)?;
+/// "the output-only check is blind to this dimension", while coverage requires
+/// the residual to BOTH respond AND round-trip — a responding-but-incomplete
+/// residual (e.g. the count-only bug) does not actually cover the dimension.
+pub fn multiplicity_coverage<M>(m: &M, x: &Transaction) -> Option<Coverage>
+where
+    M: Morphism<In = Transaction, Out = crate::ledger::boundary::AccountSummary>,
+{
+    let pr = probe(m, &Split, x)?;
     Some(Coverage {
         dof: Dof::Multiplicity,
         output_check_blind: pr.output_invariant,
@@ -97,7 +101,7 @@ mod tests {
     #[test]
     fn synthesized_residual_check_covers_multiplicity() {
         let x = sample();
-        let cov = multiplicity_coverage(&x).unwrap();
+        let cov = multiplicity_coverage(&Aggregate, &x).unwrap();
         assert_eq!(cov.dof, Dof::Multiplicity);
         assert!(
             cov.output_check_blind,
@@ -106,6 +110,20 @@ mod tests {
         assert!(
             cov.residual_check_covers,
             "the residual responds and the perturbed input round-trips"
+        );
+    }
+
+    /// A responding-but-incomplete residual does NOT cover the dimension: the
+    /// count-only bug's residual responds to Split but cannot round-trip, so
+    /// coverage requires BOTH (responds AND round-trips), not either.
+    #[test]
+    fn responding_but_incomplete_residual_does_not_cover() {
+        let x = sample();
+        let cov = multiplicity_coverage(&AggregateDropsAmounts, &x).unwrap();
+        assert!(cov.output_check_blind);
+        assert!(
+            !cov.residual_check_covers,
+            "a residual that responds but cannot round-trip does not cover the DOF"
         );
     }
 

@@ -129,6 +129,9 @@ proptest! {
     fn buggy_fails_plain_round_trip(x in tx_substantial()) {
         let (summary, residual) = AggregateDropsAmounts.forward(&x);
         let recovered = AggregateDropsAmounts.backward(&summary, &residual);
+        // The bug is not "fails to reconstruct" — it reconstructs SOMETHING, just
+        // the WRONG transaction. (Pins that `backward` is not vacuously `None`.)
+        prop_assert!(recovered.is_some());
         prop_assert_ne!(recovered.as_ref(), Some(&x));
     }
 
@@ -141,10 +144,26 @@ proptest! {
         prop_assert_eq!(half.checked_add(rest), Some(c));
     }
 
+    /// `split` is BALANCED: the two parts differ by at most one cent. (The
+    /// round-trip law alone is invariant under e.g. `/`→`*`, which yields a wildly
+    /// unbalanced split that still sums back; this pins the actual halving.)
+    #[test]
+    fn cents_split_is_balanced(c in cents()) {
+        let (half, rest) = c.split();
+        prop_assert!((half.get() - rest.get()).abs() <= 1, "unbalanced split: {:?}/{:?}", half, rest);
+    }
+
     /// Negation is an involution.
     #[test]
     fn cents_negate_is_involution(c in cents()) {
         prop_assert_eq!(c.negate().negate(), c);
+    }
+
+    /// Negation is the ADDITIVE INVERSE: `c + (-c) == 0`. (Involution alone holds
+    /// for the identity, so it cannot tell a deleted negation from a real one.)
+    #[test]
+    fn cents_negate_is_additive_inverse(c in cents()) {
+        prop_assert_eq!(c.negate().checked_add(c), Some(Cents::zero()));
     }
 
     /// Zero is the additive identity.
@@ -181,6 +200,13 @@ proptest! {
     #[test]
     fn balance_negate_is_involution(b in balance()) {
         prop_assert_eq!(b.negate().negate(), b);
+    }
+
+    /// Negation is the ADDITIVE INVERSE: `b + (-b) == 0` (kills a deleted `-`,
+    /// which involution alone misses).
+    #[test]
+    fn balance_negate_is_additive_inverse(b in balance()) {
+        prop_assert_eq!(b.negate().plus(b), Balance::zero());
     }
 
     /// Zero is the additive identity.

@@ -1,0 +1,11 @@
+# cargo-mutants configuration.
+#
+# Mutation testing is the engine of this method: it certifies that the probe
+# suite actually kills planted bugs, and any SURVIVING mutant points at a
+# missing relation or degree of freedom (see src/select.rs::uncoverable).
+#
+# The `demo` binary (src/main.rs) has no assertions — it only prints — so
+# mutating it produces survivors that are noise rather than signal. The library
+# carries the algebra and is exercised by the unit + property suites, so that is
+# where mutation testing earns its keep.
+exclude_globs = ["src/main.rs"]

@@ -144,6 +144,13 @@ mod tests {
         assert_eq!(m.select(), vec![0, 2]);
     }
 
+    /// With no mutants there is nothing to be noisy about: `is_noisy` is false.
+    #[test]
+    fn is_noisy_is_false_with_no_mutants() {
+        let m = KillMatrix::new(vec![vec![]]);
+        assert!(!m.is_noisy(0));
+    }
+
     /// A mutant no relation kills is reported as a survivor (missing relation/DOF).
     #[test]
     fn surfaces_uncoverable_mutants() {

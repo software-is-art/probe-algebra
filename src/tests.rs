@@ -3,9 +3,10 @@
 
 use crate::boundary::{probe, run, Compose, Morphism};
 use crate::ledger::boundary::{
-    Account, Aggregate, AggregateDropsAmounts, Cents, NudgeCents, Posting, Round, Split,
+    Account, Aggregate, AggregateDropsAmounts, Balance, Cents, NudgeCents, Posting, Round, Split,
     Transaction,
 };
+use crate::linear::boundary::Quantity;
 
 fn sample() -> Transaction {
     Transaction::new(vec![
@@ -24,6 +25,18 @@ fn value_object_validation_rejects_bad_input() {
     assert!(Account::new("   ").is_none());
     assert!(Cents::new(i64::MAX).is_none());
     assert!(Transaction::new(vec![]).is_none());
+}
+
+#[test]
+fn accessors_return_the_wrapped_value() {
+    // The sanctioned exit hatches must report the real contents, not a constant.
+    assert_eq!(Cents::new(7).unwrap().get(), 7);
+    assert_eq!(Balance::zero().add_cents(Cents::new(5).unwrap()).get(), 5);
+    assert_eq!(Account::new("Cash").unwrap().get(), "Cash");
+    assert_eq!(Quantity::new(7).unwrap().get(), 7);
+    // `is_zero` must track the value, not a fixed answer.
+    assert!(Cents::zero().is_zero());
+    assert!(!Cents::new(5).unwrap().is_zero());
 }
 
 #[test]
