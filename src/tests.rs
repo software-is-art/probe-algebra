@@ -146,3 +146,70 @@ mod nesting {
         assert!(pr.residual_complete());
     }
 }
+
+// ===== state: a stateful update is a lossy morphism (residual = prior) =====
+
+mod state {
+    use crate::boundary::{probe, run, Compose, Morphism};
+    use crate::journal::boundary::{Add, NudgeState, Register, Set, SetForgetsPrior};
+
+    fn reg(n: i64) -> Register {
+        Register::new(n).unwrap()
+    }
+
+    /// A `Set` overwrites the state; its residual is exactly the prior it forgot,
+    /// so retaining it rewinds the update.
+    #[test]
+    fn set_residual_is_the_overwritten_prior() {
+        let prior = reg(42);
+        let carried = run(&Set::to(reg(10)), &prior);
+        assert_eq!(carried.out(), &reg(10), "the new state is the set value");
+        assert_eq!(
+            carried.residual(),
+            &prior,
+            "the residual is the prior state"
+        );
+        assert_eq!(carried.invert(&Set::to(reg(10))).as_ref(), Some(&prior));
+    }
+
+    /// The forgetful `Set` cannot rewind — the probe catches it where the honest
+    /// `Set` is complete. The state analogue of the count-only residual bug.
+    #[test]
+    fn forgetful_set_is_caught_by_the_probe() {
+        let s = reg(42);
+        assert!(probe(&Set::to(reg(10)), &NudgeState, &s)
+            .unwrap()
+            .residual_complete());
+        let buggy = probe(&SetForgetsPrior::to(reg(10)), &NudgeState, &s).unwrap();
+        assert!(!buggy.residual_responds, "the residual ignores the prior");
+        assert!(!buggy.round_trips, "so it cannot rewind");
+        assert!(!buggy.residual_complete());
+    }
+
+    /// Composing updates threads the state and accumulates the priors into a
+    /// nested residual — the undo history, built by the same `Compose`.
+    #[test]
+    fn composed_updates_build_an_undo_history() {
+        let start = reg(7);
+        // Set to 10, then Add 5: state 7 -> 10 -> 15.
+        let history = Compose {
+            f: Set::to(reg(10)),
+            g: Add::by(reg(5)),
+        };
+        let (out, residual) = history.forward(&start);
+        assert_eq!(out, reg(15));
+        // residual is Pair<prior-of-Set = 7, Unit-of-Add>; it rewinds to the start.
+        assert_eq!(residual.0, start);
+        assert_eq!(history.backward(&out, &residual).as_ref(), Some(&start));
+    }
+
+    /// Discarding the state residual removes the ability to rewind — at compile
+    /// time. `discarded.invert(..)` would not compile (the state is unrecoverable).
+    #[test]
+    fn discarding_the_prior_removes_rewind() {
+        let prior = reg(42);
+        let carried = run(&Set::to(reg(10)), &prior);
+        let discarded = carried.discard();
+        assert_eq!(discarded.out(), &reg(10)); // current state still readable
+    }
+}
