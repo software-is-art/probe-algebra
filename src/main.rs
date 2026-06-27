@@ -3,11 +3,14 @@
 //! `probe_algebra::ledger::boundary` (the ledger's interface); the aggregation
 //! algorithm in `ledger::internal` is private and unreachable from here.
 
-use probe_algebra::boundary::{probe, run, Compose, Morphism, ProbeResult};
-use probe_algebra::ledger::boundary::{
-    Account, Aggregate, AggregateDropsAmounts, Cents, NudgeCents, Posting, Round, Split,
-    Transaction,
+use probe_algebra::boundary::{
+    coefficient_holds, commutes, probe, run, Compose, Morphism, ProbeResult,
 };
+use probe_algebra::ledger::boundary::{
+    Account, Aggregate, AggregateDropsAmounts, AggregateOffsetsTotals, Cents, DoublePostings,
+    NudgeCents, Posting, Round, Split, Transaction,
+};
+use probe_algebra::linear::boundary::{Double, Quantity, Scale, UnitResponse};
 
 fn banner(s: &str) {
     println!("\n=== {} ===", s);
@@ -91,6 +94,43 @@ fn main() {
     );
     let composed = probe(&pipeline, &Split, &x).unwrap();
     report("Compose<Aggregate, Round> probed by Split", &composed);
+
+    banner("LAYER 2 (structural, reference-free): commutation");
+    println!("  DoublePostings: duplicating every posting must double every total.");
+    println!(
+        "  honest aggregate commutes        : {}",
+        yn(commutes(&Aggregate, &DoublePostings, &x) == Some(true))
+    );
+    println!(
+        "  offset-bug aggregate commutes    : {}  <- non-linear bug CAUGHT",
+        yn(commutes(&AggregateOffsetsTotals, &DoublePostings, &x) == Some(true))
+    );
+    println!(
+        "  drops-amounts aggregate commutes : {}  <- output correct, commutation BLIND",
+        yn(commutes(&AggregateDropsAmounts, &DoublePostings, &x) == Some(true))
+    );
+
+    banner("THE DECISIVE NEGATIVE RESULT: a coefficient bug defeats every structural check");
+    let q = Quantity::new(7).unwrap();
+    println!("  Scale::honest (rate 3) vs Scale::skew (rate 5) — same type, wrong constant.");
+    println!(
+        "  skew round-trips                 : {}  <- invertible, so round-trip BLIND",
+        yn(run(&Scale::skew(), &q).invert(&Scale::skew()) == Some(q))
+    );
+    println!(
+        "  skew commutes with doubling      : {}  <- linear, so commutation BLIND",
+        yn(commutes(&Scale::skew(), &Double, &q) == Some(true))
+    );
+    let unit_response = UnitResponse::from_reference(Scale::reference_rate());
+    println!(
+        "  LAYER 3 (quantitative) honest    : {}",
+        yn(coefficient_holds(&Scale::honest(), &unit_response, &q) == Some(true))
+    );
+    println!(
+        "  LAYER 3 (quantitative) skew      : {}  <- reference-bearing probe CATCHES it",
+        yn(coefficient_holds(&Scale::skew(), &unit_response, &q) == Some(true))
+    );
+    println!("  => no single check is highest-assurance; the layers are complementary.");
 
     banner("WHAT THIS BUYS");
     println!("  - Loss is forced into typed residual value objects (visible in the type).");

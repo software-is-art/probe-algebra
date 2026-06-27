@@ -3,12 +3,11 @@
 //! Each probe flavour catches a bug class and is blind to another; NO single
 //! check is highest-assurance. These tests pin that down:
 //!
-//!   | bug                     | round-trip | commutation | quantitative |
-//!   |-------------------------|------------|-------------|--------------|
-//!   | residual incompleteness | CATCHES    | blind       | (n/a)        |
-//!   | non-linear output offset | blind     | CATCHES     | (catches)    |
-//!   | wrong-but-invertible    | blind      | blind       | CATCHES      |
-//!     coefficient (Skew)
+//!   | bug                              | round-trip | commutation | quantitative |
+//!   |----------------------------------|------------|-------------|--------------|
+//!   | residual incompleteness          | CATCHES    | blind       | n/a          |
+//!   | non-linear output offset         | blind      | CATCHES     | catches      |
+//!   | wrong-but-invertible coefficient | blind      | blind       | CATCHES      |
 //!
 //! The decisive negative result: the wrong-coefficient `Skew` survives BOTH
 //! structural checks and dies only to the reference-bearing quantitative probe.
