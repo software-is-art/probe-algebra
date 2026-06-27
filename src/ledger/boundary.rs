@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::boundary::{Morphism, Perturbation};
+use crate::boundary::{Metamorphic, Morphism, Perturbation};
 
 // ===== value objects =====================================================
 
@@ -229,11 +229,26 @@ pub struct Aggregate;
 /// type-identical morphisms.
 pub struct AggregateDropsAmounts;
 
+/// Another BUGGY aggregation, type-identical to `Aggregate`, that adds a fixed
+/// one-cent OFFSET to every account total. Its residual (the breakdown) is
+/// untouched, so it ROUND-TRIPS (backward rebuilds from the breakdown) and its
+/// residual probe passes — yet its OUTPUT is wrong. Only a *commutation* probe
+/// (e.g. `DoublePostings`) catches it: an additive offset breaks linearity
+/// (`2·(s+c) ≠ 2·s + c`). The complement of `AggregateDropsAmounts`, which the
+/// commutation probe is in turn blind to. Together they populate the blind-spot
+/// map: no single structural probe catches both.
+pub struct AggregateOffsetsTotals;
+
 /// Round each account total down to whole dollars; the residual captures the
 /// removed sub-dollar cents. Lossy in the SUB-DOLLAR dimension.
 pub struct Round;
 
-crate::value_operator!(Aggregate, AggregateDropsAmounts, Round);
+crate::value_operator!(
+    Aggregate,
+    AggregateDropsAmounts,
+    AggregateOffsetsTotals,
+    Round
+);
 
 impl Morphism for Aggregate {
     type In = Transaction;
@@ -273,6 +288,32 @@ impl Morphism for AggregateDropsAmounts {
     fn backward(&self, out: &AccountSummary, r: &MultiplicityResidual) -> Option<Transaction> {
         // Same reconstruction logic — it just has too little to work with, so the
         // round-trip will not match.
+        super::internal::Aggregation.backward(out, r)
+    }
+}
+
+impl Morphism for AggregateOffsetsTotals {
+    type In = Transaction;
+    type Out = AccountSummary;
+    type Residual = MultiplicityResidual;
+
+    fn forward(&self, input: &Transaction) -> (AccountSummary, MultiplicityResidual) {
+        let (summary, residual) = super::internal::Aggregation.forward(input);
+        // BUG: every total is offset by one cent. The residual is left correct,
+        // so the round-trip (which rebuilds from the residual) still holds — the
+        // damage is only in the OUTPUT, where a commutation probe must catch it.
+        let mut totals = BTreeMap::new();
+        for (label, balance) in summary.totals() {
+            let account = Account::new(label).expect("a stored label is a valid account");
+            totals.insert(
+                account,
+                balance.add_cents(Cents::new(1).expect("one cent is valid")),
+            );
+        }
+        (AccountSummary::from_totals(totals), residual)
+    }
+
+    fn backward(&self, out: &AccountSummary, r: &MultiplicityResidual) -> Option<Transaction> {
         super::internal::Aggregation.backward(out, r)
     }
 }
@@ -328,6 +369,34 @@ impl<M: Morphism<In = Transaction>> Perturbation<M> for Split {
         out.push(Posting::new(first.account().clone(), rest));
         out.extend(ps[1..].iter().cloned());
         Transaction::new(out)
+    }
+}
+
+/// A METAMORPHIC RELATION (structural, reference-free): duplicating every
+/// posting must double every account total. Holds for any honest aggregation by
+/// linearity, so it witnesses the SHAPE without pinning constants. It catches a
+/// non-linear output bug (`AggregateOffsetsTotals`) but is BLIND to a
+/// residual-only bug (`AggregateDropsAmounts`), whose output is already correct.
+pub struct DoublePostings;
+crate::value_operator!(DoublePostings);
+
+impl<M: Morphism<In = Transaction, Out = AccountSummary>> Metamorphic<M> for DoublePostings {
+    fn input_op(&self, x: &Transaction) -> Option<Transaction> {
+        let mut out = Vec::new();
+        for p in x.postings() {
+            out.push(p.clone());
+            out.push(p.clone());
+        }
+        Transaction::new(out)
+    }
+
+    fn output_op(&self, y: &AccountSummary) -> AccountSummary {
+        let mut totals = BTreeMap::new();
+        for (label, balance) in y.totals() {
+            let account = Account::new(label).expect("a stored label is a valid account");
+            totals.insert(account, balance.plus(*balance));
+        }
+        AccountSummary::from_totals(totals)
     }
 }
 

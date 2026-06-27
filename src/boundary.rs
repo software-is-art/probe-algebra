@@ -87,6 +87,14 @@ pub trait Morphism: ValueOperator {
     fn backward(&self, out: &Self::Out, residual: &Self::Residual) -> Option<Self::In>;
 }
 
+/// The empty residual: a LOSSLESS transport collapses nothing, so its witness of
+/// loss is trivial. `Morphism<Residual = Unit>` marks a transport (an invertible
+/// map with no discarded dimension) — the case where structural commutation is
+/// vacuous and the quantitative probe becomes load-bearing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Unit;
+crate::value_object!(Unit);
+
 /// A perturbation is a partial value operator `In -> In` that nudges the input
 /// along ONE dimension — used to probe whether a residual captures it.
 pub trait Perturbation<M: Morphism>: ValueOperator {
@@ -134,6 +142,74 @@ where
             .map(|r| r == px)
             .unwrap_or(false),
     })
+}
+
+// ===== layer 2: structural / variational probes (reference-FREE) ==========
+
+/// A METAMORPHIC RELATION (structural / variational): an input perturbation
+/// paired with the output transform it MUST induce. The morphism *commutes* with
+/// the relation iff `forward(input_op(x)) == output_op(forward(x))`.
+///
+/// This is REFERENCE-FREE: it checks HOW the output varies under a known input
+/// change without knowing the correct output value, so it works on a fully
+/// opaque `forward`. Its blind spot is the *coefficient*: a uniform bug that
+/// respects the relation (e.g. a halving respects scaling) survives — that is
+/// what the quantitative probe below exists to catch.
+pub trait Metamorphic<M: Morphism>: ValueOperator {
+    /// Perturb the input along the relation's dimension.
+    fn input_op(&self, x: &M::In) -> Option<M::In>;
+    /// The output transform the perturbation must induce.
+    fn output_op(&self, y: &M::Out) -> M::Out;
+}
+
+/// Structural commutation probe (reference-free): `Some(true)` iff the morphism
+/// commutes with the relation at `x`. `None` if the perturbation does not apply.
+pub fn commutes<M, R>(m: &M, r: &R, x: &M::In) -> Option<bool>
+where
+    M: Morphism,
+    R: Metamorphic<M>,
+{
+    let perturbed = r.input_op(x)?;
+    let (y, _) = m.forward(x);
+    let (y_perturbed, _) = m.forward(&perturbed);
+    Some(y_perturbed == r.output_op(&y))
+}
+
+// ===== layer 3: quantitative / coefficient probes (reference-BEARING) ======
+
+/// A QUANTITATIVE / COEFFICIENT relation (reference-BEARING): apply a KNOWN unit
+/// step to the input and require a KNOWN output delta — the forward map's actual
+/// coefficient. This PINS values, catching a right-shape / wrong-constant bug
+/// that every structural check is blind to.
+///
+/// It needs an external correctness criterion (a spec or an independent
+/// reference) to supply `expected_delta` — without a referent "wrong coefficient"
+/// is undefined. This is the absolute invariant, decomposed coefficient-by-
+/// coefficient: it compares output *deltas* to reference *coefficients* instead
+/// of comparing whole outputs to a reference.
+pub trait Coefficient<M: Morphism>: ValueOperator {
+    /// The output-delta value object (often `M::Out`, kept abstract).
+    type Delta: ValueObject;
+    /// Apply one known unit step to the input.
+    fn unit_step(&self, x: &M::In) -> Option<M::In>;
+    /// The output delta the step MUST produce (the reference coefficient).
+    fn expected_delta(&self) -> Self::Delta;
+    /// Observe the delta between two outputs.
+    fn observed_delta(&self, before: &M::Out, after: &M::Out) -> Self::Delta;
+}
+
+/// Quantitative coefficient probe (reference-bearing): `Some(true)` iff the
+/// observed unit-response equals the reference coefficient. `None` if the unit
+/// step does not apply at `x`.
+pub fn coefficient_holds<M, C>(m: &M, c: &C, x: &M::In) -> Option<bool>
+where
+    M: Morphism,
+    C: Coefficient<M>,
+{
+    let stepped = c.unit_step(x)?;
+    let (y, _) = m.forward(x);
+    let (y_stepped, _) = m.forward(&stepped);
+    Some(c.observed_delta(&y, &y_stepped) == c.expected_delta())
 }
 
 // ===== composition: loss composes as a value object ======================

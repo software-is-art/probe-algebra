@@ -13,10 +13,11 @@
 
 use proptest::prelude::*;
 
-use crate::boundary::{probe, run, Compose, Morphism};
+use crate::boundary::{coefficient_holds, commutes, probe, run, Compose, Morphism};
 use crate::ledger::boundary::{
     Account, Aggregate, AggregateDropsAmounts, Balance, Cents, Posting, Round, Split, Transaction,
 };
+use crate::linear::boundary::{Double, Quantity, Scale, UnitResponse};
 
 // ===== strategies ========================================================
 
@@ -62,6 +63,12 @@ fn tx_broad() -> impl Strategy<Value = Transaction> {
 
 fn tx_substantial() -> impl Strategy<Value = Transaction> {
     transaction(amount_substantial())
+}
+
+/// Quantities small enough that doubling-then-scaling stays inside the valid
+/// range, so the structural relations are exercised without overflow noise.
+fn quantity() -> impl Strategy<Value = Quantity> {
+    (-50_000i64..=50_000i64).prop_map(|n| Quantity::new(n).expect("in range"))
 }
 
 // ===== laws ==============================================================
@@ -180,5 +187,32 @@ proptest! {
     #[test]
     fn balance_zero_is_identity(b in balance()) {
         prop_assert_eq!(b.plus(Balance::zero()), b);
+    }
+
+    // ----- linear transport: the decisive negative result, over the space -----
+
+    /// BLIND #1 (everywhere): the wrong-coefficient transport round-trips for
+    /// every input — round-trip is structurally blind to a wrong constant.
+    #[test]
+    fn skew_round_trips_everywhere(x in quantity()) {
+        let recovered = run(&Scale::skew(), &x).invert(&Scale::skew());
+        prop_assert_eq!(recovered.as_ref(), Some(&x));
+    }
+
+    /// BLIND #2 (everywhere): the wrong coefficient commutes with doubling for
+    /// every input, exactly as the honest one does.
+    #[test]
+    fn skew_commutes_everywhere(x in quantity()) {
+        prop_assert_eq!(commutes(&Scale::honest(), &Double, &x), Some(true));
+        prop_assert_eq!(commutes(&Scale::skew(), &Double, &x), Some(true));
+    }
+
+    /// CATCH (everywhere): the quantitative probe holds for the honest transport
+    /// and FAILS for skew on every input — it is what separates them.
+    #[test]
+    fn quantitative_separates_honest_and_skew(x in quantity()) {
+        let unit_response = UnitResponse::from_reference(Scale::reference_rate());
+        prop_assert_eq!(coefficient_holds(&Scale::honest(), &unit_response, &x), Some(true));
+        prop_assert_eq!(coefficient_holds(&Scale::skew(), &unit_response, &x), Some(false));
     }
 }
