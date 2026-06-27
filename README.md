@@ -177,6 +177,23 @@ The audit verifies a *declared* channel (it cannot infer a channel's role from
 the type), so it catches taking the wrong amount of power once the channels are
 named — the same perturb-and-observe machinery as every other probe.
 
+## Carried proofs (a GDP spike)
+
+Value objects enforce *single-value* invariants by construction; they cannot
+express a *relational* fact like "this particular transaction balances". `gdp.rs`
+spikes [Ghosts of Departed Proofs](https://kataskeue.com/gdp.pdf) (mononym's
+technique, hand-rolled, no dependency): a unique type-level **name** brands a
+value, and a `Proof<Name, Predicate>` — mintable only by a real check — carries a
+relational fact across a seam, *tied to that name* so a proof for transaction A
+cannot be used with B (verified: the mismatch is a compile error). Module A's
+check thus discharges module B's precondition at the type level.
+
+The name uniqueness is sound (it bottoms out in the GhostCell HRTB +
+invariant-lifetime trick); the **proof is only as true as its minting check**, so
+proofs are never minted from the statistical probes — those stay runtime. This is
+the type-level *carrier* for facts the probe or a boundary check has established,
+not a replacement for either.
+
 ## Enforcement (build tooling)
 
 `build.rs` parses the source with `syn` and **fails the build** on two tiers.
@@ -207,6 +224,7 @@ module interior.
 | `src/effect/` | effect as a pure morphism relative to a handler (read = input, write = residual) |
 | `src/pipeline/` | nested module: a parent boundary composing two private child boundaries into one narrowed operator |
 | `src/capability.rs` | capability probe: classify a morphism on the chain and flag over-declaration |
+| `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam |
 | `src/select.rs` | kill-matrix set-cover selection |
 | `src/synth.rs` | type-driven DOF coverage / operator synthesis |
 | `src/blindspot.rs` | the blind-spot map as tests |

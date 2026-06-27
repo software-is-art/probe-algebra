@@ -23,6 +23,7 @@
 pub mod boundary;
 pub mod capability;
 pub mod effect;
+pub mod gdp;
 pub mod journal;
 pub mod ledger;
 pub mod linear;
