@@ -22,6 +22,7 @@
 
 pub mod boundary;
 pub mod capability;
+pub mod composition;
 pub mod effect;
 pub mod gdp;
 pub mod journal;

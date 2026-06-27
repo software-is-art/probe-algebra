@@ -43,12 +43,33 @@ impl<N, T> Named<N, T> {
     }
 }
 
+/// Two values sharing ONE name — e.g. an output and its residual from a single
+/// run. They can be separated (`split`) and stored apart, yet only re-paired with
+/// their original partner, because the shared name will not unify with any other.
+pub struct Paired<N, A, B>(Named<N, A>, Named<N, B>);
+impl<N, A, B> Paired<N, A, B> {
+    pub fn left(&self) -> &Named<N, A> {
+        &self.0
+    }
+    pub fn right(&self) -> &Named<N, B> {
+        &self.1
+    }
+    pub fn split(self) -> (Named<N, A>, Named<N, B>) {
+        (self.0, self.1)
+    }
+}
+
 /// An affine seed: consumed to mint a name, so the same seed cannot mint two.
 pub struct Seed<N>(PhantomData<N>);
 impl<N: Name> Seed<N> {
     /// Tag a value with a fresh unique name (consumes the seed).
     pub fn new_named<T>(self, value: T) -> Named<impl Name, T> {
         Named::<N, T>(value, PhantomData)
+    }
+
+    /// Tag TWO values with one shared fresh name (consumes the seed).
+    pub fn new_paired<A, B>(self, a: A, b: B) -> Paired<impl Name, A, B> {
+        Paired(Named::<N, A>(a, PhantomData), Named::<N, B>(b, PhantomData))
     }
 
     /// Split one seed into two with distinct names.

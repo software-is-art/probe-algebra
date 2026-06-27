@@ -133,8 +133,18 @@ the residual `Pair<R_f, R_g>`, so invertibility flows through lossy stages while
 the accumulated residual is kept — the basis for migration data-validation
 (*is the accumulated residual within the acceptable-loss set?*).
 
-**Composition validation is the open frontier** (single-transform is validated
-here; a bug living only in `A∘B`'s interaction is the next experiment).
+**Composition validation** (`src/composition.rs`): the first decisive experiment
+is done. An A∘B *interaction* bug — recombining a summary with a residual from a
+*different* run — is real and silent, and **invisible to per-module probes** (a
+probe only ever tests forward-then-backward on a matched pair, so it cannot even
+construct the mismatch). The fix is a relational precondition no value object can
+express ("these two came from the same run"), discharged at the seam by a GDP
+shared-name brand: `aggregate_paired` brands the summary and residual together,
+`reconcile` accepts only same-name values, and crossing brands from two runs is a
+**compile error** (verified). The honest limit: this holds in-process inside one
+`with_seed`; across persistence the brand cannot travel, so there the runtime
+`explains` check returns as the fallback. Still open: whether *metamorphic
+relations* (not just preconditions) survive composition.
 
 ## The capability chain (least power)
 
@@ -225,6 +235,7 @@ module interior.
 | `src/pipeline/` | nested module: a parent boundary composing two private child boundaries into one narrowed operator |
 | `src/capability.rs` | capability probe: classify a morphism on the chain and flag over-declaration |
 | `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam |
+| `src/composition.rs` | composition validation: an interaction bug invisible to per-module probes, closed by a GDP shared-name seam contract |
 | `src/select.rs` | kill-matrix set-cover selection |
 | `src/synth.rs` | type-driven DOF coverage / operator synthesis |
 | `src/blindspot.rs` | the blind-spot map as tests |
