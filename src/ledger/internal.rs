@@ -11,17 +11,21 @@ use std::collections::BTreeMap;
 
 use crate::boundary::Morphism;
 use crate::ledger::boundary::{
-    Account, AccountSummary, Cents, MultiplicityResidual, Posting, Transaction,
+    Account, AccountSummary, Balance, Cents, MultiplicityResidual, Posting, Transaction,
 };
 
-/// Fold postings into per-account totals and the per-account sorted breakdown of
-/// the amounts that summed to each total. Returns DOMAIN-TYPED maps (`Account` /
-/// `Cents`) — never raw strings, so the validated identity is carried through.
-fn fold(postings: &[Posting]) -> (BTreeMap<Account, i64>, BTreeMap<Account, Vec<Cents>>) {
-    let mut totals: BTreeMap<Account, i64> = BTreeMap::new();
+/// Fold postings into per-account balances and the per-account sorted breakdown
+/// of the amounts that summed to each total. Returns only VALUE OBJECTS
+/// (`Account` / `Balance` / `Cents`) — no raw primitive escapes, and the
+/// summation itself goes through `Balance`'s operators.
+fn fold(postings: &[Posting]) -> (BTreeMap<Account, Balance>, BTreeMap<Account, Vec<Cents>>) {
+    let mut totals: BTreeMap<Account, Balance> = BTreeMap::new();
     let mut breakdown: BTreeMap<Account, Vec<Cents>> = BTreeMap::new();
     for p in postings {
-        *totals.entry(p.account().clone()).or_insert(0) += p.amount().get();
+        let running = totals
+            .entry(p.account().clone())
+            .or_insert_with(Balance::zero);
+        *running = running.add_cents(*p.amount());
         breakdown
             .entry(p.account().clone())
             .or_default()

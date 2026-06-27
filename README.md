@@ -2,6 +2,14 @@
 
 Experiments with constraining bugs by making module boundaries an algebra.
 
+The constraint under study: **every primitive that means something in the domain
+must be a value object, and every operation on it a value operator** — no raw
+primitive arithmetic at a call site. Money is `Cents` (an amount) and `Balance`
+(a sum), each with its own operators (`split`, `checked_add`, `split_dollar`, …);
+account names are `Account`; the only place a raw `i64`/`String` appears is inside
+a value object's own operator or its accessor (the sanctioned exit hatch). This
+is a `lib` (the algebra + vocabulary) plus a thin `demo` bin.
+
 ## The boundary discipline
 
 A module's **`boundary.rs`** is the *only* surface it exposes to other modules,
@@ -62,12 +70,13 @@ grammar. No free functions, global `static`s, submodules, traits, public fields,
 or any `unsafe` / I/O (boundaries are a pure value layer).
 
 **Tier 2 — module-internal files (e.g. `internal.rs`):** the "workshop", where
-mutation and raw collections are fine — but the *inward* rule
-(parse-don't-validate) still holds: a function may not **return a raw
-`String`/`&str`**, because in this domain a string is always a validated concept
-(an `Account`) and returning it raw drops the invariant. Bare scalars (`i64`,
-`usize`) are allowed — they carry no invariant. Files directly under `src/` (the
-grammar `boundary.rs`, `main.rs`, tests) are exempt.
+mutation and raw collections are fine — but the *inward* rule still holds: a
+function may not **return a raw primitive** — `String`/`&str` or any numeric
+(`i64`, `usize`, `f64`, …) — because every domain primitive must be a value
+object with its own operators (`Account` / `Cents` / `Balance`). `bool` is exempt
+(a predicate is control, not domain data); accessors that unwrap to a primitive
+live at the boundary (tier 1), the sanctioned exit hatch. Files directly under
+`src/` (the grammar `boundary.rs`, `main.rs`, tests) are exempt.
 
 ```
 warning: src/ledger/boundary.rs: free function `helper` — value operators must

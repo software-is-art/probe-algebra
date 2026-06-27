@@ -7,10 +7,12 @@
 //!
 //! TIER 2 — module-internal files (any other `.rs` inside a module directory,
 //! e.g. `internal.rs`): the "workshop". Mutation and raw collections are fine
-//! here, but the INWARD rule (parse-don't-validate) still holds: a function may
-//! not RETURN a raw `String` / `&str`, because in this domain a string is always
-//! a validated concept (an account) and returning it raw drops the invariant.
-//! Bare scalars (`i64`, `usize`, `bool`) are allowed — they carry no invariant.
+//! here, but the INWARD rule still holds: a function may not RETURN a raw
+//! primitive — `String`/`&str` or any numeric (`i64`, `usize`, `f64`, ...) —
+//! because every primitive that means something in the domain must be a value
+//! object with its own operators. `bool` is exempt (a predicate is control, not
+//! domain data). Accessors that unwrap to a primitive live at the boundary
+//! (tier 1), the sanctioned exit hatch — they are not subject to this rule.
 //!
 //! EXEMPT — files directly under `src/` (`main.rs`, the grammar `boundary.rs`,
 //! test files): the crate root / vocabulary definition, not a module interior.
@@ -181,13 +183,13 @@ struct RuleAVisitor {
 impl<'ast> Visit<'ast> for RuleAVisitor {
     fn visit_signature(&mut self, sig: &'ast Signature) {
         if let ReturnType::Type(_, ty) = &sig.output {
-            let mut finder = StringFinder { found: false };
+            let mut finder = PrimitiveFinder { offender: None };
             finder.visit_type(ty);
-            if finder.found {
+            if let Some(prim) = finder.offender {
                 self.hits.push(format!(
-                    "{}: `{}` returns a raw String/str — parse-don't-validate: a domain string \
-                     is a validated value object (e.g. Account); don't return it un-typed",
-                    self.loc, sig.ident
+                    "{}: `{}` returns a raw `{}` — every domain primitive must be a value object \
+                     with its own operators (e.g. Account / Cents / Balance), never returned un-typed",
+                    self.loc, sig.ident, prim
                 ));
             }
         }
@@ -195,34 +197,41 @@ impl<'ast> Visit<'ast> for RuleAVisitor {
     }
 }
 
-/// Detects `String` / `&str` anywhere within a return type (incl. inside
-/// generics such as `BTreeMap<String, _>` and tuples).
-struct StringFinder {
-    found: bool,
+/// A raw primitive that must not escape a module-internal function via its return
+/// type. `bool` is intentionally absent — a predicate is control, not domain data.
+const RAW_PRIMITIVES: &[&str] = &[
+    "String", "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128",
+    "usize", "f32", "f64", "char",
+];
+
+/// Detects a raw primitive anywhere within a return type (incl. inside generics
+/// such as `BTreeMap<Account, i64>` and tuples, and `&str`).
+struct PrimitiveFinder {
+    offender: Option<String>,
 }
 
-impl<'ast> Visit<'ast> for StringFinder {
+impl<'ast> Visit<'ast> for PrimitiveFinder {
     fn visit_path(&mut self, p: &'ast syn::Path) {
-        if p.segments
-            .last()
-            .map(|s| s.ident == "String")
-            .unwrap_or(false)
-        {
-            self.found = true;
+        if let Some(seg) = p.segments.last() {
+            let id = seg.ident.to_string();
+            if self.offender.is_none() && RAW_PRIMITIVES.contains(&id.as_str()) {
+                self.offender = Some(id);
+            }
         }
         visit::visit_path(self, p);
     }
 
     fn visit_type_reference(&mut self, r: &'ast syn::TypeReference) {
         if let Type::Path(tp) = &*r.elem {
-            if tp
-                .path
-                .segments
-                .last()
-                .map(|s| s.ident == "str")
-                .unwrap_or(false)
+            if self.offender.is_none()
+                && tp
+                    .path
+                    .segments
+                    .last()
+                    .map(|s| s.ident == "str")
+                    .unwrap_or(false)
             {
-                self.found = true;
+                self.offender = Some("str".to_string());
             }
         }
         visit::visit_type_reference(self, r);

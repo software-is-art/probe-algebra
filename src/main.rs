@@ -1,19 +1,10 @@
-//! demo — exercises the morphological-testing algebra THROUGH module boundaries.
-//!
-//! `main` may name only `crate::boundary` (the grammar) and `ledger::boundary`
-//! (the ledger's interface). The aggregation algorithm in `ledger::internal` is
-//! private and unreachable from here — that is the boundary doing its job.
+//! demo — exercises the morphological-testing algebra THROUGH the published
+//! boundaries. The bin can name only `probe_algebra::boundary` (the grammar) and
+//! `probe_algebra::ledger::boundary` (the ledger's interface); the aggregation
+//! algorithm in `ledger::internal` is private and unreachable from here.
 
-mod boundary;
-mod ledger;
-
-#[cfg(test)]
-mod properties;
-#[cfg(test)]
-mod tests;
-
-use boundary::{probe, run, Compose, Morphism};
-use ledger::boundary::{
+use probe_algebra::boundary::{probe, run, Compose, Morphism, ProbeResult};
+use probe_algebra::ledger::boundary::{
     Account, Aggregate, AggregateDropsAmounts, Cents, NudgeCents, Posting, Round, Split,
     Transaction,
 };
@@ -111,7 +102,7 @@ fn main() {
     banner("DONE");
 }
 
-fn report(label: &str, pr: &boundary::ProbeResult) {
+fn report(label: &str, pr: &ProbeResult) {
     println!("  {}", label);
     println!(
         "    output invariant under perturbation : {}",

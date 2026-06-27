@@ -15,7 +15,7 @@ use proptest::prelude::*;
 
 use crate::boundary::{probe, run, Compose, Morphism};
 use crate::ledger::boundary::{
-    Account, Aggregate, AggregateDropsAmounts, Cents, Posting, Round, Split, Transaction,
+    Account, Aggregate, AggregateDropsAmounts, Balance, Cents, Posting, Round, Split, Transaction,
 };
 
 // ===== strategies ========================================================
@@ -29,6 +29,18 @@ fn account() -> impl Strategy<Value = Account> {
 
 fn amount_broad() -> impl Strategy<Value = i64> {
     -1_000_000i64..=1_000_000i64
+}
+
+/// Any valid Cents across the full range — exercises the operators near their
+/// invariant edges (where checked_add/checked_sub can return None).
+fn cents() -> impl Strategy<Value = Cents> {
+    (-100_000_000i64..=100_000_000i64).prop_map(|c| Cents::new(c).expect("in range"))
+}
+
+/// A Balance built through its operators from a single Cents (provenance: a
+/// balance only ever arises from accumulating amounts).
+fn balance() -> impl Strategy<Value = Balance> {
+    cents().prop_map(|c| Balance::zero().add_cents(c))
 }
 
 fn amount_substantial() -> impl Strategy<Value = i64> {
@@ -101,5 +113,62 @@ proptest! {
         let pr = probe(&AggregateDropsAmounts, &Split, &x).unwrap();
         prop_assert!(!pr.round_trips, "count-only residual unexpectedly round-tripped: {:?}", x);
         prop_assert!(!pr.residual_complete());
+    }
+
+    // ----- Cents operator laws -----
+
+    /// `split` is loss-free: the two parts always sum back to the original.
+    #[test]
+    fn cents_split_round_trips(c in cents()) {
+        let (half, rest) = c.split();
+        prop_assert_eq!(half.checked_add(rest), Some(c));
+    }
+
+    /// Negation is an involution.
+    #[test]
+    fn cents_negate_is_involution(c in cents()) {
+        prop_assert_eq!(c.negate().negate(), c);
+    }
+
+    /// Zero is the additive identity.
+    #[test]
+    fn cents_zero_is_identity(c in cents()) {
+        prop_assert_eq!(c.checked_add(Cents::zero()), Some(c));
+    }
+
+    /// Addition is commutative (including when it overflows the range to None).
+    #[test]
+    fn cents_add_is_commutative(a in cents(), b in cents()) {
+        prop_assert_eq!(a.checked_add(b), b.checked_add(a));
+    }
+
+    /// add then sub is identity whenever the addition stayed in range.
+    #[test]
+    fn cents_add_sub_inverse(a in cents(), b in cents()) {
+        if let Some(sum) = a.checked_add(b) {
+            prop_assert_eq!(sum.checked_sub(b), Some(a));
+        }
+    }
+
+    // ----- Balance operator laws -----
+
+    /// `split_dollar` is loss-free, and the remainder is always sub-dollar.
+    #[test]
+    fn balance_split_dollar_round_trips(b in balance()) {
+        let (whole, remainder) = b.split_dollar();
+        prop_assert!((0..100).contains(&remainder.get()), "remainder not sub-dollar: {:?}", remainder);
+        prop_assert_eq!(whole.add_cents(remainder), b);
+    }
+
+    /// Negation is an involution.
+    #[test]
+    fn balance_negate_is_involution(b in balance()) {
+        prop_assert_eq!(b.negate().negate(), b);
+    }
+
+    /// Zero is the additive identity.
+    #[test]
+    fn balance_zero_is_identity(b in balance()) {
+        prop_assert_eq!(b.plus(Balance::zero()), b);
     }
 }
