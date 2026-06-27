@@ -1,0 +1,8 @@
+[package]
+name = "probe-algebra"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"
