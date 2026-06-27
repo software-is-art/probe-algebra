@@ -213,3 +213,45 @@ mod state {
         assert_eq!(discarded.out(), &reg(10)); // current state still readable
     }
 }
+
+// ===== effect: a morphism made pure relative to a handler ==================
+
+mod effect {
+    use crate::boundary::{Morphism, Pair};
+    use crate::effect::boundary::{Clock, Demand, Entry, Message, Stamp, Stamped};
+    use crate::effect::handler::{run_stamp, RecordingHandler};
+
+    /// Pure relative to a handler: the recording handler scripts the reading and
+    /// captures the emission; the operator round-trips like any pure morphism.
+    #[test]
+    fn pure_relative_to_a_handler_round_trips() {
+        let mut handler = RecordingHandler::new(Clock::new(100).unwrap());
+        let out = run_stamp(&mut handler, &Demand, &Message::new(5).unwrap());
+        assert_eq!(out, Stamped::new(105).unwrap());
+        // the WRITE is captured as data, not performed
+        assert_eq!(handler.written(), &[Entry::new(100).unwrap()]);
+        // the pure morphism inverts: (output, emission) -> (message, reading)
+        let recovered = Stamp.backward(&out, &Entry::new(100).unwrap());
+        assert_eq!(
+            recovered,
+            Some(Pair(Message::new(5).unwrap(), Clock::new(100).unwrap()))
+        );
+    }
+
+    /// The output depends on the WORLD reading — the defining mark of a read
+    /// effect. Two scripted clocks give two outputs; each handler is deterministic.
+    #[test]
+    fn output_responds_to_the_world_reading() {
+        let msg = Message::new(5).unwrap();
+        let mut early = RecordingHandler::new(Clock::new(100).unwrap());
+        let mut late = RecordingHandler::new(Clock::new(200).unwrap());
+        let a = run_stamp(&mut early, &Demand, &msg);
+        let b = run_stamp(&mut late, &Demand, &msg);
+        assert_ne!(a, b, "the output reflects the world reading");
+        assert_eq!(a, Stamped::new(105).unwrap());
+        assert_eq!(b, Stamped::new(205).unwrap());
+        // deterministic relative to a fixed handler (unlike a live clock)
+        let mut again = RecordingHandler::new(Clock::new(100).unwrap());
+        assert_eq!(run_stamp(&mut again, &Demand, &msg), a);
+    }
+}

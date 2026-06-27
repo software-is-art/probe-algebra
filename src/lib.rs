@@ -21,6 +21,7 @@
 //!   - `synth`   — type-driven degree-of-freedom coverage / operator synthesis.
 
 pub mod boundary;
+pub mod effect;
 pub mod journal;
 pub mod ledger;
 pub mod linear;
