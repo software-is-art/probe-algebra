@@ -213,7 +213,12 @@ free functions, global `static`s, submodules, traits, public fields, any
 `unsafe` / I/O, **or `pub use` re-exports** — a boundary must *define* its
 citizens, not forward a child's. (Re-export would let a parent's surface silently
 become its whole subtree, destroying "one place to look"; a parent narrows by
-defining an operator that delegates inward — see `src/pipeline/`.)
+defining an operator that delegates inward — see `src/pipeline/`.) A value
+object's field **may not downgrade a value object to a raw primitive**: a
+primitive may appear only as the lone field of a newtype wrapper (`Cents(i64)`,
+`Account(String)`), never nested in a composite (`BTreeMap<String, _>` is a build
+error — use `BTreeMap<Account, _>`). This makes the downgrade that forces
+re-parsing impossible.
 
 **Tier 2 — module-internal files (e.g. `internal.rs`):** the "workshop", where
 mutation and raw collections are fine — but a function may not **return a raw

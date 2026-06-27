@@ -153,19 +153,59 @@ fn check_boundary(loc: &str, file: &syn::File, out: &mut Vec<String>) {
 }
 
 fn check_fields(loc: &str, name: &str, fields: &Fields, out: &mut Vec<String>) {
-    let visibilities = match fields {
-        Fields::Named(n) => n.named.iter().map(|f| &f.vis).collect::<Vec<_>>(),
-        Fields::Unnamed(u) => u.unnamed.iter().map(|f| &f.vis).collect::<Vec<_>>(),
+    let field_types: Vec<(&Visibility, &Type)> = match fields {
+        Fields::Named(n) => n.named.iter().map(|f| (&f.vis, &f.ty)).collect(),
+        Fields::Unnamed(u) => u.unnamed.iter().map(|f| (&f.vis, &f.ty)).collect(),
         Fields::Unit => return,
     };
-    for vis in visibilities {
-        if !matches!(vis, Visibility::Inherited) {
+
+    // A value object must not expose its internals.
+    if field_types
+        .iter()
+        .any(|(vis, _)| !matches!(vis, Visibility::Inherited))
+    {
+        out.push(format!(
+            "{loc}: `{name}` has a public field — a value object must not expose its internals"
+        ));
+    }
+
+    // A raw primitive may appear ONLY as the lone field of a newtype WRAPPER
+    // (`Cents(i64)`, `Account(String)`). Anywhere else — nested in a collection,
+    // a named field, a multi-field tuple — it is a value object DOWNGRADED to a
+    // primitive (e.g. `BTreeMap<String, _>` instead of `BTreeMap<Account, _>`),
+    // which is what forces re-parsing later. Make that impossible here.
+    if is_primitive_newtype(fields) {
+        return;
+    }
+    for (_, ty) in &field_types {
+        let mut finder = PrimitiveFinder { offender: None };
+        finder.visit_type(ty);
+        if let Some(prim) = finder.offender {
             out.push(format!(
-                "{loc}: `{name}` has a public field — a value object must not expose its internals"
+                "{loc}: `{name}` has a field containing raw `{prim}` — a value object must compose \
+                 value objects; a primitive may appear only as the lone field of a newtype wrapper \
+                 (e.g. `Account(String)`), never downgraded inside one"
             ));
-            break;
         }
     }
+}
+
+/// A single-field tuple struct whose field is a bare primitive — the sanctioned
+/// wrapper (`Cents(i64)`, `Account(String)`). The one place a primitive is allowed.
+fn is_primitive_newtype(fields: &Fields) -> bool {
+    matches!(fields, Fields::Unnamed(u) if u.unnamed.len() == 1 && is_bare_primitive(&u.unnamed[0].ty))
+}
+
+/// A type that IS a raw primitive at the top level (no generic arguments), as
+/// opposed to one that merely contains a primitive nested inside generics.
+fn is_bare_primitive(ty: &Type) -> bool {
+    if let Type::Path(tp) = ty {
+        if let Some(seg) = tp.path.segments.last() {
+            return RAW_PRIMITIVES.contains(&seg.ident.to_string().as_str())
+                && matches!(seg.arguments, syn::PathArguments::None);
+        }
+    }
+    false
 }
 
 fn describe(item: &Item) -> &'static str {

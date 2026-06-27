@@ -161,22 +161,22 @@ impl Transaction {
 
 /// OUTPUT value object: per-account totals. Multiplicity is GONE (each account
 /// has one total). Constructed only inside this boundary.
+///
+/// Keyed by `Account`, NOT `String`: downgrading the key to a raw label was the
+/// value object dropped to a primitive, which forced later code to re-parse it
+/// (`Account::new(label).expect(...)`). Keeping the value object removes the
+/// re-parse — and the latent panic — entirely.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountSummary {
-    totals: BTreeMap<String, Balance>,
+    totals: BTreeMap<Account, Balance>,
 }
 impl AccountSummary {
     /// Module-scoped constructor: the internal aggregation hands back
-    /// `Account`-keyed balances; the summary stores plain labels for its view.
+    /// `Account`-keyed balances, and the summary keeps them as such.
     pub(in crate::ledger) fn from_totals(totals: BTreeMap<Account, Balance>) -> Self {
-        Self {
-            totals: totals
-                .into_iter()
-                .map(|(a, b)| (a.get().to_string(), b))
-                .collect(),
-        }
+        Self { totals }
     }
-    pub fn totals(&self) -> &BTreeMap<String, Balance> {
+    pub fn totals(&self) -> &BTreeMap<Account, Balance> {
         &self.totals
     }
 }
@@ -203,7 +203,7 @@ impl MultiplicityResidual {
 /// account total. Rounded total + this residual reconstructs the exact total.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoundingResidual {
-    leftover: BTreeMap<String, Cents>,
+    leftover: BTreeMap<Account, Cents>,
 }
 
 crate::value_object!(
@@ -309,10 +309,9 @@ impl Morphism for AggregateOffsetsTotals {
         // so the round-trip (which rebuilds from the residual) still holds — the
         // damage is only in the OUTPUT, where a commutation probe must catch it.
         let mut totals = BTreeMap::new();
-        for (label, balance) in summary.totals() {
-            let account = Account::new(label).expect("a stored label is a valid account");
+        for (account, balance) in summary.totals() {
             totals.insert(
-                account,
+                account.clone(),
                 balance.add_cents(Cents::new(1).expect("one cent is valid")),
             );
         }
@@ -400,9 +399,8 @@ impl<M: Morphism<In = Transaction, Out = AccountSummary>> Metamorphic<M> for Dou
 
     fn output_op(&self, y: &AccountSummary) -> AccountSummary {
         let mut totals = BTreeMap::new();
-        for (label, balance) in y.totals() {
-            let account = Account::new(label).expect("a stored label is a valid account");
-            totals.insert(account, balance.plus(*balance));
+        for (account, balance) in y.totals() {
+            totals.insert(account.clone(), balance.plus(*balance));
         }
         AccountSummary::from_totals(totals)
     }

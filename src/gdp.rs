@@ -19,7 +19,8 @@
 
 use core::marker::PhantomData;
 
-use crate::ledger::boundary::{Balance, Transaction};
+use crate::boundary::Morphism;
+use crate::ledger::boundary::{AccountSummary, Balance, Round, Transaction};
 
 // ===== the name machinery (mononym's technique, hand-rolled) ==============
 
@@ -93,34 +94,101 @@ pub struct Proof<N, P>(PhantomData<(N, P)>);
 
 /// Predicate: a transaction is balanced (its postings sum to zero — double entry).
 pub struct Balanced;
+/// Predicate: a transaction is NOT balanced.
+pub struct Unbalanced;
 
-/// Module A's check: mint `Balanced` IFF the named transaction really balances.
-/// This is where the fact is EARNED; the name carries it onward at no cost.
-pub fn prove_balanced<N>(tx: &Named<N, Transaction>) -> Option<Proof<N, Balanced>> {
+/// Total classification — the paper's `classify`, NOT a `Maybe`. Every named
+/// transaction is balanced or not, and BOTH branches carry a usable proof.
+/// `Option<Proof<Balanced>>` would discard the negative witness; keeping it makes
+/// the unbalanced case first-class (route it to a correction queue, etc.).
+pub enum BalanceProof<N> {
+    Balanced(Proof<N, Balanced>),
+    Unbalanced(Proof<N, Unbalanced>),
+}
+
+/// Classify a named transaction by balance, minting the matching proof. This is
+/// where the fact is EARNED; the name carries it onward at no cost.
+pub fn classify_balance<N>(tx: &Named<N, Transaction>) -> BalanceProof<N> {
     let mut total = Balance::zero();
     for posting in tx.value().postings() {
         total = total.add_cents(*posting.amount());
     }
     if total == Balance::zero() {
-        Some(Proof(PhantomData))
+        BalanceProof::Balanced(Proof(PhantomData))
     } else {
-        None
+        BalanceProof::Unbalanced(Proof(PhantomData))
     }
 }
 
-/// Module B's precondition: it accepts a transaction ONLY together with a proof
-/// that the SAME named transaction is balanced. It cannot be called with an
-/// unbalanced one (no proof exists), an unbranded one (not `Named`), or a proof
-/// minted for a different transaction (`N` will not unify). A's check discharges
-/// B's precondition at the type level.
+/// Consumer of the POSITIVE branch: accepts a transaction ONLY with a proof that
+/// the SAME named value is balanced — so an unbalanced, unbranded, or
+/// wrong-named transaction will not type-check. A's classification discharges B's
+/// precondition.
 pub fn export_balanced<N>(tx: &Named<N, Transaction>, _proof: &Proof<N, Balanced>) -> usize {
     tx.value().postings().len()
+}
+
+/// Consumer of the NEGATIVE branch: accepts a transaction ONLY with a proof it is
+/// UNBALANCED (e.g. route to a correction queue). The negative witness is carried,
+/// not discarded — that is the upgrade over an `Option`-returning check.
+pub fn quarantine_unbalanced<N>(
+    tx: &Named<N, Transaction>,
+    _proof: &Proof<N, Unbalanced>,
+) -> usize {
+    tx.value().postings().len()
+}
+
+// ===== a witness that an OPERATION occurred (the audit) ===================
+
+/// A named value bundled with a proof about it under one shared name — e.g. an
+/// output together with a witness of the operation that produced it.
+pub struct Witnessed<N, T, P>(Named<N, T>, Proof<N, P>);
+impl<N, T, P> Witnessed<N, T, P> {
+    pub fn named(&self) -> &Named<N, T> {
+        &self.0
+    }
+    pub fn proof(&self) -> &Proof<N, P> {
+        &self.1
+    }
+    pub fn split(self) -> (Named<N, T>, Proof<N, P>) {
+        (self.0, self.1)
+    }
+}
+
+/// Witness: this summary is the result of `Round` (whole-dollar) reduction.
+///
+/// AUDIT finding: an operation's having-occurred is lost from the type system
+/// exactly when the operation is an ENDO-map (input and output the same type).
+/// `Round: AccountSummary -> AccountSummary` and `Scale: Quantity -> Quantity`
+/// both erase the fact that they ran — a rounded summary is indistinguishable
+/// from an un-rounded one. (Contrast `Calibrate: Sample -> Reading`, where the
+/// type change itself witnesses the operation, so nothing is lost.) For an
+/// endo-operation, capture the lost witness with a proof on the named output.
+pub struct Rounded;
+
+/// Run `Round`, capturing a witness — tied to the output's name — that rounding
+/// occurred. The operation is no longer invisible: downstream can DEMAND it.
+pub fn round_witnessed<N: Name>(
+    // consumed for its unique name `N` (affine: the seed cannot be reused) — the
+    // value and the proof are both branded with it below.
+    _seed: Seed<N>,
+    summary: &AccountSummary,
+) -> Witnessed<impl Name, AccountSummary, Rounded> {
+    let (rounded, _residual) = Round.forward(summary);
+    Witnessed(Named::<N, _>(rounded, PhantomData), Proof(PhantomData))
+}
+
+/// A consumer requiring its input to have been ROUNDED — e.g. a whole-dollar
+/// formatter. It cannot be called on an un-rounded or un-witnessed summary, so
+/// "forgot to round" becomes a compile error rather than a wrong report.
+pub fn whole_dollars<N>(summary: &Named<N, AccountSummary>, _proof: &Proof<N, Rounded>) -> usize {
+    summary.value().totals().len()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ledger::boundary::{Account, Cents, Posting};
+    use crate::ledger::boundary::{Account, Aggregate, Cents, Posting};
 
     fn balanced() -> Transaction {
         Transaction::new(vec![
@@ -134,49 +202,71 @@ mod tests {
     }
 
     fn unbalanced() -> Transaction {
-        Transaction::new(vec![Posting::new(
-            Account::new("Cash").unwrap(),
-            Cents::new(10_000).unwrap(),
-        )])
+        Transaction::new(vec![
+            Posting::new(Account::new("Cash").unwrap(), Cents::new(10_000).unwrap()),
+            Posting::new(Account::new("Fees").unwrap(), Cents::new(5_000).unwrap()),
+        ])
         .unwrap()
     }
 
-    /// A's check mints the proof; the SAME named value + proof discharges B's
-    /// precondition. (The proof is tied to this value's name; one minted for
-    /// another transaction would not type-check here — `N` cannot unify.)
+    /// Total classify, positive branch: the proof discharges B's precondition,
+    /// tied to this value's name (a proof for another transaction would not unify).
     #[test]
-    fn balance_proof_discharges_the_export_precondition() {
+    fn balanced_branch_discharges_export() {
         with_seed(|seed| {
             let named = seed.new_named(balanced());
-            let proof = prove_balanced(&named).expect("the sample balances");
-            assert_eq!(export_balanced(&named, &proof), 2);
+            match classify_balance(&named) {
+                BalanceProof::Balanced(proof) => assert_eq!(export_balanced(&named, &proof), 2),
+                BalanceProof::Unbalanced(_) => panic!("the sample balances"),
+            }
         });
     }
 
-    /// An unbalanced transaction yields NO proof, so `export_balanced` is
-    /// unreachable for it — there is nothing to pass as the second argument.
+    /// Total classify, negative branch: the unbalanced case is NOT discarded — it
+    /// carries a proof the correction path consumes.
     #[test]
-    fn unbalanced_transaction_has_no_proof() {
+    fn unbalanced_branch_carries_a_usable_witness() {
         with_seed(|seed| {
             let named = seed.new_named(unbalanced());
-            assert!(prove_balanced(&named).is_none());
+            match classify_balance(&named) {
+                BalanceProof::Unbalanced(proof) => {
+                    assert_eq!(quarantine_unbalanced(&named, &proof), 2)
+                }
+                BalanceProof::Balanced(_) => panic!("the sample does not balance"),
+            }
         });
     }
 
-    /// Distinct seeds give distinct names: a proof about one cannot be confused
-    /// with the other. (Using `proof_a` with `named_b` below would not compile.)
+    /// Distinct seeds give distinct names: a proof about one cannot be used with
+    /// the other (crossing them would not compile).
     #[test]
     fn names_from_distinct_seeds_do_not_unify() {
         with_seed(|seed| {
             let (s1, s2) = seed.replicate();
-            let named_a = s1.new_named(balanced());
-            let named_b = s2.new_named(balanced());
-            let proof_a = prove_balanced(&named_a).unwrap();
-            let proof_b = prove_balanced(&named_b).unwrap();
-            // each proof discharges only its own value's precondition
-            assert_eq!(export_balanced(&named_a, &proof_a), 2);
-            assert_eq!(export_balanced(&named_b, &proof_b), 2);
-            // export_balanced(&named_a, &proof_b) — does NOT compile: N mismatch.
+            let a = s1.new_named(balanced());
+            let b = s2.new_named(balanced());
+            match (classify_balance(&a), classify_balance(&b)) {
+                (BalanceProof::Balanced(pa), BalanceProof::Balanced(pb)) => {
+                    assert_eq!(export_balanced(&a, &pa), 2);
+                    assert_eq!(export_balanced(&b, &pb), 2);
+                    // export_balanced(&a, &pb) — does NOT compile: names differ.
+                }
+                _ => panic!("both balance"),
+            }
+        });
+    }
+
+    /// The captured operation-witness: `round_witnessed` records that rounding
+    /// occurred, and `whole_dollars` can be called ONLY with that witness — the
+    /// endo-operation is no longer invisible in the type system.
+    #[test]
+    fn rounding_witness_is_captured_and_required() {
+        with_seed(|seed| {
+            let summary = Aggregate.forward(&balanced()).0;
+            let (named, proof) = round_witnessed(seed, &summary).split();
+            assert_eq!(whole_dollars(&named, &proof), 2);
+            // whole_dollars(&some_unrounded_named, ...) — impossible: no Rounded
+            // proof exists for a summary that did not pass round_witnessed.
         });
     }
 }
