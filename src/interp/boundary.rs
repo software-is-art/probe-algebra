@@ -189,9 +189,12 @@ impl Source {
         Source(text.to_string())
     }
     /// The character at position `p`, or `None` past the end. The one place a `char`
-    /// crosses out — a boundary accessor, the substrate's sanctioned exit hatch.
+    /// crosses out — a boundary accessor, the substrate's sanctioned exit hatch. The
+    /// canonical source is ASCII (the language has no other glyphs), so a byte index is
+    /// O(1) and exact; a non-ASCII byte maps to a char no token arm accepts, so the lex
+    /// rejects it anyway.
     pub(crate) fn at(&self, p: &Pos) -> Option<char> {
-        self.0.chars().nth(p.index())
+        self.0.as_bytes().get(p.index()).map(|&b| b as char)
     }
 }
 
