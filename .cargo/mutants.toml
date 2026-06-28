@@ -1,0 +1,56 @@
+# cargo-mutants configuration.
+#
+# Mutation testing is the engine of this method: it certifies that the probe
+# suite actually kills planted bugs, and any SURVIVING mutant points at a
+# missing relation or degree of freedom (see src/select.rs::uncoverable).
+#
+# WHERE mutations are generated — scoped to the DOMAIN ALGEBRA, not the whole
+# crate. The boundary discipline concentrates behaviour at the edges (morphisms,
+# constructions, branches, guards) and the probes, so that surface is exactly
+# where a surviving mutant is a genuine signal. We exclude:
+#
+#   - `src/main.rs` — the `demo` binary only prints, no assertions, so its
+#     mutants are noise.
+#   - `src/select.rs` / `src/capability.rs` — the method's META-TOOLING (kill-matrix
+#     set-cover selection; the claim-vs-behaviour capability audit). These are
+#     demonstrations OF the method, not domain behaviour; they carry their own unit
+#     tests, but their mutants are internal heuristics that earlier full-crate runs
+#     showed to be provably EQUIVALENT (a monotonic tie-break that is `-`/`/`
+#     invariant; an `under-claim` edge whose `declared_sources` is legitimately the
+#     empty slice, so an empty-body mutant is indistinguishable) or a
+#     non-terminating `&&`/`||` swap. Excluding them keeps every survivor on the
+#     DOMAIN surface meaningful rather than mixing in equivalent-mutant noise.
+#   - `boundary-algebra-macros/**` — the `#[derive(Shaped)]` proc-macro. It is
+#     code-GENERATION tooling, not domain behaviour; its output is exercised
+#     transitively (every derived `Shaped` is hit by the fused-probe and
+#     universal-sensitivity tests), so a real generation bug still surfaces on the
+#     domain surface, while the macro's own internals are not domain signal.
+#
+# The rest of the library — the grammar (`boundary.rs`), the interpreter's edges and
+# probes, and `gdp` — stays in scope, so a domain bug still cannot hide. (The one
+# equivalent survivor on the grammar surface is `Shaped for bool`'s `inhabitant`,
+# whose canonical seed `false` equals `Default::default()` — documented, not excluded.)
+#
+# `interp/internal.rs` is DELIBERATELY kept in scope despite being module-internal:
+# the interpreter is the experiment that MEASURES whether the boundary rigour buys
+# zero internal testing. `interp/internal.rs` has no tests of its own, so its
+# mutation score quantifies exactly how much internal correctness the boundary
+# contracts (the autogen `Parse` round-trip law + the `WellTyped` evaluation guard)
+# certify for free. The only survivors there are provably-equivalent (an empty
+# identifier still rejected by `Ident::new`; the evaluator's `_` arms that the
+# `WellTyped` guard makes unreachable).
+exclude_globs = [
+    "src/main.rs",
+    "src/select.rs",
+    "src/capability.rs",
+    "boundary-algebra-macros/**",
+]
+
+# Mutation testing certifies the LIBRARY against the unit + property suites, so
+# run only those. The `tests/compile_fail` (trybuild) suite is the NEGATIVE
+# specification of the interpreter boundary — it asserts illegal uses (e.g. a
+# `WellTyped` proof for the wrong program, a `Lossy` edge through `run_pure`) fail
+# to COMPILE, never executing `src` runtime code, so it kills no `src` mutant. It is
+# also excluded because trybuild's `.stderr` matching is sensitive to the build
+# environment and is unstable inside cargo-mutants' copied tree.
+additional_cargo_test_args = ["--lib"]
