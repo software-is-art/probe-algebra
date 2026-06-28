@@ -116,6 +116,62 @@ macro_rules! proof_token {
     };
 }
 
+/// A REFINED value object: a newtype over a primitive admitted only by a validity rule —
+/// the inward rule's whole premise ("every primitive that means something is a value object
+/// with a smart constructor"), as one grammar line. The PREDICATE is the only content; the
+/// struct, the parse-don't-validate `new`, and the `value_object!` registration are
+/// generated, so a leaf cannot be declared without its validity rule:
+///
+/// ```ignore
+/// refined! {
+///     /// A non-negative integer.
+///     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///     pub struct Int(i64);
+///     // `new` is given the raw input and returns the validated/normalized FIELD, or None.
+///     fn new(n: i64) = (n >= 0).then_some(n);
+/// }
+/// ```
+///
+/// `new`'s body is an expression of type `Option<Field>` over the bound argument — pure
+/// refinement (`Int`) or refinement-with-normalization (`Ident`: `&str` in, `String`
+/// stored). Accessors and value OPERATORS stay in a normal `impl` (they are content).
+#[macro_export]
+macro_rules! refined {
+    (
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident ( $field:ty );
+        fn new( $arg:ident : $argty:ty ) = $validate:expr;
+    ) => {
+        $(#[$meta])*
+        $vis struct $name($field);
+        impl $name {
+            /// Parse-don't-validate: `Some` iff the raw input satisfies the rule.
+            pub fn new($arg: $argty) -> ::core::option::Option<Self> {
+                let __v: ::core::option::Option<$field> = $validate;
+                __v.map($name)
+            }
+        }
+        $crate::value_object!($name);
+    };
+}
+
+/// Assign each named size axis a UNIQUE sequential Peano `Id`, left to right — so two axes
+/// cannot accidentally share an id (the one mistake the open cost map's overlap-freedom
+/// depends on). `axis!(Nodes, Depth)` gives `Nodes = Z`, `Depth = S<Z>`, ...
+#[macro_export]
+macro_rules! axis {
+    ($($name:ident),+ $(,)?) => {
+        $crate::axis!(@ $crate::boundary::Z; $($name),+);
+    };
+    (@ $cur:ty; $name:ident $(, $rest:ident)*) => {
+        impl $crate::boundary::Axis for $name {
+            type Id = $cur;
+        }
+        $crate::axis!(@ $crate::boundary::S<$cur>; $($rest),*);
+    };
+    (@ $cur:ty;) => {};
+}
+
 /// Declare an oracle-free `Relation` (see below) as a grammar line instead of a ~12-line
 /// `impl`. Every value relation has the same skeleton — `apply` a map, `vary` the input,
 /// `rewrite` the expected output — and only the three closures carry information; the
@@ -432,38 +488,43 @@ pub fn stamp_through<Path, M: Morphism>(
     Stamped(m.forward(input.value()).0, PhantomData)
 }
 
-// ===== degrees of freedom: coverage as a COMPILE-TIME obligation ==========
+// ===== degrees of freedom: completeness as a COMPILE-TIME obligation =======
 //
-// `synth` reads a value object's degrees of freedom off its type and checks, at
-// runtime, that a probe's instrument is appropriate to each. The type-level twin
-// makes that completeness a BOUND: a value object declares its DOFs as a type-level
-// set (`DofCons`/`DofNil`, the same cons-list shape as the provenance lineage), a
-// check declares which DOFs it `Covers`, and `CoversAll` recurses the set — so a probe
-// that omits a dimension fails to COMPILE, the way an unbalanced post does. The runtime
-// `Dof` enumeration is then DERIVED from the type-level set, exactly as the runtime
-// `CAPABILITY` is derived from `type Capability` (the third use of the reflect pattern).
+// A value object's degrees of freedom are a type-level set (`DofCons`/`DofNil`); a probe
+// declares which it `Covers`, `CoversAll` recurses the set, and `require_complete` makes
+// covering ALL of them a BOUND — an incomplete probe fails to COMPILE.
+//
+// The DOF SET is now DERIVED, not hand-declared: `#[derive(Shaped)]` emits `HasDofs` with
+// one `Field<T, I>` marker per variant/field, and `Complete<T>` covers every `Field<T, I>`
+// by construction. So the COMPLETE probe is generated — you cannot forget a dimension or
+// under-specify it; the only thing left to get wrong (a hand-written PARTIAL `Covers` set)
+// is still rejected (`tests/compile_fail/incomplete_probe_rejected`). The actual RUNTIME
+// probing is the fused `Shaped` probe above, which is likewise complete by construction —
+// so the per-dimension perturbation is derived, never hand-written.
 
 /// The empty type-level DOF set — a probe covers it vacuously.
 pub struct DofNil;
 /// A cons cell of a type-level DOF set: head DOF `H`, tail set `T`.
 pub struct DofCons<H, T>(PhantomData<(H, T)>);
 
-/// A value object declares its degrees of freedom as a type-level set, so a probe's
-/// completeness is demandable as a bound rather than enumerated at runtime. (The
-/// runtime `synth::Dof` list reflects from `Self::Dofs`.)
+/// The `I`-th DERIVED degree of freedom of value object `T` (one per variant / field).
+/// Generated by `#[derive(Shaped)]`, so the DOF set is mechanical — there is no
+/// hand-written marker to forget or mis-name.
+pub struct Field<T, const I: usize>(PhantomData<T>);
+
+/// A value object's degrees of freedom as a type-level set, so completeness is a bound
+/// rather than enumerated by hand. DERIVED by `#[derive(Shaped)]`.
 pub trait HasDofs {
-    /// The type-level DOF set (a `DofCons`/`DofNil` list).
+    /// The type-level DOF set (a `DofCons`/`DofNil` list of `Field<Self, _>`).
     type Dofs;
 }
 
-/// A check that can SEE the degree of freedom `D` — it reaches the dimension AND fires
-/// an instrument appropriate to it (per `synth`, reaching with the wrong check covers
-/// nothing). The per-dimension witness a complete probe must exhibit.
+/// A probe that can SEE the degree of freedom `D` — the per-dimension witness a complete
+/// probe must exhibit.
 pub trait Covers<D> {}
 
-/// A check that covers EVERY DOF in the type-level set `L` — the completeness relation,
-/// by recursion over the set. No overlap: `DofNil` and `DofCons` are disjoint head
-/// constructors, so this is a clean bound on stable Rust.
+/// A probe that covers EVERY DOF in the type-level set `L` — the completeness relation, by
+/// recursion. No overlap: `DofNil` and `DofCons` are disjoint head constructors.
 pub trait CoversAll<L> {}
 impl<C> CoversAll<DofNil> for C {}
 impl<C, H, T> CoversAll<DofCons<H, T>> for C
@@ -473,11 +534,17 @@ where
 {
 }
 
-/// The completeness obligation as a BOUND: this type-checks only when `C` covers every
-/// DOF the value object `T` declares. A check that omits a dimension fails to compile —
-/// the static twin of `synth`'s runtime coverage check, and the LSP push-back a coding
-/// agent gets for an incomplete probe before any test runs. (`tests/compile_fail` pins
-/// the negative: an output-only check that misses a real DOF is rejected.)
+/// The DERIVED complete probe for `T`: it `Covers` every `Field<T, I>` by construction, so
+/// `require_complete::<T, Complete<T>>()` always type-checks — completeness is generated,
+/// not asserted. (The hand-written path still exists as the backstop: a partial `Covers`
+/// set is rejected, which `incomplete_probe_rejected` pins.)
+pub struct Complete<T>(PhantomData<T>);
+impl<T, const I: usize> Covers<Field<T, I>> for Complete<T> {}
+
+/// The completeness obligation as a BOUND: type-checks only when `C` covers every DOF `T`
+/// declares. With the DOF set derived and `Complete<T>` covering it by construction, the
+/// normal path cannot be incomplete; a hand-written probe that omits a dimension still
+/// fails to compile — the push-back a coding agent gets before any test runs.
 pub fn require_complete<T, C>(_check: &C)
 where
     T: HasDofs,
@@ -485,71 +552,14 @@ where
 {
 }
 
-// ===== DOF-driven probe SYNTHESIS: the declaration generates the suite =====
-//
-// `require_complete` checks, at compile time, that a probe COVERS the declared DOFs.
-// This goes the other way: each DOF supplies the perturbation that reaches its
-// dimension, so the runtime completeness suite is SYNTHESIZED from the type-level DOF
-// set — declaring a degree of freedom generates its probe. Coverage is unified across
-// the residual axis: a DOF is covered if perturbing along it is OBSERVABLE, either
-// because the OUTPUT changes (the dimension survives into the output) or the RESIDUAL
-// completely captures it (a lossy dimension witnessed). A dimension covered by NEITHER
-// is silently dropped — exactly the bug the probe exists to find.
-
-/// A degree of freedom that can be probed on morphism `M`: it supplies the perturbation
-/// reaching its dimension. With this, the completeness suite is derived from the DOF set
-/// rather than hand-written per dimension.
-pub trait DofProbe<M: Morphism> {
-    /// The perturbation that moves this dimension.
-    type Perturb: Perturbation<M>;
-    fn perturbation() -> Self::Perturb;
-}
-
-/// Is this DOF OBSERVABLE through `m` at `x`? `Some(true)` if the output responds or the
-/// residual completely captures the perturbation; `Some(false)` if it is silently
-/// dropped; `None` if the perturbation does not apply at `x`.
-pub fn dof_covered<M, D>(m: &M, x: &M::In) -> Option<bool>
-where
-    M: Morphism,
-    D: DofProbe<M>,
-{
-    let pr = probe(m, &D::perturbation(), x)?;
-    Some(!pr.output_invariant || pr.residual_complete())
-}
-
-/// Walk a type-level DOF set, probing each DOF on `M` (oldest first). The recursion over
-/// `DofCons`/`DofNil` is what turns the type-level declaration into a runtime sweep.
-pub trait ProbeDofs<M: Morphism> {
-    fn probe_each(m: &M, x: &M::In, out: &mut Vec<Option<bool>>);
-}
-impl<M: Morphism> ProbeDofs<M> for DofNil {
-    fn probe_each(_m: &M, _x: &M::In, _out: &mut Vec<Option<bool>>) {}
-}
-impl<M, H, T> ProbeDofs<M> for DofCons<H, T>
-where
-    M: Morphism,
-    H: DofProbe<M>,
-    T: ProbeDofs<M>,
-{
-    fn probe_each(m: &M, x: &M::In, out: &mut Vec<Option<bool>>) {
-        out.push(dof_covered::<M, H>(m, x));
-        T::probe_each(m, x, out);
-    }
-}
-
-/// Synthesize and run the completeness suite for EVERY degree of freedom the value
-/// object `T` declares (`HasDofs`), against edge `M` — one verdict per DOF. The DOF
-/// declaration generates the probes: a value object that adds a dimension to its
-/// `HasDofs` set automatically gets it checked, with no new test code.
-pub fn probe_declared_dofs<T, M>(m: &M, x: &M::In) -> Vec<Option<bool>>
+/// The DERIVED-completeness statement: `Complete<T>` covers every DOF `T` declares. It takes
+/// no probe value — completeness is generated, so there is nothing to pass in and nothing to
+/// get wrong. `assert_complete::<Expr>()` is the positive twin of `incomplete_probe_rejected`.
+pub fn assert_complete<T>()
 where
     T: HasDofs,
-    T::Dofs: ProbeDofs<M>,
-    M: Morphism,
+    Complete<T>: CoversAll<<T as HasDofs>::Dofs>,
 {
-    let mut out = Vec::new();
-    <T::Dofs as ProbeDofs<M>>::probe_each(m, x, &mut out);
-    out
 }
 
 /// A possibly-lossy morphism whose `Residual` value object witnesses EXACTLY

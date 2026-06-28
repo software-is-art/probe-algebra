@@ -23,27 +23,23 @@
 use core::marker::PhantomData;
 
 use crate::boundary::{
-    Axis, Branch, Construction, CostCons, CostNil, Covers, DofCons, DofNil, Guarded, HasDofs,
-    Lossy, Morphism, Pure, Stateful, Unit, S, Z,
+    Branch, Construction, CostCons, CostNil, Guarded, Lossy, Morphism, Pure, Stateful, Unit, S, Z,
 };
 use crate::gdp::Named;
 use crate::Shaped; // the `#[derive(Shaped)]` macro (the trait is `crate::boundary::Shaped`)
 
 // ===== value objects: the language's nouns ================================
 
-/// A non-negative integer literal / result, range-checked.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Int(i64);
-impl Int {
-    /// Smart constructor: a literal must be non-negative (the language has no unary
+// `refined!` generates the newtype, the parse-don't-validate `new`, and the value-object
+// registration; the validity rule is the only content.
+crate::refined! {
+    /// A non-negative integer literal / result, range-checked (the language has no unary
     /// minus, so negatives have no source form to round-trip).
-    pub fn new(n: i64) -> Option<Self> {
-        if n >= 0 {
-            Some(Int(n))
-        } else {
-            None
-        }
-    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct Int(i64);
+    fn new(n: i64) = (n >= 0).then_some(n);
+}
+impl Int {
     pub fn get(&self) -> i64 {
         self.0
     }
@@ -66,22 +62,21 @@ impl Int {
     }
 }
 
-/// A variable identifier: a non-empty, all-alphabetic name that is not a keyword.
-/// (Named `Ident`, not `Name`, to avoid colliding with the GDP `Name` brand trait.)
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Ident(String);
-impl Ident {
-    /// Smart constructor — rejects empty, non-alphabetic, or keyword identifiers.
-    pub fn new(s: &str) -> Option<Self> {
+// The validity rule is the only content (it refines a `&str` and NORMALIZES it into the
+// stored `String`); `refined!` generates the rest.
+crate::refined! {
+    /// A variable identifier: a non-empty, all-alphabetic name that is not a keyword. (Named
+    /// `Ident`, not `Name`, to avoid colliding with the GDP `Name` brand trait.)
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    pub struct Ident(String);
+    fn new(s: &str) = {
         let ok = !s.is_empty()
             && s.chars().all(|c| c.is_ascii_alphabetic())
             && !matches!(s, "if" | "then" | "else" | "let" | "in" | "true" | "false");
-        if ok {
-            Some(Ident(s.to_string()))
-        } else {
-            None
-        }
-    }
+        ok.then(|| s.to_string())
+    };
+}
+impl Ident {
     pub fn get(&self) -> &str {
         &self.0
     }
@@ -290,7 +285,8 @@ impl Pos {
     }
 }
 
-crate::value_object!(Int, Ident, Op, Lit, Ty, Expr, Value, Env, Bound, Source, Pos);
+// `Int` and `Ident` register themselves via `refined!`; the rest are registered here.
+crate::value_object!(Op, Lit, Ty, Expr, Value, Env, Bound, Source, Pos);
 
 // The probe surface (`Shaped`) is DERIVED for the composites (`Op`, `Lit`, `Value`, `Expr`)
 // but the two leaves carry smart-constructor INVARIANTS the derive cannot see (an `Int` is
@@ -619,14 +615,11 @@ impl Morphism for ResolvePretendsPure {
 
 /// Size axis: the number of AST nodes (`Expr::node_count`).
 pub struct Nodes;
-impl Axis for Nodes {
-    type Id = Z;
-}
 /// Size axis: the nesting depth (`Expr::depth`).
 pub struct Depth;
-impl Axis for Depth {
-    type Id = S<Z>;
-}
+// `axis!` assigns each a unique sequential Peano `Id` (Nodes = Z, Depth = S<Z>), so two
+// axes cannot collide — the overlap-freedom the cost-map lookup relies on, by construction.
+crate::axis!(Nodes, Depth);
 
 // `Parse` scans the source once and builds a tree of `Nodes` cells: linear in `Nodes` in
 // both time and space.
@@ -634,33 +627,7 @@ crate::cost!(Parse, time = CostCons<Nodes, S<Z>, CostNil>, space = CostCons<Node
 // `Eval` walks the tree once (linear TIME in `Nodes`) but holds only the current path's
 // recursion and bindings (linear SPACE in `Depth`, NOT in `Nodes`).
 crate::cost!(Eval, time = CostCons<Nodes, S<Z>, CostNil>, space = CostCons<Depth, S<Z>, CostNil>);
-
-// ===== degrees of freedom of an `Expr`, and the coverage demand ===========
-//
-// The static completeness obligation from `crate::boundary`, re-homed onto `Expr`. An
-// expression varies along two independent dimensions, and a probe suite that claims to be
-// complete must reach BOTH or fail to compile.
-
-/// DOF: the STRUCTURE — which constructor, which operator, the tree shape. A probe sees it
-/// by perturbing the shape (swap `Add` for `Mul`, an `If` for a `Let`).
-pub struct Shape;
-/// DOF: the LITERAL payloads — the `Int`/`Bool` values at the leaves. A probe sees it by
-/// nudging a literal while holding the shape fixed.
-pub struct Literals;
-
-impl HasDofs for Expr {
-    type Dofs = DofCons<Shape, DofCons<Literals, DofNil>>;
-}
-
-/// A complete probe of `Expr`: it reaches BOTH the shape and the leaf values, so
-/// `require_complete::<Expr, _>(&FullProbe)` type-checks.
-pub struct FullProbe;
-impl Covers<Shape> for FullProbe {}
-impl Covers<Literals> for FullProbe {}
-
-/// An INCOMPLETE probe: it perturbs the tree shape but never varies a literal, so it is
-/// blind to the `Literals` dimension. `require_complete` rejects it at compile time
-/// (pinned in `tests/compile_fail/incomplete_probe_rejected`) — the LSP push-back a coding
-/// agent gets for a probe with a hole, before any test runs.
-pub struct ShapeOnlyProbe;
-impl Covers<Shape> for ShapeOnlyProbe {}
+// The degree-of-freedom set of every value object (and thus the completeness obligation)
+// is now DERIVED by `#[derive(Shaped)]` — `Expr`'s DOFs are one `Field<Expr, I>` per
+// variant, and `Complete<Expr>` covers them by construction. There is no hand-written DOF
+// marker to forget: see `crate::boundary::{Field, Complete, require_complete}`.

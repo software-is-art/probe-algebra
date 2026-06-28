@@ -6,13 +6,11 @@
 //! testing measures how much that buys.
 
 use crate::boundary::{
-    fits, require_complete, require_within, CostCons, CostNil, Fold, MapCollect, SpaceCost,
+    assert_complete, fits, require_within, CostCons, CostNil, Fold, MapCollect, SpaceCost,
     TimeCost, S, Z,
 };
 use crate::gdp::with_seed;
-use crate::interp::boundary::{
-    Check, Depth, Eval, Expr, FullProbe, Ident, Int, Nodes, Op, Parse, Value,
-};
+use crate::interp::boundary::{Check, Depth, Eval, Expr, Ident, Int, Nodes, Op, Parse, Value};
 
 fn name(s: &str) -> Ident {
     Ident::new(s).unwrap()
@@ -223,14 +221,15 @@ fn eval_time_and_space_axes_are_within_budget() {
     require_within::<SpaceCost, MapCollect<Eval, Nodes>, CostCons<Nodes, S<S<Z>>, CostNil>>();
 }
 
-// ===== degrees of freedom: the static completeness demand =================
+// ===== degrees of freedom: completeness is DERIVED, not asserted ==========
 
-/// A probe that reaches BOTH of `Expr`'s declared DOFs (shape and literals) satisfies
-/// `require_complete` — the positive of `tests/compile_fail/incomplete_probe_rejected`,
-/// where a shape-only probe is rejected for missing the `Literals` dimension.
+/// `Expr`'s DOF set is derived (one per variant) and `Complete<Expr>` covers it by
+/// construction — so the complete probe cannot be under-specified. The positive of
+/// `tests/compile_fail/incomplete_probe_rejected`, where a hand-written PARTIAL probe is
+/// still rejected.
 #[test]
-fn a_complete_probe_covers_every_dof() {
-    require_complete::<Expr, _>(&FullProbe);
+fn the_derived_probe_is_complete_by_construction() {
+    assert_complete::<Expr>();
 }
 
 /// The headline: the brand minted at `with_seed` threads through parse, the `Check`
@@ -444,11 +443,10 @@ mod blind_spot {
 mod algebra_surface {
     use super::{int, name, Expr, Op};
     use crate::boundary::{
-        construction_probe, dof_covered, probe, probe_declared_dofs, reconstructs, run,
-        stamp_through, Compose, Construction, Degree, DofProbe, Meter, Morphism, Perturbation,
-        ProbeResult, Profiled, RawPerturbation, Stamped, Then, S, Z,
+        construction_probe, probe, reconstructs, run, stamp_through, Compose, Construction, Degree,
+        Meter, Morphism, Perturbation, ProbeResult, Profiled, RawPerturbation, Stamped, Then, S, Z,
     };
-    use crate::interp::boundary::{ConstFold, Lit, Literals, Parse, Shape};
+    use crate::interp::boundary::{ConstFold, Lit, Parse};
 
     fn sum() -> Expr {
         Expr::bin(Op::Add, int(2), int(3))
@@ -460,22 +458,8 @@ mod algebra_surface {
         Expr::int(3).unwrap() // "(1 + 2)" folded
     }
 
-    // --- perturbations on the ConstFold morphism (for probe / DOF synthesis) ---
-
-    /// Shape perturbation: swap the top operator (Add <-> Mul) — changes the folded value.
-    pub struct PerturbOp;
-    crate::value_operator!(PerturbOp);
-    impl<M: Morphism<In = Expr, Out = Expr>> Perturbation<M> for PerturbOp {
-        fn perturb(&self, x: &Expr) -> Option<Expr> {
-            match x {
-                Expr::Bin(Op::Add, a, b) => Some(Expr::bin(Op::Mul, (**a).clone(), (**b).clone())),
-                Expr::Bin(Op::Mul, a, b) => Some(Expr::bin(Op::Add, (**a).clone(), (**b).clone())),
-                _ => None,
-            }
-        }
-    }
-
-    /// Literal perturbation: bump the left integer literal — changes the folded value.
+    /// Literal perturbation: bump the left integer literal — the hand-written perturbation
+    /// the `probe` harness needs (the DOF surface itself is now derived via `Shaped`).
     pub struct PerturbLit;
     crate::value_operator!(PerturbLit);
     impl<M: Morphism<In = Expr, Out = Expr>> Perturbation<M> for PerturbLit {
@@ -491,19 +475,6 @@ mod algebra_surface {
                 },
                 _ => None,
             }
-        }
-    }
-
-    impl DofProbe<ConstFold> for Shape {
-        type Perturb = PerturbOp;
-        fn perturbation() -> PerturbOp {
-            PerturbOp
-        }
-    }
-    impl DofProbe<ConstFold> for Literals {
-        type Perturb = PerturbLit;
-        fn perturbation() -> PerturbLit {
-            PerturbLit
         }
     }
 
@@ -557,23 +528,6 @@ mod algebra_surface {
         ] {
             assert!(!r.residual_complete());
         }
-    }
-
-    /// DOF SYNTHESIS: the completeness suite is generated from `Expr`'s declared DOF set —
-    /// both `Shape` and `Literals` are observable through `ConstFold` (the output responds),
-    /// so the synthesized verdicts are both `Some(true)`.
-    #[test]
-    fn declared_dofs_synthesize_their_probes() {
-        let verdicts = probe_declared_dofs::<Expr, ConstFold>(&ConstFold, &sum());
-        assert_eq!(verdicts, vec![Some(true), Some(true)]);
-        // a single DOF directly: covered at a foldable node...
-        assert_eq!(
-            dof_covered::<ConstFold, Literals>(&ConstFold, &sum()),
-            Some(true)
-        );
-        // ...but INAPPLICABLE at a bare literal (no operator to perturb) — `None`, which
-        // pins `dof_covered` against an always-`Some(true)` collapse.
-        assert_eq!(dof_covered::<ConstFold, Shape>(&ConstFold, &int(5)), None);
     }
 
     /// COMPOSE + run + Carried::invert: two folds compose into one morphism whose retained

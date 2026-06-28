@@ -32,6 +32,19 @@ pub fn derive_shaped(input: TokenStream) -> TokenStream {
                 .into();
         }
     };
+    // The DERIVED degree-of-freedom set: one `Field<Self, I>` per variant (enum) or field
+    // (struct), folded into a `DofCons` list. So `HasDofs` is mechanical and `Complete<Self>`
+    // covers it by construction — completeness cannot be under-specified.
+    let dof_count = match &input.data {
+        Data::Enum(data) => data.variants.len(),
+        Data::Struct(data) => data.fields.len(),
+        Data::Union(_) => 0,
+    };
+    let mut dofs = quote! { crate::boundary::DofNil };
+    for i in (0..dof_count).rev() {
+        let idx = proc_macro2::Literal::usize_unsuffixed(i);
+        dofs = quote! { crate::boundary::DofCons<crate::boundary::Field<#name, #idx>, #dofs> };
+    }
     quote! {
         impl crate::boundary::Shaped for #name {
             fn inhabitant() -> Self {
@@ -42,6 +55,9 @@ pub fn derive_shaped(input: TokenStream) -> TokenStream {
                 #classes
                 __classes
             }
+        }
+        impl crate::boundary::HasDofs for #name {
+            type Dofs = #dofs;
         }
     }
     .into()
