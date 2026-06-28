@@ -160,15 +160,22 @@ Mutation testing certifies the suite and *discovers* missing checks. Wired with
 cargo mutants        # plant bugs; every survivor is a missing relation/DOF
 ```
 
-A full-crate run kills **298 of 302** viable mutants (a further one is a timeout —
-an infinite loop, effectively caught); the three survivors are provably
-**equivalent** mutants, which no test can kill: an empty-source declaration
-replaced by another empty (`SecretStamp` genuinely declares none), a monotonic
-tie-break in the selector (`-` vs `/` induce the same ordering), and an
-always-true demonstration helper. Several survivors in the *first* run revealed
+Mutation is **scoped to the domain algebra** (see `.cargo/mutants.toml`): the
+boundary discipline concentrates behaviour at the edges and probes, so that is
+where a surviving mutant is a genuine signal. The method's META-tooling —
+`select` (kill-matrix set-cover) and `synth` (DOF synthesis) — is excluded: it's a
+demonstration *of* the method (separately unit/property tested), and its mutants
+are internal heuristics earlier runs showed to be equivalent (a `-`/`/`-invariant
+tie-break, an always-true demo helper) or a non-terminating `&&`/`||` swap —
+noise, not signal.
+
+On that surface a run kills **276 of 277** viable mutants. The single survivor is a
+provably **equivalent** mutant no test can kill: an empty-source declaration
+replaced by another empty (`SecretStamp` genuinely declares none), kept in scope
+and documented rather than excluded. Several survivors in the *first* runs revealed
 genuinely weak laws — e.g. `Cents::negate` could be *deleted* because
 `negate(negate(c)) == c` holds for the identity too — which were then closed by
-stronger properties (`src/properties.rs`).
+stronger properties (`src/properties.rs`) and the generic laws (`src/laws.rs`).
 
 ## The worked example
 

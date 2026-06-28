@@ -4,11 +4,28 @@
 # suite actually kills planted bugs, and any SURVIVING mutant points at a
 # missing relation or degree of freedom (see src/select.rs::uncoverable).
 #
-# The `demo` binary (src/main.rs) has no assertions — it only prints — so
-# mutating it produces survivors that are noise rather than signal. The library
-# carries the algebra and is exercised by the unit + property suites, so that is
-# where mutation testing earns its keep.
-exclude_globs = ["src/main.rs"]
+# WHERE mutations are generated — scoped to the DOMAIN ALGEBRA, not the whole
+# crate. The boundary discipline concentrates behaviour at the edges (morphisms,
+# constructions, branches, guards) and the probes, so that surface is exactly
+# where a surviving mutant is a genuine signal. We exclude:
+#
+#   - `src/main.rs` — the `demo` binary only prints, no assertions, so its
+#     mutants are noise.
+#   - `src/select.rs` / `src/synth.rs` — the method's META-TOOLING (kill-matrix
+#     set-cover selection; degree-of-freedom synthesis). These are demonstrations
+#     OF the method, not domain behaviour; they carry their own unit/property
+#     tests, but their mutants are internal heuristics that earlier full-crate
+#     runs showed to be provably EQUIVALENT (a monotonic tie-break that is `-`/`/`
+#     invariant, an always-true demo helper) or a non-terminating `&&`/`||` swap.
+#     Excluding them keeps every survivor on the DOMAIN surface meaningful rather
+#     than mixing in equivalent-mutant noise from the tooling.
+#
+# The rest of the library — the grammar (`boundary.rs`), every module's edges and
+# probes, `gdp`, `composition`, `capability`, and `lifecycle` — stays in scope, so
+# a domain bug still cannot hide. (The one remaining equivalent survivor, an empty
+# `declared_sources` in `capability.rs`, is kept in scope and documented rather
+# than excluded.)
+exclude_globs = ["src/main.rs", "src/select.rs", "src/synth.rs"]
 
 # Mutation testing certifies the LIBRARY against the unit + property suites, so
 # run only those. The `tests/compile_fail` (trybuild) suite is the NEGATIVE
