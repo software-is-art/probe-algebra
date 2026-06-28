@@ -11,15 +11,17 @@
 #
 #   - `src/main.rs` — the `demo` binary only prints, no assertions, so its
 #     mutants are noise.
-#   - `src/select.rs` / `src/capability.rs` — the method's META-TOOLING (kill-matrix
-#     set-cover selection; the claim-vs-behaviour capability audit). These are
-#     demonstrations OF the method, not domain behaviour; they carry their own unit
-#     tests, but their mutants are internal heuristics that earlier full-crate runs
-#     showed to be provably EQUIVALENT (a monotonic tie-break that is `-`/`/`
-#     invariant; an `under-claim` edge whose `declared_sources` is legitimately the
-#     empty slice, so an empty-body mutant is indistinguishable) or a
-#     non-terminating `&&`/`||` swap. Excluding them keeps every survivor on the
-#     DOMAIN surface meaningful rather than mixing in equivalent-mutant noise.
+#   - `src/capability.rs` — the claim-vs-behaviour capability audit, a demonstration
+#     OF the method rather than domain behaviour; it carries its own unit tests, but its
+#     mutants are internal heuristics earlier runs showed to be provably EQUIVALENT (an
+#     `under-claim` edge whose `declared_sources` is legitimately the empty slice, so an
+#     empty-body mutant is indistinguishable). Excluding it keeps survivors meaningful.
+#
+# `src/select/` is NOT excluded — it used to be (as meta-tooling), but it has now been
+# SELF-HOSTED: re-specified as a boundary module with its example tests deleted, so its
+# interior (`select/internal.rs`) is kept in scope exactly like `interp/internal.rs`. Its
+# surviving mutants measure whether the method's own oracle-free probes certify the
+# component that chooses the method's probes — the self-host fixed point.
 #   - `boundary-algebra-macros/**` — the `#[derive(Shaped)]` proc-macro. It is
 #     code-GENERATION tooling, not domain behaviour; its output is exercised
 #     transitively (every derived `Shaped` is hit by the fused-probe and

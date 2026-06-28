@@ -27,7 +27,8 @@
 //! measured by mutation. `gdp` is the name-branding machinery the edges use; `capability`
 //! is the behavioural audit that reconciles an edge's declared capability with what it
 //! actually does (over- and under-claim detection); `select` is the kill-matrix set-cover
-//! meta-tooling.
+//! selector — itself a SELF-HOST, a second substrate specified in the discipline and
+//! certified by mutation with no example tests of its own.
 
 pub mod boundary;
 pub mod capability;

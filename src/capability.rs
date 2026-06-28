@@ -17,8 +17,8 @@
 //!   - UNDER-claiming (used but undeclared) → a HIDDEN DEPENDENCY, the dangerous case: a
 //!     "pure" edge that secretly reads state or the world, which the type system accepts.
 //!
-//! Crate-level tooling (like `select`), exempt from the per-module boundary discipline. It
-//! is demonstrated on the interpreter's `Resolve` family.
+//! Crate-level tooling, exempt from the per-module boundary discipline (it audits edges
+//! rather than being one). It is demonstrated on the interpreter's `Resolve` family.
 
 use crate::boundary::{Capability, Morphism, Perturbation};
 
