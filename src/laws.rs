@@ -268,11 +268,41 @@ impl Sampled for Entry<Draft> {
 mod registry {
     use super::*;
     use crate::boundary::Compose;
+    use crate::interp::boundary::{Expr, Ident, Op, Parse};
     use crate::ledger::boundary::{
         PadName, ParseAccount, ParseCents, ParseTransaction, ReorderPostings, Round, Split,
     };
     use crate::lifecycle::boundary::Submit;
     use crate::linear::boundary::Scale;
+
+    // A generator of well-formed `Expr` trees, and the CANONICAL source they render to —
+    // the input distribution for the interpreter's `Parse` round-trip. (`Parse::Raw` is
+    // `String`, whose `Sampled` is the ledger's account distribution, so `Parse` is
+    // registered with this explicit strategy rather than the argument-free `Sampled`.)
+    fn op() -> impl Strategy<Value = Op> {
+        prop_oneof![Just(Op::Add), Just(Op::Mul), Just(Op::Lt)]
+    }
+    fn ident() -> impl Strategy<Value = Ident> {
+        prop_oneof![Just("x"), Just("y"), Just("z")].prop_map(|s| Ident::new(s).unwrap())
+    }
+    fn expr() -> impl Strategy<Value = Expr> {
+        let leaf = prop_oneof![
+            (0i64..=999).prop_map(|n| Expr::int(n).unwrap()),
+            any::<bool>().prop_map(Expr::boolean),
+            ident().prop_map(Expr::var),
+        ];
+        leaf.prop_recursive(4, 48, 3, |inner| {
+            prop_oneof![
+                (op(), inner.clone(), inner.clone()).prop_map(|(o, a, b)| Expr::bin(o, a, b)),
+                (inner.clone(), inner.clone(), inner.clone())
+                    .prop_map(|(c, t, e)| Expr::cond(c, t, e)),
+                (ident(), inner.clone(), inner.clone()).prop_map(|(n, v, b)| Expr::bind(n, v, b)),
+            ]
+        })
+    }
+    fn canonical_source() -> impl Strategy<Value = String> {
+        expr().prop_map(|e| e.render())
+    }
 
     // Each edge: ONE registration. Round-trip + capability are argument-free
     // (`Sampled` supplies the input); completeness adds its matched perturbation.
@@ -325,5 +355,15 @@ mod registry {
     fn parse_transaction_is_probed() {
         construction_laws(&ParseTransaction);
         construction_residual_complete(&ParseTransaction, &ReorderPostings, postings(2));
+    }
+
+    /// The interpreter's entry edge: `render . parse == id` over generated canonical
+    /// source. This single registration is the ONLY rigour the lexer/parser/unparser get
+    /// — `interp::internal` has no tests of its own — yet it certifies the whole parse
+    /// path. Capability is checked statically (a `Pure` refinement has a `Unit` residual).
+    #[test]
+    fn parse_is_probed() {
+        construction_round_trips(&Parse, canonical_source());
+        construction_capability_matches_residual::<Parse>();
     }
 }

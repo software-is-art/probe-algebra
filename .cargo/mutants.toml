@@ -25,6 +25,15 @@
 # a domain bug still cannot hide. (The one remaining equivalent survivor, an empty
 # `declared_sources` in `capability.rs`, is kept in scope and documented rather
 # than excluded.)
+#
+# `interp/internal.rs` is DELIBERATELY kept in scope despite being module-internal:
+# the interpreter is the experiment that MEASURES whether the boundary rigour buys
+# zero internal testing. `interp/internal.rs` has no tests of its own, so its
+# mutation score quantifies exactly how much internal correctness the boundary
+# contracts (the autogen `Parse` round-trip law + the `WellTyped` evaluation guard)
+# certify for free. The only survivors there are provably-equivalent (an empty
+# identifier still rejected by `Ident::new`; the evaluator's `_` arms that the
+# `WellTyped` guard makes unreachable).
 exclude_globs = ["src/main.rs", "src/select.rs", "src/synth.rs"]
 
 # Mutation testing certifies the LIBRARY against the unit + property suites, so

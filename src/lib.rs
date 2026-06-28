@@ -24,13 +24,16 @@
 //!   - `ledger`  — lossy worked example (aggregation + residual + mutants);
 //!   - `linear`  — lossless transport carrying the decisive coefficient bug;
 //!   - `select`  — kill-matrix set-cover selection (the generation+selection loop);
-//!   - `synth`   — type-driven degree-of-freedom coverage / operator synthesis.
+//!   - `synth`   — type-driven degree-of-freedom coverage / operator synthesis;
+//!   - `interp`  — a "cold" use case (expression-language interpreter) testing whether
+//!     the boundary rigour buys ZERO internal testing (measured by mutation).
 
 pub mod boundary;
 pub mod capability;
 pub mod composition;
 pub mod effect;
 pub mod gdp;
+pub mod interp;
 pub mod journal;
 pub mod ledger;
 pub mod lifecycle;

@@ -190,13 +190,40 @@ are internal heuristics earlier runs showed to be equivalent (a `-`/`/`-invarian
 tie-break, an always-true demo helper) or a non-terminating `&&`/`||` swap —
 noise, not signal.
 
-On that surface a run kills **276 of 277** viable mutants. The single survivor is a
-provably **equivalent** mutant no test can kill: an empty-source declaration
-replaced by another empty (`SecretStamp` genuinely declares none), kept in scope
-and documented rather than excluded. Several survivors in the *first* runs revealed
-genuinely weak laws — e.g. `Cents::negate` could be *deleted* because
-`negate(negate(c)) == c` holds for the identity too — which were then closed by
-stronger properties (`src/properties.rs`) and the generic laws (`src/laws.rs`).
+On that surface a run kills every viable mutant but **two provably-equivalent
+survivors** no test can kill: an empty-source declaration replaced by another empty
+(`SecretStamp` genuinely declares none), and the interpreter lexer's alphabetic guard
+(an empty identifier is rejected by `Ident::new` either way). Both are kept in scope and
+documented rather than excluded. Several survivors in the *first* runs revealed genuinely
+weak laws — e.g. `Cents::negate` could be *deleted* because `negate(negate(c)) == c`
+holds for the identity too — which were then closed by stronger properties
+(`src/properties.rs`) and the generic laws (`src/laws.rs`).
+
+## Does the boundary buy internal freedom? (`src/interp/`)
+
+The point of paying for a heavy, type-level boundary is to be FREED inside it: if the
+edge contracts are strong enough, the internals need not be exhaustively re-tested.
+`src/interp/` — a tiny expression-language interpreter, a domain the grammar was *not*
+designed around — puts a number on that claim.
+
+Its boundary is three edges: `Parse` (a `Construction`, parse-don't-validate), `Check`
+(a `Branch` minting a `WellTyped`/`IllTyped` witness), and `Eval` (a `Guarded` edge that
+is UNCALLABLE without `Check`'s `WellTyped<N>` for the same brand — "well-typed programs
+don't go wrong" as a *compile* error, pinned in `tests/compile_fail/eval_wrong_program`).
+The lexer, parser, type checker, and evaluator live in `interp/internal.rs`, which has
+**zero tests of its own**. They are reached ONLY transitively — by the autogen `Parse`
+round-trip law (`render . parse == id` over generated source) and the behavioural tests
+of the three edges in `tests.rs`. Kept in the mutation sweep to MEASURE the result, every
+viable mutant in `interp/internal.rs` is caught (or killed by timeout — mutated
+increments that loop forever) except a **single provably-equivalent survivor**.
+
+The leak pattern is the real lesson: the boundary buys **shape** for free (round-trips,
+invertibility, composition) but not **value** — the gaps that surfaced were value-level
+facts no structural law can see (`Int::get` returning the wrong constant, `<` vs `<=`),
+plus one *measurement artifact* (`render`-to-constant survived its own round-trip law,
+because that law's generator is built from `render`). Each was closed by a small
+*boundary* test (an accessor oracle, an equal-operands case), never an internal one. The
+bug-catching budget moves to the edge; the inside comes nearly for free.
 
 ## The worked example
 
