@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use crate::interp::boundary::{Expr, Ident, Int, Lit, Op, Ty, Value};
+use crate::interp::boundary::{Expr, Ident, Int, Lit, Op, Pos, Source, Ty, Value};
 
 // ===== lexer ==============================================================
 
@@ -39,54 +39,55 @@ enum Token {
     Ident(Ident),
 }
 
-/// Tokenize canonical source. `None` on any unrecognized character or out-of-range
-/// literal (so the parse rejects it rather than admitting garbage).
-fn lex(src: &str) -> Option<Vec<Token>> {
-    let chars: Vec<char> = src.chars().collect();
-    let mut i = 0;
+/// Tokenize a `Source`. `None` on any unrecognized character or out-of-range literal
+/// (so the parse rejects it rather than admitting garbage). Characters are read through
+/// the `Source::at` accessor and the cursor is a `Pos` value object — no raw `char`/
+/// `usize` helpers, so the scanner composes typed citizens (the inward rule, satisfied
+/// by MODELLING the substrate rather than exempting it).
+fn lex(source: &Source) -> Option<Vec<Token>> {
+    let mut pos = Pos::start();
     let mut out = Vec::new();
-    while i < chars.len() {
-        let c = chars[i];
+    while let Some(c) = source.at(&pos) {
         match c {
-            ' ' => i += 1,
+            ' ' => pos = pos.next(),
             '(' => {
                 out.push(Token::LParen);
-                i += 1;
+                pos = pos.next();
             }
             ')' => {
                 out.push(Token::RParen);
-                i += 1;
+                pos = pos.next();
             }
             '+' => {
                 out.push(Token::Op(Op::Add));
-                i += 1;
+                pos = pos.next();
             }
             '*' => {
                 out.push(Token::Op(Op::Mul));
-                i += 1;
+                pos = pos.next();
             }
             '<' => {
                 out.push(Token::Op(Op::Lt));
-                i += 1;
+                pos = pos.next();
             }
             '=' => {
                 out.push(Token::Eq);
-                i += 1;
+                pos = pos.next();
             }
             _ if c.is_ascii_digit() => {
                 let mut s = String::new();
-                while i < chars.len() && chars[i].is_ascii_digit() {
-                    s.push(chars[i]);
-                    i += 1;
+                while let Some(d) = source.at(&pos).filter(|d| d.is_ascii_digit()) {
+                    s.push(d);
+                    pos = pos.next();
                 }
                 let n: i64 = s.parse().ok()?;
                 out.push(Token::Num(Int::new(n)?));
             }
             _ if c.is_ascii_alphabetic() => {
                 let mut s = String::new();
-                while i < chars.len() && chars[i].is_ascii_alphabetic() {
-                    s.push(chars[i]);
-                    i += 1;
+                while let Some(a) = source.at(&pos).filter(|a| a.is_ascii_alphabetic()) {
+                    s.push(a);
+                    pos = pos.next();
                 }
                 out.push(match s.as_str() {
                     "if" => Token::If,
@@ -208,7 +209,7 @@ impl Parser {
 /// Parse canonical source into an `Expr`, or `None` if it is not a complete, valid
 /// program (the `Construction`'s partial parse).
 pub(super) fn parse(src: &str) -> Option<Expr> {
-    let toks = lex(src)?;
+    let toks = lex(&Source::new(src))?;
     let mut p = Parser { toks, pos: 0 };
     let e = p.expr()?;
     if p.pos == p.toks.len() {

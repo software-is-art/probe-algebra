@@ -177,7 +177,43 @@ pub enum Value {
     Bool(bool),
 }
 
-crate::value_object!(Int, Ident, Op, Lit, Ty, Expr, Value);
+/// The raw source text as a value object — the lexer's substrate. Modelling it (rather
+/// than passing a bare `&str`) is what lets the scanner read characters through a
+/// sanctioned ACCESSOR (`at`) instead of a primitive-returning helper the inward rule
+/// would forbid: char handling is confined to this citizen, the same way a `Cents`
+/// confines `i64`. `pub(crate)` — it is internal substrate, not domain API.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Source(String);
+impl Source {
+    pub(crate) fn new(text: &str) -> Self {
+        Source(text.to_string())
+    }
+    /// The character at position `p`, or `None` past the end. The one place a `char`
+    /// crosses out — a boundary accessor, the substrate's sanctioned exit hatch.
+    pub(crate) fn at(&self, p: &Pos) -> Option<char> {
+        self.0.chars().nth(p.index())
+    }
+}
+
+/// A position into a `Source` — a value object, so the scanner's cursor is a citizen
+/// rather than a raw `usize` (which the boundary would reject as a primitive field).
+/// Advancing is functional: `next` returns the successor position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Pos(usize);
+impl Pos {
+    pub(crate) fn start() -> Self {
+        Pos(0)
+    }
+    pub(crate) fn next(self) -> Self {
+        Pos(self.0 + 1)
+    }
+    /// The raw offset — the sanctioned exit hatch for indexing.
+    pub(crate) fn index(&self) -> usize {
+        self.0
+    }
+}
+
+crate::value_object!(Int, Ident, Op, Lit, Ty, Expr, Value, Source, Pos);
 
 // ===== the proof tokens: the type-correctness witnesses ===================
 
