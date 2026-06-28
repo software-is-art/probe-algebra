@@ -169,7 +169,7 @@ are internal heuristics earlier runs showed to be equivalent (a `-`/`/`-invarian
 tie-break, an always-true demo helper) or a non-terminating `&&`/`||` swap —
 noise, not signal.
 
-On that surface a run kills **276 of 277** viable mutants. The single survivor is a
+On that surface a run kills **268 of 269** viable mutants. The single survivor is a
 provably **equivalent** mutant no test can kill: an empty-source declaration
 replaced by another empty (`SecretStamp` genuinely declares none), kept in scope
 and documented rather than excluded. Several survivors in the *first* runs revealed
@@ -370,7 +370,7 @@ module interior.
 
 | Path | Role |
 | --- | --- |
-| `src/boundary.rs` | the grammar (a boundary as a **category**): sealed markers + edge shapes `Morphism` / `Construction` (entry edge) / `Branch` (coproduct) / `Guarded` (witnessed) + probes `probe` / `commutes` / `coefficient_holds` / `reconstructs` / `construction_probe` / `Compose` + `Then` composition / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
+| `src/boundary.rs` | the grammar (a boundary as a **category**): sealed markers + edge shapes `Morphism` / `Construction` (entry edge) / `Branch` (coproduct) / `Guarded` (witnessed) + probes `probe` / `commutes` / `coefficient_holds` / `reconstructs` / `construction_probe` / `Compose` + `Then` composition / retention typestate / `Qty` tagged primitives / `StateMachine`+`state_machine!`+`transition!` (carrier + descriptor + edges of a state graph) / `proof_token!` (zero-data name-branded proofs) / `Meter`+`Profiled` instrumentation seam |
 | `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants; **constructions** (`ParseCents`/`ParseAccount`/`ParseTransaction`) bring the smart constructor into the probe space |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
 | `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |

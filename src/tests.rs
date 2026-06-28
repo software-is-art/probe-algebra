@@ -361,7 +361,7 @@ mod instrumentation {
 /// no hand-written `Morphism`. If the abstraction were secretly tied to the ledger
 /// `Entry`, this would not compile — proving it before client code relies on it.
 mod state_machine {
-    use crate::boundary::{run, sealed, Morphism, StateMachine, Typestate, ValueObject};
+    use crate::boundary::{run, Morphism};
     use crate::ledger::boundary::Cents;
     use core::marker::PhantomData;
 
@@ -370,25 +370,12 @@ mod state_machine {
     pub struct Hi;
     crate::typestate!(Lo, Hi);
 
-    // a different carrier: a `Cents` reading indexed by a phantom level
-    pub struct Gauge<S>(Cents, PhantomData<S>);
-    impl<S> Clone for Gauge<S> {
-        fn clone(&self) -> Self {
-            Gauge(self.0, PhantomData)
-        }
-    }
-    impl<S> PartialEq for Gauge<S> {
-        fn eq(&self, other: &Self) -> bool {
-            self.0 == other.0
-        }
-    }
-    impl<S> core::fmt::Debug for Gauge<S> {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.debug_tuple("Gauge").field(&self.0).finish()
-        }
-    }
-    impl<S> sealed::Sealed for Gauge<S> {}
-    impl<S> ValueObject for Gauge<S> {}
+    // A DIFFERENT carrier (a `Cents` reading indexed by a phantom level) and its
+    // descriptor, declared by the SAME grammar macro that `Entry`/`EntryFlow` use —
+    // proving `state_machine!` is not tied to the ledger lifecycle. The whole carrier
+    // (value-object impls + `StateMachine`) is one line; the module adds only its own
+    // entry constructor and accessor.
+    crate::state_machine!(GaugeFlow, Gauge, Cents);
     impl Gauge<Lo> {
         fn new(reading: Cents) -> Self {
             Gauge(reading, PhantomData)
@@ -397,22 +384,6 @@ mod state_machine {
     impl<S> Gauge<S> {
         fn reading(&self) -> Cents {
             self.0
-        }
-    }
-
-    // the machine descriptor + its reversible edges — the only per-machine cost
-    pub struct GaugeFlow;
-    crate::value_operator!(GaugeFlow);
-    impl StateMachine for GaugeFlow {
-        type Data = Cents;
-        type At<S: Typestate> = Gauge<S>;
-
-        fn at<S: Typestate>(data: Cents) -> Gauge<S> {
-            Gauge(data, PhantomData)
-        }
-
-        fn data<S: Typestate>(at: &Gauge<S>) -> &Cents {
-            &at.0
         }
     }
     crate::transition!(Raise: GaugeFlow, Lo => Hi);

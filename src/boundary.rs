@@ -85,6 +85,37 @@ macro_rules! value_operator {
     )+};
 }
 
+/// A NAME-BRANDED PROOF TOKEN realized as a value object: zero data, branded by a
+/// phantom `N`, so two tokens of the same name are the SAME fact and a token for name
+/// A cannot stand in for B. Its field is private to the defining module, so it is
+/// minted only there (a GDP "ghost" — `Cleared<N>` / `Flagged<N>`). This lifts the
+/// ~17 lines those hand-rolled each into one line: `proof_token!(/// doc... Cleared);`
+#[macro_export]
+macro_rules! proof_token {
+    ($(#[$meta:meta])* $name:ident) => {
+        $(#[$meta])*
+        pub struct $name<N>(::core::marker::PhantomData<N>);
+        impl<N> ::core::clone::Clone for $name<N> {
+            fn clone(&self) -> Self {
+                *self
+            }
+        }
+        impl<N> ::core::marker::Copy for $name<N> {}
+        impl<N> ::core::cmp::PartialEq for $name<N> {
+            fn eq(&self, _other: &Self) -> bool {
+                true // a token of a given name carries no distinguishing data.
+            }
+        }
+        impl<N> ::core::fmt::Debug for $name<N> {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                f.write_str(stringify!($name))
+            }
+        }
+        impl<N> $crate::boundary::sealed::Sealed for $name<N> {}
+        impl<N> $crate::boundary::ValueObject for $name<N> {}
+    };
+}
+
 // ===== generic morphism: In -> (Out, Residual) ===========================
 
 /// The capability chain, least-power first: each step adds a capability and
@@ -726,6 +757,61 @@ macro_rules! transition {
                 ::core::option::Option::Some(
                     <$machine as $crate::boundary::StateMachine>::at::<$from>(payload),
                 )
+            }
+        }
+    };
+}
+
+/// Declare a state machine's CARRIER and descriptor in one line. The carrier is a
+/// phantom-indexed value object `Carrier<S>` over a `Payload`: its value semantics
+/// (`Clone`/`PartialEq`/`Eq`/`Debug`) delegate to the payload and the phantom `S` is
+/// erased, so the index costs nothing at runtime. The descriptor `Flow` is the
+/// `StateMachine` whose `at`/`data` wrap and read the payload — the only operations
+/// every `transition!` is built from.
+///
+/// This lifts the ~18 lines of identical carrier boilerplate each machine used to
+/// hand-write (see `Entry`/`Gauge`). Declaring a machine is then: `typestate!` (the
+/// states), `state_machine!` (carrier + descriptor), and one `transition!` per
+/// reversible edge — the carrier's field stays module-private, so the defining module
+/// still writes its own entry constructors and accessors.
+#[macro_export]
+macro_rules! state_machine {
+    ($flow:ident, $carrier:ident, $payload:ty) => {
+        pub struct $carrier<S>($payload, ::core::marker::PhantomData<S>);
+        impl<S> ::core::clone::Clone for $carrier<S> {
+            fn clone(&self) -> Self {
+                $carrier(
+                    ::core::clone::Clone::clone(&self.0),
+                    ::core::marker::PhantomData,
+                )
+            }
+        }
+        impl<S> ::core::cmp::PartialEq for $carrier<S> {
+            fn eq(&self, other: &Self) -> bool {
+                self.0 == other.0
+            }
+        }
+        impl<S> ::core::cmp::Eq for $carrier<S> {}
+        impl<S> ::core::fmt::Debug for $carrier<S> {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                f.debug_tuple(stringify!($carrier)).field(&self.0).finish()
+            }
+        }
+        impl<S> $crate::boundary::sealed::Sealed for $carrier<S> {}
+        impl<S> $crate::boundary::ValueObject for $carrier<S> {}
+
+        pub struct $flow;
+        $crate::value_operator!($flow);
+        impl $crate::boundary::StateMachine for $flow {
+            type Data = $payload;
+            type At<S: $crate::boundary::Typestate> = $carrier<S>;
+
+            fn at<S: $crate::boundary::Typestate>(data: $payload) -> $carrier<S> {
+                $carrier(data, ::core::marker::PhantomData)
+            }
+
+            fn data<S: $crate::boundary::Typestate>(at: &$carrier<S>) -> &$payload {
+                &at.0
             }
         }
     };

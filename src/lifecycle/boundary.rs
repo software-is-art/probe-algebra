@@ -38,7 +38,7 @@
 
 use core::marker::PhantomData;
 
-use crate::boundary::{sealed, Branch, Capability, Guarded, StateMachine, Typestate, ValueObject};
+use crate::boundary::{Branch, Capability, Guarded};
 use crate::gdp::Named;
 use crate::ledger::boundary::{Balance, Transaction};
 
@@ -56,38 +56,19 @@ pub struct Rejected;
 pub struct Voided;
 crate::typestate!(Draft, Submitted, Posted, Rejected, Voided);
 
-// ===== the value object carried through the protocol =====================
+// ===== the state machine: carrier + descriptor + reversible edges ========
 
-/// A ledger entry INDEXED by its lifecycle position `S`. The data never changes —
-/// it is always one `Transaction` — but the type records WHERE in the protocol the
-/// entry sits, so a transition out of order does not type-check. `S` is phantom:
-/// the index is erased at runtime, so the state machine costs nothing.
-pub struct Entry<S>(Transaction, PhantomData<S>);
-
-// Manual impls (no `S: Trait` bounds): the value-object markers delegate to the
-// `Transaction` field, and the phantom `S` need implement nothing.
-impl<S> Clone for Entry<S> {
-    fn clone(&self) -> Self {
-        Entry(self.0.clone(), PhantomData)
-    }
-}
-impl<S> PartialEq for Entry<S> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-impl<S> Eq for Entry<S> {}
-impl<S> core::fmt::Debug for Entry<S> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("Entry").field(&self.0).finish()
-    }
-}
-impl<S> sealed::Sealed for Entry<S> {}
-impl<S> ValueObject for Entry<S> {}
+// The carrier `Entry<S>` (a `Transaction` indexed by its lifecycle position `S`, the
+// index erased at runtime) and its descriptor `EntryFlow` are declared in one line by
+// the grammar's `state_machine!` — the ~18 lines of value-object boilerplate every
+// machine used to hand-write. The data never changes; only the type records WHERE in
+// the protocol the entry sits, so a transition out of order does not type-check.
+crate::state_machine!(EntryFlow, Entry, Transaction);
 
 impl<S> Entry<S> {
     /// The underlying transaction (read-only) — the sanctioned accessor, available
-    /// in any state.
+    /// in any state. (Reads the macro-generated carrier's field directly, so it needs
+    /// no `S: Typestate` bound.)
     pub fn tx(&self) -> &Transaction {
         &self.0
     }
@@ -99,29 +80,6 @@ impl Entry<Draft> {
     /// `Draft` — every other state is reachable only through a transition.
     pub fn draft(tx: Transaction) -> Self {
         Entry(tx, PhantomData)
-    }
-}
-
-// ===== the state machine: reversible edges via the grammar ===============
-
-/// The state-machine descriptor for the entry lifecycle: the payload is a
-/// `Transaction`, carried as `Entry<S>`. A value-operator family — it supplies the
-/// pure retag (`at`) and read (`data`) operations every transition is built from,
-/// so the boundary declares its reversible edges with `transition!` instead of
-/// hand-writing each `Morphism`. The block of `transition!` declarations below IS
-/// the reversible part of the state graph, in code.
-pub struct EntryFlow;
-crate::value_operator!(EntryFlow);
-impl StateMachine for EntryFlow {
-    type Data = Transaction;
-    type At<S: Typestate> = Entry<S>;
-
-    fn at<S: Typestate>(data: Transaction) -> Entry<S> {
-        Entry(data, PhantomData)
-    }
-
-    fn data<S: Typestate>(at: &Entry<S>) -> &Transaction {
-        &at.0
     }
 }
 
@@ -145,53 +103,22 @@ crate::transition!(
 
 // ===== the branch proofs (GDP tokens, realized as value objects) =========
 
-/// A proof that the entry named `N` is BALANCED (double entry holds). A GDP "ghost"
-/// realized as a value object: zero data, minted ONLY by `Validate::classify` (its
-/// field is private to this boundary), and branded with the entry's unique name
-/// `N`. Tied to `N`, a proof for entry A cannot discharge `Post::commit` on B.
-pub struct Cleared<N>(PhantomData<N>);
-/// A proof that the entry named `N` is UNBALANCED — the NEGATIVE witness, kept (not
-/// thrown away as a `None`) so the reject path is a first-class branch. It gates
-/// `Reject`, so a balanced entry cannot be rejected.
-pub struct Flagged<N>(PhantomData<N>);
+// The two branch proofs are GDP tokens realized as value objects, declared by the
+// grammar's `proof_token!` (the zero-data, name-branded, fixed-`Debug` boilerplate).
+// Their fields stay private to this boundary, so they are minted ONLY here.
 
-impl<N> Clone for Cleared<N> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-impl<N> Copy for Cleared<N> {}
-impl<N> PartialEq for Cleared<N> {
-    fn eq(&self, _other: &Self) -> bool {
-        true // two clearances of the same name are the same fact; no data to differ on.
-    }
-}
-impl<N> core::fmt::Debug for Cleared<N> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("Cleared")
-    }
-}
-impl<N> sealed::Sealed for Cleared<N> {}
-impl<N> ValueObject for Cleared<N> {}
-
-impl<N> Clone for Flagged<N> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-impl<N> Copy for Flagged<N> {}
-impl<N> PartialEq for Flagged<N> {
-    fn eq(&self, _other: &Self) -> bool {
-        true // likewise: a flag of a given name carries no distinguishing data.
-    }
-}
-impl<N> core::fmt::Debug for Flagged<N> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("Flagged")
-    }
-}
-impl<N> sealed::Sealed for Flagged<N> {}
-impl<N> ValueObject for Flagged<N> {}
+crate::proof_token!(
+    /// A proof that the entry named `N` is BALANCED (double entry holds). Branded with
+    /// the entry's unique name `N`, so a proof for entry A cannot discharge
+    /// `Post::commit` on B; minted only by `Validate::classify`.
+    Cleared
+);
+crate::proof_token!(
+    /// A proof that the entry named `N` is UNBALANCED — the NEGATIVE witness, kept (not
+    /// thrown away as a `None`) so the reject path is a first-class branch. It gates
+    /// `Reject`, so a balanced entry cannot be rejected.
+    Flagged
+);
 
 // ===== the branching + guarded transitions ===============================
 

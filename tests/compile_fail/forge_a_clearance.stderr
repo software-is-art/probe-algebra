@@ -5,7 +5,18 @@ error[E0423]: cannot initialize a tuple struct which contains private fields
    |                                  ^^^^^^^
    |
 note: constructor is not visible here due to private fields
-  --> src/lifecycle/boundary.rs
+  --> src/boundary.rs
    |
-   | pub struct Cleared<N>(PhantomData<N>);
-   |                       ^^^^^^^^^^^^^^ private field
+   |           pub struct $name<N>(::core::marker::PhantomData<N>);
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private field
+   |
+  ::: src/lifecycle/boundary.rs
+   |
+   | / crate::proof_token!(
+   | |     /// A proof that the entry named `N` is BALANCED (double entry holds). Branded with
+   | |     /// the entry's unique name `N`, so a proof for entry A cannot discharge
+   | |     /// `Post::commit` on B; minted only by `Validate::classify`.
+   | |     Cleared
+   | | );
+   | |_- in this macro invocation
+   = note: this error originates in the macro `crate::proof_token` (in Nightly builds, run with -Z macro-backtrace for more info)
