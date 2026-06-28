@@ -196,6 +196,55 @@ pub fn get_in_bounds<'m, Coll, Idx, K, V>(
         .expect("the InBounds proof guarantees the index is valid")
 }
 
+// ===== a PERMUTATION proven valid for its collection ======================
+//
+// The `InBounds` proof bounds ONE index; reordering a whole sequence needs a
+// stronger relation — that an index vector is a valid PERMUTATION (a bijection). With
+// it proven, an un-permute is TOTAL: no per-index bounds check and no missing/dup
+// slots. This is what lets a coupling-aware construction reconstruct without the
+// runtime checks the plain `Construction::reconstruct` carries.
+
+/// Predicate: the named `Vec<usize>` is a PERMUTATION of `0..len` — a bijection.
+/// Earned by `prove_permutation`, and tied to the order's own name, so a permutation
+/// proven for one vector cannot stand in for another.
+pub struct PermutationOf;
+
+/// Earn a `PermutationOf` proof by the real bijection check: right length, every
+/// index in range, none repeated. `None` if the order is not a valid permutation.
+pub fn prove_permutation<N>(
+    order: &Named<N, Vec<usize>>,
+    len: usize,
+) -> Option<Proof<N, PermutationOf>> {
+    let o = order.value();
+    if o.len() != len {
+        return None;
+    }
+    let mut seen = vec![false; len];
+    for &i in o {
+        if i >= len || core::mem::replace(&mut seen[i], true) {
+            return None;
+        }
+    }
+    Some(Proof(PhantomData))
+}
+
+/// Reorder `sorted` by a PROVEN permutation whose `order[k]` is the ORIGINAL index of
+/// `sorted[k]`. TOTAL — the `PermutationOf` proof guarantees a bijection of the right
+/// length, so every output slot is filled exactly once (the `expect` is unreachable).
+pub fn unpermute<N, T: Clone>(
+    order: &Named<N, Vec<usize>>,
+    _proof: &Proof<N, PermutationOf>,
+    sorted: &[T],
+) -> Vec<T> {
+    let mut out: Vec<Option<T>> = vec![None; sorted.len()];
+    for (k, &orig) in order.value().iter().enumerate() {
+        out[orig] = Some(sorted[k].clone());
+    }
+    out.into_iter()
+        .map(|slot| slot.expect("PermutationOf proof guarantees every slot is filled"))
+        .collect()
+}
+
 /// Witness: this summary is the result of `Round` (whole-dollar) reduction.
 ///
 /// AUDIT finding: an operation's having-occurred is lost from the type system
@@ -400,6 +449,37 @@ mod tests {
             m.insert("a", 10);
             let named_map = s_map.new_named(m);
             assert!(lookup(s_idx, &named_map, &"z").is_none());
+        });
+    }
+
+    /// `prove_permutation` accepts a bijection and rejects a wrong length, an
+    /// out-of-range index, and a duplicate — earning the proof only for a real
+    /// permutation (each rejection pins one branch of the check).
+    #[test]
+    fn prove_permutation_is_exact() {
+        with_seed(|seed| {
+            let (a, rest) = seed.replicate();
+            let (b, rest) = rest.replicate();
+            let (c, d) = rest.replicate();
+            assert!(prove_permutation(&a.new_named(vec![2usize, 0, 1]), 3).is_some());
+            assert!(prove_permutation(&b.new_named(vec![0usize, 1]), 3).is_none()); // wrong length
+            assert!(prove_permutation(&c.new_named(vec![0usize, 1, 3]), 3).is_none()); // out of range
+            assert!(prove_permutation(&d.new_named(vec![0usize, 0, 1]), 3).is_none());
+            // duplicate
+        });
+    }
+
+    /// `unpermute` scatters each item to its original index, totally, under the proof.
+    #[test]
+    fn unpermute_inverts_a_known_permutation() {
+        with_seed(|seed| {
+            // order[k] = original index of sorted[k]: sorted[0]->2, [1]->0, [2]->1.
+            let order = seed.new_named(vec![2usize, 0, 1]);
+            let proof = prove_permutation(&order, 3).expect("valid permutation");
+            assert_eq!(
+                unpermute(&order, &proof, &["a", "b", "c"]),
+                vec!["b", "c", "a"]
+            );
         });
     }
 }

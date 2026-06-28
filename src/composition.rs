@@ -38,8 +38,10 @@
 //! subsumes the other.
 
 use crate::boundary::{Construction, Morphism};
-use crate::gdp::{Name, Named, Paired, Seed};
-use crate::ledger::boundary::{AccountSummary, Aggregate, MultiplicityResidual, Transaction};
+use crate::gdp::{prove_permutation, unpermute, Name, Named, Paired, PermutationOf, Proof, Seed};
+use crate::ledger::boundary::{
+    AccountSummary, Aggregate, MultiplicityResidual, ParseTransaction, Posting, Transaction,
+};
 
 /// The RELATION, via public API only: does `residual` actually explain `summary`?
 /// Reconstruct the transaction from the residual, re-aggregate it, and compare to
@@ -100,6 +102,52 @@ pub fn reconstruct_paired<C: Construction, N>(
     residual: &Named<N, C::Residual>,
 ) -> Option<C::Raw> {
     c.reconstruct(refined.value(), residual.value())
+}
+
+// ===== a COUPLING-AWARE construction: the proof makes reconstruct total =====
+
+/// The seed-taking construction the plain `Construction` trait cannot express: its
+/// `parse` has no seed, and a GDP name cannot escape a `with_seed` closure, so a
+/// branded/proven residual needs a construction that takes the seed itself. Here the
+/// sorted `Transaction` and its permutation residual are named TOGETHER and the
+/// permutation is PROVEN valid, so reconstruction drops the runtime bounds/bijection
+/// checks the plain `ParseTransaction::reconstruct` must keep — it becomes TOTAL.
+pub struct CoupledTransaction<N> {
+    tx: Named<N, Transaction>,
+    order: Named<N, Vec<usize>>,
+    proof: Proof<N, PermutationOf>,
+}
+
+impl<N> CoupledTransaction<N> {
+    /// The canonical (sorted) transaction.
+    pub fn transaction(&self) -> &Transaction {
+        self.tx.value()
+    }
+
+    /// Reconstruct the EXACT original posting order — TOTAL (no `Option`), because the
+    /// `PermutationOf` proof guarantees the residual is a valid bijection.
+    pub fn reconstruct(&self) -> Vec<Posting> {
+        unpermute(&self.order, &self.proof, self.tx.value().postings())
+    }
+}
+
+/// Parse a raw posting list into a `CoupledTransaction`: name the sorted transaction
+/// and its discarded ordering together, and prove the ordering a valid permutation
+/// (it always is, by construction). `None` only for an empty input (no transaction).
+pub fn parse_transaction_coupled<N: Name>(
+    seed: Seed<N>,
+    raw: &[Posting],
+) -> Option<CoupledTransaction<impl Name>> {
+    let (tx, residual) = ParseTransaction.parse(&raw.to_vec())?;
+    let order: Vec<usize> = residual.positions().iter().map(|i| i.get()).collect();
+    let len = order.len();
+    let (named_tx, named_order) = seed.new_paired(tx, order).split();
+    let proof = prove_permutation(&named_order, len)?;
+    Some(CoupledTransaction {
+        tx: named_tx,
+        order: named_order,
+        proof,
+    })
 }
 
 #[cfg(test)]
@@ -179,6 +227,27 @@ mod tests {
             );
             // A residual from a different parse, under another name, would not unify —
             // the mismatched recombination cannot be expressed.
+        });
+    }
+
+    /// The coupling-aware construction: with the permutation PROVEN valid, reconstruct
+    /// is TOTAL — it returns `Vec<Posting>`, not `Option`, recovering the exact input
+    /// order with no runtime bounds/bijection checks.
+    #[test]
+    fn coupled_transaction_reconstructs_totally() {
+        with_seed(|seed| {
+            // input order differs from canonical, so the permutation is non-trivial.
+            let raw = vec![
+                Posting::new(Account::new("Revenue").unwrap(), Cents::new(-60).unwrap()),
+                Posting::new(Account::new("Cash").unwrap(), Cents::new(60).unwrap()),
+            ];
+            let coupled = parse_transaction_coupled(seed, &raw).expect("non-empty input");
+            assert_eq!(
+                coupled.transaction(),
+                &Transaction::new(raw.clone()).unwrap()
+            );
+            let recovered: Vec<Posting> = coupled.reconstruct(); // total — no Option
+            assert_eq!(recovered, raw);
         });
     }
 
