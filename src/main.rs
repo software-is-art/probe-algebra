@@ -1,19 +1,13 @@
-//! demo — exercises the morphological-testing algebra THROUGH the published
-//! boundaries. The bin can name only `boundary_algebra::boundary` (the grammar) and
-//! `boundary_algebra::ledger::boundary` (the ledger's interface); the aggregation
-//! algorithm in `ledger::internal` is private and unreachable from here.
+//! demo — exercises the boundary algebra THROUGH the interpreter, the sole demonstration
+//! substrate. The bin names only `boundary_algebra::boundary` (the grammar) and
+//! `boundary_algebra::interp::boundary` (the interpreter's interface); the lexer, parser,
+//! type checker, and evaluator in `interp::internal` are private and unreachable here.
 
-use boundary_algebra::boundary::{
-    coefficient_holds, commutes, probe, run, Compose, Morphism, ProbeResult,
-};
-use boundary_algebra::ledger::boundary::{
-    Account, Aggregate, AggregateDropsAmounts, AggregateOffsetsTotals, Cents, DoublePostings,
-    NudgeCents, Posting, Round, Split, Transaction,
-};
-use boundary_algebra::linear::boundary::{Double, Quantity, Scale, UnitResponse};
+use boundary_algebra::gdp::with_seed;
+use boundary_algebra::interp::boundary::{Check, Eval, Parse};
 
 fn banner(s: &str) {
-    println!("\n=== {} ===", s);
+    println!("\n=== {s} ===");
 }
 fn yn(b: bool) -> &'static str {
     if b {
@@ -23,141 +17,42 @@ fn yn(b: bool) -> &'static str {
     }
 }
 
-fn sample() -> Transaction {
-    Transaction::new(vec![
-        Posting::new(Account::new("Cash").unwrap(), Cents::new(6000).unwrap()),
-        Posting::new(Account::new("Cash").unwrap(), Cents::new(4000).unwrap()), // dup -> multiplicity
-        Posting::new(
-            Account::new("Revenue").unwrap(),
-            Cents::new(-10000).unwrap(),
-        ),
-    ])
-    .unwrap()
-}
-
 fn main() {
-    let x = sample();
+    banner("BOUNDARY: the interpreter's seam is a category of edges");
+    println!("  Parse  : Construction  String -> Expr        (parse, don't validate)");
+    println!("  Check  : Branch        Expr   -> WellTyped + IllTyped");
+    println!("  Eval   : Guarded       Expr   -> Value        (needs a WellTyped witness)");
+    println!("  interp::internal (lexer/parser/checker/evaluator) is PRIVATE — unreachable.");
 
-    banner("BOUNDARY: every cross-module value is a value object or value operator");
-    println!("  main can name only crate::boundary + ledger::boundary.");
-    println!("  ledger::internal (the aggregation algorithm) is PRIVATE — unreachable.");
-    println!("  Aggregate is a Morphism: Transaction -> (AccountSummary, MultiplicityResidual).");
+    let src = "(let x = 5 in (if (x < 10) then (x + 1) else 0))";
 
-    banner("HONEST: forward output + residual, retained via the typestate");
-    let carried = run(&Aggregate, &x); // Carried<Aggregate, Retained>
-    println!("  summary totals : {:?}", carried.out().totals());
-    println!("  residual       : {:?}", carried.residual());
+    banner("CONSTRUCTION: parse the canonical source, and render it back");
+    let expr = Parse.parse_str(src).expect("valid program");
+    println!("  source     : {src}");
+    println!("  re-rendered : {}", expr.render());
+    println!("  render . parse == id : {}", yn(expr.render() == src));
 
-    banner("INVERTIBILITY RESTORED: a retained residual makes a lossy map invert");
-    let recovered = carried.invert(&Aggregate);
-    println!(
-        "  reconstructed transaction == original: {}",
-        yn(recovered.as_ref() == Some(&x))
-    );
+    banner("BRANCH then GUARDED: type-check mints the witness eval demands");
+    with_seed(|seed| {
+        let named = seed.new_named(expr.clone());
+        match Check.classify(&named) {
+            Ok(proof) => {
+                let value = Eval.run(&named, &proof);
+                println!("  well-typed -> evaluates to : {:?}", value.value());
+            }
+            Err(_) => println!("  ill-typed (unreachable for this program)"),
+        }
+    });
 
-    banner("TYPESTATE: discarding the residual REMOVES invertibility at compile time");
-    let discarded = carried.discard(); // Carried<Aggregate, Discarded>
-    println!("  output still available : {:?}", discarded.out().totals());
-    println!("  discarded.invert(&Aggregate)  // <- does not compile: method gone");
+    banner("WELL-TYPED PROGRAMS DON'T GO WRONG (as a compile-time fact)");
+    println!("  Eval::run requires a WellTyped<N> for the SAME brand as the expression,");
+    println!("  so an unchecked or ill-typed program cannot be evaluated at all —");
+    println!("  see tests/compile_fail/eval_wrong_program (a proof for A cannot eval B).");
 
-    banner("PROBE (generic): perturb the lost dimension, check the residual");
-    println!("  Operator: Split (perturbs multiplicity — the dimension Aggregate loses).\n");
-    let honest = probe(&Aggregate, &Split, &x).unwrap();
-    report("Aggregate (honest residual)", &honest);
-    let buggy = probe(&AggregateDropsAmounts, &Split, &x).unwrap();
-    report("AggregateDropsAmounts (records only counts)", &buggy);
-    println!("  Same morphism TYPE, same Split probe — the probe alone catches the bug:");
-    println!(
-        "  the count-only residual cannot reconstruct, so round-trip FAILS ({}).",
-        yn(buggy.round_trips)
-    );
-
-    banner("PROBE a different dimension: Round, perturbed by NudgeCents");
-    let summary = run(&Aggregate, &x).out().clone();
-    let round = probe(&Round, &NudgeCents, &summary).unwrap();
-    report("Round (sub-dollar residual)", &round);
-
-    banner("COMPOSITION: loss composes as a Pair value object");
-    println!("  Compose {{ f: Aggregate, g: Round }} : Transaction -> rounded AccountSummary,");
-    println!("  Residual = Pair<MultiplicityResidual, RoundingResidual>.");
-    let pipeline = Compose {
-        f: Aggregate,
-        g: Round,
-    };
-    let (out, res) = pipeline.forward(&x);
-    println!("  rounded totals : {:?}", out.totals());
-    println!("  paired residual: {:?}", res);
-    let back = pipeline.backward(&out, &res);
-    println!(
-        "  end-to-end round-trip through TWO lossy stages: {}",
-        yn(back.as_ref() == Some(&x))
-    );
-    let composed = probe(&pipeline, &Split, &x).unwrap();
-    report("Compose<Aggregate, Round> probed by Split", &composed);
-
-    banner("LAYER 2 (structural, reference-free): commutation");
-    println!("  DoublePostings: duplicating every posting must double every total.");
-    println!(
-        "  honest aggregate commutes        : {}",
-        yn(commutes(&Aggregate, &DoublePostings, &x) == Some(true))
-    );
-    println!(
-        "  offset-bug aggregate commutes    : {}  <- non-linear bug CAUGHT",
-        yn(commutes(&AggregateOffsetsTotals, &DoublePostings, &x) == Some(true))
-    );
-    println!(
-        "  drops-amounts aggregate commutes : {}  <- output correct, commutation BLIND",
-        yn(commutes(&AggregateDropsAmounts, &DoublePostings, &x) == Some(true))
-    );
-
-    banner("THE DECISIVE NEGATIVE RESULT: a coefficient bug defeats every structural check");
-    let q = Quantity::new(7).unwrap();
-    println!("  Scale::honest (rate 3) vs Scale::skew (rate 5) — same type, wrong constant.");
-    println!(
-        "  skew round-trips                 : {}  <- invertible, so round-trip BLIND",
-        yn(run(&Scale::skew(), &q).invert(&Scale::skew()) == Some(q))
-    );
-    println!(
-        "  skew commutes with doubling      : {}  <- linear, so commutation BLIND",
-        yn(commutes(&Scale::skew(), &Double, &q) == Some(true))
-    );
-    let unit_response = UnitResponse::from_reference(Scale::reference_rate());
-    println!(
-        "  LAYER 3 (quantitative) honest    : {}",
-        yn(coefficient_holds(&Scale::honest(), &unit_response, &q) == Some(true))
-    );
-    println!(
-        "  LAYER 3 (quantitative) skew      : {}  <- reference-bearing probe CATCHES it",
-        yn(coefficient_holds(&Scale::skew(), &unit_response, &q) == Some(true))
-    );
-    println!("  => no single check is highest-assurance; the layers are complementary.");
-
-    banner("WHAT THIS BUYS");
-    println!("  - Loss is forced into typed residual value objects (visible in the type).");
-    println!("  - Discarding a residual removes invertibility at COMPILE time (typestate).");
-    println!("  - Every cross-module morphism is uniformly probeable for completeness.");
-    println!("  - Residuals compose, so reference back-propagation flows THROUGH lossy");
-    println!("    stages as long as the accumulated residual is retained.");
+    banner("REJECTION: an ill-typed program never type-checks");
+    let bad = Parse.parse_str("(1 + true)").expect("parses");
+    let well_typed = with_seed(|seed| Check.classify(&seed.new_named(bad)).is_ok());
+    println!("  (1 + true) type-checks : {}", yn(well_typed));
 
     banner("DONE");
-}
-
-fn report(label: &str, pr: &ProbeResult) {
-    println!("  {}", label);
-    println!(
-        "    output invariant under perturbation : {}",
-        yn(pr.output_invariant)
-    );
-    println!(
-        "    residual responds                   : {}",
-        yn(pr.residual_responds)
-    );
-    println!(
-        "    round-trip on perturbed input       : {}",
-        yn(pr.round_trips)
-    );
-    println!(
-        "    => RESIDUAL COMPLETE                 : {}\n",
-        yn(pr.residual_complete())
-    );
 }

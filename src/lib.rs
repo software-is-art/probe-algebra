@@ -5,7 +5,7 @@
 //!      every operation on it a VALUE OPERATOR — never raw primitive arithmetic
 //!      at a call site; and
 //!   2. a transformation is checked by a LAYERED probe suite, because no single
-//!      check is highest-assurance (see `blindspot`).
+//!      check is highest-assurance.
 //!
 //! `crate::boundary` defines the grammar: a boundary is a CATEGORY of value-object
 //! OBJECTS and value-operator MORPHISMS. The morphisms share one algebra in a few
@@ -20,34 +20,19 @@
 //! analogs). Each module's `boundary.rs` is its only public surface; `build.rs`
 //! enforces the grammar and the inward "no raw primitive escapes" rule.
 //!
-//! Modules:
-//!   - `ledger`  — lossy worked example (aggregation + residual + mutants);
-//!   - `linear`  — lossless transport carrying the decisive coefficient bug;
-//!   - `select`  — kill-matrix set-cover selection (the generation+selection loop);
-//!   - `synth`   — type-driven degree-of-freedom coverage / operator synthesis;
-//!   - `interp`  — a "cold" use case (expression-language interpreter) testing whether
-//!     the boundary rigour buys ZERO internal testing (measured by mutation).
+//! The interpreter (`interp`) is the sole demonstration substrate: an expression
+//! language whose boundary is `Parse` (a `Construction`), `Check` (a `Branch`), and
+//! `Eval` (a `Guarded` edge), and whose private internals carry ZERO tests of their own —
+//! the boundary rigour plus the autogen `laws` registry are their entire verification,
+//! measured by mutation. `gdp` is the name-branding machinery the edges use; `select` is
+//! the kill-matrix set-cover meta-tooling.
 
 pub mod boundary;
-pub mod capability;
-pub mod composition;
-pub mod effect;
 pub mod gdp;
 pub mod interp;
-pub mod journal;
-pub mod ledger;
-pub mod lifecycle;
-pub mod linear;
-pub mod money;
-pub mod pipeline;
 pub mod select;
-pub mod synth;
 
 #[cfg(test)]
-mod blindspot;
-#[cfg(test)]
 mod laws;
-#[cfg(test)]
-mod properties;
 #[cfg(test)]
 mod tests;

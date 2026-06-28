@@ -20,9 +20,7 @@
 use core::marker::PhantomData;
 use std::collections::BTreeMap;
 
-use crate::boundary::{Construction, Morphism};
-use crate::ledger::boundary::{AccountSummary, Balance, Round, Transaction};
-use crate::linear::boundary::{Quantity, Scale};
+use crate::boundary::Construction;
 
 // ===== the name machinery (mononym's technique, hand-rolled) ==============
 
@@ -114,14 +112,7 @@ pub fn with_region<R>(cont: impl for<'name> FnOnce(Brander<Life<'name>>) -> R) -
     cont(Brander(PhantomData))
 }
 
-/// Run ANY morphism on a branded input and stamp its output into the SAME region, so
-/// identity flows along the dataflow through an edge of any shape. The morphism's
-/// residual/invertibility is `run`'s concern; this is the orthogonal IDENTITY axis.
-pub fn stamp<N, M: Morphism>(r: &Brander<N>, m: &M, input: &Named<N, M::In>) -> Named<N, M::Out> {
-    r.brand(m.forward(input.value()).0)
-}
-
-/// The entry-edge analog: parse a raw input and stamp the refined value into the
+/// The entry-edge stamp: parse a raw input and stamp the refined value into the
 /// region (`None` if the parse rejects). A whole pipeline can thus start from a raw
 /// primitive and carry one region brand all the way through.
 pub fn stamp_parse<N, C: Construction>(
@@ -136,54 +127,11 @@ pub fn stamp_parse<N, C: Construction>(
 
 /// A proof that predicate `P` holds for the value named `N`. Its constructor is
 /// private to this module, so a proof can be minted ONLY by the checks here —
-/// and `N` ties it to one specific named value.
+/// and `N` ties it to one specific named value. (The relational predicates and the
+/// proofs that carry domain facts across a seam are now demonstrated on the
+/// interpreter — `interp`'s `WellTyped`/`IllTyped` are exactly such name-branded
+/// proofs, minted only by the `Check` branch.)
 pub struct Proof<N, P>(PhantomData<(N, P)>);
-
-/// Predicate: a transaction is balanced (its postings sum to zero — double entry).
-pub struct Balanced;
-/// Predicate: a transaction is NOT balanced.
-pub struct Unbalanced;
-
-/// Total classification — the paper's `classify`, NOT a `Maybe`. Every named
-/// transaction is balanced or not, and BOTH branches carry a usable proof.
-/// `Option<Proof<Balanced>>` would discard the negative witness; keeping it makes
-/// the unbalanced case first-class (route it to a correction queue, etc.).
-pub enum BalanceProof<N> {
-    Balanced(Proof<N, Balanced>),
-    Unbalanced(Proof<N, Unbalanced>),
-}
-
-/// Classify a named transaction by balance, minting the matching proof. This is
-/// where the fact is EARNED; the name carries it onward at no cost.
-pub fn classify_balance<N>(tx: &Named<N, Transaction>) -> BalanceProof<N> {
-    let mut total = Balance::zero();
-    for posting in tx.value().postings() {
-        total = total.add_cents(*posting.amount());
-    }
-    if total == Balance::zero() {
-        BalanceProof::Balanced(Proof(PhantomData))
-    } else {
-        BalanceProof::Unbalanced(Proof(PhantomData))
-    }
-}
-
-/// Consumer of the POSITIVE branch: accepts a transaction ONLY with a proof that
-/// the SAME named value is balanced — so an unbalanced, unbranded, or
-/// wrong-named transaction will not type-check. A's classification discharges B's
-/// precondition.
-pub fn export_balanced<N>(tx: &Named<N, Transaction>, _proof: &Proof<N, Balanced>) -> usize {
-    tx.value().postings().len()
-}
-
-/// Consumer of the NEGATIVE branch: accepts a transaction ONLY with a proof it is
-/// UNBALANCED (e.g. route to a correction queue). The negative witness is carried,
-/// not discarded — that is the upgrade over an `Option`-returning check.
-pub fn quarantine_unbalanced<N>(
-    tx: &Named<N, Transaction>,
-    _proof: &Proof<N, Unbalanced>,
-) -> usize {
-    tx.value().postings().len()
-}
 
 // ===== a witness that an OPERATION occurred (the audit) ===================
 
@@ -288,175 +236,14 @@ pub fn unpermute<N, T: Clone>(
         .collect()
 }
 
-/// Witness: this summary is the result of `Round` (whole-dollar) reduction.
-///
-/// AUDIT finding: an operation's having-occurred is lost from the type system
-/// exactly when the operation is an ENDO-map (input and output the same type).
-/// `Round: AccountSummary -> AccountSummary` and `Scale: Quantity -> Quantity`
-/// both erase the fact that they ran — a rounded summary is indistinguishable
-/// from an un-rounded one. (Contrast `Calibrate: Sample -> Reading`, where the
-/// type change itself witnesses the operation, so nothing is lost.) For an
-/// endo-operation, capture the lost witness with a proof on the named output.
-pub struct Rounded;
-
-/// Run `Round`, capturing a witness — tied to the output's name — that rounding
-/// occurred. The operation is no longer invisible: downstream can DEMAND it.
-pub fn round_witnessed<N: Name>(
-    // consumed for its unique name `N` (affine: the seed cannot be reused) — the
-    // value and the proof are both branded with it below.
-    _seed: Seed<N>,
-    summary: &AccountSummary,
-) -> Witnessed<impl Name, AccountSummary, Rounded> {
-    let (rounded, _residual) = Round.forward(summary);
-    Witnessed(Named::<N, _>(rounded, PhantomData), Proof(PhantomData))
-}
-
-/// A consumer requiring its input to have been ROUNDED — e.g. a whole-dollar
-/// formatter. It cannot be called on an un-rounded or un-witnessed summary, so
-/// "forgot to round" becomes a compile error rather than a wrong report.
-pub fn whole_dollars<N>(summary: &Named<N, AccountSummary>, _proof: &Proof<N, Rounded>) -> usize {
-    summary.value().totals().len()
-}
-
-/// Witness: this quantity is the output of the REFERENCE scaling (`Scale::honest`).
-///
-/// `Scale: Quantity -> Quantity` is the other endo-map from the audit, so "scaled"
-/// is invisible in the type — and (the decisive negative result) a wrong-rate
-/// `skew` output is indistinguishable from a right one. A value obtains this
-/// witness ONLY by passing through `scale_witnessed`, which runs the honest rate;
-/// the library offers no skew-witnessing counterpart, so a skew-scaled value can
-/// never carry it. A consumer that requires `Scaled` therefore rejects skew (and
-/// raw, un-scaled quantities) at COMPILE time — the provenance complement to the
-/// runtime quantitative probe. (Sound because the witness is minted only on the
-/// honest path; it is provenance, not verification of an arbitrary input.)
-///
-/// Together with `Scale::CAPABILITY` this captures BOTH facts an endo-operation
-/// hides: its capability (`Pure`, a static const) and its having-occurred (this
-/// witness).
-pub struct Scaled;
-
-/// Run the reference scaling, capturing a witness — tied to the output's name —
-/// that it occurred at the honest rate.
-pub fn scale_witnessed<N: Name>(
-    // consumed for its unique name `N` (affine), used to brand the output below.
-    _seed: Seed<N>,
-    quantity: &Quantity,
-) -> Witnessed<impl Name, Quantity, Scaled> {
-    let (scaled, _unit) = Scale::honest().forward(quantity);
-    Witnessed(Named::<N, _>(scaled, PhantomData), Proof(PhantomData))
-}
-
-/// A consumer requiring its input to be a reference-scaled figure. It cannot be
-/// called on a raw quantity or a skew-scaled one — neither carries `Scaled`.
-pub fn report_scaled<N>(quantity: &Named<N, Quantity>, _proof: &Proof<N, Scaled>) -> i64 {
-    quantity.value().get()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ledger::boundary::{Account, Aggregate, Cents, Posting};
-    use std::collections::BTreeMap;
 
-    fn balanced() -> Transaction {
-        Transaction::new(vec![
-            Posting::new(Account::new("Cash").unwrap(), Cents::new(10_000).unwrap()),
-            Posting::new(
-                Account::new("Revenue").unwrap(),
-                Cents::new(-10_000).unwrap(),
-            ),
-        ])
-        .unwrap()
-    }
-
-    fn unbalanced() -> Transaction {
-        Transaction::new(vec![
-            Posting::new(Account::new("Cash").unwrap(), Cents::new(10_000).unwrap()),
-            Posting::new(Account::new("Fees").unwrap(), Cents::new(5_000).unwrap()),
-        ])
-        .unwrap()
-    }
-
-    /// Total classify, positive branch: the proof discharges B's precondition,
-    /// tied to this value's name (a proof for another transaction would not unify).
-    #[test]
-    fn balanced_branch_discharges_export() {
-        with_seed(|seed| {
-            let named = seed.new_named(balanced());
-            match classify_balance(&named) {
-                BalanceProof::Balanced(proof) => assert_eq!(export_balanced(&named, &proof), 2),
-                BalanceProof::Unbalanced(_) => panic!("the sample balances"),
-            }
-        });
-    }
-
-    /// Total classify, negative branch: the unbalanced case is NOT discarded — it
-    /// carries a proof the correction path consumes.
-    #[test]
-    fn unbalanced_branch_carries_a_usable_witness() {
-        with_seed(|seed| {
-            let named = seed.new_named(unbalanced());
-            match classify_balance(&named) {
-                BalanceProof::Unbalanced(proof) => {
-                    assert_eq!(quarantine_unbalanced(&named, &proof), 2)
-                }
-                BalanceProof::Balanced(_) => panic!("the sample does not balance"),
-            }
-        });
-    }
-
-    /// Distinct seeds give distinct names: a proof about one cannot be used with
-    /// the other (crossing them would not compile).
-    #[test]
-    fn names_from_distinct_seeds_do_not_unify() {
-        with_seed(|seed| {
-            let (s1, s2) = seed.replicate();
-            let a = s1.new_named(balanced());
-            let b = s2.new_named(balanced());
-            match (classify_balance(&a), classify_balance(&b)) {
-                (BalanceProof::Balanced(pa), BalanceProof::Balanced(pb)) => {
-                    assert_eq!(export_balanced(&a, &pa), 2);
-                    assert_eq!(export_balanced(&b, &pb), 2);
-                    // export_balanced(&a, &pb) — does NOT compile: names differ.
-                }
-                _ => panic!("both balance"),
-            }
-        });
-    }
-
-    /// The captured operation-witness: `round_witnessed` records that rounding
-    /// occurred, and `whole_dollars` can be called ONLY with that witness — the
-    /// endo-operation is no longer invisible in the type system.
-    #[test]
-    fn rounding_witness_is_captured_and_required() {
-        with_seed(|seed| {
-            let summary = Aggregate.forward(&balanced()).0;
-            let (named, proof) = round_witnessed(seed, &summary).split();
-            assert_eq!(whole_dollars(&named, &proof), 2);
-            // whole_dollars(&some_unrounded_named, ...) — impossible: no Rounded
-            // proof exists for a summary that did not pass round_witnessed.
-        });
-    }
-
-    /// The other endo-map: `scale_witnessed` records that reference scaling ran,
-    /// `report_scaled` requires the witness, and the witnessed op's capability is
-    /// `Pure` — both type-invisible facts of the endo-operation now captured.
-    #[test]
-    fn scaling_witness_gates_consumer_and_pairs_with_capability() {
-        use crate::boundary::Capability;
-        use crate::linear::boundary::Scale;
-        with_seed(|seed| {
-            let q = Quantity::new(7).unwrap();
-            let (named, proof) = scale_witnessed(seed, &q).split();
-            // 7 * honest rate 3; report_scaled on a raw or skew-scaled Quantity is
-            // impossible — neither carries a Scaled proof.
-            assert_eq!(report_scaled(&named, &proof), 21);
-            assert_eq!(<Scale as Morphism>::CAPABILITY, Capability::Pure);
-        });
-    }
-
-    /// Relational coupling: `lookup` mints an index FRESHLY named and proven in bounds
-    /// of THIS map, and `get_in_bounds` reads it with no runtime bounds check. The
+    /// Distinct seeds give distinct names: an index/proof minted under one cannot be
+    /// used with another (crossing them would not compile). Exercised via `lookup` below.
+    /// Relational coupling: `lookup` mints an index FRESHLY named and proven in bounds of
+    /// THIS map, and `get_in_bounds` reads it with no runtime bounds check. The
     /// `InBounds<Coll>` proof ties the index to the one map — an index proven for a
     /// different map would not unify (a compile error), so it cannot index the wrong
     /// collection.
@@ -526,40 +313,21 @@ mod tests {
         });
     }
 
-    /// A consumer requiring its inputs to be from the SAME region (one brand `N`) — a
-    /// value from another region would not unify, so cross-run mixing cannot be spelled.
-    fn same_run<N>(tx: &Named<N, Transaction>, summary: &Named<N, AccountSummary>) -> usize {
-        tx.value()
-            .postings()
-            .len()
-            .max(summary.value().totals().len())
-    }
-
-    /// A REGION stamps EVERY value flowing through the dataflow with one brand, no
-    /// matter the edge's shape: a raw list is stamped through the `ParseTransaction`
-    /// entry edge, then through two different morphisms (`Aggregate`, `Round`). The
-    /// THREE co-branded values (not a pair) all share the region, so same-run
-    /// provenance is demandable across the whole pipeline.
+    /// A REGION stamps values flowing through the dataflow with one brand, whatever the
+    /// edge's shape. Here a raw source is stamped through the `Parse` construction edge,
+    /// and another value is branded into the SAME region — both share the brand, so
+    /// same-run provenance is demandable across them.
     #[test]
-    fn a_region_stamps_values_through_morphisms_of_any_shape() {
-        use crate::ledger::boundary::{ParseTransaction, Round};
+    fn a_region_stamps_a_value_through_the_parse_edge() {
+        use crate::interp::boundary::Parse;
         with_region(|r| {
-            let raw = vec![
-                Posting::new(Account::new("Cash").unwrap(), Cents::new(10_000).unwrap()),
-                Posting::new(
-                    Account::new("Revenue").unwrap(),
-                    Cents::new(-10_000).unwrap(),
-                ),
-            ];
-            let tx = stamp_parse(&r, &ParseTransaction, &raw).expect("non-empty input");
-            let summary = stamp(&r, &Aggregate, &tx);
-            let rounded = stamp(&r, &Round, &summary);
-            // each stamped value is the real morphism output (pins that `stamp` runs it)
-            assert_eq!(tx.value(), &Transaction::new(raw.clone()).unwrap());
-            assert_eq!(summary.value(), &Aggregate.forward(tx.value()).0);
-            assert_eq!(rounded.value(), &Round.forward(summary.value()).0);
-            // all three share the region brand — same-run provenance over the pipeline.
-            assert_eq!(same_run(&tx, &rounded), 2);
+            let expr = stamp_parse(&r, &Parse, &"(1 + 2)".to_string()).expect("valid source");
+            assert_eq!(expr.value(), &Parse.parse_str("(1 + 2)").unwrap());
+            // a second value branded into the same region shares the name `N`.
+            let rendered = r.brand(expr.value().render());
+            fn same_region<N, A, B>(_a: &Named<N, A>, _b: &Named<N, B>) {}
+            same_region(&expr, &rendered); // compiles only because both carry one brand
+            assert_eq!(rendered.value(), "(1 + 2)");
         });
     }
 }
