@@ -60,8 +60,9 @@ mod tests {
             let named = seed.new_named(submitted);
             match Validate.classify(&named) {
                 Ok(proof) => {
+                    // `posted` is `Named<N, Entry<Posted>>` — the brand flows through.
                     let posted = Post.commit(&named, &proof);
-                    assert_eq!(posted.tx(), &balanced());
+                    assert_eq!(posted.value().tx(), &balanced());
                 }
                 Err(_) => panic!("a balanced entry clears"),
             }
@@ -81,13 +82,14 @@ mod tests {
                 Err(proof) => Reject.apply(&named, &proof),
                 Ok(_) => panic!("the sample does not balance"),
             };
-            assert_eq!(rejected.tx(), &unbalanced());
-            // the cycle: Rejected -> Draft, reversible.
-            let reopened = run(&Amend, &rejected);
+            assert_eq!(rejected.value().tx(), &unbalanced());
+            // the cycle: Rejected -> Draft, reversible. `Amend` is a name-free
+            // morphism, so the entry steps out of its brand via `value()`.
+            let reopened = run(&Amend, rejected.value());
             assert_eq!(reopened.out().tx(), &unbalanced());
             assert_eq!(
-                reopened.invert(&Amend).expect("amend is reversible"),
-                rejected
+                &reopened.invert(&Amend).expect("amend is reversible"),
+                rejected.value()
             );
         });
     }
@@ -104,9 +106,12 @@ mod tests {
                 Ok(proof) => Post.commit(&named, &proof),
                 Err(_) => panic!("a balanced entry clears"),
             };
-            let voided = run(&Void, &posted);
+            let voided = run(&Void, posted.value());
             assert_eq!(voided.out().tx(), &balanced());
-            assert_eq!(voided.invert(&Void).expect("void is reversible"), posted);
+            assert_eq!(
+                &voided.invert(&Void).expect("void is reversible"),
+                posted.value()
+            );
         });
     }
 
@@ -173,9 +178,11 @@ mod tests {
     /// dispatch cannot cross the wires.
     #[test]
     fn classify_then_dispatch_is_one_branching_hop() {
+        // Both arms keep the brand `N`: the coproduct is `Named<N, Entry<Posted>> +
+        // Named<N, Entry<Rejected>>`, so provenance survives the dispatch.
         fn dispatch<N>(
             entry: &Named<N, Entry<Submitted>>,
-        ) -> Result<Entry<Posted>, Entry<Rejected>> {
+        ) -> Result<Named<N, Entry<Posted>>, Named<N, Entry<Rejected>>> {
             match Validate.branch(entry) {
                 Ok(cleared) => Ok(Post.guard(entry, &cleared)),
                 Err(flagged) => Err(Reject.guard(entry, &flagged)),
@@ -186,13 +193,42 @@ mod tests {
             let (s_ok, s_bad) = seed.replicate();
 
             let (ok, _u) = Submit.forward(&Entry::<Draft>::draft(balanced()));
-            let posted = dispatch(&s_ok.new_named(ok)).expect("a balanced entry posts");
-            assert_eq!(posted.tx(), &balanced());
+            match dispatch(&s_ok.new_named(ok)) {
+                Ok(posted) => assert_eq!(posted.value().tx(), &balanced()),
+                Err(_) => panic!("a balanced entry posts"),
+            }
 
             let (bad, _u) = Submit.forward(&Entry::<Draft>::draft(unbalanced()));
-            let rejected =
-                dispatch(&s_bad.new_named(bad)).expect_err("an unbalanced entry rejects");
-            assert_eq!(rejected.tx(), &unbalanced());
+            match dispatch(&s_bad.new_named(bad)) {
+                Err(rejected) => assert_eq!(rejected.value().tx(), &unbalanced()),
+                Ok(_) => panic!("an unbalanced entry rejects"),
+            }
+        });
+    }
+
+    /// Provenance coupling (case c1): a `Post`ed entry KEEPS the brand of the
+    /// submitted entry it came from, so a consumer can demand the posted output and
+    /// its origin under ONE name — `same_origin` only type-checks for the matching
+    /// brand. A posted entry from a DIFFERENT seed would not unify, so a `Posted`
+    /// cannot be misattributed to an entry it did not come from.
+    #[test]
+    fn posting_carries_provenance_of_its_origin() {
+        // The consumer: both arguments must share the brand `N`.
+        fn same_origin<N>(
+            posted: &Named<N, Entry<Posted>>,
+            origin: &Named<N, Entry<Submitted>>,
+        ) -> bool {
+            posted.value().tx() == origin.value().tx()
+        }
+
+        with_seed(|seed| {
+            let (sub, _u) = Submit.forward(&Entry::<Draft>::draft(balanced()));
+            let named = seed.new_named(sub);
+            let cleared = Validate.branch(&named).expect("balanced clears");
+            let posted = Post.guard(&named, &cleared); // Named<N, Entry<Posted>>
+            assert!(same_origin(&posted, &named));
+            // same_origin(&posted, &other_named) — would NOT compile: a posted entry
+            // can only be paired with the exact submitted entry it was derived from.
         });
     }
 }

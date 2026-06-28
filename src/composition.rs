@@ -37,7 +37,7 @@
 //! Conclusion: you need BOTH per-module and composite-level checks; neither
 //! subsumes the other.
 
-use crate::boundary::Morphism;
+use crate::boundary::{Construction, Morphism};
 use crate::gdp::{Name, Named, Paired, Seed};
 use crate::ledger::boundary::{AccountSummary, Aggregate, MultiplicityResidual, Transaction};
 
@@ -72,6 +72,34 @@ pub fn reconcile<N>(
     residual: &Named<N, MultiplicityResidual>,
 ) -> Option<Transaction> {
     Aggregate.backward(summary.value(), residual.value())
+}
+
+/// The same matched-pair seam, GENERALIZED to the ENTRY edge. A `Construction`'s
+/// `parse` returns `(refined, residual)` that correspond — the residual reconstructs
+/// the raw only WITH its own refined value — yet `reconstruct` takes them separately,
+/// so a refined from one parse and a residual from another silently mis-reconstruct.
+/// Morphisms get the `Carried`/`run` wrapper that bundles them; constructions had no
+/// such wrapper, so this is where output⋈residual coupling reaches the parse edge:
+/// `parse_paired` brands the pair with one shared name so they can be stored apart yet
+/// only re-paired with each other.
+pub fn parse_paired<C: Construction, N: Name>(
+    seed: Seed<N>,
+    c: &C,
+    raw: &C::Raw,
+) -> Option<Paired<impl Name, C::Refined, C::Residual>> {
+    c.parse(raw)
+        .map(|(refined, residual)| seed.new_paired(refined, residual))
+}
+
+/// Reconstruct from a branded (refined, residual) pair — only same-parse values,
+/// sharing a name, recombine; a mismatched pair will not compile, so no cross-run
+/// check is needed.
+pub fn reconstruct_paired<C: Construction, N>(
+    c: &C,
+    refined: &Named<N, C::Refined>,
+    residual: &Named<N, C::Residual>,
+) -> Option<C::Raw> {
+    c.reconstruct(refined.value(), residual.value())
 }
 
 #[cfg(test)]
@@ -127,6 +155,30 @@ mod tests {
             // Negative (compile-checked by hand): with a second run under another
             // name, `reconcile(&summary, &other_residual)` is a type error — the two
             // names do not unify, so a mismatched pair cannot even be expressed.
+        });
+    }
+
+    /// The seam GENERALIZED to a construction: a `ParseTransaction` refined value and
+    /// its permutation residual, branded together, recombine to the exact raw — and
+    /// only with their own partner. (Constructions previously had no wrapper coupling
+    /// the two halves of `parse`.)
+    #[test]
+    fn construction_seam_recombines_only_matched_pairs() {
+        use crate::ledger::boundary::ParseTransaction;
+        with_seed(|seed| {
+            // input order differs from canonical, so the residual is non-trivial.
+            let raw = vec![
+                Posting::new(Account::new("Revenue").unwrap(), Cents::new(-60).unwrap()),
+                Posting::new(Account::new("Cash").unwrap(), Cents::new(60).unwrap()),
+            ];
+            let paired = parse_paired(seed, &ParseTransaction, &raw).expect("non-empty parses");
+            let (refined, residual) = paired.split();
+            assert_eq!(
+                reconstruct_paired(&ParseTransaction, &refined, &residual).as_ref(),
+                Some(&raw)
+            );
+            // A residual from a different parse, under another name, would not unify —
+            // the mismatched recombination cannot be expressed.
         });
     }
 

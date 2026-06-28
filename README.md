@@ -51,6 +51,9 @@ type-distinguished **shapes**:
   name-branded proof for the same value); the categorical **sibling** of
   `Construction`, which mints its own. So a guarded transition like `Post` (needs a
   `Cleared` proof) is in the algebra too — every hop of a multistate path is an edge.
+  Its output is **brand-coupled** (`type Out<N>`): a `Post`ed entry keeps the brand
+  of the submitted entry it came from (`Named::map`), so **provenance flows** through
+  the hop — a `Posted` cannot be misattributed to an entry it did not derive from.
 
 The markers are **sealed**, so the set of citizens is *closed*: no module can
 invent a new kind, and no external crate can mint one. Non-boundary logic
@@ -144,7 +147,7 @@ Mutation testing certifies the suite and *discovers* missing checks. Wired with
 cargo mutants        # plant bugs; every survivor is a missing relation/DOF
 ```
 
-A full-crate run kills **296 of 300** viable mutants (a further one is a timeout —
+A full-crate run kills **298 of 302** viable mutants (a further one is a timeout —
 an infinite loop, effectively caught); the three survivors are provably
 **equivalent** mutants, which no test can kill: an empty-source declaration
 replaced by another empty (`SecretStamp` genuinely declares none), a monotonic
@@ -355,8 +358,8 @@ module interior.
 | `src/pipeline/` | nested module: a parent boundary composing two private child boundaries into one narrowed operator |
 | `src/money/` + `boundary::Qty` | tagged-primitive substrate: one operator set per *kind* — a full-domain concept costs a tag (near-zero boilerplate), a partitioning one adds only a validity rule |
 | `src/capability.rs` | capability probe: classify a morphism on the chain and flag over-declaration |
-| `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam |
-| `src/composition.rs` | composition validation: an interaction bug invisible to per-module probes, closed by a GDP shared-name seam contract |
+| `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam; brand-preserving `Named::map` (provenance through an edge) and the `InBounds` lookup coupling (a fresh-named index proven in bounds of its map — check-free indexing) |
+| `src/composition.rs` | composition validation: an interaction bug invisible to per-module probes, closed by a GDP shared-name seam contract — output⋈residual coupling for both morphisms (`aggregate_paired`/`reconcile`) and constructions (`parse_paired`/`reconstruct_paired`) |
 | `src/lifecycle/` | "interfaces are state machines": a non-linear typestate lifecycle (`Draft/Submitted/Posted/Rejected/Voided`) with reversible, branching, and guarded transitions; illegal moves pinned by `tests/compile_fail/` |
 | `src/select.rs` | kill-matrix set-cover selection |
 | `src/synth.rs` | type-driven DOF coverage / operator synthesis |

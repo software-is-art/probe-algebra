@@ -18,6 +18,7 @@
 //! program, an imposition on a library's callers.
 
 use core::marker::PhantomData;
+use std::collections::BTreeMap;
 
 use crate::boundary::Morphism;
 use crate::ledger::boundary::{AccountSummary, Balance, Round, Transaction};
@@ -39,6 +40,17 @@ pub struct Named<N, T>(T, PhantomData<N>);
 impl<N, T> Named<N, T> {
     pub fn value(&self) -> &T {
         &self.0
+    }
+
+    /// Transform the value while KEEPING its name — the derived value INHERITS the
+    /// source's identity. This is the coupling that lets a brand FLOW through an edge:
+    /// a `Post`ed entry derived from a submitted one named `N` is itself named `N`, so
+    /// "this output came from THAT input" is carried in the type, and a consumer can
+    /// demand both under one name. (Sound as provenance only insofar as the value is
+    /// actually computed FROM the source — the same "a proof is only as true as its
+    /// mint" discipline as every GDP check; here the source is the sole input.)
+    pub fn map<U>(&self, f: impl FnOnce(&T) -> U) -> Named<N, U> {
+        Named(f(&self.0), PhantomData)
     }
 }
 
@@ -141,6 +153,49 @@ impl<N, T, P> Witnessed<N, T, P> {
     }
 }
 
+// ===== relational coupling: an index bound to its collection ==============
+//
+// The proofs above are SINGLE-name (a fact about one value). COUPLING is the
+// two-name case: a proof relating a FRESH output to a DISTINCT existing named value.
+// The canonical example (mononym's `exists!(LookupResult(idx): InBounds(Map, idx))`):
+// a lookup yields a named index PLUS a proof it is in bounds of THAT map, so indexing
+// needs no runtime check and an index for map A cannot index map B.
+
+/// Predicate: the named index is a valid position in the collection named `Coll`. A
+/// TWO-name relational proof — `Proof<Idx, InBounds<Coll>>` carries BOTH the index's
+/// name and the collection's, tying them together.
+pub struct InBounds<Coll>(PhantomData<Coll>);
+
+/// Look up a key in a NAMED map: on a hit, return the value's position FRESHLY named
+/// and an `InBounds` proof coupling it to THIS map. This is where the relation is
+/// EARNED (the position is real); the proof carries it onward at no cost.
+pub fn lookup<Coll, N: Name, K: Ord, V>(
+    // consumed for the index's unique fresh name (affine).
+    _seed: Seed<N>,
+    map: &Named<Coll, BTreeMap<K, V>>,
+    key: &K,
+) -> Option<Witnessed<impl Name, usize, InBounds<Coll>>> {
+    map.value()
+        .keys()
+        .position(|k| k == key)
+        .map(|idx| Witnessed(Named::<N, _>(idx, PhantomData), Proof(PhantomData)))
+}
+
+/// Read a NAMED map at an index PROVEN in bounds of THAT map. The proof discharges
+/// the bounds obligation, so this cannot be called with an index proven for a
+/// different map, and the internal lookup is total by construction (the `expect` is
+/// unreachable given the proof). The provenance complement to a runtime check.
+pub fn get_in_bounds<'m, Coll, Idx, K, V>(
+    map: &'m Named<Coll, BTreeMap<K, V>>,
+    index: &Named<Idx, usize>,
+    _proof: &Proof<Idx, InBounds<Coll>>,
+) -> &'m V {
+    map.value()
+        .values()
+        .nth(*index.value())
+        .expect("the InBounds proof guarantees the index is valid")
+}
+
 /// Witness: this summary is the result of `Round` (whole-dollar) reduction.
 ///
 /// AUDIT finding: an operation's having-occurred is lost from the type system
@@ -209,6 +264,7 @@ pub fn report_scaled<N>(quantity: &Named<N, Quantity>, _proof: &Proof<N, Scaled>
 mod tests {
     use super::*;
     use crate::ledger::boundary::{Account, Aggregate, Cents, Posting};
+    use std::collections::BTreeMap;
 
     fn balanced() -> Transaction {
         Transaction::new(vec![
@@ -304,6 +360,46 @@ mod tests {
             // impossible — neither carries a Scaled proof.
             assert_eq!(report_scaled(&named, &proof), 21);
             assert_eq!(<Scale as Morphism>::CAPABILITY, Capability::Pure);
+        });
+    }
+
+    /// Relational coupling: `lookup` mints an index FRESHLY named and proven in bounds
+    /// of THIS map, and `get_in_bounds` reads it with no runtime bounds check. The
+    /// `InBounds<Coll>` proof ties the index to the one map — an index proven for a
+    /// different map would not unify (a compile error), so it cannot index the wrong
+    /// collection.
+    #[test]
+    fn lookup_couples_an_in_bounds_index_to_its_map() {
+        with_seed(|seed| {
+            let (s_map, s_idx) = seed.replicate();
+            let mut m = BTreeMap::new();
+            m.insert("a", 10i64);
+            m.insert("b", 20);
+            m.insert("c", 30);
+            let named_map = s_map.new_named(m);
+            match lookup(s_idx, &named_map, &"b") {
+                Some(found) => {
+                    let (idx, proof) = found.split();
+                    assert_eq!(*idx.value(), 1, "b is the 2nd key in BTree order");
+                    // read with the proof — no bounds check, and bound to THIS map.
+                    assert_eq!(*get_in_bounds(&named_map, &idx, &proof), 20);
+                    // get_in_bounds(&another_named_map, &idx, &proof) — would NOT
+                    // compile: the proof's `Coll` is `named_map`'s name alone.
+                }
+                None => panic!("b is present"),
+            }
+        });
+    }
+
+    /// A miss returns `None` — no index, no proof minted for an absent key.
+    #[test]
+    fn lookup_miss_mints_no_proof() {
+        with_seed(|seed| {
+            let (s_map, s_idx) = seed.replicate();
+            let mut m: BTreeMap<&str, i64> = BTreeMap::new();
+            m.insert("a", 10);
+            let named_map = s_map.new_named(m);
+            assert!(lookup(s_idx, &named_map, &"z").is_none());
         });
     }
 }

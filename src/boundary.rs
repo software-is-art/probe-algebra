@@ -653,10 +653,13 @@ pub trait Guarded: ValueOperator {
     type In<N>;
     /// The unforgeable witness required for the SAME brand `N`.
     type Proof<N>;
-    /// The state reached once admitted — a value object.
-    type Out: ValueObject;
-    /// Cross the edge, consuming the proof of admissibility.
-    fn guard<N>(&self, input: &Self::In<N>, proof: &Self::Proof<N>) -> Self::Out;
+    /// The state reached once admitted — itself BRANDED by `N`, so the input's
+    /// identity FLOWS through the edge (provenance coupling): the output is provably
+    /// the image of the value that was admitted, not some other. (The underlying datum
+    /// is a value object; the `N` wrapper carries its lineage.)
+    type Out<N>;
+    /// Cross the edge, consuming the proof of admissibility; the output keeps `N`.
+    fn guard<N>(&self, input: &Self::In<N>, proof: &Self::Proof<N>) -> Self::Out<N>;
 }
 
 // ===== state machines: a boundary as a transition graph ==================

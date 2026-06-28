@@ -252,10 +252,17 @@ impl Guarded for Post {
     const CAPABILITY: Capability = Capability::Pure;
     type In<N> = Named<N, Entry<Submitted>>;
     type Proof<N> = Cleared<N>;
-    type Out = Entry<Posted>;
+    // The posted entry KEEPS the submitted entry's brand `N` — provenance flows
+    // through the edge, so a `Named<N, Entry<Posted>>` is provably the one named `N`.
+    type Out<N> = Named<N, Entry<Posted>>;
 
-    fn guard<N>(&self, entry: &Named<N, Entry<Submitted>>, _proof: &Cleared<N>) -> Entry<Posted> {
-        Entry(entry.value().tx().clone(), PhantomData)
+    fn guard<N>(
+        &self,
+        entry: &Named<N, Entry<Submitted>>,
+        _proof: &Cleared<N>,
+    ) -> Named<N, Entry<Posted>> {
+        // `Named::map` retags the payload while inheriting the name (the coupling).
+        entry.map(|e| Entry(e.tx().clone(), PhantomData))
     }
 }
 
@@ -263,12 +270,12 @@ impl Post {
     /// Commit a cleared, submitted entry to `Posted` — the ergonomic name for the
     /// `Guarded` edge. Requires a `Cleared<N>` for the same name `N`: ORDER (typestate)
     /// AND the PRECONDITION (proof) are both enforced at compile time, and there is no
-    /// other constructor of `Entry<Posted>`.
+    /// other constructor of `Entry<Posted>`. The result keeps the brand `N`.
     pub fn commit<N>(
         &self,
         entry: &Named<N, Entry<Submitted>>,
         proof: &Cleared<N>,
-    ) -> Entry<Posted> {
+    ) -> Named<N, Entry<Posted>> {
         self.guard(entry, proof)
     }
 }
@@ -277,10 +284,14 @@ impl Guarded for Reject {
     const CAPABILITY: Capability = Capability::Pure;
     type In<N> = Named<N, Entry<Submitted>>;
     type Proof<N> = Flagged<N>;
-    type Out = Entry<Rejected>;
+    type Out<N> = Named<N, Entry<Rejected>>;
 
-    fn guard<N>(&self, entry: &Named<N, Entry<Submitted>>, _proof: &Flagged<N>) -> Entry<Rejected> {
-        Entry(entry.value().tx().clone(), PhantomData)
+    fn guard<N>(
+        &self,
+        entry: &Named<N, Entry<Submitted>>,
+        _proof: &Flagged<N>,
+    ) -> Named<N, Entry<Rejected>> {
+        entry.map(|e| Entry(e.tx().clone(), PhantomData))
     }
 }
 
@@ -288,11 +299,12 @@ impl Reject {
     /// Move a flagged, submitted entry to `Rejected` — the ergonomic name for the
     /// `Guarded` edge. Requires a `Flagged<N>` for the same name, so only an entry
     /// actually found unbalanced can be rejected — the negative witness authorizes it.
+    /// The result keeps the brand `N`.
     pub fn apply<N>(
         &self,
         entry: &Named<N, Entry<Submitted>>,
         proof: &Flagged<N>,
-    ) -> Entry<Rejected> {
+    ) -> Named<N, Entry<Rejected>> {
         self.guard(entry, proof)
     }
 }
