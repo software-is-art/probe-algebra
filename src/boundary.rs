@@ -153,6 +153,98 @@ impl Capability {
     }
 }
 
+// ----- capability at the TYPE level: markers + lattice --------------------
+//
+// The `Capability` enum above is the runtime REFLECTION; these markers put the same
+// lattice in the TYPE system, so an effect ceiling can be DEMANDED as a bound
+// (`where M::Capability: AtMost<Pure>`) — a compile-time effect contract the LSP can
+// red-squiggle, the capability analog of the provenance contract. Each edge declares
+// `type Capability`; the runtime `CAPABILITY` const is DERIVED from it by reflection,
+// so every read site (the audit, the laws, the tests) is unchanged.
+
+/// A type-level capability level, reflecting to the runtime `Capability`. Sealed: the
+/// lattice is closed at exactly the four levels below.
+pub trait Effect: sealed::Sealed {
+    const VALUE: Capability;
+}
+/// The four levels as marker types (parallel to the `Capability` variants).
+pub struct Pure;
+pub struct Lossy;
+pub struct Stateful;
+pub struct Effectful;
+impl sealed::Sealed for Pure {}
+impl sealed::Sealed for Lossy {}
+impl sealed::Sealed for Stateful {}
+impl sealed::Sealed for Effectful {}
+impl Effect for Pure {
+    const VALUE: Capability = Capability::Pure;
+}
+impl Effect for Lossy {
+    const VALUE: Capability = Capability::Lossy;
+}
+impl Effect for Stateful {
+    const VALUE: Capability = Capability::Stateful;
+}
+impl Effect for Effectful {
+    const VALUE: Capability = Capability::Effectful;
+}
+
+/// `Self` is at most `Ceiling` on the lattice — the bound that makes a ceiling
+/// demandable. `where M::Capability: AtMost<Pure>` accepts only pure edges; a lossier
+/// edge fails to satisfy it, at compile time.
+pub trait AtMost<Ceiling> {}
+impl AtMost<Pure> for Pure {}
+impl AtMost<Lossy> for Pure {}
+impl AtMost<Stateful> for Pure {}
+impl AtMost<Effectful> for Pure {}
+impl AtMost<Lossy> for Lossy {}
+impl AtMost<Stateful> for Lossy {}
+impl AtMost<Effectful> for Lossy {}
+impl AtMost<Stateful> for Stateful {}
+impl AtMost<Effectful> for Stateful {}
+impl AtMost<Effectful> for Effectful {}
+
+/// The type-level join (the composition rule): the higher of two levels. `Compose` and
+/// `Then` use it, so a path's ceiling is computed in the type system — the type-level
+/// twin of the const `join`.
+pub trait Join<Other> {
+    type Out: Effect;
+}
+macro_rules! join_impls {
+    ($($a:ty, $b:ty => $out:ty);+ $(;)?) => {$(
+        impl Join<$b> for $a { type Out = $out; }
+    )+};
+}
+join_impls!(
+    Pure, Pure => Pure; Pure, Lossy => Lossy; Pure, Stateful => Stateful; Pure, Effectful => Effectful;
+    Lossy, Pure => Lossy; Lossy, Lossy => Lossy; Lossy, Stateful => Stateful; Lossy, Effectful => Effectful;
+    Stateful, Pure => Stateful; Stateful, Lossy => Stateful; Stateful, Stateful => Stateful; Stateful, Effectful => Effectful;
+    Effectful, Pure => Effectful; Effectful, Lossy => Effectful; Effectful, Stateful => Effectful; Effectful, Effectful => Effectful;
+);
+
+/// Apply a morphism only if its declared effect is at most `Ceiling` — a compile-time
+/// effect contract, the capability twin of the provenance `Stamped` bound. The bound
+/// `M::Capability: AtMost<Ceiling>` is checked by the type system at the CALL site: an
+/// edge lossier than the ceiling fails to compile, so a coding agent gets LSP push-back
+/// on the wrong effect shape before any test runs. `tests/compile_fail` pins the
+/// negative (a `Lossy` edge rejected by an `AtMost<Pure>` call), and `run_pure` names
+/// the common `Pure` ceiling.
+pub fn run_within<Ceiling, M: Morphism>(m: &M, input: &M::In) -> (M::Out, M::Residual)
+where
+    M::Capability: AtMost<Ceiling>,
+{
+    m.forward(input)
+}
+
+/// `run_within` with the ceiling fixed at `Pure` — accepts only effect-free edges, so a
+/// lossy, stateful, or effectful edge is rejected at compile time.
+pub fn run_pure<M: Morphism>(m: &M, input: &M::In) -> (M::Out, M::Residual)
+where
+    M::Capability: AtMost<Pure>,
+{
+    run_within::<Pure, M>(m, input)
+}
+
 // ===== gradings: one monoid pattern, manifested at three levels ===========
 //
 // Each edge carries ANNOTATIONS that accumulate — a GRADING, i.e. a monoid (`EMPTY`
@@ -286,10 +378,12 @@ pub fn stamp_through<Path, M: Morphism>(
 /// what the forward map collapsed. Retaining the residual restores
 /// invertibility: `backward(forward(x)) == x`.
 pub trait Morphism: ValueOperator {
-    /// The declared capability ceiling — the furthest-LEFT class on the chain this
-    /// operator claims (see `Capability`). The behavioural audit checks it; the
-    /// type system composes it.
-    const CAPABILITY: Capability;
+    /// The declared capability ceiling, at the TYPE level (a marker implementing
+    /// `Effect`), so it is composable by `Join` and demandable as an `AtMost` bound.
+    type Capability: Effect;
+    /// The same ceiling reflected to a runtime value — DERIVED from `Capability`, so
+    /// the audit/laws/tests read it unchanged. (Don't override; set `type Capability`.)
+    const CAPABILITY: Capability = <Self::Capability as Effect>::VALUE;
 
     type In: ValueObject;
     type Out: ValueObject;
@@ -543,10 +637,14 @@ impl<F, G> Morphism for Compose<F, G>
 where
     F: Morphism,
     G: Morphism<In = F::Out>,
+    F::Capability: Join<G::Capability>,
 {
     // the composite is as capable as its most-capable stage — the static join,
-    // computed by the type system at compile time.
-    const CAPABILITY: Capability = F::CAPABILITY.join(G::CAPABILITY);
+    // now computed in the TYPE system: the effect of the composite is the
+    // type-level `Join` of the two stages' effects, so a mis-stated composite
+    // ceiling is an LSP error, not a runtime surprise. The runtime `CAPABILITY`
+    // const is still derived from it for the audit/laws.
+    type Capability = <F::Capability as Join<G::Capability>>::Out;
 
     type In = F::In;
     type Out = G::Out;
@@ -668,8 +766,11 @@ pub trait Construction: ValueOperator {
     /// (range check, `Unit` residual) is `Pure`; a NORMALIZING parse (trimming,
     /// sorting) collapses a dimension and is `Lossy`. `Then` joins it with the
     /// morphism's, so a primitive-to-output path's capability is computed by the type
-    /// system just like a `Compose` chain's.
-    const CAPABILITY: Capability;
+    /// system just like a `Compose` chain's. Declared as a type-level `Effect`; the
+    /// runtime const is derived so the audit/laws read it unchanged.
+    type Capability: Effect;
+    /// Reflected from `type Capability` — do not override.
+    const CAPABILITY: Capability = <Self::Capability as Effect>::VALUE;
 
     /// The raw input — a primitive, NOT a value object: the only state outside the
     /// domain. Bounded just enough to probe the round-trip (equality + diagnostics).
@@ -747,10 +848,11 @@ impl<C, M> Construction for Then<C, M>
 where
     C: Construction,
     M: Morphism<In = C::Refined>,
+    C::Capability: Join<M::Capability>,
 {
-    // the path is as capable as its most-capable edge — the static join, exactly as
-    // `Compose` does for two morphisms.
-    const CAPABILITY: Capability = C::CAPABILITY.join(M::CAPABILITY);
+    // the path is as capable as its most-capable edge — the static join in the TYPE
+    // system, exactly as `Compose` does for two morphisms.
+    type Capability = <C::Capability as Join<M::Capability>>::Out;
 
     type Raw = C::Raw;
     type Refined = M::Out;
@@ -785,8 +887,10 @@ where
 /// grammar it declares a `CAPABILITY` like any edge, so a path through a branch keeps
 /// a computed ceiling.
 pub trait Branch: ValueOperator {
-    /// The declared capability ceiling, as on every edge.
-    const CAPABILITY: Capability;
+    /// The declared capability ceiling, as on every edge — a type-level `Effect`.
+    type Capability: Effect;
+    /// Reflected from `type Capability` — do not override.
+    const CAPABILITY: Capability = <Self::Capability as Effect>::VALUE;
     /// The branded input (e.g. `Named<N, _>`); the brand is not itself a citizen.
     type In<N>;
     /// The positive arm — a value object (often a proof realized as one).
@@ -807,8 +911,10 @@ pub trait Branch: ValueOperator {
 /// `Guarded` edge consumes its brand and is one-way — reversal, when wanted, is its
 /// own edge, the way `Void` reverses `Post`.)
 pub trait Guarded: ValueOperator {
-    /// The declared capability ceiling, as on every edge.
-    const CAPABILITY: Capability;
+    /// The declared capability ceiling, as on every edge — a type-level `Effect`.
+    type Capability: Effect;
+    /// Reflected from `type Capability` — do not override.
+    const CAPABILITY: Capability = <Self::Capability as Effect>::VALUE;
     /// The branded input being admitted.
     type In<N>;
     /// The unforgeable witness required for the SAME brand `N`.
@@ -864,7 +970,7 @@ macro_rules! transition {
         pub struct $name;
         $crate::value_operator!($name);
         impl $crate::boundary::Morphism for $name {
-            const CAPABILITY: $crate::boundary::Capability = $crate::boundary::Capability::Pure;
+            type Capability = $crate::boundary::Pure;
             type In = <$machine as $crate::boundary::StateMachine>::At<$from>;
             type Out = <$machine as $crate::boundary::StateMachine>::At<$to>;
             type Residual = $crate::boundary::Unit;
@@ -1019,7 +1125,8 @@ impl<M, T> Profiled<M, T> {
 impl<M, T> sealed::Sealed for Profiled<M, T> {}
 impl<M, T> ValueOperator for Profiled<M, T> {}
 impl<M: Morphism, T: Meter> Morphism for Profiled<M, T> {
-    const CAPABILITY: Capability = M::CAPABILITY;
+    // profiling is transparent to the effect — it just times the inner edge.
+    type Capability = M::Capability;
     type In = M::In;
     type Out = M::Out;
     type Residual = M::Residual;

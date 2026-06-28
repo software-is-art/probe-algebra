@@ -38,7 +38,7 @@
 
 use core::marker::PhantomData;
 
-use crate::boundary::{Branch, Capability, Guarded};
+use crate::boundary::{Branch, Guarded, Pure};
 use crate::gdp::Named;
 use crate::ledger::boundary::{Balance, Transaction};
 
@@ -144,7 +144,7 @@ crate::value_operator!(Validate, Post, Reject);
 
 impl Branch for Validate {
     // A read-only classification: no loss, no state, no effect.
-    const CAPABILITY: Capability = Capability::Pure;
+    type Capability = Pure;
     type In<N> = Named<N, Entry<Submitted>>;
     type Left<N> = Cleared<N>;
     type Right<N> = Flagged<N>;
@@ -176,7 +176,7 @@ impl Validate {
 
 impl Guarded for Post {
     // A payload-preserving retag gated by a proof — pure.
-    const CAPABILITY: Capability = Capability::Pure;
+    type Capability = Pure;
     type In<N> = Named<N, Entry<Submitted>>;
     type Proof<N> = Cleared<N>;
     // The posted entry KEEPS the submitted entry's brand `N` — provenance flows
@@ -208,7 +208,7 @@ impl Post {
 }
 
 impl Guarded for Reject {
-    const CAPABILITY: Capability = Capability::Pure;
+    type Capability = Pure;
     type In<N> = Named<N, Entry<Submitted>>;
     type Proof<N> = Flagged<N>;
     type Out<N> = Named<N, Entry<Rejected>>;

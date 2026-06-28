@@ -682,4 +682,20 @@ mod grading {
 
     /// Demands the exact provenance in the type — `Aggregate` then `Round`.
     fn audited(_x: &Stamped<Step<Round, Step<Aggregate, Origin>>, AccountSummary>) {}
+
+    /// CAPABILITY is now type-level too: a consumer can DEMAND a ceiling as a bound
+    /// (`run_pure` ⇒ `M::Capability: AtMost<Pure>`), so the type system rejects a too-
+    /// capable edge at the call site. `Scale` is `Pure`, so it satisfies the bound and
+    /// runs; a `Lossy` edge would not compile (pinned in `tests/compile_fail`).
+    #[test]
+    fn an_effect_ceiling_is_demandable_as_a_bound() {
+        use crate::boundary::run_pure;
+        use crate::linear::boundary::{Quantity, Scale};
+
+        let q = Quantity::new(2).expect("2 is a valid quantity");
+        // `Scale: Morphism<Capability = Pure>`, so `AtMost<Pure>` holds and this type-
+        // checks; the result is the ordinary forward output.
+        let (out, _unit) = run_pure(&Scale::honest(), &q);
+        assert_eq!(out, Scale::honest().forward(&q).0);
+    }
 }

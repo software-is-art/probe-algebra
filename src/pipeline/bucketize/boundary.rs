@@ -5,7 +5,7 @@
 //! the sibling stage's `Reading` and produces the PARENT's `Bucket` / `Leftover`
 //! value objects — all by private import, none re-exported.
 
-use crate::boundary::{Capability, Morphism};
+use crate::boundary::{Lossy, Morphism};
 use crate::pipeline::boundary::{Bucket, Leftover};
 use crate::pipeline::calibrate::boundary::Reading;
 
@@ -15,7 +15,7 @@ pub struct Bucketize;
 crate::value_operator!(Bucketize);
 
 impl Morphism for Bucketize {
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type In = Reading;
     type Out = Bucket;

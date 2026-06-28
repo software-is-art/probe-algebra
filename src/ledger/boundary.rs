@@ -17,7 +17,7 @@
 use std::collections::BTreeMap;
 
 use crate::boundary::{
-    Capability, Construction, Metamorphic, Morphism, Pair, Perturbation, RawPerturbation, Unit,
+    Construction, Lossy, Metamorphic, Morphism, Pair, Perturbation, Pure, RawPerturbation, Unit,
 };
 
 // ===== value objects =====================================================
@@ -288,7 +288,7 @@ crate::value_operator!(
 );
 
 impl Morphism for Aggregate {
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type In = Transaction;
     type Out = AccountSummary;
@@ -306,7 +306,7 @@ impl Morphism for Aggregate {
 }
 
 impl Morphism for AggregateDropsAmounts {
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type In = Transaction;
     type Out = AccountSummary;
@@ -334,7 +334,7 @@ impl Morphism for AggregateDropsAmounts {
 }
 
 impl Morphism for AggregateOffsetsTotals {
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type In = Transaction;
     type Out = AccountSummary;
@@ -361,7 +361,7 @@ impl Morphism for AggregateOffsetsTotals {
 }
 
 impl Morphism for Round {
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type In = AccountSummary;
     type Out = AccountSummary;
@@ -487,7 +487,7 @@ crate::value_operator!(
 );
 
 impl Construction for ParseCents {
-    const CAPABILITY: Capability = Capability::Pure;
+    type Capability = Pure;
 
     type Raw = i64;
     type Refined = Cents;
@@ -509,7 +509,7 @@ impl Construction for ParseCents {
 impl Construction for ParseAccount {
     // Trimming collapses the surrounding whitespace — a real lost dimension — so the
     // honest ceiling is `Lossy` (the residual restores it), exactly like `Aggregate`.
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type Raw = String;
     type Refined = Account;
@@ -543,7 +543,7 @@ impl Construction for ParseAccountDropsPadding {
     // It CLAIMS to be a pure refinement (`Unit` residual, `Pure`) though it actually
     // trims — the lie `construction_probe` exposes, the entry-edge twin of
     // `AggregateDropsAmounts`'s incomplete residual.
-    const CAPABILITY: Capability = Capability::Pure;
+    type Capability = Pure;
 
     type Raw = String;
     type Refined = Account;
@@ -567,7 +567,7 @@ impl Construction for ParseAccountDropsPadding {
 
 impl Construction for ParseTransaction {
     // Sorting discards the input ordering (the residual restores it) — `Lossy`.
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type Raw = Vec<Posting>;
     type Refined = Transaction;

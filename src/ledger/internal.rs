@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::boundary::{Capability, Morphism};
+use crate::boundary::{Lossy, Morphism};
 use crate::ledger::boundary::{
     Account, AccountSummary, Balance, Cents, MultiplicityResidual, Posting, Transaction,
 };
@@ -45,7 +45,7 @@ pub(super) struct Aggregation;
 crate::value_operator!(Aggregation);
 
 impl Morphism for Aggregation {
-    const CAPABILITY: Capability = Capability::Lossy;
+    type Capability = Lossy;
 
     type In = Transaction;
     type Out = AccountSummary;

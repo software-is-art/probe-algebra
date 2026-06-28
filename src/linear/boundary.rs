@@ -13,7 +13,7 @@
 //! with scaling) and are separated only by the quantitative `UnitResponse` probe,
 //! which carries the reference coefficient.
 
-use crate::boundary::{Capability, Coefficient, Metamorphic, Morphism, Unit};
+use crate::boundary::{Coefficient, Metamorphic, Morphism, Pure, Unit};
 
 // ===== value objects =====================================================
 
@@ -117,7 +117,7 @@ impl Scale {
 crate::value_operator!(Scale);
 
 impl Morphism for Scale {
-    const CAPABILITY: Capability = Capability::Pure;
+    type Capability = Pure;
 
     type In = Quantity;
     type Out = Quantity;
