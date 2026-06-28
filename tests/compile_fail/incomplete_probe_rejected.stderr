@@ -1,0 +1,24 @@
+error[E0277]: the trait bound `ShapeOnlyProbe: CoversAll<DofCons<Shape, DofCons<Literals, DofNil>>>` is not satisfied
+  --> tests/compile_fail/incomplete_probe_rejected.rs:15:30
+   |
+15 |     require_complete::<Expr, _>(&ShapeOnlyProbe);
+   |                              ^ the trait `Covers<Literals>` is not implemented for `ShapeOnlyProbe`
+   |
+help: the trait `Covers<Literals>` is not implemented for `ShapeOnlyProbe`
+      but trait `Covers<Shape>` is implemented for it
+  --> src/interp/boundary.rs
+   |
+   | impl Covers<Shape> for ShapeOnlyProbe {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for that trait implementation, expected `Shape`, found `Literals`
+   = note: required for `ShapeOnlyProbe` to implement `CoversAll<DofCons<Literals, DofNil>>`
+   = note: 1 redundant requirement hidden
+   = note: required for `ShapeOnlyProbe` to implement `CoversAll<DofCons<Shape, DofCons<Literals, DofNil>>>`
+note: required by a bound in `require_complete`
+  --> src/boundary.rs
+   |
+   | pub fn require_complete<T, C>(_check: &C)
+   |        ---------------- required by a bound in this function
+...
+   |     C: CoversAll<<T as HasDofs>::Dofs>,
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `require_complete`

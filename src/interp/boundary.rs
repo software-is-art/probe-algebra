@@ -22,7 +22,10 @@
 
 use core::marker::PhantomData;
 
-use crate::boundary::{Branch, Construction, Guarded, Pure, Unit};
+use crate::boundary::{
+    Axis, Branch, Construction, CostCons, CostNil, Covers, DofCons, DofNil, Graded, Guarded,
+    HasDofs, Pure, SpaceCost, TimeCost, Unit, S, Z,
+};
 use crate::gdp::Named;
 
 // ===== value objects: the language's nouns ================================
@@ -143,6 +146,31 @@ impl Expr {
     }
     pub fn bind(name: Ident, value: Expr, body: Expr) -> Expr {
         Expr::Let(name, Box::new(value), Box::new(body))
+    }
+
+    /// The number of AST nodes — the `Nodes` size axis the cost grading is keyed on.
+    /// `Eval` visits each node once, so this is also its step count (the empirical
+    /// `fits` audit measures growth against this).
+    pub fn node_count(&self) -> usize {
+        match self {
+            Expr::Lit(_) | Expr::Var(_) => 1,
+            Expr::Bin(_, a, b) => 1 + a.node_count() + b.node_count(),
+            Expr::If(c, t, e) => 1 + c.node_count() + t.node_count() + e.node_count(),
+            Expr::Let(_, v, body) => 1 + v.node_count() + body.node_count(),
+        }
+    }
+
+    /// The maximum nesting depth — the `Depth` size axis. `Eval`'s recursion (and the
+    /// environment it threads) grows with this, so it is `Eval`'s SPACE axis, distinct
+    /// from its `Nodes` TIME axis: a tree-walker is linear in nodes but only linear in
+    /// depth in space.
+    pub fn depth(&self) -> usize {
+        match self {
+            Expr::Lit(_) | Expr::Var(_) => 1,
+            Expr::Bin(_, a, b) => 1 + a.depth().max(b.depth()),
+            Expr::If(c, t, e) => 1 + c.depth().max(t.depth()).max(e.depth()),
+            Expr::Let(_, v, body) => 1 + v.depth().max(body.depth()),
+        }
     }
 
     /// Render to the CANONICAL source form — the exact inverse of the parse, so
@@ -323,3 +351,69 @@ impl Eval {
         self.guard(expr, proof)
     }
 }
+
+// ===== the COST grading on the interp edges ===============================
+//
+// The pluggable cost grading from `crate::boundary` keyed on this language's two size
+// axes. `Eval` is the case the open keyed map exists for: a tree-walker whose TIME and
+// SPACE diverge — linear in `Nodes` (one visit each) but only linear in `Depth` in space
+// (the recursion + environment stack), not linear in nodes. A single scalar "cost" could
+// not say that; the per-axis map can.
+
+/// Size axis: the number of AST nodes (`Expr::node_count`).
+pub struct Nodes;
+impl Axis for Nodes {
+    type Id = Z;
+}
+/// Size axis: the nesting depth (`Expr::depth`).
+pub struct Depth;
+impl Axis for Depth {
+    type Id = S<Z>;
+}
+
+// `Parse` scans the source once and builds a tree of `Nodes` cells: linear in `Nodes` in
+// both time and space.
+impl Graded<TimeCost> for Parse {
+    type Carrier = CostCons<Nodes, S<Z>, CostNil>;
+}
+impl Graded<SpaceCost> for Parse {
+    type Carrier = CostCons<Nodes, S<Z>, CostNil>;
+}
+// `Eval` walks the tree once (linear TIME in `Nodes`) but holds only the current path's
+// recursion and bindings (linear SPACE in `Depth`, NOT in `Nodes`).
+impl Graded<TimeCost> for Eval {
+    type Carrier = CostCons<Nodes, S<Z>, CostNil>;
+}
+impl Graded<SpaceCost> for Eval {
+    type Carrier = CostCons<Depth, S<Z>, CostNil>;
+}
+
+// ===== degrees of freedom of an `Expr`, and the coverage demand ===========
+//
+// The static completeness obligation from `crate::boundary`, re-homed onto `Expr`. An
+// expression varies along two independent dimensions, and a probe suite that claims to be
+// complete must reach BOTH or fail to compile.
+
+/// DOF: the STRUCTURE — which constructor, which operator, the tree shape. A probe sees it
+/// by perturbing the shape (swap `Add` for `Mul`, an `If` for a `Let`).
+pub struct Shape;
+/// DOF: the LITERAL payloads — the `Int`/`Bool` values at the leaves. A probe sees it by
+/// nudging a literal while holding the shape fixed.
+pub struct Literals;
+
+impl HasDofs for Expr {
+    type Dofs = DofCons<Shape, DofCons<Literals, DofNil>>;
+}
+
+/// A complete probe of `Expr`: it reaches BOTH the shape and the leaf values, so
+/// `require_complete::<Expr, _>(&FullProbe)` type-checks.
+pub struct FullProbe;
+impl Covers<Shape> for FullProbe {}
+impl Covers<Literals> for FullProbe {}
+
+/// An INCOMPLETE probe: it perturbs the tree shape but never varies a literal, so it is
+/// blind to the `Literals` dimension. `require_complete` rejects it at compile time
+/// (pinned in `tests/compile_fail/incomplete_probe_rejected`) — the LSP push-back a coding
+/// agent gets for a probe with a hole, before any test runs.
+pub struct ShapeOnlyProbe;
+impl Covers<Shape> for ShapeOnlyProbe {}
