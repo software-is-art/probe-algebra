@@ -440,10 +440,12 @@ mod state_machine {
 /// round-trip is probed exactly like a `Morphism`'s residual, and `new` now routes
 /// through the same parse the probe certifies.
 mod construction {
-    use crate::boundary::{reconstructs, Construction, Morphism, Then, Unit};
+    use crate::boundary::{
+        construction_probe, reconstructs, Capability, Construction, Morphism, Then, Unit,
+    };
     use crate::ledger::boundary::{
-        Account, Aggregate, Cents, ParseAccount, ParseAccountDropsPadding, ParseCents,
-        ParseTransaction, Posting, Transaction,
+        Account, Aggregate, Cents, PadName, ParseAccount, ParseAccountDropsPadding, ParseCents,
+        ParseTransaction, Posting, ReorderPostings, Transaction,
     };
 
     /// Three unbalanced-but-valid postings whose INPUT order differs from canonical
@@ -552,5 +554,78 @@ mod construction {
         // and the whole primitive -> summary path inverts through the paired residual
         assert_eq!(pipeline.reconstruct(&summary, &residual), Some(raw.clone()));
         assert_eq!(reconstructs(&pipeline, &raw), Some(true));
+    }
+
+    /// Construction now declares a capability just like a `Morphism`: a pure
+    /// refinement is `Pure`, a normalizing parse is `Lossy`, and `Then` JOINS them, so
+    /// a raw -> summary path's ceiling is computed by the type system.
+    #[test]
+    fn capability_is_declared_and_joins_through_then() {
+        assert_eq!(ParseCents::CAPABILITY, Capability::Pure);
+        assert_eq!(ParseAccount::CAPABILITY, Capability::Lossy);
+        assert_eq!(ParseTransaction::CAPABILITY, Capability::Lossy);
+        // Lossy parse joined with a Lossy morphism is still Lossy (the static join).
+        type Pipe = Then<ParseTransaction, Aggregate>;
+        assert_eq!(<Pipe as Construction>::CAPABILITY, Capability::Lossy);
+    }
+
+    /// The construction COMPLETENESS probe (entry-edge analog of `probe`): perturb the
+    /// padding that `ParseAccount` normalizes away — the `Account` stays invariant, the
+    /// residual responds, and the perturbed raw round-trips, so the residual is complete.
+    #[test]
+    fn account_residual_is_complete_under_padding() {
+        let raw = "Cash".to_string();
+        let pr = construction_probe(&ParseAccount, &PadName, &raw).unwrap();
+        assert!(pr.output_invariant, "trimming must normalize the pad away");
+        assert!(pr.residual_responds, "the affix residual records the pad");
+        assert!(pr.round_trips, "the padded raw reconstructs");
+        assert!(pr.residual_complete());
+    }
+
+    /// The SAME probe catches the lying parse: a `Unit` residual cannot respond to the
+    /// padding nor reconstruct it, so completeness fails — exactly as `probe` flags
+    /// `AggregateDropsAmounts`.
+    #[test]
+    fn dropped_padding_is_caught_by_the_completeness_probe() {
+        let raw = "Cash".to_string();
+        let pr = construction_probe(&ParseAccountDropsPadding, &PadName, &raw).unwrap();
+        assert!(
+            !pr.residual_responds,
+            "a Unit residual cannot record the pad"
+        );
+        assert!(!pr.round_trips);
+        assert!(!pr.residual_complete());
+    }
+
+    /// `ParseTransaction`'s permutation residual is complete under a reordering of the
+    /// raw postings: sorting makes the `Transaction` invariant, the permutation
+    /// responds, and the reordered raw round-trips.
+    #[test]
+    fn transaction_residual_is_complete_under_reordering() {
+        let raw = unsorted();
+        let pr = construction_probe(&ParseTransaction, &ReorderPostings, &raw).unwrap();
+        assert!(
+            pr.output_invariant,
+            "sorting normalizes the reordering away"
+        );
+        assert!(
+            pr.residual_responds,
+            "the permutation records the reordering"
+        );
+        assert!(pr.round_trips);
+        assert!(pr.residual_complete());
+        // a TWO-posting reorder still applies and is complete (pins the `len < 2`
+        // boundary: a single posting yields `None`, a pair does not).
+        let pair = raw[..2].to_vec();
+        assert!(
+            construction_probe(&ParseTransaction, &ReorderPostings, &pair)
+                .unwrap()
+                .residual_complete()
+        );
+        // the perturbation does not apply to a single posting (nothing to reorder)
+        assert_eq!(
+            construction_probe(&ParseTransaction, &ReorderPostings, &raw[..1].to_vec()),
+            None
+        );
     }
 }

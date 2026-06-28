@@ -67,10 +67,15 @@ keeps the trimmed whitespace, `ParseTransaction` keeps the discarded input
 ordering — and **`reconstructs`** (the construction round-trip probe) checks that
 residual recovers the exact raw input. A constructor that silently normalizes but
 claims a `Unit` residual (`ParseAccountDropsPadding`) is caught, exactly as
-`probe` catches an incomplete `Morphism` residual. Constructions compose with
-ordinary morphisms via `Then` (`ParseTransaction` then `Aggregate` is one edge
-from `Vec<Posting>` to a summary), so the whole primitive-to-output path stays
-reconstructible — the category closes over construction.
+`probe` catches an incomplete `Morphism` residual. A construction carries the same
+**`CAPABILITY`** ceiling as a `Morphism` (a pure refinement is `Pure`, a
+normalizing parse is `Lossy`) and the same perturbation-based completeness probe
+(**`construction_probe`**: nudge the normalized-away dimension — the refined value
+stays invariant, the residual responds, and the perturbed raw round-trips).
+Constructions compose with ordinary morphisms via `Then` (`ParseTransaction` then
+`Aggregate` is one edge from `Vec<Posting>` to a summary), which **joins** the
+capabilities just as `Compose` does, so the whole primitive-to-output path stays
+reconstructible with a computed ceiling — the category closes over construction.
 
 ### Layer 2 — structural / variational probes (reference-FREE)
 Perturb the input and check the output *responds correctly*, without knowing the
@@ -130,7 +135,7 @@ Mutation testing certifies the suite and *discovers* missing checks. Wired with
 cargo mutants        # plant bugs; every survivor is a missing relation/DOF
 ```
 
-A full-crate run kills **281 of 285** viable mutants (a further one is a timeout —
+A full-crate run kills **296 of 300** viable mutants (a further one is a timeout —
 an infinite loop, effectively caught); the three survivors are provably
 **equivalent** mutants, which no test can kill: an empty-source declaration
 replaced by another empty (`SecretStamp` genuinely declares none), a monotonic
@@ -333,7 +338,7 @@ module interior.
 
 | Path | Role |
 | --- | --- |
-| `src/boundary.rs` | the grammar (a boundary as a **category**): sealed markers + `Morphism` / `Construction` (the entry edge) + probes `probe` / `commutes` / `coefficient_holds` / `reconstructs` / `Compose` + `Then` composition / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
+| `src/boundary.rs` | the grammar (a boundary as a **category**): sealed markers + `Morphism` / `Construction` (the entry edge) + probes `probe` / `commutes` / `coefficient_holds` / `reconstructs` / `construction_probe` / `Compose` + `Then` composition / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
 | `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants; **constructions** (`ParseCents`/`ParseAccount`/`ParseTransaction`) bring the smart constructor into the probe space |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
 | `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |

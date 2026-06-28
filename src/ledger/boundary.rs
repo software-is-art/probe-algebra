@@ -2,14 +2,13 @@
 //!
 //! By the boundary discipline this file contains ONLY (a category of objects and
 //! morphisms):
-//!   - VALUE OBJECTS   : Cents, Account, Posting, Transaction, AccountSummary,
-//!                       MultiplicityResidual, RoundingResidual, Affix, Index,
-//!                       PostingOrder
-//!   - VALUE OPERATORS : Aggregate, AggregateDropsAmounts, Round (Morphisms);
-//!                       ParseCents, ParseAccount, ParseTransaction (Constructions —
-//!                       the ENTRY edge from a raw primitive); Split, NudgeCents
-//!                       (Perturbations)
-//!   - (typestates — object indices — live in the universal `crate::boundary`)
+//! - VALUE OBJECTS — the objects: Cents, Account, Posting, Transaction,
+//!   AccountSummary, MultiplicityResidual, RoundingResidual, Affix, Index, PostingOrder.
+//! - VALUE OPERATORS — the morphisms: Aggregate, AggregateDropsAmounts, Round
+//!   (Morphisms); ParseCents, ParseAccount, ParseTransaction (Constructions — the
+//!   ENTRY edge from a raw primitive); Split, NudgeCents, PadName, ReorderPostings
+//!   (Perturbations).
+//! - (typestates — object indices — live in the universal `crate::boundary`)
 //!
 //! Each value object carries the sealed `ValueObject` marker; each operator the
 //! sealed `ValueOperator` marker. The aggregation ALGORITHM is delegated to the
@@ -17,7 +16,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::boundary::{Capability, Construction, Metamorphic, Morphism, Pair, Perturbation, Unit};
+use crate::boundary::{
+    Capability, Construction, Metamorphic, Morphism, Pair, Perturbation, RawPerturbation, Unit,
+};
 
 // ===== value objects =====================================================
 
@@ -486,6 +487,8 @@ crate::value_operator!(
 );
 
 impl Construction for ParseCents {
+    const CAPABILITY: Capability = Capability::Pure;
+
     type Raw = i64;
     type Refined = Cents;
     type Residual = Unit;
@@ -504,6 +507,10 @@ impl Construction for ParseCents {
 }
 
 impl Construction for ParseAccount {
+    // Trimming collapses the surrounding whitespace — a real lost dimension — so the
+    // honest ceiling is `Lossy` (the residual restores it), exactly like `Aggregate`.
+    const CAPABILITY: Capability = Capability::Lossy;
+
     type Raw = String;
     type Refined = Account;
     type Residual = Pair<Affix, Affix>;
@@ -533,6 +540,11 @@ impl Construction for ParseAccount {
 }
 
 impl Construction for ParseAccountDropsPadding {
+    // It CLAIMS to be a pure refinement (`Unit` residual, `Pure`) though it actually
+    // trims — the lie `construction_probe` exposes, the entry-edge twin of
+    // `AggregateDropsAmounts`'s incomplete residual.
+    const CAPABILITY: Capability = Capability::Pure;
+
     type Raw = String;
     type Refined = Account;
     type Residual = Unit;
@@ -554,6 +566,9 @@ impl Construction for ParseAccountDropsPadding {
 }
 
 impl Construction for ParseTransaction {
+    // Sorting discards the input ordering (the residual restores it) — `Lossy`.
+    const CAPABILITY: Capability = Capability::Lossy;
+
     type Raw = Vec<Posting>;
     type Refined = Transaction;
     type Residual = PostingOrder;
@@ -586,5 +601,45 @@ impl Construction for ParseTransaction {
             out[pos] = Some(sorted[k].clone());
         }
         out.into_iter().collect()
+    }
+}
+
+// ===== value operators: raw perturbations (probe the construction edge) ===
+
+/// Prepend a space to a raw name — perturbs the LEADING-PADDING dimension that
+/// `ParseAccount` normalizes away. A complete residual leaves the `Account` invariant
+/// and records the extra space.
+pub struct PadName;
+crate::value_operator!(PadName);
+
+impl RawPerturbation<ParseAccount> for PadName {
+    fn perturb(&self, raw: &String) -> Option<String> {
+        Some(format!(" {raw}"))
+    }
+}
+
+/// The SAME perturbation pointed at the lying parse, so one probe catches the
+/// `Unit`-residual `ParseAccountDropsPadding` exactly as `Split` catches
+/// `AggregateDropsAmounts`.
+impl RawPerturbation<ParseAccountDropsPadding> for PadName {
+    fn perturb(&self, raw: &String) -> Option<String> {
+        Some(format!(" {raw}"))
+    }
+}
+
+/// Rotate the postings by one — perturbs the ORDERING dimension that
+/// `ParseTransaction` normalizes away by sorting. `None` for a single posting (no
+/// reordering is possible), like `Split` on a degenerate input.
+pub struct ReorderPostings;
+crate::value_operator!(ReorderPostings);
+
+impl RawPerturbation<ParseTransaction> for ReorderPostings {
+    fn perturb(&self, raw: &Vec<Posting>) -> Option<Vec<Posting>> {
+        if raw.len() < 2 {
+            return None;
+        }
+        let mut out = raw.clone();
+        out.rotate_left(1);
+        Some(out)
     }
 }

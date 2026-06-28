@@ -504,6 +504,13 @@ pub fn run<M: Morphism>(m: &M, input: &M::In) -> Carried<M, Retained> {
 /// smart constructor was the one edge outside the testing space — modelled as a
 /// construction, it is back inside it.
 pub trait Construction: ValueOperator {
+    /// The declared capability ceiling, exactly as on `Morphism` — a pure refinement
+    /// (range check, `Unit` residual) is `Pure`; a NORMALIZING parse (trimming,
+    /// sorting) collapses a dimension and is `Lossy`. `Then` joins it with the
+    /// morphism's, so a primitive-to-output path's capability is computed by the type
+    /// system just like a `Compose` chain's.
+    const CAPABILITY: Capability;
+
     /// The raw input — a primitive, NOT a value object: the only state outside the
     /// domain. Bounded just enough to probe the round-trip (equality + diagnostics).
     type Raw: Clone + PartialEq + Debug;
@@ -534,6 +541,36 @@ pub fn reconstructs<C: Construction>(c: &C, raw: &C::Raw) -> Option<bool> {
     Some(c.reconstruct(&refined, &residual).as_ref() == Some(raw))
 }
 
+/// A RAW perturbation: nudges a construction's raw input along one dimension — the
+/// entry-edge analog of `Perturbation`, used to probe whether the parse's residual
+/// captures that dimension.
+pub trait RawPerturbation<C: Construction>: ValueOperator {
+    fn perturb(&self, raw: &C::Raw) -> Option<C::Raw>;
+}
+
+/// Construction COMPLETENESS probe — the entry-edge analog of `probe`, and the
+/// upgrade over the bare `reconstructs` round-trip. Perturb the raw along a dimension
+/// the parse NORMALIZES away; a COMPLETE residual then:
+///   (1) leaves the REFINED value invariant (the parse really does normalize it),
+///   (2) makes the RESIDUAL respond (it records the perturbed dimension), and
+///   (3) still ROUND-TRIPS on the perturbed raw.
+/// A `Unit`-residual parse that secretly normalizes fails (2) and (3) — exactly how
+/// `probe` catches an incomplete `Morphism` residual.
+pub fn construction_probe<C, P>(c: &C, p: &P, raw: &C::Raw) -> Option<ProbeResult>
+where
+    C: Construction,
+    P: RawPerturbation<C>,
+{
+    let praw = p.perturb(raw)?;
+    let (refined_x, res_x) = c.parse(raw)?;
+    let (refined_px, res_px) = c.parse(&praw)?;
+    Some(ProbeResult {
+        output_invariant: refined_x == refined_px,
+        residual_responds: res_x != res_px,
+        round_trips: c.reconstruct(&refined_px, &res_px).as_ref() == Some(&praw),
+    })
+}
+
 /// Sequential composition of a CONSTRUCTION with a `Morphism` — the proof that
 /// construction lives in the SAME category as every other edge. A path FROM a raw
 /// primitive, THROUGH the parse, THROUGH a value-object morphism, is itself one
@@ -551,6 +588,10 @@ where
     C: Construction,
     M: Morphism<In = C::Refined>,
 {
+    // the path is as capable as its most-capable edge — the static join, exactly as
+    // `Compose` does for two morphisms.
+    const CAPABILITY: Capability = C::CAPABILITY.join(M::CAPABILITY);
+
     type Raw = C::Raw;
     type Refined = M::Out;
     type Residual = Pair<C::Residual, M::Residual>;

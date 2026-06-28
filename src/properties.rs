@@ -14,11 +14,12 @@
 use proptest::prelude::*;
 
 use crate::boundary::{
-    coefficient_holds, commutes, probe, reconstructs, run, Compose, Construction, Morphism,
+    coefficient_holds, commutes, construction_probe, probe, reconstructs, run, Compose,
+    Construction, Morphism,
 };
 use crate::ledger::boundary::{
-    Account, Aggregate, AggregateDropsAmounts, Balance, Cents, ParseAccount, ParseCents,
-    ParseTransaction, Posting, Round, Split, Transaction,
+    Account, Aggregate, AggregateDropsAmounts, Balance, Cents, PadName, ParseAccount,
+    ParseAccountDropsPadding, ParseCents, ParseTransaction, Posting, Round, Split, Transaction,
 };
 use crate::linear::boundary::{Double, Quantity, Scale, UnitResponse};
 
@@ -245,6 +246,28 @@ proptest! {
     fn parse_transaction_round_trips(raw in raw_postings()) {
         prop_assert_eq!(reconstructs(&ParseTransaction, &raw), Some(true));
         prop_assert_eq!(ParseTransaction.parse(&raw).map(|(v, _)| v), Transaction::new(raw.clone()));
+    }
+
+    /// `ParseAccount`'s residual is COMPLETE under the completeness probe for every
+    /// padded name: the account is invariant, the affix residual responds, and the
+    /// padded raw round-trips.
+    #[test]
+    fn parse_account_probe_is_complete(raw in padded_name()) {
+        let pr = construction_probe(&ParseAccount, &PadName, &raw).unwrap();
+        prop_assert!(pr.output_invariant, "trim must normalize the pad away: {:?}", raw);
+        prop_assert!(pr.residual_responds, "residual ignored the pad: {:?}", raw);
+        prop_assert!(pr.round_trips, "padded raw failed to reconstruct: {:?}", raw);
+        prop_assert!(pr.residual_complete());
+    }
+
+    /// The completeness probe CATCHES the lying `Unit`-residual parse on every padded
+    /// name: it cannot respond to or reconstruct the pad.
+    #[test]
+    fn dropped_padding_probe_is_caught(raw in padded_name()) {
+        let pr = construction_probe(&ParseAccountDropsPadding, &PadName, &raw).unwrap();
+        prop_assert!(!pr.residual_responds, "a Unit residual cannot record the pad: {:?}", raw);
+        prop_assert!(!pr.round_trips);
+        prop_assert!(!pr.residual_complete());
     }
 
     // ----- Balance operator laws -----
