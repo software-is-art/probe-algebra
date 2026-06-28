@@ -39,13 +39,17 @@ Underneath, those annotations are **one structure — a grading** (a `Monoid`:
 `EMPTY` for `id`, `combine` along the chain) appearing once at each level of Rust's
 tower, and split by *what* it annotates. Two are **operator** gradings, threaded by
 `Compose`: **residual** is the *type-level* monoid (`Pair`/`Unit`, so "discarded ⇒
-not invertible" is a compile error) and **capability** is the *const-level* monoid
-(`join`/`Pure`, a compile-time ceiling). The third, **provenance**, is the journey of
-a *value*: a *type-level* lineage (`Stamped<Path, T>`, extended one `Step` per edge by
-`stamp_through`) so a value's type *proves* where it came from — a compile-time
-provenance contract — reflectable to the runtime `Provenance` via `Lineage`. (They
-can't be one Rust trait — type, const, and value are different worlds, and
-associated-type defaults are unstable — but they're one pattern.)
+not invertible" is a compile error) and **capability** is now *also type-level* — each
+edge declares `type Capability: Effect` (a marker), composed by the type-level `Join`
+and demandable as an `AtMost<Ceiling>` bound, with the runtime `CAPABILITY` const
+*derived* from it by reflection so every read site is unchanged. The third,
+**provenance**, is the journey of a *value*: a *type-level* lineage (`Stamped<Path, T>`,
+extended one `Step` per edge by `stamp_through`) so a value's type *proves* where it
+came from — a compile-time provenance contract — reflectable to the runtime
+`Provenance` via `Lineage`. (They can't be one Rust trait — type, const, and value are
+different worlds, and associated-type defaults are unstable — but they're one pattern,
+and the const ⇒ type lift means a wrong effect shape is now LSP push-back, not a runtime
+surprise.)
 
 The morphisms share **one algebra** (residual, `backward`/`reconstruct`, probe,
 and a `CAPABILITY` ceiling that composes by static join) in a few
@@ -161,7 +165,12 @@ is generated and pruned:
   finds one the available checks can't see (a `Transaction`'s *multiplicity*),
   and shows the synthesized coverage: a reaching operator (`Split`) plus a
   *dimension-appropriate* check (the residual, not the totals). Reaching + the
-  right check = coverage.
+  right check = coverage. The DOFs are also lifted to the **type level**: a value
+  object declares its DOF *set* (`HasDofs`, a `DofCons`/`DofNil` list), a check
+  declares what it `Covers`, and `require_complete` makes completeness a
+  *compile-time* `CoversAll` bound — an incomplete probe fails to compile (pinned
+  in `tests/compile_fail/incomplete_probe_rejected`), and the runtime
+  `transaction_dofs()` is *derived* from the type-level set so the two cannot drift.
 
 ## Mutation testing — the engine
 
@@ -244,13 +253,15 @@ effect  ⊃  state  ⊃  pure-with-loss  ⊃  pure
   live (I/O) handler is the one seam the method cannot probe — the program edge.
 
 The rule: keep each operator as far RIGHT (as close to pure) as its behaviour
-allows. Each `Morphism` declares a `CAPABILITY` ceiling in the grammar, and
-**`Compose` joins the stages' ceilings at compile time** — a path's capability is
-a *type fact*, so a `const` assertion that a pipeline stays "at most Lossy" is a
-BUILD error if any stage is promoted to `Stateful`/`Effectful` (see the const in
-`src/capability.rs`). `src/capability.rs` also makes the claim *measurable* — it
-perturbs each declared capability *source* and observes whether the
-output/residual respond.
+allows. Each `Morphism` declares its ceiling as a type-level `type Capability:
+Effect`, and **`Compose` joins the stages' ceilings in the type system** (the
+type-level `Join`) — a path's capability is a *type fact*, so demanding a pipeline
+stays "at most Pure/Lossy" is an `AtMost<Ceiling>` *bound* (`run_pure`,
+`run_within`): a stage promoted to `Stateful`/`Effectful` is a BUILD error at the
+call site (pinned in `tests/compile_fail/run_pure_rejects_lossy`). The runtime
+`CAPABILITY` const is *derived* from the marker, so `src/capability.rs` still makes
+the claim *measurable* — it perturbs each declared capability *source* and observes
+whether the output/residual respond.
 
 An operator carries its capability claim (`Declares`), and the `Audit` reconciles
 the claim with the probed behaviour per source, catching BOTH error directions —

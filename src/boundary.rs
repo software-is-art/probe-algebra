@@ -374,6 +374,59 @@ pub fn stamp_through<Path, M: Morphism>(
     Stamped(m.forward(input.value()).0, PhantomData)
 }
 
+// ===== degrees of freedom: coverage as a COMPILE-TIME obligation ==========
+//
+// `synth` reads a value object's degrees of freedom off its type and checks, at
+// runtime, that a probe's instrument is appropriate to each. The type-level twin
+// makes that completeness a BOUND: a value object declares its DOFs as a type-level
+// set (`DofCons`/`DofNil`, the same cons-list shape as the provenance lineage), a
+// check declares which DOFs it `Covers`, and `CoversAll` recurses the set — so a probe
+// that omits a dimension fails to COMPILE, the way an unbalanced post does. The runtime
+// `Dof` enumeration is then DERIVED from the type-level set, exactly as the runtime
+// `CAPABILITY` is derived from `type Capability` (the third use of the reflect pattern).
+
+/// The empty type-level DOF set — a probe covers it vacuously.
+pub struct DofNil;
+/// A cons cell of a type-level DOF set: head DOF `H`, tail set `T`.
+pub struct DofCons<H, T>(PhantomData<(H, T)>);
+
+/// A value object declares its degrees of freedom as a type-level set, so a probe's
+/// completeness is demandable as a bound rather than enumerated at runtime. (The
+/// runtime `synth::Dof` list reflects from `Self::Dofs`.)
+pub trait HasDofs {
+    /// The type-level DOF set (a `DofCons`/`DofNil` list).
+    type Dofs;
+}
+
+/// A check that can SEE the degree of freedom `D` — it reaches the dimension AND fires
+/// an instrument appropriate to it (per `synth`, reaching with the wrong check covers
+/// nothing). The per-dimension witness a complete probe must exhibit.
+pub trait Covers<D> {}
+
+/// A check that covers EVERY DOF in the type-level set `L` — the completeness relation,
+/// by recursion over the set. No overlap: `DofNil` and `DofCons` are disjoint head
+/// constructors, so this is a clean bound on stable Rust.
+pub trait CoversAll<L> {}
+impl<C> CoversAll<DofNil> for C {}
+impl<C, H, T> CoversAll<DofCons<H, T>> for C
+where
+    C: Covers<H>,
+    C: CoversAll<T>,
+{
+}
+
+/// The completeness obligation as a BOUND: this type-checks only when `C` covers every
+/// DOF the value object `T` declares. A check that omits a dimension fails to compile —
+/// the static twin of `synth`'s runtime coverage check, and the LSP push-back a coding
+/// agent gets for an incomplete probe before any test runs. (`tests/compile_fail` pins
+/// the negative: an output-only check that misses a real DOF is rejected.)
+pub fn require_complete<T, C>(_check: &C)
+where
+    T: HasDofs,
+    C: CoversAll<<T as HasDofs>::Dofs>,
+{
+}
+
 /// A possibly-lossy morphism whose `Residual` value object witnesses EXACTLY
 /// what the forward map collapsed. Retaining the residual restores
 /// invertibility: `backward(forward(x)) == x`.
