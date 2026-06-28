@@ -601,13 +601,20 @@ mod construction {
     }
 }
 
-// ===== gradings: one monoid pattern, threaded by composition at three levels =====
+// ===== gradings: one monoid pattern at three levels =====
+//
+// Residual and capability are OPERATOR gradings, composed by `Compose`. Provenance is
+// the VALUE's journey, now type-level, accumulated by `stamp_through`.
 
 mod grading {
-    use crate::boundary::{Capability, Compose, Construction, Monoid, Morphism, Provenance, Then};
-    use crate::ledger::boundary::{Aggregate, ParseTransaction, Round};
+    use super::sample;
+    use crate::boundary::{
+        stamp_through, Capability, Compose, Monoid, Morphism, Origin, Provenance, Stamped, Step,
+    };
+    use crate::ledger::boundary::{AccountSummary, Aggregate, Round};
 
     /// `Provenance` obeys the monoid laws: `EMPTY` is the unit, `combine` concatenates.
+    /// (It is the runtime reflection target of the type-level lineage.)
     #[test]
     fn provenance_is_a_monoid() {
         assert_eq!(Provenance::EMPTY.steps().len(), 0);
@@ -638,52 +645,41 @@ mod grading {
         );
     }
 
-    /// `Compose` is the single point that threads ALL THREE gradings, each at its level:
-    /// the type-level residual (it compiles as `Pair<_, _>`), the const-level capability
-    /// (a static join), and the value-level provenance (both stage labels, in order).
+    /// `Compose` threads the two OPERATOR gradings: the const-level capability (a static
+    /// join) and the type-level residual (the composite type-checks, so its `Residual`
+    /// is `Pair<MultiplicityResidual, RoundingResidual>`).
     #[test]
-    fn compose_threads_all_three_gradings() {
-        let pipeline = Compose {
-            f: Aggregate,
-            g: Round,
-        };
-        // const level: Lossy ∨ Lossy = Lossy
+    fn compose_threads_the_operator_gradings() {
         assert_eq!(
             <Compose<Aggregate, Round> as Morphism>::CAPABILITY,
             Capability::Lossy
         );
-        // value level: the lineage is both edges, in composition order
-        let steps = pipeline.provenance();
-        let steps = steps.steps();
-        assert_eq!(steps.len(), 2);
-        assert!(steps[0].contains("Aggregate"), "first step: {}", steps[0]);
-        assert!(steps[1].contains("Round"), "second step: {}", steps[1]);
-        // (the type-level residual grading is witnessed by this composite type-checking
-        // at all — its `Residual` is `Pair<MultiplicityResidual, RoundingResidual>`.)
     }
 
-    /// The entry edge threads provenance across the construction→morphism seam too.
+    /// PROVENANCE is now type-level on the VALUE: `stamp_through` extends the value's
+    /// lineage TYPE by each edge crossed, so the type records the whole journey. It is
+    /// reflectable to the runtime `Provenance` (oldest edge first), and a consumer can
+    /// DEMAND a specific path — a value with the wrong history will not compile.
     #[test]
-    fn then_threads_provenance_across_the_seam() {
-        let pipe = Then {
-            construct: ParseTransaction,
-            then: Aggregate,
-        };
-        let steps = pipe.provenance();
-        let steps = steps.steps();
+    fn stamping_records_the_lineage_in_the_type() {
+        let at_origin = Stamped::origin(sample()); // Stamped<Origin, Transaction>
+        let summarized = stamp_through(&at_origin, &Aggregate); // + Step<Aggregate, _>
+        let rounded = stamp_through(&summarized, &Round); // + Step<Round, _>
+
+        // the value is the real morphism output...
+        assert_eq!(rounded.value(), &Round.forward(summarized.value()).0);
+        // ...and its TYPE-level lineage reflects to the runtime path, oldest first
+        let prov = rounded.lineage();
+        let steps = prov.steps();
         assert_eq!(steps.len(), 2);
-        assert!(steps[0].contains("ParseTransaction"));
-        assert!(steps[1].contains("Aggregate"));
+        assert!(steps[0].contains("Aggregate"), "first: {}", steps[0]);
+        assert!(steps[1].contains("Round"), "second: {}", steps[1]);
+
+        // a compile-time provenance contract: `audited` only accepts a value whose TYPE
+        // proves it went Aggregate THEN Round — a different history would not unify.
+        audited(&rounded);
     }
 
-    /// Metering is transparent to provenance: `Profiled` reports the inner edge's
-    /// lineage, not the wrapper's.
-    #[test]
-    fn profiled_is_transparent_to_provenance() {
-        use crate::boundary::Profiled;
-        assert_eq!(
-            Profiled::new(Aggregate).provenance(),
-            Aggregate.provenance()
-        );
-    }
+    /// Demands the exact provenance in the type — `Aggregate` then `Round`.
+    fn audited(_x: &Stamped<Step<Round, Step<Aggregate, Origin>>, AccountSummary>) {}
 }

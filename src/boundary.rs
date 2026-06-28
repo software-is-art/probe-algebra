@@ -155,21 +155,26 @@ impl Capability {
 
 // ===== gradings: one monoid pattern, manifested at three levels ===========
 //
-// Each edge carries ANNOTATIONS that accumulate along composition — a GRADING, i.e. a
-// monoid (`EMPTY` for `id`, `combine` along `∘`). The boundary has the SAME pattern at
-// all three levels of Rust's tower, each living where its guarantees require:
+// Each edge carries ANNOTATIONS that accumulate — a GRADING, i.e. a monoid (`EMPTY`
+// for `id`, `combine` along the chain). The SAME pattern appears at all three levels
+// of Rust's tower, each living where its guarantees require — and split by WHAT it
+// annotates: residual and capability are properties of the OPERATOR (composed by
+// `Compose`); provenance is the journey of a VALUE (accumulated by stamping):
 //
-//   - RESIDUAL — a TYPE-level monoid `(ValueObject, Pair, Unit)`. It must be type-level
-//     so "discarded residual ⇒ not invertible" is a COMPILE error (see `Carried`).
-//   - CAPABILITY — a CONST-level monoid `(Capability, join, Pure)`. It must be const so
-//     the effect ceiling is a compile-time fact; a `const fn` cannot call a trait
-//     method, so capability composes via the inherent `join`, not `Monoid::combine`.
-//   - PROVENANCE — a VALUE-level monoid `(Provenance, ++, empty)`, runtime lineage.
+//   - RESIDUAL — a TYPE-level monoid `(ValueObject, Pair, Unit)` on the OPERATOR. It
+//     must be type-level so "discarded residual ⇒ not invertible" is a COMPILE error.
+//   - CAPABILITY — a CONST-level monoid `(Capability, join, Pure)` on the OPERATOR. It
+//     must be const so the effect ceiling is a compile-time fact (a `const fn` cannot
+//     call a trait method, so it composes via the inherent `join`).
+//   - PROVENANCE — a TYPE-level lineage `(Origin / Step, ++)` on the VALUE: each
+//     `stamp` extends the value's path TYPE by the edge it crossed, so a value's type
+//     proves where it came from (a compile-time provenance contract), reflectable to
+//     the runtime `Provenance` via `Lineage`. Generative, so it accrues by an explicit
+//     stamp call, not by `Compose`.
 //
-// `Compose` is the single point that threads ALL THREE (its `Residual` Pairs, its
-// `CAPABILITY` joins, its `provenance()` combines). The genus cannot be ONE Rust trait
-// — type/const/value are different worlds — but it is one structure; `Monoid` names the
-// value-level form, and `Capability`/the residual are the const/type analogues.
+// The genus cannot be ONE Rust trait — type/const/value are different worlds, and
+// associated-type defaults are unstable — but it is one structure; `Monoid` names the
+// value-level reflection, and residual/capability are the type/const analogues.
 
 /// The algebra a value-level grading accumulates in: `EMPTY` for the identity edge,
 /// `combine` along composition. (Associative with `EMPTY` as unit — the monoid laws.)
@@ -188,11 +193,10 @@ impl Monoid for Capability {
     }
 }
 
-/// PROVENANCE — the value-level grading: the lineage of edges a value has flowed
-/// through, each labelled by its operator type. `Compose`/`Then` accumulate it, so a
-/// value carries the path that produced it. (The runtime reflection of the static
-/// `Profiled`/`Meter` labels.)
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+/// The runtime REFLECTION of a value's type-level lineage: the ordered edge labels it
+/// flowed through. The lineage itself lives in the type (`Origin`/`Step`); `Lineage`
+/// reflects it here when a human (or a log) wants to read it.
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Provenance(Vec<&'static str>);
 
 impl Provenance {
@@ -214,6 +218,70 @@ impl Monoid for Provenance {
     }
 }
 
+// ----- the type-level lineage and the stamped value that carries it --------
+
+/// The empty lineage — a value that has crossed no edges yet (the `Nil` of the
+/// type-level path).
+pub struct Origin;
+
+/// A lineage `Edge` then `Rest` — the type-level `Cons`. A value's path grows by
+/// wrapping its previous path in a `Step` per edge crossed, so the whole journey is a
+/// type, checkable at compile time.
+pub struct Step<Edge, Rest>(PhantomData<(Edge, Rest)>);
+
+/// Reflect a type-level lineage to the runtime `Provenance` (oldest edge first).
+pub trait Lineage {
+    fn reflect() -> Provenance;
+}
+impl Lineage for Origin {
+    fn reflect() -> Provenance {
+        Provenance::EMPTY
+    }
+}
+impl<Edge, Rest: Lineage> Lineage for Step<Edge, Rest> {
+    fn reflect() -> Provenance {
+        Rest::reflect().combine(Provenance::single(core::any::type_name::<Edge>()))
+    }
+}
+
+/// A value tagged with its type-level lineage `Path`. Its TYPE records every edge it
+/// has crossed, so a consumer can demand a specific provenance (`Stamped<Step<Round,
+/// Step<Aggregate, Origin>>, _>`) and a value with the wrong history will not compile.
+/// `lineage()` reflects the path to a runtime `Provenance` when you want to read it.
+pub struct Stamped<Path, T>(T, PhantomData<Path>);
+
+impl<T> Stamped<Origin, T> {
+    /// Enter a value into provenance tracking at the origin (no edges yet).
+    pub fn origin(value: T) -> Self {
+        Stamped(value, PhantomData)
+    }
+}
+
+impl<Path, T> Stamped<Path, T> {
+    /// The carried value (read-only).
+    pub fn value(&self) -> &T {
+        &self.0
+    }
+    /// The runtime lineage, reflected from the type-level `Path`.
+    pub fn lineage(&self) -> Provenance
+    where
+        Path: Lineage,
+    {
+        Path::reflect()
+    }
+}
+
+/// Run a morphism on a stamped value and EXTEND its lineage type by the edge crossed —
+/// the type-level, n-ary value stamping. (Identity axis: the morphism's residual is
+/// `run`'s concern, so it is dropped here.) Each call adds one `Step`, so the value's
+/// type carries its whole journey.
+pub fn stamp_through<Path, M: Morphism>(
+    input: &Stamped<Path, M::In>,
+    m: &M,
+) -> Stamped<Step<M, Path>, M::Out> {
+    Stamped(m.forward(input.value()).0, PhantomData)
+}
+
 /// A possibly-lossy morphism whose `Residual` value object witnesses EXACTLY
 /// what the forward map collapsed. Retaining the residual restores
 /// invertibility: `backward(forward(x)) == x`.
@@ -233,14 +301,6 @@ pub trait Morphism: ValueOperator {
     /// Reconstruct the input from output + residual. Total iff the residual is
     /// COMPLETE; `None` when the residual cannot reconstruct a valid input.
     fn backward(&self, out: &Self::Out, residual: &Self::Residual) -> Option<Self::In>;
-
-    /// The value-level grading: this edge's lineage (default: a single step labelled by
-    /// the operator's type). `Compose` overrides it to combine its stages, so a
-    /// composite reports the whole path — the third grading `Compose` threads, beside
-    /// the type-level `Residual` and the const-level `CAPABILITY`.
-    fn provenance(&self) -> Provenance {
-        Provenance::single(core::any::type_name::<Self>())
-    }
 }
 
 /// The empty residual: a LOSSLESS transport collapses nothing, so its witness of
@@ -502,12 +562,6 @@ where
         let mid = self.g.backward(out, &r.1)?;
         self.f.backward(&mid, &r.0)
     }
-
-    // the THIRD grading, accumulated exactly as the residual (Pair) and capability
-    // (join) above — Compose is the single point that threads all three.
-    fn provenance(&self) -> Provenance {
-        self.f.provenance().combine(self.g.provenance())
-    }
 }
 
 // ===== retention typestate: discarded residual => not invertible =========
@@ -634,13 +688,6 @@ pub trait Construction: ValueOperator {
     /// morphism can thread that morphism's `backward` through). For an admitted `x`, a
     /// COMPLETE residual gives `reconstruct(parse(x)) == Some(x)`.
     fn reconstruct(&self, refined: &Self::Refined, residual: &Self::Residual) -> Option<Self::Raw>;
-
-    /// The value-level grading (as on `Morphism`): this edge's lineage, default a single
-    /// step labelled by the operator's type; `Then` combines its construction and
-    /// morphism stages.
-    fn provenance(&self) -> Provenance {
-        Provenance::single(core::any::type_name::<Self>())
-    }
 }
 
 /// Construction round-trip probe (the entry-edge analog of `probe`): a parse that
@@ -718,12 +765,6 @@ where
     fn reconstruct(&self, out: &Self::Refined, residual: &Self::Residual) -> Option<Self::Raw> {
         let refined = self.then.backward(out, &residual.1)?;
         self.construct.reconstruct(&refined, &residual.0)
-    }
-
-    // threads the value-level grading across the seam, just as it threads the residual
-    // (Pair) and capability (join) above.
-    fn provenance(&self) -> Provenance {
-        self.construct.provenance().combine(self.then.provenance())
     }
 }
 
@@ -996,11 +1037,5 @@ impl<M: Morphism, T: Meter> Morphism for Profiled<M, T> {
         self.meter.measured(core::any::type_name::<M>(), || {
             self.inner.backward(out, residual)
         })
-    }
-
-    // metering is transparent to provenance: report the inner edge's lineage, not the
-    // `Profiled` wrapper's.
-    fn provenance(&self) -> Provenance {
-        self.inner.provenance()
     }
 }
