@@ -16,8 +16,12 @@
 //!
 //! Crate-level tooling, like `select` — exempt from the boundary discipline.
 
-use crate::boundary::{probe, require_complete, Covers, DofCons, DofNil, HasDofs, Morphism};
-use crate::ledger::boundary::{Aggregate, AggregateDropsAmounts, Split, Transaction};
+use crate::boundary::{
+    probe, require_complete, Covers, DofCons, DofNil, DofProbe, HasDofs, Morphism,
+};
+use crate::ledger::boundary::{
+    AccountSummary, Aggregate, AggregateDropsAmounts, NudgePosting, Split, Transaction,
+};
 
 /// The degrees of freedom of a `Transaction`, as read off its type. A multiset
 /// of postings has per-account TOTALS and MULTIPLICITY (how each total splits
@@ -72,6 +76,24 @@ impl<H: DegreeOfFreedom, T: ReflectDofs> ReflectDofs for DofCons<H, T> {
 /// `require_complete` demands coverage of.
 impl HasDofs for Transaction {
     type Dofs = DofCons<Totals, DofCons<Multiplicity, DofNil>>;
+}
+
+// Each DOF supplies the perturbation that reaches its dimension, so the completeness
+// suite is SYNTHESIZED from the type-level set by `probe_declared_dofs` — generic over
+// any aggregation-shaped morphism, so it probes the honest and buggy edges alike.
+impl<M: Morphism<In = Transaction, Out = AccountSummary>> DofProbe<M> for Totals {
+    // Totals survive into the OUTPUT, so nudging an amount makes the summary respond.
+    type Perturb = NudgePosting;
+    fn perturbation() -> NudgePosting {
+        NudgePosting
+    }
+}
+impl<M: Morphism<In = Transaction, Out = AccountSummary>> DofProbe<M> for Multiplicity {
+    // Multiplicity is COLLAPSED into the residual, so `Split` reaches it there.
+    type Perturb = Split;
+    fn perturbation() -> Split {
+        Split
+    }
 }
 
 /// Enumerate the DOFs a `Transaction` exposes — the dimensions any check claiming
@@ -177,6 +199,34 @@ mod tests {
     #[test]
     fn dofs_are_reflected_from_the_type_level_set() {
         assert_eq!(transaction_dofs(), vec![Dof::Totals, Dof::Multiplicity]);
+    }
+
+    /// SYNTHESIS: the completeness suite is generated from the type-level DOF set. For
+    /// the honest aggregation, EVERY declared DOF is observable — totals through the
+    /// output, multiplicity through the residual — so all verdicts are `Some(true)`,
+    /// with no per-dimension test code.
+    #[test]
+    fn synthesized_suite_covers_every_declared_dof() {
+        use crate::boundary::probe_declared_dofs;
+        let x = sample();
+        let verdicts = probe_declared_dofs::<Transaction, _>(&Aggregate, &x);
+        assert_eq!(verdicts, vec![Some(true), Some(true)]);
+    }
+
+    /// SYNTHESIS catches a silently-dropped dimension: `AggregateDropsAmounts` keeps
+    /// totals in the output but collapses multiplicity with no complete residual, so the
+    /// generated suite flags the MULTIPLICITY DOF as uncovered — a bug found with no
+    /// hand-written probe for that edge.
+    #[test]
+    fn synthesized_suite_flags_a_dropped_dof() {
+        use crate::boundary::probe_declared_dofs;
+        let x = sample();
+        let verdicts = probe_declared_dofs::<Transaction, _>(&AggregateDropsAmounts, &x);
+        assert_eq!(
+            verdicts,
+            vec![Some(true), Some(false)],
+            "totals survive in the output; multiplicity is silently dropped"
+        );
     }
 
     /// Completeness is a COMPILE-TIME fact: `assert_residual_check_is_complete` only

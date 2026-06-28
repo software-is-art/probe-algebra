@@ -457,6 +457,24 @@ impl<M: Morphism<In = AccountSummary>> Perturbation<M> for NudgeCents {
     }
 }
 
+/// Nudge the first posting's amount by one cent — perturbs the TOTALS dimension (the
+/// account's total changes, so the aggregation OUTPUT responds). The complement of
+/// `Split`, which moves multiplicity while leaving totals fixed; together they reach the
+/// two declared degrees of freedom of a `Transaction`.
+pub struct NudgePosting;
+crate::value_operator!(NudgePosting);
+
+impl<M: Morphism<In = Transaction>> Perturbation<M> for NudgePosting {
+    fn perturb(&self, input: &Transaction) -> Option<Transaction> {
+        let ps = input.postings();
+        let first = ps.first()?;
+        let bumped = first.amount().checked_add(Cents::new(1)?)?;
+        let mut out = vec![Posting::new(first.account().clone(), bumped)];
+        out.extend(ps[1..].iter().cloned());
+        Transaction::new(out)
+    }
+}
+
 // ===== value operators: constructions (the entry edge) ===================
 
 /// Parse a raw `i64` into `Cents`. A PURE REFINEMENT: it only range-checks, losing

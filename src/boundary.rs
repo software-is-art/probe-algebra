@@ -427,6 +427,73 @@ where
 {
 }
 
+// ===== DOF-driven probe SYNTHESIS: the declaration generates the suite =====
+//
+// `require_complete` checks, at compile time, that a probe COVERS the declared DOFs.
+// This goes the other way: each DOF supplies the perturbation that reaches its
+// dimension, so the runtime completeness suite is SYNTHESIZED from the type-level DOF
+// set — declaring a degree of freedom generates its probe. Coverage is unified across
+// the residual axis: a DOF is covered if perturbing along it is OBSERVABLE, either
+// because the OUTPUT changes (the dimension survives into the output) or the RESIDUAL
+// completely captures it (a lossy dimension witnessed). A dimension covered by NEITHER
+// is silently dropped — exactly the bug the probe exists to find.
+
+/// A degree of freedom that can be probed on morphism `M`: it supplies the perturbation
+/// reaching its dimension. With this, the completeness suite is derived from the DOF set
+/// rather than hand-written per dimension.
+pub trait DofProbe<M: Morphism> {
+    /// The perturbation that moves this dimension.
+    type Perturb: Perturbation<M>;
+    fn perturbation() -> Self::Perturb;
+}
+
+/// Is this DOF OBSERVABLE through `m` at `x`? `Some(true)` if the output responds or the
+/// residual completely captures the perturbation; `Some(false)` if it is silently
+/// dropped; `None` if the perturbation does not apply at `x`.
+pub fn dof_covered<M, D>(m: &M, x: &M::In) -> Option<bool>
+where
+    M: Morphism,
+    D: DofProbe<M>,
+{
+    let pr = probe(m, &D::perturbation(), x)?;
+    Some(!pr.output_invariant || pr.residual_complete())
+}
+
+/// Walk a type-level DOF set, probing each DOF on `M` (oldest first). The recursion over
+/// `DofCons`/`DofNil` is what turns the type-level declaration into a runtime sweep.
+pub trait ProbeDofs<M: Morphism> {
+    fn probe_each(m: &M, x: &M::In, out: &mut Vec<Option<bool>>);
+}
+impl<M: Morphism> ProbeDofs<M> for DofNil {
+    fn probe_each(_m: &M, _x: &M::In, _out: &mut Vec<Option<bool>>) {}
+}
+impl<M, H, T> ProbeDofs<M> for DofCons<H, T>
+where
+    M: Morphism,
+    H: DofProbe<M>,
+    T: ProbeDofs<M>,
+{
+    fn probe_each(m: &M, x: &M::In, out: &mut Vec<Option<bool>>) {
+        out.push(dof_covered::<M, H>(m, x));
+        T::probe_each(m, x, out);
+    }
+}
+
+/// Synthesize and run the completeness suite for EVERY degree of freedom the value
+/// object `T` declares (`HasDofs`), against edge `M` — one verdict per DOF. The DOF
+/// declaration generates the probes: a value object that adds a dimension to its
+/// `HasDofs` set automatically gets it checked, with no new test code.
+pub fn probe_declared_dofs<T, M>(m: &M, x: &M::In) -> Vec<Option<bool>>
+where
+    T: HasDofs,
+    T::Dofs: ProbeDofs<M>,
+    M: Morphism,
+{
+    let mut out = Vec::new();
+    <T::Dofs as ProbeDofs<M>>::probe_each(m, x, &mut out);
+    out
+}
+
 /// A possibly-lossy morphism whose `Residual` value object witnesses EXACTLY
 /// what the forward map collapsed. Retaining the residual restores
 /// invertibility: `backward(forward(x)) == x`.
