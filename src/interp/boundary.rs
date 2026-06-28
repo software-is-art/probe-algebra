@@ -24,7 +24,7 @@ use core::marker::PhantomData;
 
 use crate::boundary::{
     Axis, Branch, Construction, CostCons, CostNil, Covers, DofCons, DofNil, Graded, Guarded,
-    HasDofs, Pure, SpaceCost, TimeCost, Unit, S, Z,
+    HasDofs, Lossy, Morphism, Pure, SpaceCost, TimeCost, Unit, S, Z,
 };
 use crate::gdp::Named;
 
@@ -280,7 +280,14 @@ pub struct Check;
 /// SAME name. You cannot evaluate an expression that has not been proven well-typed —
 /// the witness comes from `Check`, exactly as a `Construction` mints its own. Pure.
 pub struct Eval;
-crate::value_operator!(Parse, Check, Eval);
+crate::value_operator!(
+    Parse,
+    Check,
+    Eval,
+    ConstFold,
+    ConstFoldDoubles,
+    ConstFoldForgetful
+);
 
 impl Construction for Parse {
     type Capability = Pure;
@@ -349,6 +356,113 @@ impl Eval {
     /// result keeps the brand `N`.
     pub fn run<N>(&self, expr: &Named<N, Expr>, proof: &WellTyped<N>) -> Named<N, Value> {
         self.guard(expr, proof)
+    }
+}
+
+// ===== ConstFold: a LOSSY optimization edge, and the capability lattice ====
+//
+// `Parse`/`Check`/`Eval` are all `Pure`; nothing yet exercised a higher rung of the
+// capability lattice or the `Morphism` shape (lossy projection + residual witness).
+// `ConstFold` does both. It is an optimizer `Expr -> Expr` that collapses constant
+// subexpressions — a real loss (you cannot recover `(2 + 3)` from `5`), so it is declared
+// `Lossy` and keeps a `Residual` that witnesses what it collapsed, restoring
+// invertibility. Because it is `Lossy`, `run_pure` REFUSES it at compile time
+// (`tests/compile_fail/run_pure_rejects_lossy`): the capability ceiling is an enforced
+// contract, not a comment.
+//
+// Three variants make the BLIND-SPOT MAP executable on this substrate — no single probe
+// flavour is highest-assurance:
+//   - `ConstFold` is honest;
+//   - `ConstFoldForgetful` folds correctly but throws its residual away (`Unit`), so it
+//     cannot reconstruct — the residual ROUND-TRIP catches it, while a value-only probe
+//     is blind (the folded value is right);
+//   - `ConstFoldDoubles` keeps a complete residual AND is symmetric, so it round-trips
+//     AND commutes with operand-swap, yet computes the WRONG constant — both structural
+//     probes are blind and only the reference-bearing COEFFICIENT probe catches it. That
+//     is the project's decisive negative result, re-homed onto the interpreter.
+
+/// The honest constant folder: a `Lossy` `Morphism` whose residual is the ORIGINAL
+/// expression, so `backward` reconstructs exactly.
+pub struct ConstFold;
+/// A WRONG-coefficient folder: doubles every folded result. Keeps a complete residual and
+/// is symmetric, so it survives BOTH structural probes; only the coefficient probe pins it.
+pub struct ConstFoldDoubles;
+/// A residual-INCOMPLETE folder: folds correctly but declares a `Unit` residual, so it
+/// cannot reconstruct a folded input — the round-trip probe catches the dropped dimension.
+pub struct ConstFoldForgetful;
+
+impl ConstFold {
+    /// The honest arithmetic at a reducible node — the reference combiner the engine
+    /// (`internal::fold`) is parameterized over.
+    fn combine(op: Op, x: Int, y: Int) -> Option<Lit> {
+        match op {
+            Op::Add => Some(Lit::Int(x.plus(y))),
+            Op::Mul => Some(Lit::Int(x.times(y))),
+            Op::Lt => Some(Lit::Bool(x.less_than(y))),
+        }
+    }
+}
+impl ConstFoldDoubles {
+    /// The skewed combiner: the right SHAPE (still linear, still symmetric) but the wrong
+    /// CONSTANT — every folded integer is doubled.
+    fn combine(op: Op, x: Int, y: Int) -> Option<Lit> {
+        match op {
+            Op::Add => Some(Lit::Int(x.plus(y).times(Int::new(2)?))),
+            Op::Mul => Some(Lit::Int(x.times(y).times(Int::new(2)?))),
+            Op::Lt => Some(Lit::Bool(x.less_than(y))),
+        }
+    }
+}
+
+impl Morphism for ConstFold {
+    type Capability = Lossy;
+    type In = Expr;
+    type Out = Expr;
+    // The residual witnesses EXACTLY what folding collapsed: the original expression.
+    type Residual = Expr;
+
+    fn forward(&self, input: &Expr) -> (Expr, Expr) {
+        (
+            super::internal::fold(input, &ConstFold::combine),
+            input.clone(),
+        )
+    }
+    fn backward(&self, _out: &Expr, residual: &Expr) -> Option<Expr> {
+        Some(residual.clone())
+    }
+}
+
+impl Morphism for ConstFoldDoubles {
+    type Capability = Lossy;
+    type In = Expr;
+    type Out = Expr;
+    type Residual = Expr;
+
+    fn forward(&self, input: &Expr) -> (Expr, Expr) {
+        (
+            super::internal::fold(input, &ConstFoldDoubles::combine),
+            input.clone(),
+        )
+    }
+    fn backward(&self, _out: &Expr, residual: &Expr) -> Option<Expr> {
+        Some(residual.clone())
+    }
+}
+
+impl Morphism for ConstFoldForgetful {
+    type Capability = Lossy;
+    type In = Expr;
+    type Out = Expr;
+    // It THROWS AWAY the witness — a `Unit` residual, the claim "I lost nothing
+    // reconstructible". For a foldable input that is a lie, and the round-trip exposes it.
+    type Residual = Unit;
+
+    fn forward(&self, input: &Expr) -> (Expr, Unit) {
+        (super::internal::fold(input, &ConstFold::combine), Unit)
+    }
+    fn backward(&self, out: &Expr, _residual: &Unit) -> Option<Expr> {
+        // All it has is the folded output; it cannot recover the collapsed structure.
+        Some(out.clone())
     }
 }
 

@@ -311,3 +311,29 @@ fn ev(e: &Expr, env: &HashMap<Ident, Value>) -> Value {
 pub(super) fn eval(e: &Expr) -> Value {
     ev(e, &HashMap::new())
 }
+
+// ===== constant folding (the Lossy `ConstFold` edge's engine) ==============
+
+/// Constant-fold an expression: any binary node whose folded operands are BOTH integer
+/// literals collapses to the literal `combine` computes. The recursion (which nodes are
+/// reducible, how the tree is rebuilt) is honest and SHARED; only `combine` — the
+/// arithmetic at a reducible node — is injected, so a wrong-coefficient edge differs from
+/// the honest one by its combiner alone, not by a forked traversal. A node `combine`
+/// declines (`None`) is left unfolded.
+pub(super) fn fold(e: &Expr, combine: &dyn Fn(Op, Int, Int) -> Option<Lit>) -> Expr {
+    match e {
+        Expr::Lit(_) | Expr::Var(_) => e.clone(),
+        Expr::Bin(op, a, b) => {
+            let fa = fold(a, combine);
+            let fb = fold(b, combine);
+            if let (Expr::Lit(Lit::Int(x)), Expr::Lit(Lit::Int(y))) = (&fa, &fb) {
+                if let Some(lit) = combine(*op, *x, *y) {
+                    return Expr::Lit(lit);
+                }
+            }
+            Expr::bin(*op, fa, fb)
+        }
+        Expr::If(c, t, f) => Expr::cond(fold(c, combine), fold(t, combine), fold(f, combine)),
+        Expr::Let(name, v, body) => Expr::bind(name.clone(), fold(v, combine), fold(body, combine)),
+    }
+}

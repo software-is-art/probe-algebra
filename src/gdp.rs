@@ -20,7 +20,7 @@
 use core::marker::PhantomData;
 use std::collections::BTreeMap;
 
-use crate::boundary::Construction;
+use crate::boundary::{Construction, Morphism};
 
 // ===== the name machinery (mononym's technique, hand-rolled) ==============
 
@@ -121,6 +121,15 @@ pub fn stamp_parse<N, C: Construction>(
     raw: &C::Raw,
 ) -> Option<Named<N, C::Refined>> {
     c.parse(raw).map(|(refined, _residual)| r.brand(refined))
+}
+
+/// Push a NAMED value through a `Morphism` and re-stamp the result into the SAME region:
+/// the brand is the IDENTITY of the dataflow, threaded across an edge. The input and
+/// output share `N`, so a value carried through one region cannot be confused with
+/// another's — `same_region` (the region demo) checks exactly that. (The residual is
+/// dropped here; `run`/`Carried` is the residual-keeping form.)
+pub fn stamp<N, M: Morphism>(r: &Brander<N>, m: &M, input: &Named<N, M::In>) -> Named<N, M::Out> {
+    r.brand(m.forward(input.value()).0)
 }
 
 // ===== a proof carried across a seam ======================================
@@ -314,19 +323,25 @@ mod tests {
     }
 
     /// A REGION stamps values flowing through the dataflow with one brand, whatever the
-    /// edge's shape. Here a raw source is stamped through the `Parse` construction edge,
-    /// and another value is branded into the SAME region — both share the brand, so
-    /// same-run provenance is demandable across them.
+    /// edge's shape. A raw source is stamped through the `Parse` CONSTRUCTION edge, then the
+    /// parsed expression is pushed through the `ConstFold` MORPHISM edge with `stamp` — and
+    /// the folded result still carries the SAME brand. `same_region` compiles only because
+    /// every step shares `N`, so same-run provenance is demandable across the whole pipeline.
     #[test]
-    fn a_region_stamps_a_value_through_the_parse_edge() {
-        use crate::interp::boundary::Parse;
+    fn a_region_stamps_a_value_across_construction_and_morphism_edges() {
+        use crate::interp::boundary::{ConstFold, Expr, Parse};
         with_region(|r| {
             let expr = stamp_parse(&r, &Parse, &"(1 + 2)".to_string()).expect("valid source");
             assert_eq!(expr.value(), &Parse.parse_str("(1 + 2)").unwrap());
-            // a second value branded into the same region shares the name `N`.
+            // push the named expression through the ConstFold morphism, keeping the brand.
+            let folded = stamp(&r, &ConstFold, &expr);
+            assert_eq!(folded.value(), &Expr::int(3).unwrap()); // (1 + 2) folded to 3
+            assert_eq!(folded.value().render(), "3");
+            // a third value branded into the same region also shares the name `N`.
             let rendered = r.brand(expr.value().render());
             fn same_region<N, A, B>(_a: &Named<N, A>, _b: &Named<N, B>) {}
-            same_region(&expr, &rendered); // compiles only because both carry one brand
+            same_region(&expr, &folded); // compiles only because both carry one brand
+            same_region(&folded, &rendered);
             assert_eq!(rendered.value(), "(1 + 2)");
         });
     }

@@ -250,3 +250,139 @@ fn the_brand_threads_parse_check_eval() {
         }
     });
 }
+
+// ===== the capability lattice + the blind-spot map ========================
+//
+// `ConstFold` is a `Lossy` `Morphism` (collapses constant subexpressions, witnessing the
+// loss in a residual). Three variants make the blind-spot map executable: NO single probe
+// flavour is highest-assurance, and the decisive negative result is that a wrong-but-
+// invertible coefficient survives BOTH structural probes and dies only to the
+// reference-bearing quantitative one.
+mod blind_spot {
+    use super::{int, Expr, Op};
+    use crate::boundary::{
+        coefficient_holds, commutes, Capability, Coefficient, Metamorphic, Morphism,
+    };
+    use crate::interp::boundary::{ConstFold, ConstFoldDoubles, ConstFoldForgetful, Int, Lit};
+
+    /// A top-level `Add` of two integer literals — folds to a single literal.
+    fn sum(a: i64, b: i64) -> Expr {
+        Expr::bin(Op::Add, int(a), int(b))
+    }
+    /// The folded output (the morphism's `Out`).
+    fn folds_to<M: Morphism<In = Expr, Out = Expr>>(m: &M, x: &Expr) -> Expr {
+        m.forward(x).0
+    }
+    /// Does `backward(forward(x)) == x`? — the residual round-trip, as a `bool`.
+    fn round_trips<M: Morphism<In = Expr, Out = Expr>>(m: &M, x: &Expr) -> bool {
+        let (out, residual) = m.forward(x);
+        m.backward(&out, &residual).as_ref() == Some(x)
+    }
+
+    /// METAMORPHIC relation (reference-free): swapping the operands of a top-level `Add`
+    /// must leave the folded result unchanged (addition is commutative).
+    struct SwapAddends;
+    crate::value_operator!(SwapAddends);
+    impl<M: Morphism<In = Expr, Out = Expr>> Metamorphic<M> for SwapAddends {
+        fn input_op(&self, x: &Expr) -> Option<Expr> {
+            match x {
+                Expr::Bin(Op::Add, a, b) => Some(Expr::bin(Op::Add, (**b).clone(), (**a).clone())),
+                _ => None,
+            }
+        }
+        fn output_op(&self, y: &Expr) -> Expr {
+            y.clone()
+        }
+    }
+
+    /// COEFFICIENT relation (reference-bearing): incrementing one addend by 1 must raise the
+    /// folded sum by exactly 1 — the reference coefficient of honest addition.
+    struct IncrementAddend;
+    crate::value_operator!(IncrementAddend);
+    fn lit_int(e: &Expr) -> i64 {
+        match e {
+            Expr::Lit(Lit::Int(i)) => i.get(),
+            _ => -1, // a non-folded result fails the equality, as it should.
+        }
+    }
+    impl<M: Morphism<In = Expr, Out = Expr>> Coefficient<M> for IncrementAddend {
+        type Delta = Int;
+        fn unit_step(&self, x: &Expr) -> Option<Expr> {
+            match x {
+                Expr::Bin(Op::Add, a, b) => match &**b {
+                    Expr::Lit(Lit::Int(bi)) => Some(Expr::bin(
+                        Op::Add,
+                        (**a).clone(),
+                        Expr::Lit(Lit::Int(bi.plus(Int::new(1)?))),
+                    )),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        fn expected_delta(&self) -> Int {
+            Int::new(1).expect("1 is a valid Int")
+        }
+        fn observed_delta(&self, before: &Expr, after: &Expr) -> Int {
+            Int::new((lit_int(after) - lit_int(before)).max(0)).expect("non-negative delta")
+        }
+    }
+
+    /// The `Lossy` ceiling is REFLECTED to the runtime so the audit/laws read it unchanged.
+    /// (The type-level demand is pinned in `tests/compile_fail/run_pure_rejects_lossy`.)
+    #[test]
+    fn const_fold_declares_lossy() {
+        assert_eq!(ConstFold::CAPABILITY, Capability::Lossy);
+        assert_eq!(ConstFoldDoubles::CAPABILITY, Capability::Lossy);
+    }
+
+    /// ROW 1 — residual incompleteness: the round-trip CATCHES the forgetful folder (its
+    /// `Unit` residual cannot rebuild the collapsed input), while a value-only check is
+    /// BLIND, because the folded value itself is correct.
+    #[test]
+    fn round_trip_catches_a_dropped_residual_but_the_value_is_blind() {
+        let x = sum(2, 3);
+        assert!(
+            round_trips(&ConstFold, &x),
+            "honest keeps a complete residual"
+        );
+        assert!(
+            !round_trips(&ConstFoldForgetful, &x),
+            "a dropped residual cannot reconstruct the folded input"
+        );
+        // value-only blind spot: the forgetful folder computes the SAME (correct) value.
+        assert_eq!(folds_to(&ConstFold, &x), folds_to(&ConstFoldForgetful, &x));
+    }
+
+    /// ROW 2 — wrong coefficient: the doubling folder keeps a complete residual AND is
+    /// symmetric, so BOTH structural probes (round-trip and commutation) are BLIND to it.
+    #[test]
+    fn structural_probes_are_blind_to_a_wrong_coefficient() {
+        let x = sum(2, 3);
+        // round-trip blind: the residual restores the original regardless of the value.
+        assert!(round_trips(&ConstFoldDoubles, &x));
+        // commutation blind: doubling is symmetric, so it commutes with operand-swap.
+        assert_eq!(commutes(&ConstFold, &SwapAddends, &x), Some(true));
+        assert_eq!(
+            commutes(&ConstFoldDoubles, &SwapAddends, &x),
+            Some(true),
+            "a uniform (symmetric) wrong coefficient respects the swap relation"
+        );
+    }
+
+    /// The DECISIVE negative result: only the reference-bearing COEFFICIENT probe separates
+    /// the honest folder from the doubling one — the structural checks above could not.
+    #[test]
+    fn the_coefficient_probe_catches_what_structure_cannot() {
+        let x = sum(2, 3);
+        assert_eq!(
+            coefficient_holds(&ConstFold, &IncrementAddend, &x),
+            Some(true)
+        );
+        assert_eq!(
+            coefficient_holds(&ConstFoldDoubles, &IncrementAddend, &x),
+            Some(false),
+            "the quantitative probe pins the coefficient the structural checks missed"
+        );
+    }
+}
