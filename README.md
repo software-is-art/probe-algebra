@@ -35,13 +35,22 @@ nouns) and **morphisms** (the verbs).
 | **Value operator** | morphism | a pure map over value objects — no I/O, no external mutation | `ValueOperator` |
 | **Typestate** | object *index* | distinguishes objects (`Entry<Draft>` vs `Entry<Submitted>`) so illegal sequencing fails to compile — not a citizen of its own | `Typestate` |
 
-The morphisms share **one algebra** (residual, `backward`/`reconstruct`, probe)
-in a few type-distinguished **shapes**: a `Morphism` is a *total* edge between
-value objects; a **`Construction`** is the *partial* **entry edge** from a raw
-primitive *into* a value object (`u64 -> Cents` — "parse, don't validate"); a
-*transition* is a `Morphism` declared by `transition!`. Construction is the one
-edge the value-object pattern used to leave *outside* the algebra as a native
-`fn new`; modelled as a morphism, it is back inside the probe space (see below).
+The morphisms share **one algebra** (residual, `backward`/`reconstruct`, probe,
+and a `CAPABILITY` ceiling that composes by static join) in a few
+type-distinguished **shapes**:
+
+- **`Morphism`** — a *total* edge between value objects; a *transition* is one
+  declared by `transition!`.
+- **`Construction`** — the *partial* **entry edge** from a raw primitive *into* a
+  value object (`u64 -> Cents` — "parse, don't validate"). The one edge the
+  value-object pattern used to leave *outside* the algebra as a native `fn new`;
+  modelled as a morphism, it is back inside the probe space.
+- **`Branch`** — a total edge into a **coproduct** (`classify`: one input, one of
+  two arms), *keeping* the negative witness rather than discarding it as a `None`.
+- **`Guarded`** — a *partial* edge admitted by an external **witness** (a
+  name-branded proof for the same value); the categorical **sibling** of
+  `Construction`, which mints its own. So a guarded transition like `Post` (needs a
+  `Cleared` proof) is in the algebra too — every hop of a multistate path is an edge.
 
 The markers are **sealed**, so the set of citizens is *closed*: no module can
 invent a new kind, and no external crate can mint one. Non-boundary logic
@@ -338,7 +347,7 @@ module interior.
 
 | Path | Role |
 | --- | --- |
-| `src/boundary.rs` | the grammar (a boundary as a **category**): sealed markers + `Morphism` / `Construction` (the entry edge) + probes `probe` / `commutes` / `coefficient_holds` / `reconstructs` / `construction_probe` / `Compose` + `Then` composition / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
+| `src/boundary.rs` | the grammar (a boundary as a **category**): sealed markers + edge shapes `Morphism` / `Construction` (entry edge) / `Branch` (coproduct) / `Guarded` (witnessed) + probes `probe` / `commutes` / `coefficient_holds` / `reconstructs` / `construction_probe` / `Compose` + `Then` composition / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
 | `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants; **constructions** (`ParseCents`/`ParseAccount`/`ParseTransaction`) bring the smart constructor into the probe space |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
 | `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |

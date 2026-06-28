@@ -608,6 +608,57 @@ where
     }
 }
 
+// ===== branching & guarded edges: completing the category ================
+//
+// A `Morphism`/`Construction` is a SINGLE-target edge between value objects. Two
+// remaining edge shapes complete the category, so every hop of a multistate path is
+// an edge of the algebra rather than a hand-written seam: a BRANCH lands in a
+// COPRODUCT, and a GUARDED edge is a partial map admitted by an external witness.
+// Both are name-BRANDED (a per-call brand `N`, GDP-style) so a proof minted for one
+// value cannot discharge an edge on another — hence the generic-associated `<N>`.
+
+/// A BRANCHING edge — a total morphism into a COPRODUCT. Where a `Morphism` lands in
+/// one object, a `Branch` lands in one of two (`Left` / `Right`) and KEEPS the witness
+/// of which: the categorical case-split (`classify`), not a `Maybe` that throws the
+/// negative arm away. The brand `N` ties each produced proof to the one value
+/// classified, so it can only discharge a `Guarded` edge on that SAME value. In the
+/// grammar it declares a `CAPABILITY` like any edge, so a path through a branch keeps
+/// a computed ceiling.
+pub trait Branch: ValueOperator {
+    /// The declared capability ceiling, as on every edge.
+    const CAPABILITY: Capability;
+    /// The branded input (e.g. `Named<N, _>`); the brand is not itself a citizen.
+    type In<N>;
+    /// The positive arm — a value object (often a proof realized as one).
+    type Left<N>: ValueObject;
+    /// The negative arm, KEPT as a first-class value object, never discarded.
+    type Right<N>: ValueObject;
+    /// Classify the input into one arm of the coproduct, branded to its value.
+    fn branch<N>(&self, input: &Self::In<N>) -> Result<Self::Left<N>, Self::Right<N>>;
+}
+
+/// A GUARDED edge — the categorical SIBLING of `Construction`. Both are "a morphism
+/// plus an admissibility witness", differing only in WHERE the witness is born: a
+/// `Construction` MINTS its own (the parse succeeds, residual in hand), while a
+/// `Guarded` edge DEMANDS one minted elsewhere — a name-branded `Proof` for the SAME
+/// value, typically a `Branch`'s output. With the witness present the map is total,
+/// so "you forgot the precondition" is a COMPILE error rather than a runtime check,
+/// and no other path can reach `Out`. (A `Construction` reverses via its residual; a
+/// `Guarded` edge consumes its brand and is one-way — reversal, when wanted, is its
+/// own edge, the way `Void` reverses `Post`.)
+pub trait Guarded: ValueOperator {
+    /// The declared capability ceiling, as on every edge.
+    const CAPABILITY: Capability;
+    /// The branded input being admitted.
+    type In<N>;
+    /// The unforgeable witness required for the SAME brand `N`.
+    type Proof<N>;
+    /// The state reached once admitted — a value object.
+    type Out: ValueObject;
+    /// Cross the edge, consuming the proof of admissibility.
+    fn guard<N>(&self, input: &Self::In<N>, proof: &Self::Proof<N>) -> Self::Out;
+}
+
 // ===== state machines: a boundary as a transition graph ==================
 
 /// A boundary modelled EXPLICITLY as a state machine: one piece of `Data` carried

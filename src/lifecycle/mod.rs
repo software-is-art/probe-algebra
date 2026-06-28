@@ -10,9 +10,11 @@ pub mod boundary;
 
 #[cfg(test)]
 mod tests {
-    use super::boundary::{Amend, Draft, Entry, Post, Reject, Submit, Validate, Void};
-    use crate::boundary::{run, Capability, Morphism};
-    use crate::gdp::with_seed;
+    use super::boundary::{
+        Amend, Draft, Entry, Post, Posted, Reject, Rejected, Submit, Submitted, Validate, Void,
+    };
+    use crate::boundary::{run, Branch, Capability, Guarded, Morphism};
+    use crate::gdp::{with_seed, Named};
     use crate::ledger::boundary::{Account, Cents, Posting, Transaction};
 
     fn balanced() -> Transaction {
@@ -147,6 +149,50 @@ mod tests {
             assert_eq!(f1, f2);
             assert_eq!(f1, f1.clone());
             assert_eq!(format!("{f1:?}"), "Flagged");
+        });
+    }
+
+    /// Every hop of the path is now an edge of the algebra that declares a capability
+    /// — `Submit`/`Void` as `Morphism`, `Validate` as `Branch`, `Post` as `Guarded` —
+    /// so the WHOLE multistate lifecycle's ceiling is the static join of its edges,
+    /// computed at compile time. An edge that smuggled in an effect would lift this
+    /// above `Pure` and the assertion would fail: the category bounds the path.
+    #[test]
+    fn the_whole_path_capability_is_the_join_of_its_edges() {
+        const PATH: Capability = <Submit as Morphism>::CAPABILITY
+            .join(<Validate as Branch>::CAPABILITY)
+            .join(<Post as Guarded>::CAPABILITY)
+            .join(<Void as Morphism>::CAPABILITY);
+        assert_eq!(PATH, Capability::Pure);
+    }
+
+    /// A multistate hop flowing as ONE categorical edge: `[Post, Reject] ∘ classify`
+    /// is `Entry<Submitted> -> Entry<Posted> + Entry<Rejected>` (the copairing of two
+    /// `Guarded` edges after a `Branch`). The brand routes the proof to the matching
+    /// guard — `Cleared` discharges `Post`, `Flagged` discharges `Reject` — so the
+    /// dispatch cannot cross the wires.
+    #[test]
+    fn classify_then_dispatch_is_one_branching_hop() {
+        fn dispatch<N>(
+            entry: &Named<N, Entry<Submitted>>,
+        ) -> Result<Entry<Posted>, Entry<Rejected>> {
+            match Validate.branch(entry) {
+                Ok(cleared) => Ok(Post.guard(entry, &cleared)),
+                Err(flagged) => Err(Reject.guard(entry, &flagged)),
+            }
+        }
+
+        with_seed(|seed| {
+            let (s_ok, s_bad) = seed.replicate();
+
+            let (ok, _u) = Submit.forward(&Entry::<Draft>::draft(balanced()));
+            let posted = dispatch(&s_ok.new_named(ok)).expect("a balanced entry posts");
+            assert_eq!(posted.tx(), &balanced());
+
+            let (bad, _u) = Submit.forward(&Entry::<Draft>::draft(unbalanced()));
+            let rejected =
+                dispatch(&s_bad.new_named(bad)).expect_err("an unbalanced entry rejects");
+            assert_eq!(rejected.tx(), &unbalanced());
         });
     }
 }

@@ -9,13 +9,16 @@
 //!
 //! `crate::boundary` defines the grammar: a boundary is a CATEGORY of value-object
 //! OBJECTS and value-operator MORPHISMS. The morphisms share one algebra in a few
-//! type-distinguished shapes — `Morphism` (a total edge between value objects) and
-//! `Construction` (the partial ENTRY edge from a raw primitive into a value object,
-//! so even "parse, don't validate" construction is probeable) — exercised by four
-//! probe flavours: `probe` (residual completeness), `commutes` (commutation),
-//! `coefficient_holds` (quantitative, reference-bearing), and `reconstructs` (the
-//! construction round-trip). Each module's `boundary.rs` is its only public surface;
-//! `build.rs` enforces the grammar and the inward "no raw primitive escapes" rule.
+//! type-distinguished shapes — `Morphism` (a total edge between value objects),
+//! `Construction` (the partial ENTRY edge from a raw primitive, so even "parse, don't
+//! validate" construction is probeable), `Branch` (a total edge into a coproduct —
+//! the kept-witness `classify`), and `Guarded` (a partial edge admitted by a witness,
+//! `Construction`'s sibling). Each declares a `CAPABILITY`, so a whole path's ceiling
+//! is the static join of its edges. Probes come in flavours: `probe` (residual
+//! completeness), `commutes` (commutation), `coefficient_holds` (quantitative,
+//! reference-bearing), and `reconstructs` / `construction_probe` (the entry-edge
+//! analogs). Each module's `boundary.rs` is its only public surface; `build.rs`
+//! enforces the grammar and the inward "no raw primitive escapes" rule.
 //!
 //! Modules:
 //!   - `ledger`  — lossy worked example (aggregation + residual + mutants);

@@ -19,24 +19,26 @@
 //!                          └─classify─▶ Flagged ─Reject─▶ Rejected ──Amend─────┘ (cycle)
 //! ```
 //!
-//! Four transition SHAPES appear, and only the first is a plain `Morphism`:
-//!   - REVERSIBLE (`Submit`, `Amend`, `Void`): data invariant, `Unit` residual, so
-//!     `backward` returns to the prior state — phantom transitions that round-trip
-//!     and probe like any morphism. These are now DECLARED, not hand-written: the
-//!     `StateMachine` descriptor `EntryFlow` plus the grammar's `transition!` macro
-//!     reduce each reversible edge to one line (its name and endpoints).
-//!   - BRANCHING (`Validate::classify`): one input, one of SEVERAL next states. It
-//!     is the GDP total-`classify` lesson AS a transition — the failure case is a
-//!     `Flagged` STATE-proof, not a discarded `None`.
-//!   - GUARDED (`Post`, `Reject`): each needs a name-branded proof for THIS entry
-//!     (`Cleared<N>` / `Flagged<N>`), so you cannot post an unbalanced entry NOR
-//!     reject a balanced one, and a proof for entry A will not discharge entry B.
+//! Three edge SHAPES appear, and EVERY one is now an edge of the boundary category
+//! (each declares a `CAPABILITY`, so the whole path's ceiling is the static join):
+//!   - REVERSIBLE `Morphism` (`Submit`, `Amend`, `Void`): data invariant, `Unit`
+//!     residual, so `backward` returns to the prior state. DECLARED, not hand-written:
+//!     the `StateMachine` descriptor `EntryFlow` plus the grammar's `transition!`
+//!     macro reduce each reversible edge to one line (its name and endpoints).
+//!   - `Branch` (`Validate`): a total morphism into a COPRODUCT — one input, one of
+//!     two next states, KEEPING the negative arm as a `Flagged` STATE-proof rather
+//!     than a discarded `None` (the GDP total-`classify`).
+//!   - `Guarded` (`Post`, `Reject`): a partial morphism admitted by a name-branded
+//!     proof for THIS entry (`Cleared<N>` / `Flagged<N>`) — the sibling of a
+//!     `Construction` (which mints its own witness); here the witness comes from the
+//!     `Branch`. You cannot post an unbalanced entry nor reject a balanced one, and a
+//!     proof for entry A will not discharge entry B.
 //!
 //! The illegal transitions are pinned negatively by `tests/compile_fail`.
 
 use core::marker::PhantomData;
 
-use crate::boundary::{sealed, StateMachine, Typestate, ValueObject};
+use crate::boundary::{sealed, Branch, Capability, Guarded, StateMachine, Typestate, ValueObject};
 use crate::gdp::Named;
 use crate::ledger::boundary::{Balance, Transaction};
 
@@ -193,34 +195,34 @@ impl<N> ValueObject for Flagged<N> {}
 
 // ===== the branching + guarded transitions ===============================
 
-/// The classifier — the BRANCH. `classify` performs the REAL balance check and
-/// mints the proof for whichever branch holds, branded with the entry's name. The
-/// branch carrier is a `Result<Cleared<N>, Flagged<N>>` — a std two-armed sum like
-/// `Morphism::backward`'s `Option`, so it needs no boundary citizen of its own —
-/// but unlike a bare `Option<Cleared>` it KEEPS the negative witness in the `Err`
-/// arm: rejection is a legitimate outcome whose proof is as load-bearing as the
-/// clearance's, the paper's total `classify` rather than a `Maybe`. (A statistical
-/// probe must never mint such a proof; this is an exact check, per the GDP
-/// discipline that a proof is only as true as its mint.)
+/// The classifier — a `Branch` edge (`Submitted -> Cleared + Flagged`). It performs
+/// the REAL balance check and mints the proof for whichever arm holds, branded with
+/// the entry's name. The coproduct carrier is `Result<Cleared<N>, Flagged<N>>` — a
+/// std two-armed sum, so it needs no boundary citizen of its own — but unlike a bare
+/// `Option<Cleared>` it KEEPS the negative witness in the `Err` arm: rejection is a
+/// legitimate outcome whose proof is as load-bearing as the clearance's, the paper's
+/// total `classify` rather than a `Maybe`. (A statistical probe must never mint such a
+/// proof; this is an exact check, per the GDP discipline that a proof is only as true
+/// as its mint.)
 pub struct Validate;
-/// The poster — a GUARDED transition `Submitted -> Posted`. Not a plain `Morphism`:
-/// its balance precondition cannot fit `In -> (Out, Residual)`, so it is supplied a
-/// `Cleared<N>` for the SAME name.
+/// The poster — a `Guarded` edge `Submitted -> Posted`. Its balance precondition is
+/// supplied as a `Cleared<N>` for the SAME name (the sibling of a `Construction`'s
+/// self-minted witness; here the witness comes from the `Validate` branch).
 pub struct Post;
-/// The rejecter — a GUARDED transition `Submitted -> Rejected`. Symmetric to
-/// `Post`: it needs a `Flagged<N>` for the same name, so a balanced entry (which
-/// has no `Flagged`) cannot be rejected.
+/// The rejecter — a `Guarded` edge `Submitted -> Rejected`. Symmetric to `Post`: it
+/// needs a `Flagged<N>` for the same name, so a balanced entry (which has no
+/// `Flagged`) cannot be rejected.
 pub struct Reject;
 crate::value_operator!(Validate, Post, Reject);
 
-impl Validate {
-    /// Classify a named, submitted entry, minting the proof for the branch that
-    /// holds. Both branches carry a proof — the unbalanced case is a `Flagged`
-    /// state-proof, never a silent `None`.
-    pub fn classify<N>(
-        &self,
-        entry: &Named<N, Entry<Submitted>>,
-    ) -> Result<Cleared<N>, Flagged<N>> {
+impl Branch for Validate {
+    // A read-only classification: no loss, no state, no effect.
+    const CAPABILITY: Capability = Capability::Pure;
+    type In<N> = Named<N, Entry<Submitted>>;
+    type Left<N> = Cleared<N>;
+    type Right<N> = Flagged<N>;
+
+    fn branch<N>(&self, entry: &Named<N, Entry<Submitted>>) -> Result<Cleared<N>, Flagged<N>> {
         let mut total = Balance::zero();
         for posting in entry.value().tx().postings() {
             total = total.add_cents(*posting.amount());
@@ -233,28 +235,64 @@ impl Validate {
     }
 }
 
+impl Validate {
+    /// Classify a named, submitted entry — the ergonomic name for the `Branch` edge.
+    /// Both arms carry a proof; the unbalanced case is a `Flagged` state-proof, never
+    /// a silent `None`.
+    pub fn classify<N>(
+        &self,
+        entry: &Named<N, Entry<Submitted>>,
+    ) -> Result<Cleared<N>, Flagged<N>> {
+        self.branch(entry)
+    }
+}
+
+impl Guarded for Post {
+    // A payload-preserving retag gated by a proof — pure.
+    const CAPABILITY: Capability = Capability::Pure;
+    type In<N> = Named<N, Entry<Submitted>>;
+    type Proof<N> = Cleared<N>;
+    type Out = Entry<Posted>;
+
+    fn guard<N>(&self, entry: &Named<N, Entry<Submitted>>, _proof: &Cleared<N>) -> Entry<Posted> {
+        Entry(entry.value().tx().clone(), PhantomData)
+    }
+}
+
 impl Post {
-    /// Commit a cleared, submitted entry to `Posted`. Requires a `Cleared<N>` for
-    /// the same name `N`: ORDER (typestate) AND the PRECONDITION (proof) are both
-    /// enforced at compile time, and there is no other constructor of `Entry<Posted>`.
+    /// Commit a cleared, submitted entry to `Posted` — the ergonomic name for the
+    /// `Guarded` edge. Requires a `Cleared<N>` for the same name `N`: ORDER (typestate)
+    /// AND the PRECONDITION (proof) are both enforced at compile time, and there is no
+    /// other constructor of `Entry<Posted>`.
     pub fn commit<N>(
         &self,
         entry: &Named<N, Entry<Submitted>>,
-        _proof: &Cleared<N>,
+        proof: &Cleared<N>,
     ) -> Entry<Posted> {
+        self.guard(entry, proof)
+    }
+}
+
+impl Guarded for Reject {
+    const CAPABILITY: Capability = Capability::Pure;
+    type In<N> = Named<N, Entry<Submitted>>;
+    type Proof<N> = Flagged<N>;
+    type Out = Entry<Rejected>;
+
+    fn guard<N>(&self, entry: &Named<N, Entry<Submitted>>, _proof: &Flagged<N>) -> Entry<Rejected> {
         Entry(entry.value().tx().clone(), PhantomData)
     }
 }
 
 impl Reject {
-    /// Move a flagged, submitted entry to `Rejected`. Requires a `Flagged<N>` for
-    /// the same name, so only an entry actually found unbalanced can be rejected —
-    /// the negative witness is what authorizes the transition.
+    /// Move a flagged, submitted entry to `Rejected` — the ergonomic name for the
+    /// `Guarded` edge. Requires a `Flagged<N>` for the same name, so only an entry
+    /// actually found unbalanced can be rejected — the negative witness authorizes it.
     pub fn apply<N>(
         &self,
         entry: &Named<N, Entry<Submitted>>,
-        _proof: &Flagged<N>,
+        proof: &Flagged<N>,
     ) -> Entry<Rejected> {
-        Entry(entry.value().tx().clone(), PhantomData)
+        self.guard(entry, proof)
     }
 }
