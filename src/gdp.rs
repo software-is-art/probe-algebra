@@ -20,7 +20,7 @@
 use core::marker::PhantomData;
 use std::collections::BTreeMap;
 
-use crate::boundary::Morphism;
+use crate::boundary::{Construction, Morphism};
 use crate::ledger::boundary::{AccountSummary, Balance, Round, Transaction};
 use crate::linear::boundary::{Quantity, Scale};
 
@@ -87,6 +87,49 @@ impl<N: Name> Seed<N> {
 /// unique to this call, so every name derived from the seed is unique.
 pub fn with_seed<R>(cont: impl for<'name> FnOnce(Seed<Life<'name>>) -> R) -> R {
     cont(Seed(PhantomData))
+}
+
+// ===== a REGION: arbitrarily many values under one brand ==================
+//
+// `Seed`/`new_named` brands ONE value (affine). `Paired` brands two. A REGION brands
+// ARBITRARILY MANY under one name — the n-ary generalization. All values stamped in a
+// region share its brand, so they recombine only with each other and a value from
+// another region does not unify. This is the GhostCell-style per-SCOPE brand, and it
+// is what lets every morphism STAMP the values flowing through it, whatever its shape:
+// `stamp` is generic over `Morphism`, so identity threads through the entire dataflow
+// graph (the orthogonal axis to `run`'s residual/invertibility).
+
+/// A reusable brand for a region — unlike the affine `Seed`, it stamps many values.
+pub struct Brander<N>(PhantomData<N>);
+impl<N> Brander<N> {
+    /// Stamp a value into this region (brand it with the region's name).
+    pub fn brand<T>(&self, value: T) -> Named<N, T> {
+        Named(value, PhantomData)
+    }
+}
+
+/// Enter a region with a fresh, unique brand (the `for<'name>` HRTB makes it unique to
+/// this call, exactly as `with_seed`). Every value stamped inside shares the brand.
+pub fn with_region<R>(cont: impl for<'name> FnOnce(Brander<Life<'name>>) -> R) -> R {
+    cont(Brander(PhantomData))
+}
+
+/// Run ANY morphism on a branded input and stamp its output into the SAME region, so
+/// identity flows along the dataflow through an edge of any shape. The morphism's
+/// residual/invertibility is `run`'s concern; this is the orthogonal IDENTITY axis.
+pub fn stamp<N, M: Morphism>(r: &Brander<N>, m: &M, input: &Named<N, M::In>) -> Named<N, M::Out> {
+    r.brand(m.forward(input.value()).0)
+}
+
+/// The entry-edge analog: parse a raw input and stamp the refined value into the
+/// region (`None` if the parse rejects). A whole pipeline can thus start from a raw
+/// primitive and carry one region brand all the way through.
+pub fn stamp_parse<N, C: Construction>(
+    r: &Brander<N>,
+    c: &C,
+    raw: &C::Raw,
+) -> Option<Named<N, C::Refined>> {
+    c.parse(raw).map(|(refined, _residual)| r.brand(refined))
 }
 
 // ===== a proof carried across a seam ======================================
@@ -480,6 +523,43 @@ mod tests {
                 unpermute(&order, &proof, &["a", "b", "c"]),
                 vec!["b", "c", "a"]
             );
+        });
+    }
+
+    /// A consumer requiring its inputs to be from the SAME region (one brand `N`) — a
+    /// value from another region would not unify, so cross-run mixing cannot be spelled.
+    fn same_run<N>(tx: &Named<N, Transaction>, summary: &Named<N, AccountSummary>) -> usize {
+        tx.value()
+            .postings()
+            .len()
+            .max(summary.value().totals().len())
+    }
+
+    /// A REGION stamps EVERY value flowing through the dataflow with one brand, no
+    /// matter the edge's shape: a raw list is stamped through the `ParseTransaction`
+    /// entry edge, then through two different morphisms (`Aggregate`, `Round`). The
+    /// THREE co-branded values (not a pair) all share the region, so same-run
+    /// provenance is demandable across the whole pipeline.
+    #[test]
+    fn a_region_stamps_values_through_morphisms_of_any_shape() {
+        use crate::ledger::boundary::{ParseTransaction, Round};
+        with_region(|r| {
+            let raw = vec![
+                Posting::new(Account::new("Cash").unwrap(), Cents::new(10_000).unwrap()),
+                Posting::new(
+                    Account::new("Revenue").unwrap(),
+                    Cents::new(-10_000).unwrap(),
+                ),
+            ];
+            let tx = stamp_parse(&r, &ParseTransaction, &raw).expect("non-empty input");
+            let summary = stamp(&r, &Aggregate, &tx);
+            let rounded = stamp(&r, &Round, &summary);
+            // each stamped value is the real morphism output (pins that `stamp` runs it)
+            assert_eq!(tx.value(), &Transaction::new(raw.clone()).unwrap());
+            assert_eq!(summary.value(), &Aggregate.forward(tx.value()).0);
+            assert_eq!(rounded.value(), &Round.forward(summary.value()).0);
+            // all three share the region brand — same-run provenance over the pipeline.
+            assert_eq!(same_run(&tx, &rounded), 2);
         });
     }
 }

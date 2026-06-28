@@ -169,7 +169,7 @@ are internal heuristics earlier runs showed to be equivalent (a `-`/`/`-invarian
 tie-break, an always-true demo helper) or a non-terminating `&&`/`||` swap —
 noise, not signal.
 
-On that surface a run kills **268 of 269** viable mutants. The single survivor is a
+On that surface a run kills **269 of 270** viable mutants. The single survivor is a
 provably **equivalent** mutant no test can kill: an empty-source declaration
 replaced by another empty (`SecretStamp` genuinely declares none), kept in scope
 and documented rather than excluded. Several survivors in the *first* runs revealed
@@ -378,7 +378,7 @@ module interior.
 | `src/pipeline/` | nested module: a parent boundary composing two private child boundaries into one narrowed operator |
 | `src/money/` + `boundary::Qty` | tagged-primitive substrate: one operator set per *kind* — a full-domain concept costs a tag (near-zero boilerplate), a partitioning one adds only a validity rule |
 | `src/capability.rs` | capability probe: classify a morphism on the chain and flag over-declaration |
-| `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam; brand-preserving `Named::map` (provenance through an edge) and the `InBounds` lookup coupling (a fresh-named index proven in bounds of its map — check-free indexing) |
+| `src/gdp.rs` | Ghosts-of-Departed-Proofs spike: unique type-level names carry a relational fact (balance) across a seam; brand-preserving `Named::map` (provenance through an edge); the `InBounds` lookup coupling (check-free indexing); `PermutationOf` (a proven permutation → total reconstruct); and an n-ary **region** (`Brander`/`with_region`) with generic `stamp`/`stamp_parse` so ANY morphism carries one brand through the dataflow — the identity axis, orthogonal to the residual axis |
 | `src/composition.rs` | composition validation: an interaction bug invisible to per-module probes, closed by a GDP shared-name seam contract — output⋈residual coupling for both morphisms (`aggregate_paired`/`reconcile`) and constructions (`parse_paired`/`reconstruct_paired`) |
 | `src/lifecycle/` | "interfaces are state machines": a non-linear typestate lifecycle (`Draft/Submitted/Posted/Rejected/Voided`) with reversible, branching, and guarded transitions; illegal moves pinned by `tests/compile_fail/` |
 | `src/select.rs` | kill-matrix set-cover selection |
