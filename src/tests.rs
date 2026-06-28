@@ -600,3 +600,90 @@ mod construction {
         );
     }
 }
+
+// ===== gradings: one monoid pattern, threaded by composition at three levels =====
+
+mod grading {
+    use crate::boundary::{Capability, Compose, Construction, Monoid, Morphism, Provenance, Then};
+    use crate::ledger::boundary::{Aggregate, ParseTransaction, Round};
+
+    /// `Provenance` obeys the monoid laws: `EMPTY` is the unit, `combine` concatenates.
+    #[test]
+    fn provenance_is_a_monoid() {
+        assert_eq!(Provenance::EMPTY.steps().len(), 0);
+        let p = Provenance::single("a").combine(Provenance::single("b"));
+        assert_eq!(p.steps(), &["a", "b"]);
+        assert_eq!(
+            Provenance::single("a").combine(Provenance::EMPTY),
+            Provenance::single("a")
+        );
+        assert_eq!(
+            Provenance::EMPTY.combine(Provenance::single("a")),
+            Provenance::single("a")
+        );
+    }
+
+    /// `Capability` is the same genus at the const level: `Pure` is the unit, `combine`
+    /// is the join.
+    #[test]
+    fn capability_is_a_monoid() {
+        assert_eq!(<Capability as Monoid>::EMPTY, Capability::Pure);
+        assert_eq!(
+            Capability::Lossy.combine(Capability::Pure),
+            Capability::Lossy
+        );
+        assert_eq!(
+            Capability::Pure.combine(Capability::Effectful),
+            Capability::Effectful
+        );
+    }
+
+    /// `Compose` is the single point that threads ALL THREE gradings, each at its level:
+    /// the type-level residual (it compiles as `Pair<_, _>`), the const-level capability
+    /// (a static join), and the value-level provenance (both stage labels, in order).
+    #[test]
+    fn compose_threads_all_three_gradings() {
+        let pipeline = Compose {
+            f: Aggregate,
+            g: Round,
+        };
+        // const level: Lossy ∨ Lossy = Lossy
+        assert_eq!(
+            <Compose<Aggregate, Round> as Morphism>::CAPABILITY,
+            Capability::Lossy
+        );
+        // value level: the lineage is both edges, in composition order
+        let steps = pipeline.provenance();
+        let steps = steps.steps();
+        assert_eq!(steps.len(), 2);
+        assert!(steps[0].contains("Aggregate"), "first step: {}", steps[0]);
+        assert!(steps[1].contains("Round"), "second step: {}", steps[1]);
+        // (the type-level residual grading is witnessed by this composite type-checking
+        // at all — its `Residual` is `Pair<MultiplicityResidual, RoundingResidual>`.)
+    }
+
+    /// The entry edge threads provenance across the construction→morphism seam too.
+    #[test]
+    fn then_threads_provenance_across_the_seam() {
+        let pipe = Then {
+            construct: ParseTransaction,
+            then: Aggregate,
+        };
+        let steps = pipe.provenance();
+        let steps = steps.steps();
+        assert_eq!(steps.len(), 2);
+        assert!(steps[0].contains("ParseTransaction"));
+        assert!(steps[1].contains("Aggregate"));
+    }
+
+    /// Metering is transparent to provenance: `Profiled` reports the inner edge's
+    /// lineage, not the wrapper's.
+    #[test]
+    fn profiled_is_transparent_to_provenance() {
+        use crate::boundary::Profiled;
+        assert_eq!(
+            Profiled::new(Aggregate).provenance(),
+            Aggregate.provenance()
+        );
+    }
+}
