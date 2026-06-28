@@ -362,6 +362,61 @@ impl Wrapped for crate::interp::boundary::Ident {
     }
 }
 
+// `Sampled` DERIVED FROM STRUCTURE: a composite's generator is built from its parts'
+// generators (`Value` from `Int`/`bool`, `Expr` recursively from its variants), exactly
+// as the value object is built from its fields. No bespoke strategy per type — the shape
+// supplies the distribution. This also breaks the generator/oracle coupling that masked
+// the `render` mutant: `Expr` is now generated structurally, INDEPENDENT of `render`.
+#[cfg(test)]
+impl Sampled for crate::interp::boundary::Int {
+    fn sampled() -> BoxedStrategy<Self> {
+        (0i64..=100_000)
+            .prop_map(|n| crate::interp::boundary::Int::new(n).unwrap())
+            .boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for crate::interp::boundary::Ident {
+    fn sampled() -> BoxedStrategy<Self> {
+        prop_oneof![Just("x"), Just("y"), Just("z")]
+            .prop_map(|s| crate::interp::boundary::Ident::new(s).unwrap())
+            .boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for crate::interp::boundary::Value {
+    fn sampled() -> BoxedStrategy<Self> {
+        use crate::interp::boundary::{Int, Value};
+        prop_oneof![
+            <Int as Sampled>::sampled().prop_map(Value::Int),
+            any::<bool>().prop_map(Value::Bool),
+        ]
+        .boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for crate::interp::boundary::Expr {
+    fn sampled() -> BoxedStrategy<Self> {
+        use crate::interp::boundary::{Expr, Ident, Op};
+        let leaf = prop_oneof![
+            (0i64..=999).prop_map(|n| Expr::int(n).unwrap()),
+            any::<bool>().prop_map(Expr::boolean),
+            <Ident as Sampled>::sampled().prop_map(Expr::var),
+        ];
+        leaf.prop_recursive(4, 48, 3, |inner| {
+            let op = prop_oneof![Just(Op::Add), Just(Op::Mul), Just(Op::Lt)];
+            prop_oneof![
+                (op, inner.clone(), inner.clone()).prop_map(|(o, a, b)| Expr::bin(o, a, b)),
+                (inner.clone(), inner.clone(), inner.clone())
+                    .prop_map(|(c, t, e)| Expr::cond(c, t, e)),
+                (<Ident as Sampled>::sampled(), inner.clone(), inner.clone())
+                    .prop_map(|(n, v, b)| Expr::bind(n, v, b)),
+            ]
+        })
+        .boxed()
+    }
+}
+
 // ===== the registry: register an edge; the laws are automatic =============
 
 #[cfg(test)]
@@ -376,33 +431,13 @@ mod registry {
     use crate::lifecycle::boundary::Submit;
     use crate::linear::boundary::{Double, Scale};
 
-    // A generator of well-formed `Expr` trees, and the CANONICAL source they render to —
-    // the input distribution for the interpreter's `Parse` round-trip. (`Parse::Raw` is
-    // `String`, whose `Sampled` is the ledger's account distribution, so `Parse` is
-    // registered with this explicit strategy rather than the argument-free `Sampled`.)
-    fn op() -> impl Strategy<Value = Op> {
-        prop_oneof![Just(Op::Add), Just(Op::Mul), Just(Op::Lt)]
-    }
-    fn ident() -> impl Strategy<Value = Ident> {
-        prop_oneof![Just("x"), Just("y"), Just("z")].prop_map(|s| Ident::new(s).unwrap())
-    }
-    fn expr() -> impl Strategy<Value = Expr> {
-        let leaf = prop_oneof![
-            (0i64..=999).prop_map(|n| Expr::int(n).unwrap()),
-            any::<bool>().prop_map(Expr::boolean),
-            ident().prop_map(Expr::var),
-        ];
-        leaf.prop_recursive(4, 48, 3, |inner| {
-            prop_oneof![
-                (op(), inner.clone(), inner.clone()).prop_map(|(o, a, b)| Expr::bin(o, a, b)),
-                (inner.clone(), inner.clone(), inner.clone())
-                    .prop_map(|(c, t, e)| Expr::cond(c, t, e)),
-                (ident(), inner.clone(), inner.clone()).prop_map(|(n, v, b)| Expr::bind(n, v, b)),
-            ]
-        })
-    }
+    // The canonical source distribution for the `Parse` round-trip: `Expr` is now
+    // self-sampling (its `Sampled` is DERIVED FROM STRUCTURE, module level), so the
+    // generator is just `Expr::sampled().render()` — no bespoke strategy. (`Parse::Raw`
+    // is `String`, whose `Sampled` is the ledger's account distribution, so `Parse` takes
+    // this explicit strategy rather than the argument-free one.)
     fn canonical_source() -> impl Strategy<Value = String> {
-        expr().prop_map(|e| e.render())
+        <Expr as Sampled>::sampled().prop_map(|e| e.render())
     }
 
     // ===== oracle-free RELATIONS over the interpreter's value frontier ======
@@ -577,6 +612,21 @@ mod registry {
     fn parse_is_probed() {
         construction_round_trips(&Parse, canonical_source());
         construction_capability_matches_residual::<Parse>();
+    }
+
+    /// `parse . render == id` on the AST, with the oracle being `Expr` EQUALITY rather
+    /// than string equality. This breaks the self-masking the experiment found: the
+    /// string round-trip law (`render . parse == id`) generated its input via `render`,
+    /// so a `render`-to-constant mutant masked itself; here `Expr` is generated
+    /// structurally and compared structurally, so that mutant is caught.
+    #[test]
+    fn parse_inverts_render() {
+        TestRunner::default()
+            .run(&<Expr as Sampled>::sampled(), |e| {
+                prop_assert_eq!(Parse.parse_str(&e.render()), Some(e.clone()));
+                Ok(())
+            })
+            .unwrap();
     }
 
     /// A `Metamorphic` relation, now an autogen law: `Scale` commutes with doubling on
