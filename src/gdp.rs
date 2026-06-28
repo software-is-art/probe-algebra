@@ -3,7 +3,7 @@
 //! phrased about a named value.
 //!
 //! Why it earns a place next to the value objects: a value object enforces
-//! SINGLE-VALUE invariants by construction (a `Cents` is in range). GDP carries
+//! SINGLE-VALUE invariants by construction (an `Int` is non-negative). GDP carries
 //! RELATIONAL / provenance facts the value's type cannot — here, "this specific
 //! transaction is balanced" — across a module seam, and TIES the proof to one
 //! named value so a proof minted for transaction A cannot be used with B.

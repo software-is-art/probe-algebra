@@ -7,17 +7,17 @@
 //!     data, never exposing mutable internals. The raw primitives are the one set of
 //!     objects OUTSIDE the domain — the source every construction flows out of.
 //!   - MORPHISMS — the value operators (the verbs): pure maps with no I/O and no
-//!     external mutation. They come in a few type-distinguished SHAPES that share one
-//!     algebra (residual, backward reconstruction, probe): `Morphism` (a total edge
-//!     between value objects), `Construction` (the PARTIAL entry edge from a raw
-//!     primitive into a value object — "parse, don't validate"), and transitions
-//!     (a `Morphism` declared by `transition!`).
+//!     external mutation, in a few type-distinguished SHAPES that share one algebra
+//!     (residual, backward reconstruction, probe): `Morphism` (a total edge between
+//!     value objects), `Construction` (the PARTIAL entry edge from a raw primitive —
+//!     "parse, don't validate"), `Branch` (a total edge into a coproduct), and
+//!     `Guarded` (a partial edge admitted by a witness).
 //!
 //! A TYPESTATE is not a third citizen but an INDEX that distinguishes objects:
-//! `Entry<Draft>` and `Entry<Submitted>` are two objects of the category — same data,
-//! different edges. This is why construction, long left as a native `fn new` OUTSIDE
-//! the algebra, is just another morphism: the edge INTO the domain, now probeable
-//! like every other.
+//! `Carried<M, Retained>` and `Carried<M, Discarded>` are two objects of the category —
+//! same data, different edges (only the first can `invert`). This is why construction,
+//! long left as a native `fn new` OUTSIDE the algebra, is just another morphism: the edge
+//! INTO the domain, now probeable like every other.
 //!
 //! This file defines that grammar once, for the whole crate:
 //!
@@ -48,17 +48,17 @@ pub(crate) mod sealed {
 pub trait ValueObject: Clone + PartialEq + Debug + sealed::Sealed {}
 
 /// Marker: an INDEX that distinguishes objects (a compile-time protocol position), so
-/// illegal sequencing fails to compile. Not an object itself — `Entry<Draft>` is the
-/// object; `Draft` is the index.
+/// illegal sequencing fails to compile. Not an object itself — `Carried<M, Retained>` is
+/// the object; `Retained` is the index.
 pub trait Typestate: sealed::Sealed {}
 
 /// Marker: a MORPHISM of the category — a pure operator-as-value over value objects
-/// (`Morphism`, `Construction`, transitions). (Free pure functions are morphisms too;
-/// this marks the operator-as-object case.)
+/// (`Morphism`, `Construction`, `Branch`, `Guarded`). (Free pure functions are morphisms
+/// too; this marks the operator-as-object case.)
 pub trait ValueOperator: sealed::Sealed {}
 
 /// Declarative sugar so per-module `boundary.rs` files read like a grammar:
-/// `value_object!(Cents, Account, Posting);`
+/// `value_object!(Int, Expr, Value);`
 #[macro_export]
 macro_rules! value_object {
     ($($t:ty),+ $(,)?) => {$(
@@ -76,7 +76,7 @@ macro_rules! typestate {
     )+};
 }
 
-/// `value_operator!(Aggregate, Round, Split);`
+/// `value_operator!(Parse, Check, Eval);`
 #[macro_export]
 macro_rules! value_operator {
     ($($t:ty),+ $(,)?) => {$(
@@ -88,8 +88,8 @@ macro_rules! value_operator {
 /// A NAME-BRANDED PROOF TOKEN realized as a value object: zero data, branded by a
 /// phantom `N`, so two tokens of the same name are the SAME fact and a token for name
 /// A cannot stand in for B. Its field is private to the defining module, so it is
-/// minted only there (a GDP "ghost" — `Cleared<N>` / `Flagged<N>`). This lifts the
-/// ~17 lines those hand-rolled each into one line: `proof_token!(/// doc... Cleared);`
+/// minted only there (a GDP "ghost" — `WellTyped<N>` / `IllTyped<N>`). This lifts the
+/// ~17 lines those hand-rolled each into one line: `proof_token!(/// doc... WellTyped);`
 #[macro_export]
 macro_rules! proof_token {
     ($(#[$meta:meta])* $name:ident) => {
@@ -451,8 +451,8 @@ impl<Edge, Rest: Lineage> Lineage for Step<Edge, Rest> {
 }
 
 /// A value tagged with its type-level lineage `Path`. Its TYPE records every edge it
-/// has crossed, so a consumer can demand a specific provenance (`Stamped<Step<Round,
-/// Step<Aggregate, Origin>>, _>`) and a value with the wrong history will not compile.
+/// has crossed, so a consumer can demand a specific provenance (`Stamped<Step<ConstFold,
+/// Origin>, _>`) and a value with the wrong history will not compile.
 /// `lineage()` reflects the path to a runtime `Provenance` when you want to read it.
 pub struct Stamped<Path, T>(T, PhantomData<Path>);
 
@@ -1406,130 +1406,6 @@ pub trait Guarded: ValueOperator {
     type Out<N>;
     /// Cross the edge, consuming the proof of admissibility; the output keeps `N`.
     fn guard<N>(&self, input: &Self::In<N>, proof: &Self::Proof<N>) -> Self::Out<N>;
-}
-
-// ===== state machines: a boundary as a transition graph ==================
-
-/// A boundary modelled EXPLICITLY as a state machine: one piece of `Data` carried
-/// at a phantom protocol state. `At<S>` is that data viewed at state `S`; `at` and
-/// `data` move it between states without re-implementing the move. Implement this
-/// once per machine, then declare each legal REVERSIBLE edge with `transition!`.
-///
-/// This generalizes what `ledger` does ad hoc over distinct value-object types
-/// (`Round: Summary -> Summary` cannot be applied to a `Transaction`): the type
-/// graph IS a state machine. `At<S>` is the tool for the one case a structural type
-/// change cannot express — the data shape is INVARIANT but the permitted next moves
-/// change (`At<Draft>` and `At<Submitted>` are the same `Data`, different edges).
-/// States are typestates; the carrier and the payload are value objects.
-pub trait StateMachine {
-    /// The payload carried through every state — invariant across transitions.
-    type Data: ValueObject;
-    /// The value object at protocol state `S`.
-    type At<S: Typestate>: ValueObject;
-    /// Seat the payload at state `S` — the only way to move it between states, so
-    /// every transition routes through here.
-    fn at<S: Typestate>(data: Self::Data) -> Self::At<S>;
-    /// Read the payload, regardless of state (the sanctioned cross-state accessor).
-    fn data<S: Typestate>(at: &Self::At<S>) -> &Self::Data;
-}
-
-/// Declare a named, REVERSIBLE transition `From => To` of a `StateMachine` as a
-/// `Morphism`. The body is mechanical — preserve the payload, retag the state,
-/// `Unit` residual, `Pure` — so this generates it, and the SOURCE carries only the
-/// irreducible content: the edge's name and endpoints. Writing this macro IS adding
-/// the edge to the graph; an edge you do not declare has no operator and cannot be
-/// called, so the legal transition graph stays exactly the set of declarations.
-///
-/// It is ONLY for free, data-preserving edges. A GUARDED transition (a precondition
-/// — see a GDP proof) or a BRANCHING one (several targets) is not mechanical — its
-/// content is the guard or the branch — so it stays hand-written.
-#[macro_export]
-macro_rules! transition {
-    ($(#[$meta:meta])* $name:ident : $machine:ty, $from:ty => $to:ty) => {
-        $(#[$meta])*
-        pub struct $name;
-        $crate::value_operator!($name);
-        impl $crate::boundary::Morphism for $name {
-            type Capability = $crate::boundary::Pure;
-            type In = <$machine as $crate::boundary::StateMachine>::At<$from>;
-            type Out = <$machine as $crate::boundary::StateMachine>::At<$to>;
-            type Residual = $crate::boundary::Unit;
-
-            fn forward(&self, input: &Self::In) -> (Self::Out, $crate::boundary::Unit) {
-                let payload = <$machine as $crate::boundary::StateMachine>::data(input).clone();
-                (
-                    <$machine as $crate::boundary::StateMachine>::at::<$to>(payload),
-                    $crate::boundary::Unit,
-                )
-            }
-
-            fn backward(
-                &self,
-                out: &Self::Out,
-                _residual: &$crate::boundary::Unit,
-            ) -> ::core::option::Option<Self::In> {
-                let payload = <$machine as $crate::boundary::StateMachine>::data(out).clone();
-                ::core::option::Option::Some(
-                    <$machine as $crate::boundary::StateMachine>::at::<$from>(payload),
-                )
-            }
-        }
-    };
-}
-
-/// Declare a state machine's CARRIER and descriptor in one line. The carrier is a
-/// phantom-indexed value object `Carrier<S>` over a `Payload`: its value semantics
-/// (`Clone`/`PartialEq`/`Eq`/`Debug`) delegate to the payload and the phantom `S` is
-/// erased, so the index costs nothing at runtime. The descriptor `Flow` is the
-/// `StateMachine` whose `at`/`data` wrap and read the payload — the only operations
-/// every `transition!` is built from.
-///
-/// This lifts the ~18 lines of identical carrier boilerplate each machine used to
-/// hand-write (see `Entry`/`Gauge`). Declaring a machine is then: `typestate!` (the
-/// states), `state_machine!` (carrier + descriptor), and one `transition!` per
-/// reversible edge — the carrier's field stays module-private, so the defining module
-/// still writes its own entry constructors and accessors.
-#[macro_export]
-macro_rules! state_machine {
-    ($flow:ident, $carrier:ident, $payload:ty) => {
-        pub struct $carrier<S>($payload, ::core::marker::PhantomData<S>);
-        impl<S> ::core::clone::Clone for $carrier<S> {
-            fn clone(&self) -> Self {
-                $carrier(
-                    ::core::clone::Clone::clone(&self.0),
-                    ::core::marker::PhantomData,
-                )
-            }
-        }
-        impl<S> ::core::cmp::PartialEq for $carrier<S> {
-            fn eq(&self, other: &Self) -> bool {
-                self.0 == other.0
-            }
-        }
-        impl<S> ::core::cmp::Eq for $carrier<S> {}
-        impl<S> ::core::fmt::Debug for $carrier<S> {
-            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                f.debug_tuple(stringify!($carrier)).field(&self.0).finish()
-            }
-        }
-        impl<S> $crate::boundary::sealed::Sealed for $carrier<S> {}
-        impl<S> $crate::boundary::ValueObject for $carrier<S> {}
-
-        pub struct $flow;
-        $crate::value_operator!($flow);
-        impl $crate::boundary::StateMachine for $flow {
-            type Data = $payload;
-            type At<S: $crate::boundary::Typestate> = $carrier<S>;
-
-            fn at<S: $crate::boundary::Typestate>(data: $payload) -> $carrier<S> {
-                $carrier(data, ::core::marker::PhantomData)
-            }
-
-            fn data<S: $crate::boundary::Typestate>(at: &$carrier<S>) -> &$payload {
-                &at.0
-            }
-        }
-    };
 }
 
 // ===== instrumentation: the morphism as the annotation point =============

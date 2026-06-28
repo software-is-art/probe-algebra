@@ -249,7 +249,7 @@ impl Bound {
 /// The raw source text as a value object — the lexer's substrate. Modelling it (rather
 /// than passing a bare `&str`) is what lets the scanner read characters through a
 /// sanctioned ACCESSOR (`at`) instead of a primitive-returning helper the inward rule
-/// would forbid: char handling is confined to this citizen, the same way a `Cents`
+/// would forbid: char handling is confined to this citizen, the same way `Int`
 /// confines `i64`. `pub(crate)` — it is internal substrate, not domain API.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Source(String);
@@ -340,7 +340,7 @@ crate::proof_token!(
 /// refinement — the canonical form carries no formatting to normalize away — so its
 /// residual is `Unit` and `reconstruct` (via `Expr::render`) recovers the source
 /// exactly. Modelled as a `Construction`, the parser is INSIDE the probe space: the
-/// autogen round-trip law (`laws::construction_laws`) certifies `render . parse == id`.
+/// autogen round-trip law (`laws::construction_round_trips`) certifies `render . parse == id`.
 pub struct Parse;
 /// The classifier: a `Branch` that type-checks a named expression into
 /// `WellTyped<N> + IllTyped<N>`, running real inference and keeping BOTH witnesses.

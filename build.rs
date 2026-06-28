@@ -1,7 +1,7 @@
 //! build.rs — enforces the boundary discipline at COMPILE time, in two tiers.
 //!
 //! A boundary is a CATEGORY: value-object OBJECTS and value-operator MORPHISMS
-//! (`Morphism` / `Construction` / transitions), with typestates as object INDICES.
+//! (`Morphism` / `Construction` / `Branch` / `Guarded`), with typestates as object INDICES.
 //!
 //! TIER 1 — domain boundary files (`src/<module>/boundary.rs`): the strict
 //! grammar. May contain ONLY value objects, typestates, and value operators —
@@ -173,9 +173,9 @@ fn check_fields(loc: &str, name: &str, fields: &Fields, out: &mut Vec<String>) {
     }
 
     // A raw primitive may appear ONLY as the lone field of a newtype WRAPPER
-    // (`Cents(i64)`, `Account(String)`). Anywhere else — nested in a collection,
+    // (`Int(i64)`, `Ident(String)`). Anywhere else — nested in a collection,
     // a named field, a multi-field tuple — it is a value object DOWNGRADED to a
-    // primitive (e.g. `BTreeMap<String, _>` instead of `BTreeMap<Account, _>`),
+    // primitive (e.g. `BTreeMap<String, _>` instead of `BTreeMap<Ident, _>`),
     // which is what forces re-parsing later. Make that impossible here.
     if is_primitive_newtype(fields) {
         return;
@@ -187,14 +187,14 @@ fn check_fields(loc: &str, name: &str, fields: &Fields, out: &mut Vec<String>) {
             out.push(format!(
                 "{loc}: `{name}` has a field containing raw `{prim}` — a value object must compose \
                  value objects; a primitive may appear only as the lone field of a newtype wrapper \
-                 (e.g. `Account(String)`), never downgraded inside one"
+                 (e.g. `Ident(String)`), never downgraded inside one"
             ));
         }
     }
 }
 
 /// A single-field tuple struct whose field is a bare primitive — the sanctioned
-/// wrapper (`Cents(i64)`, `Account(String)`). The one place a primitive is allowed.
+/// wrapper (`Int(i64)`, `Ident(String)`). The one place a primitive is allowed.
 fn is_primitive_newtype(fields: &Fields) -> bool {
     matches!(fields, Fields::Unnamed(u) if u.unnamed.len() == 1 && is_bare_primitive(&u.unnamed[0].ty))
 }
@@ -245,7 +245,7 @@ impl<'ast> Visit<'ast> for RuleAVisitor {
             if let Some(prim) = finder.offender {
                 self.hits.push(format!(
                     "{}: `{}` returns a raw `{}` — every domain primitive must be a value object \
-                     with its own operators (e.g. Account / Cents / Balance), never returned un-typed",
+                     with its own operators (e.g. Int / Ident), never returned un-typed",
                     self.loc, sig.ident, prim
                 ));
             }
@@ -262,7 +262,7 @@ const RAW_PRIMITIVES: &[&str] = &[
 ];
 
 /// Detects a raw primitive anywhere within a return type (incl. inside generics
-/// such as `BTreeMap<Account, i64>` and tuples, and `&str`).
+/// such as `BTreeMap<Ident, i64>` and tuples, and `&str`).
 struct PrimitiveFinder {
     offender: Option<String>,
 }

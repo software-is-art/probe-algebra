@@ -4,7 +4,7 @@
 //! This is the "relax inside" half of the experiment, taken to its limit: this file has
 //! **zero tests of its own**. Nothing here is exercised directly — the lexer, parser,
 //! type checker, and evaluator are reached ONLY transitively, through the boundary edges
-//! in `boundary.rs`: the autogen parse round-trip law (`laws::construction_laws`, which
+//! in `boundary.rs`: the autogen parse round-trip law (`laws::construction_round_trips`, which
 //! certifies `render . parse == id` over generated source) plus the behavioural tests of
 //! `Parse`/`Check`/`Eval` in `tests.rs`.
 //!
