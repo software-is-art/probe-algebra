@@ -431,3 +431,126 @@ mod state_machine {
         assert_eq!(Lower.forward(&hi).0, lo);
     }
 }
+
+// ===== construction: the smart constructor as the ENTRY morphism ===========
+
+/// Construction is the one edge the value-object pattern left OUTSIDE the probe
+/// space — a native `fn new`. Modelled as a `Construction` (the entry morphism
+/// `Raw -> (Refined, Residual)`), it is back inside it: the parse/`reconstruct`
+/// round-trip is probed exactly like a `Morphism`'s residual, and `new` now routes
+/// through the same parse the probe certifies.
+mod construction {
+    use crate::boundary::{reconstructs, Construction, Morphism, Then, Unit};
+    use crate::ledger::boundary::{
+        Account, Aggregate, Cents, ParseAccount, ParseAccountDropsPadding, ParseCents,
+        ParseTransaction, Posting, Transaction,
+    };
+
+    /// Three unbalanced-but-valid postings whose INPUT order differs from canonical
+    /// (sorted) order, so the permutation residual is non-trivial.
+    fn unsorted() -> Vec<Posting> {
+        vec![
+            Posting::new(Account::new("Revenue").unwrap(), Cents::new(-100).unwrap()),
+            Posting::new(Account::new("Cash").unwrap(), Cents::new(60).unwrap()),
+            Posting::new(Account::new("Cash").unwrap(), Cents::new(40).unwrap()),
+        ]
+    }
+
+    /// A PURE refinement: `ParseCents` only range-checks, so its residual is `Unit`
+    /// and it reconstructs the exact integer. `new` is the same parse, residual dropped.
+    #[test]
+    fn parse_cents_is_a_pure_refinement() {
+        let (refined, residual) = ParseCents.parse(&7).unwrap();
+        assert_eq!(residual, Unit);
+        assert_eq!(refined, Cents::new(7).unwrap()); // `new` routes through this parse
+        assert_eq!(reconstructs(&ParseCents, &7), Some(true));
+        // out of range: rejected, no round-trip obligation
+        assert_eq!(reconstructs(&ParseCents, &i64::MAX), None);
+        assert_eq!(Cents::new(i64::MAX), None);
+    }
+
+    /// A NORMALIZING parse: `ParseAccount` trims, and the residual is the leading/
+    /// trailing whitespace it removed — so it reconstructs the padded original.
+    #[test]
+    fn parse_account_residual_recovers_the_padding() {
+        let raw = " Cash ".to_string();
+        let (refined, residual) = ParseAccount.parse(&raw).unwrap();
+        assert_eq!(refined, Account::new("Cash").unwrap());
+        assert_eq!(residual.0.get(), " "); // leading
+        assert_eq!(residual.1.get(), " "); // trailing
+        assert_eq!(
+            ParseAccount.reconstruct(&refined, &residual),
+            Some(raw.clone())
+        );
+        assert_eq!(reconstructs(&ParseAccount, &raw), Some(true));
+        // a non-padded name still round-trips (empty affixes)...
+        assert_eq!(reconstructs(&ParseAccount, &"Cash".to_string()), Some(true));
+        // ...and both edges of the guard reject: all-whitespace and the empty string
+        // (the `start >= end` boundary — empty is the lone `start == end` case).
+        assert_eq!(reconstructs(&ParseAccount, &"   ".to_string()), None);
+        assert_eq!(reconstructs(&ParseAccount, &String::new()), None);
+    }
+
+    /// The buggy twin claims a `Unit` residual but actually normalizes — so it cannot
+    /// rebuild the padding, and the round-trip probe catches it on any padded input.
+    /// (The entry-edge analog of `AggregateDropsAmounts`.)
+    #[test]
+    fn dropping_the_padding_residual_is_caught() {
+        // type-identical to a pure refinement, yet it loses the padding:
+        assert_eq!(
+            reconstructs(&ParseAccountDropsPadding, &" Cash ".to_string()),
+            Some(false)
+        );
+        // on an UNpadded input there is nothing to lose, so it round-trips — exactly
+        // why a probe needs an input that exercises the dropped dimension.
+        assert_eq!(
+            reconstructs(&ParseAccountDropsPadding, &"Cash".to_string()),
+            Some(true)
+        );
+        // it still rejects the empty string (pins its own emptiness guard).
+        assert_eq!(
+            reconstructs(&ParseAccountDropsPadding, &String::new()),
+            None
+        );
+    }
+
+    /// A NORMALIZING parse: `ParseTransaction` sorts into canonical order, and the
+    /// residual is the permutation it discarded — so it restores the exact input Vec.
+    #[test]
+    fn parse_transaction_residual_recovers_the_order() {
+        let raw = unsorted();
+        let (refined, residual) = ParseTransaction.parse(&raw).unwrap();
+        // the refined value is canonically sorted (so value-equality is stable)...
+        assert_eq!(refined, Transaction::new(raw.clone()).unwrap());
+        assert_ne!(refined.postings(), raw.as_slice()); // ...and order really changed
+        assert_eq!(
+            ParseTransaction.reconstruct(&refined, &residual),
+            Some(raw.clone())
+        );
+        assert_eq!(reconstructs(&ParseTransaction, &raw), Some(true));
+        // empty is rejected
+        assert_eq!(reconstructs(&ParseTransaction, &Vec::new()), None);
+    }
+
+    /// The category claim, made concrete: a construction COMPOSES with a `Morphism`
+    /// into a single construction. `ParseTransaction` then `Aggregate` is one edge
+    /// from a raw `Vec<Posting>` to an `AccountSummary`, and the PRODUCT residual
+    /// (`Pair<PostingOrder, MultiplicityResidual>`) reconstructs the raw end-to-end.
+    #[test]
+    fn construction_composes_with_a_morphism() {
+        let pipeline = Then {
+            construct: ParseTransaction,
+            then: Aggregate,
+        };
+        let raw = unsorted();
+        let (summary, residual) = pipeline.parse(&raw).unwrap();
+        // the output is the morphism's own type, reached straight from the primitive
+        assert_eq!(
+            summary,
+            Aggregate.forward(&Transaction::new(raw.clone()).unwrap()).0
+        );
+        // and the whole primitive -> summary path inverts through the paired residual
+        assert_eq!(pipeline.reconstruct(&summary, &residual), Some(raw.clone()));
+        assert_eq!(reconstructs(&pipeline, &raw), Some(true));
+    }
+}

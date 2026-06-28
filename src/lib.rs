@@ -7,12 +7,15 @@
 //!   2. a transformation is checked by a LAYERED probe suite, because no single
 //!      check is highest-assurance (see `blindspot`).
 //!
-//! `crate::boundary` defines the grammar: the sealed markers and the generic
-//! `Morphism` algebra with three probe flavours — `probe` (residual completeness,
-//! structural), `commutes` (commutation, structural), and `coefficient_holds`
-//! (quantitative, reference-bearing). Each module's `boundary.rs` is its only
-//! public surface; `build.rs` enforces the grammar and the inward "no raw
-//! primitive escapes" rule.
+//! `crate::boundary` defines the grammar: a boundary is a CATEGORY of value-object
+//! OBJECTS and value-operator MORPHISMS. The morphisms share one algebra in a few
+//! type-distinguished shapes — `Morphism` (a total edge between value objects) and
+//! `Construction` (the partial ENTRY edge from a raw primitive into a value object,
+//! so even "parse, don't validate" construction is probeable) — exercised by four
+//! probe flavours: `probe` (residual completeness), `commutes` (commutation),
+//! `coefficient_holds` (quantitative, reference-bearing), and `reconstructs` (the
+//! construction round-trip). Each module's `boundary.rs` is its only public surface;
+//! `build.rs` enforces the grammar and the inward "no raw primitive escapes" rule.
 //!
 //! Modules:
 //!   - `ledger`  — lossy worked example (aggregation + residual + mutants);

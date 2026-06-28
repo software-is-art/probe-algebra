@@ -1,24 +1,37 @@
 //! boundary.rs — the GRAMMAR of module boundaries.
 //!
-//! A module's boundary is the ONLY surface it exposes to other modules, and it
-//! may contain exactly three kinds of citizen:
+//! A module's boundary is the ONLY surface it exposes, and it is a CATEGORY: just
+//! two things cross the seam —
 //!
-//!   1. VALUE OBJECTS — immutable, validated, value-equality data, built via smart constructors, never exposing mutable internals.
-//!   2. TYPESTATES — (near) zero-data types encoding WHERE in a protocol a value sits, so illegal sequencing fails to compile.
-//!   3. VALUE OPERATORS — pure morphisms over value objects (total or `-> Option`), with no I/O and no external mutation.
+//!   - OBJECTS — the value objects (the nouns): immutable, validated, value-equality
+//!     data, never exposing mutable internals. The raw primitives are the one set of
+//!     objects OUTSIDE the domain — the source every construction flows out of.
+//!   - MORPHISMS — the value operators (the verbs): pure maps with no I/O and no
+//!     external mutation. They come in a few type-distinguished SHAPES that share one
+//!     algebra (residual, backward reconstruction, probe): `Morphism` (a total edge
+//!     between value objects), `Construction` (the PARTIAL entry edge from a raw
+//!     primitive into a value object — "parse, don't validate"), and transitions
+//!     (a `Morphism` declared by `transition!`).
+//!
+//! A TYPESTATE is not a third citizen but an INDEX that distinguishes objects:
+//! `Entry<Draft>` and `Entry<Submitted>` are two objects of the category — same data,
+//! different edges. This is why construction, long left as a native `fn new` OUTSIDE
+//! the algebra, is just another morphism: the edge INTO the domain, now probeable
+//! like every other.
 //!
 //! This file defines that grammar once, for the whole crate:
 //!
-//!   - sealed marker traits `ValueObject` / `Typestate` / `ValueOperator`, so the
-//!     set of boundary citizens is CLOSED — no module can invent a fourth kind,
-//!     and no external crate can implement them; and
-//!   - the generic `Morphism` abstraction `In -> (Out, Residual)` with `backward`
-//!     reconstruction, the generic completeness `probe`, residual `Compose`-ition
-//!     (loss as a `Pair` value object), and the retention typestate that makes
-//!     "residual discarded => not invertible" a COMPILE error.
+//!   - sealed marker traits `ValueObject` / `Typestate` / `ValueOperator`, so the set
+//!     of citizens is CLOSED — no module can invent a new kind, and no external crate
+//!     can implement them; and
+//!   - the generic `Morphism` / `Construction` algebra `… -> (Out, Residual)` with
+//!     `backward` / `reconstruct`, the generic completeness probes (`probe`,
+//!     `reconstructs`), residual `Compose`-ition / `Then`-composition (loss as a
+//!     `Pair` value object), and the retention typestate that makes "residual
+//!     discarded => not invertible" a COMPILE error.
 //!
-//! Every per-module `boundary.rs` then re-exports only types carrying one of the
-//! three markers; non-boundary logic lives in private sibling modules.
+//! Every per-module `boundary.rs` then defines only types carrying one of the
+//! markers; non-boundary logic lives in private sibling modules.
 
 use core::fmt::Debug;
 use core::marker::PhantomData;
@@ -29,16 +42,19 @@ pub(crate) mod sealed {
     pub trait Sealed {}
 }
 
-// ===== the three boundary citizens =======================================
+// ===== the boundary citizens: objects and morphisms ======================
 
-/// Marker: an immutable, validated, value-equality datum.
+/// Marker: an OBJECT of the category — an immutable, validated, value-equality datum.
 pub trait ValueObject: Clone + PartialEq + Debug + sealed::Sealed {}
 
-/// Marker: a type encoding a position in a protocol (compile-time state).
+/// Marker: an INDEX that distinguishes objects (a compile-time protocol position), so
+/// illegal sequencing fails to compile. Not an object itself — `Entry<Draft>` is the
+/// object; `Draft` is the index.
 pub trait Typestate: sealed::Sealed {}
 
-/// Marker: a pure morphism-as-value over value objects. (Free pure functions are
-/// value operators too; this marks the operator-as-object case.)
+/// Marker: a MORPHISM of the category — a pure operator-as-value over value objects
+/// (`Morphism`, `Construction`, transitions). (Free pure functions are morphisms too;
+/// this marks the operator-as-object case.)
 pub trait ValueOperator: sealed::Sealed {}
 
 /// Declarative sugar so per-module `boundary.rs` files read like a grammar:
@@ -464,6 +480,91 @@ impl<M: Morphism> Carried<M, Retained> {
 pub fn run<M: Morphism>(m: &M, input: &M::In) -> Carried<M, Retained> {
     let (out, residual) = m.forward(input);
     Carried::new(out, residual)
+}
+
+// ===== constructions: the ENTRY edge into the value-object world =========
+
+/// A CONSTRUCTION: the entry edge of the value-object category — the morphism FROM
+/// a raw primitive INTO a value object ("parse, don't validate"). It is the sibling
+/// of `Morphism`, sharing its residual algebra, and differs only in the two ways the
+/// boundary makes special:
+///
+///   - its source `Raw` is OUTSIDE the domain, so it carries NO `ValueObject` bound —
+///     it is the one state that is not a citizen (a bare `i64`, `String`, `Vec<_>`); and
+///   - it is PARTIAL: a parse either ADMITS the raw (yielding the refined value plus
+///     the residual it normalized away) or REJECTS it (`None`) — the branching shape.
+///
+/// Keeping the `Residual` is what brings construction INTO the probe space and keeps
+/// it HONEST. A pure refinement (a range check) loses nothing, so its residual is
+/// `Unit`; a NORMALIZING parse (trimming, sorting) discards a real dimension, so its
+/// residual must witness exactly that dimension and `reconstruct` recovers the
+/// original raw. A constructor that silently normalizes therefore CANNOT claim a
+/// `Unit` residual: the `reconstructs` round-trip catches it, the same way `probe`
+/// catches an incomplete `Morphism` residual. This is why the value-object pattern's
+/// smart constructor was the one edge outside the testing space — modelled as a
+/// construction, it is back inside it.
+pub trait Construction: ValueOperator {
+    /// The raw input — a primitive, NOT a value object: the only state outside the
+    /// domain. Bounded just enough to probe the round-trip (equality + diagnostics).
+    type Raw: Clone + PartialEq + Debug;
+    /// The validated value object the parse produces.
+    type Refined: ValueObject;
+    /// What normalization discarded: `Unit` for a pure refinement, a real witness for
+    /// a normalizing parse.
+    type Residual: ValueObject;
+
+    /// Parse the raw input: `Some((refined, residual))` if admitted, `None` if rejected.
+    fn parse(&self, raw: &Self::Raw) -> Option<(Self::Refined, Self::Residual)>;
+
+    /// Reconstruct the raw input from the refined value plus the residual. It mirrors
+    /// `Morphism::backward` (an `Option`, so a construction composed onto a lossy
+    /// morphism can thread that morphism's `backward` through). For an admitted `x`, a
+    /// COMPLETE residual gives `reconstruct(parse(x)) == Some(x)`.
+    fn reconstruct(&self, refined: &Self::Refined, residual: &Self::Residual) -> Option<Self::Raw>;
+}
+
+/// Construction round-trip probe (the entry-edge analog of `probe`): a parse that
+/// ADMITS `raw` must reconstruct it EXACTLY from the refined value plus the residual.
+/// `Some(true)` iff it does, `Some(false)` if the residual is too lossy to recover the
+/// raw, `None` if the raw is rejected (no obligation). It catches a constructor that
+/// normalizes without a complete residual — including one that claims a `Unit`
+/// residual but silently drops a dimension.
+pub fn reconstructs<C: Construction>(c: &C, raw: &C::Raw) -> Option<bool> {
+    let (refined, residual) = c.parse(raw)?;
+    Some(c.reconstruct(&refined, &residual).as_ref() == Some(raw))
+}
+
+/// Sequential composition of a CONSTRUCTION with a `Morphism` — the proof that
+/// construction lives in the SAME category as every other edge. A path FROM a raw
+/// primitive, THROUGH the parse, THROUGH a value-object morphism, is itself one
+/// construction: its `Raw` is the parse's, its `Refined` is the morphism's output, and
+/// its residual is the PRODUCT of the two residuals, so the whole primitive-to-output
+/// path stays reconstructible. (The entry-edge twin of `Compose`.)
+pub struct Then<C, M> {
+    pub construct: C,
+    pub then: M,
+}
+impl<C, M> sealed::Sealed for Then<C, M> {}
+impl<C, M> ValueOperator for Then<C, M> {}
+impl<C, M> Construction for Then<C, M>
+where
+    C: Construction,
+    M: Morphism<In = C::Refined>,
+{
+    type Raw = C::Raw;
+    type Refined = M::Out;
+    type Residual = Pair<C::Residual, M::Residual>;
+
+    fn parse(&self, raw: &Self::Raw) -> Option<(Self::Refined, Self::Residual)> {
+        let (refined, rc) = self.construct.parse(raw)?;
+        let (out, rm) = self.then.forward(&refined);
+        Some((out, Pair(rc, rm)))
+    }
+
+    fn reconstruct(&self, out: &Self::Refined, residual: &Self::Residual) -> Option<Self::Raw> {
+        let refined = self.then.backward(out, &residual.1)?;
+        self.construct.reconstruct(&refined, &residual.0)
+    }
 }
 
 // ===== state machines: a boundary as a transition graph ==================

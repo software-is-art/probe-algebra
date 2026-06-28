@@ -26,17 +26,26 @@ This is a `lib` (the algebra + vocabulary) plus a thin `demo` bin.
 ## The boundary discipline
 
 A module's **`boundary.rs`** is the *only* surface it exposes to other modules,
-and it may contain exactly three kinds of citizen:
+and it is a **category**: just two things cross the seam — **objects** (the
+nouns) and **morphisms** (the verbs).
 
-| Citizen | What it is | Marker (sealed) |
-| --- | --- | --- |
-| **Value object** | immutable, validated-at-construction, value-equality data | `ValueObject` |
-| **Typestate** | a type encoding *where in a protocol* a value sits (compile-time) | `Typestate` |
-| **Value operator** | a pure morphism over value objects — no I/O, no external mutation | `ValueOperator` |
+| Citizen | Role in the category | What it is | Marker (sealed) |
+| --- | --- | --- | --- |
+| **Value object** | object | immutable, validated, value-equality data | `ValueObject` |
+| **Value operator** | morphism | a pure map over value objects — no I/O, no external mutation | `ValueOperator` |
+| **Typestate** | object *index* | distinguishes objects (`Entry<Draft>` vs `Entry<Submitted>`) so illegal sequencing fails to compile — not a citizen of its own | `Typestate` |
 
-The markers are **sealed**, so the set of boundary citizens is *closed*: no
-module can invent a fourth kind, and no external crate can mint one. Non-boundary
-logic (algorithms, mutation, primitives) lives in private sibling modules and is
+The morphisms share **one algebra** (residual, `backward`/`reconstruct`, probe)
+in a few type-distinguished **shapes**: a `Morphism` is a *total* edge between
+value objects; a **`Construction`** is the *partial* **entry edge** from a raw
+primitive *into* a value object (`u64 -> Cents` — "parse, don't validate"); a
+*transition* is a `Morphism` declared by `transition!`. Construction is the one
+edge the value-object pattern used to leave *outside* the algebra as a native
+`fn new`; modelled as a morphism, it is back inside the probe space (see below).
+
+The markers are **sealed**, so the set of citizens is *closed*: no module can
+invent a new kind, and no external crate can mint one. Non-boundary logic
+(algorithms, mutation, primitives) lives in private sibling modules and is
 unreachable across the boundary.
 
 ## The layered probe suite
@@ -49,6 +58,19 @@ the previous one is blind to:
 A value object's constructor enforces the structural rules (ranges,
 non-emptiness, …). Malformed outputs *cannot be constructed*, so a whole bug
 class is gone before any probe runs.
+
+Construction itself is now a **`Construction` morphism** `Raw -> (Refined,
+Residual)`, so it joins the probe space instead of sitting outside it as a native
+`fn new`. A *pure* refinement (a range check, `ParseCents`) loses nothing, so its
+residual is `Unit`; a *normalizing* parse keeps a real residual — `ParseAccount`
+keeps the trimmed whitespace, `ParseTransaction` keeps the discarded input
+ordering — and **`reconstructs`** (the construction round-trip probe) checks that
+residual recovers the exact raw input. A constructor that silently normalizes but
+claims a `Unit` residual (`ParseAccountDropsPadding`) is caught, exactly as
+`probe` catches an incomplete `Morphism` residual. Constructions compose with
+ordinary morphisms via `Then` (`ParseTransaction` then `Aggregate` is one edge
+from `Vec<Posting>` to a summary), so the whole primitive-to-output path stays
+reconstructible — the category closes over construction.
 
 ### Layer 2 — structural / variational probes (reference-FREE)
 Perturb the input and check the output *responds correctly*, without knowing the
@@ -108,7 +130,7 @@ Mutation testing certifies the suite and *discovers* missing checks. Wired with
 cargo mutants        # plant bugs; every survivor is a missing relation/DOF
 ```
 
-A full-crate run kills **248 of 252** viable mutants (a further one is a timeout —
+A full-crate run kills **281 of 285** viable mutants (a further one is a timeout —
 an infinite loop, effectively caught); the three survivors are provably
 **equivalent** mutants, which no test can kill: an empty-source declaration
 replaced by another empty (`SecretStamp` genuinely declares none), a monotonic
@@ -311,8 +333,8 @@ module interior.
 
 | Path | Role |
 | --- | --- |
-| `src/boundary.rs` | the grammar: sealed markers + `Morphism` / `probe` / `commutes` / `coefficient_holds` / `Compose` / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
-| `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants |
+| `src/boundary.rs` | the grammar (a boundary as a **category**): sealed markers + `Morphism` / `Construction` (the entry edge) + probes `probe` / `commutes` / `coefficient_holds` / `reconstructs` / `Compose` + `Then` composition / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
+| `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants; **constructions** (`ParseCents`/`ParseAccount`/`ParseTransaction`) bring the smart constructor into the probe space |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
 | `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |
 | `src/effect/` | effect as a pure morphism relative to a handler (read = input, write = residual) |

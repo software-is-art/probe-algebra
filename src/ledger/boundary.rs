@@ -1,9 +1,15 @@
 //! ledger::boundary — the ledger module's PUBLIC interface.
 //!
-//! By the boundary discipline this file contains ONLY:
-//!   - VALUE OBJECTS   : Cents, Account, Posting, Transaction, AccountSummary, MultiplicityResidual, RoundingResidual
-//!   - VALUE OPERATORS : Aggregate, AggregateDropsAmounts, Round (Morphisms); Split, NudgeCents (Perturbations)
-//!   - (typestates live in the universal `crate::boundary`)
+//! By the boundary discipline this file contains ONLY (a category of objects and
+//! morphisms):
+//!   - VALUE OBJECTS   : Cents, Account, Posting, Transaction, AccountSummary,
+//!                       MultiplicityResidual, RoundingResidual, Affix, Index,
+//!                       PostingOrder
+//!   - VALUE OPERATORS : Aggregate, AggregateDropsAmounts, Round (Morphisms);
+//!                       ParseCents, ParseAccount, ParseTransaction (Constructions —
+//!                       the ENTRY edge from a raw primitive); Split, NudgeCents
+//!                       (Perturbations)
+//!   - (typestates — object indices — live in the universal `crate::boundary`)
 //!
 //! Each value object carries the sealed `ValueObject` marker; each operator the
 //! sealed `ValueOperator` marker. The aggregation ALGORITHM is delegated to the
@@ -11,7 +17,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::boundary::{Capability, Metamorphic, Morphism, Perturbation};
+use crate::boundary::{Capability, Construction, Metamorphic, Morphism, Pair, Perturbation, Unit};
 
 // ===== value objects =====================================================
 
@@ -24,12 +30,10 @@ use crate::boundary::{Capability, Metamorphic, Morphism, Perturbation};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cents(i64);
 impl Cents {
+    /// Smart constructor — the ergonomic facade over the `ParseCents` construction,
+    /// which is the single source of truth (and what the round-trip probe certifies).
     pub fn new(c: i64) -> Option<Self> {
-        if c.abs() <= 100_000_000 {
-            Some(Cents(c))
-        } else {
-            None
-        }
+        ParseCents.parse(&c).map(|(v, _)| v)
     }
     pub fn get(&self) -> i64 {
         self.0
@@ -105,13 +109,11 @@ impl Balance {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Account(String);
 impl Account {
+    /// Smart constructor — the ergonomic facade over the `ParseAccount` construction.
+    /// `ParseAccount` ALSO captures the trimmed padding as its residual; `new` keeps
+    /// only the value object and drops that residual.
     pub fn new(s: &str) -> Option<Self> {
-        let t = s.trim();
-        if t.is_empty() {
-            None
-        } else {
-            Some(Account(t.to_string()))
-        }
+        ParseAccount.parse(&s.to_string()).map(|(v, _)| v)
     }
     pub fn get(&self) -> &str {
         &self.0
@@ -147,12 +149,11 @@ pub struct Transaction {
     postings: Vec<Posting>,
 }
 impl Transaction {
-    pub fn new(mut p: Vec<Posting>) -> Option<Self> {
-        if p.is_empty() {
-            return None;
-        }
-        p.sort();
-        Some(Transaction { postings: p })
+    /// Smart constructor — the ergonomic facade over the `ParseTransaction`
+    /// construction, which canonically sorts the postings and captures the discarded
+    /// input ordering as its residual. `new` keeps only the sorted value object.
+    pub fn new(p: Vec<Posting>) -> Option<Self> {
+        ParseTransaction.parse(&p).map(|(v, _)| v)
     }
     pub fn postings(&self) -> &[Posting] {
         &self.postings
@@ -206,6 +207,38 @@ pub struct RoundingResidual {
     leftover: BTreeMap<Account, Cents>,
 }
 
+/// A run of surrounding whitespace that `ParseAccount` trimmed off a name. Empty
+/// when the raw had none; otherwise it witnesses EXACTLY what normalization removed,
+/// so a leading + trailing pair reconstructs the original padded string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Affix(String);
+impl Affix {
+    pub fn get(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A position in the original, pre-canonicalization posting order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Index(usize);
+impl Index {
+    pub fn get(&self) -> usize {
+        self.0
+    }
+}
+
+/// RESIDUAL value object for `ParseTransaction`: the permutation it discarded when it
+/// sorted the postings into canonical order. `positions()[k]` is the ORIGINAL index
+/// of the k-th sorted posting, so the sorted transaction plus this residual restores
+/// the exact input ordering — the construction analog of `MultiplicityResidual`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PostingOrder(Vec<Index>);
+impl PostingOrder {
+    pub fn positions(&self) -> &[Index] {
+        &self.0
+    }
+}
+
 crate::value_object!(
     Cents,
     Balance,
@@ -215,6 +248,9 @@ crate::value_object!(
     AccountSummary,
     MultiplicityResidual,
     RoundingResidual,
+    Affix,
+    Index,
+    PostingOrder,
 );
 
 // ===== value operators: morphisms ========================================
@@ -417,5 +453,138 @@ impl<M: Morphism<In = AccountSummary>> Perturbation<M> for NudgeCents {
         let (_acct, balance) = totals.iter_mut().next()?;
         *balance = balance.add_cents(Cents::new(1).expect("one cent is valid"));
         Some(AccountSummary { totals })
+    }
+}
+
+// ===== value operators: constructions (the entry edge) ===================
+
+/// Parse a raw `i64` into `Cents`. A PURE REFINEMENT: it only range-checks, losing
+/// nothing, so its residual is `Unit` and `reconstruct` returns the exact integer.
+pub struct ParseCents;
+
+/// Parse a raw `String` into an `Account`, trimming surrounding whitespace. A
+/// NORMALIZING parse: the trimmed padding is a real lost dimension, so the residual
+/// is the leading/trailing `Affix` pair that `reconstruct` re-attaches.
+pub struct ParseAccount;
+
+/// A BUGGY parse, type-shaped like a PURE refinement (`Unit` residual) though it
+/// actually normalizes: it trims the name but keeps no witness, so it cannot rebuild
+/// the padding it removed. `reconstructs` catches it on any padded input — the
+/// entry-edge analog of `AggregateDropsAmounts`.
+pub struct ParseAccountDropsPadding;
+
+/// Parse a raw `Vec<Posting>` into a `Transaction`, sorting into canonical order. A
+/// NORMALIZING parse: sorting discards the input ordering, so the residual is the
+/// `PostingOrder` permutation that `reconstruct` un-applies.
+pub struct ParseTransaction;
+
+crate::value_operator!(
+    ParseCents,
+    ParseAccount,
+    ParseAccountDropsPadding,
+    ParseTransaction
+);
+
+impl Construction for ParseCents {
+    type Raw = i64;
+    type Refined = Cents;
+    type Residual = Unit;
+
+    fn parse(&self, raw: &i64) -> Option<(Cents, Unit)> {
+        if raw.abs() <= 100_000_000 {
+            Some((Cents(*raw), Unit))
+        } else {
+            None
+        }
+    }
+
+    fn reconstruct(&self, refined: &Cents, _residual: &Unit) -> Option<i64> {
+        Some(refined.0)
+    }
+}
+
+impl Construction for ParseAccount {
+    type Raw = String;
+    type Refined = Account;
+    type Residual = Pair<Affix, Affix>;
+
+    fn parse(&self, raw: &String) -> Option<(Account, Pair<Affix, Affix>)> {
+        // Byte lengths of the trimmed-away runs are valid char boundaries, since
+        // `trim_start`/`trim_end` return suffixes/prefixes of `raw`.
+        let start = raw.len() - raw.trim_start().len();
+        let end = raw.trim_end().len();
+        if start >= end {
+            return None; // empty or all-whitespace: no name to refine
+        }
+        let leading = raw[..start].to_string();
+        let core = raw[start..end].to_string();
+        let trailing = raw[end..].to_string();
+        Some((Account(core), Pair(Affix(leading), Affix(trailing))))
+    }
+
+    fn reconstruct(&self, refined: &Account, residual: &Pair<Affix, Affix>) -> Option<String> {
+        Some(format!(
+            "{}{}{}",
+            residual.0.get(),
+            refined.get(),
+            residual.1.get()
+        ))
+    }
+}
+
+impl Construction for ParseAccountDropsPadding {
+    type Raw = String;
+    type Refined = Account;
+    type Residual = Unit;
+
+    fn parse(&self, raw: &String) -> Option<(Account, Unit)> {
+        let core = raw.trim();
+        if core.is_empty() {
+            None
+        } else {
+            Some((Account(core.to_string()), Unit))
+        }
+    }
+
+    fn reconstruct(&self, refined: &Account, _residual: &Unit) -> Option<String> {
+        // BUG: with no residual, the best it can do is the trimmed name — the padding
+        // is gone, so a padded input cannot round-trip.
+        Some(refined.get().to_string())
+    }
+}
+
+impl Construction for ParseTransaction {
+    type Raw = Vec<Posting>;
+    type Refined = Transaction;
+    type Residual = PostingOrder;
+
+    fn parse(&self, raw: &Vec<Posting>) -> Option<(Transaction, PostingOrder)> {
+        if raw.is_empty() {
+            return None;
+        }
+        // Pair each posting with its original index, then sort by posting (stably).
+        let mut indexed: Vec<(usize, Posting)> = raw.iter().cloned().enumerate().collect();
+        indexed.sort_by(|a, b| a.1.cmp(&b.1));
+        let postings: Vec<Posting> = indexed.iter().map(|(_, p)| p.clone()).collect();
+        let order: Vec<Index> = indexed.iter().map(|(i, _)| Index(*i)).collect();
+        Some((Transaction { postings }, PostingOrder(order)))
+    }
+
+    fn reconstruct(&self, refined: &Transaction, residual: &PostingOrder) -> Option<Vec<Posting>> {
+        let sorted = refined.postings();
+        let order = residual.positions();
+        if sorted.len() != order.len() {
+            return None;
+        }
+        // `order[k]` is the original index of `sorted[k]`; place each back home.
+        let mut out: Vec<Option<Posting>> = vec![None; sorted.len()];
+        for (k, idx) in order.iter().enumerate() {
+            let pos = idx.get();
+            if pos >= out.len() {
+                return None;
+            }
+            out[pos] = Some(sorted[k].clone());
+        }
+        out.into_iter().collect()
     }
 }

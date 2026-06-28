@@ -13,9 +13,12 @@
 
 use proptest::prelude::*;
 
-use crate::boundary::{coefficient_holds, commutes, probe, run, Compose, Morphism};
+use crate::boundary::{
+    coefficient_holds, commutes, probe, reconstructs, run, Compose, Construction, Morphism,
+};
 use crate::ledger::boundary::{
-    Account, Aggregate, AggregateDropsAmounts, Balance, Cents, Posting, Round, Split, Transaction,
+    Account, Aggregate, AggregateDropsAmounts, Balance, Cents, ParseAccount, ParseCents,
+    ParseTransaction, Posting, Round, Split, Transaction,
 };
 use crate::linear::boundary::{Double, Quantity, Scale, UnitResponse};
 
@@ -69,6 +72,28 @@ fn tx_substantial() -> impl Strategy<Value = Transaction> {
 /// range, so the structural relations are exercised without overflow noise.
 fn quantity() -> impl Strategy<Value = Quantity> {
     (-50_000i64..=50_000i64).prop_map(|n| Quantity::new(n).expect("in range"))
+}
+
+/// A whitespace run (possibly empty) for padding raw account names.
+fn padding() -> impl Strategy<Value = String> {
+    prop_oneof![Just(""), Just(" "), Just("  "), Just("\t"), Just(" \t ")].prop_map(str::to_string)
+}
+
+/// A RAW (unparsed) account name with arbitrary surrounding padding — the input to
+/// the `ParseAccount` construction, before any trimming.
+fn padded_name() -> impl Strategy<Value = String> {
+    (
+        padding(),
+        prop_oneof!["Cash", "Revenue", "Tax", "Fees"],
+        padding(),
+    )
+        .prop_map(|(lead, name, trail)| format!("{lead}{name}{trail}"))
+}
+
+/// A RAW (unparsed) posting list in arbitrary order — the input to the
+/// `ParseTransaction` construction, before canonical sorting.
+fn raw_postings() -> impl Strategy<Value = Vec<Posting>> {
+    prop::collection::vec(posting(amount_broad()), 1..=8)
 }
 
 // ===== laws ==============================================================
@@ -184,6 +209,42 @@ proptest! {
         if let Some(sum) = a.checked_add(b) {
             prop_assert_eq!(sum.checked_sub(b), Some(a));
         }
+    }
+
+    // ----- construction (entry-edge) round-trip laws -----
+
+    /// `ParseCents` is a PURE refinement: every admitted integer round-trips through
+    /// the `Unit` residual, and the refined value matches the `Cents::new` facade.
+    #[test]
+    fn parse_cents_round_trips(c in -100_000_000i64..=100_000_000i64) {
+        prop_assert_eq!(reconstructs(&ParseCents, &c), Some(true));
+        prop_assert_eq!(ParseCents.parse(&c).map(|(v, _)| v), Cents::new(c));
+    }
+
+    /// `ParseCents` REJECTS out-of-range integers (no round-trip obligation), exactly
+    /// as the `Cents::new` facade does.
+    #[test]
+    fn parse_cents_rejects_out_of_range(c in prop_oneof![i64::MIN..=-100_000_001i64, 100_000_001i64..=i64::MAX]) {
+        prop_assert_eq!(reconstructs(&ParseCents, &c), None);
+        prop_assert_eq!(Cents::new(c), None);
+    }
+
+    /// `ParseAccount` is a NORMALIZING parse whose residual is COMPLETE: it recovers
+    /// the exact padded original for every padded name, and the refined value equals
+    /// the trimmed `Account::new` facade.
+    #[test]
+    fn parse_account_round_trips(raw in padded_name()) {
+        prop_assert_eq!(reconstructs(&ParseAccount, &raw), Some(true));
+        prop_assert_eq!(ParseAccount.parse(&raw).map(|(v, _)| v), Account::new(&raw));
+    }
+
+    /// `ParseTransaction` is a NORMALIZING parse whose permutation residual is
+    /// COMPLETE: it restores the exact input ordering for every raw posting list, and
+    /// the refined value equals the sorted `Transaction::new` facade.
+    #[test]
+    fn parse_transaction_round_trips(raw in raw_postings()) {
+        prop_assert_eq!(reconstructs(&ParseTransaction, &raw), Some(true));
+        prop_assert_eq!(ParseTransaction.parse(&raw).map(|(v, _)| v), Transaction::new(raw.clone()));
     }
 
     // ----- Balance operator laws -----

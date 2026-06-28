@@ -1,5 +1,8 @@
 //! build.rs — enforces the boundary discipline at COMPILE time, in two tiers.
 //!
+//! A boundary is a CATEGORY: value-object OBJECTS and value-operator MORPHISMS
+//! (`Morphism` / `Construction` / transitions), with typestates as object INDICES.
+//!
 //! TIER 1 — domain boundary files (`src/<module>/boundary.rs`): the strict
 //! grammar. May contain ONLY value objects, typestates, and value operators —
 //! no free functions, no global state, no submodules, no traits, no public
