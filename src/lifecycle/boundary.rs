@@ -22,9 +22,9 @@
 //! Four transition SHAPES appear, and only the first is a plain `Morphism`:
 //!   - REVERSIBLE (`Submit`, `Amend`, `Void`): data invariant, `Unit` residual, so
 //!     `backward` returns to the prior state — phantom transitions that round-trip
-//!     and probe like any morphism. (Note the three near-identical impls: that
-//!     repetition is the signal a first-class `Transition<From, To>` could be
-//!     lifted into the grammar.)
+//!     and probe like any morphism. These are now DECLARED, not hand-written: the
+//!     `StateMachine` descriptor `EntryFlow` plus the grammar's `transition!` macro
+//!     reduce each reversible edge to one line (its name and endpoints).
 //!   - BRANCHING (`Validate::classify`): one input, one of SEVERAL next states. It
 //!     is the GDP total-`classify` lesson AS a transition — the failure case is a
 //!     `Flagged` STATE-proof, not a discarded `None`.
@@ -36,7 +36,7 @@
 
 use core::marker::PhantomData;
 
-use crate::boundary::{sealed, Capability, Morphism, Unit, ValueObject};
+use crate::boundary::{sealed, StateMachine, Typestate, ValueObject};
 use crate::gdp::Named;
 use crate::ledger::boundary::{Balance, Transaction};
 
@@ -100,65 +100,46 @@ impl Entry<Draft> {
     }
 }
 
-// ===== reversible transitions (plain Morphisms; data invariant) ==========
+// ===== the state machine: reversible edges via the grammar ===============
 
-/// `Draft -> Submitted`. No precondition, `Unit` residual, so it is a reversible
-/// `Morphism`: `backward` returns to `Draft`. The typestate gates ORDER —
-/// `Submit::In` is `Entry<Draft>`, so an already-submitted entry has the wrong type.
-pub struct Submit;
-/// `Rejected -> Draft` (the CYCLE). Reopens a rejected entry for amendment; the
-/// only legal way back to `Draft`, and only from `Rejected`. Reversible like
-/// `Submit` — the same phantom-transition shape.
-pub struct Amend;
-/// `Posted -> Voided` (the REVERSAL). Reverses a committed entry; `backward`
-/// restores it to `Posted`, so the undo is the morphism's own inverse.
-pub struct Void;
-crate::value_operator!(Submit, Amend, Void);
+/// The state-machine descriptor for the entry lifecycle: the payload is a
+/// `Transaction`, carried as `Entry<S>`. A value-operator family — it supplies the
+/// pure retag (`at`) and read (`data`) operations every transition is built from,
+/// so the boundary declares its reversible edges with `transition!` instead of
+/// hand-writing each `Morphism`. The block of `transition!` declarations below IS
+/// the reversible part of the state graph, in code.
+pub struct EntryFlow;
+crate::value_operator!(EntryFlow);
+impl StateMachine for EntryFlow {
+    type Data = Transaction;
+    type At<S: Typestate> = Entry<S>;
 
-impl Morphism for Submit {
-    const CAPABILITY: Capability = Capability::Pure;
-    type In = Entry<Draft>;
-    type Out = Entry<Submitted>;
-    type Residual = Unit;
-
-    fn forward(&self, input: &Entry<Draft>) -> (Entry<Submitted>, Unit) {
-        (Entry(input.0.clone(), PhantomData), Unit)
+    fn at<S: Typestate>(data: Transaction) -> Entry<S> {
+        Entry(data, PhantomData)
     }
 
-    fn backward(&self, out: &Entry<Submitted>, _residual: &Unit) -> Option<Entry<Draft>> {
-        Some(Entry(out.0.clone(), PhantomData))
+    fn data<S: Typestate>(at: &Entry<S>) -> &Transaction {
+        &at.0
     }
 }
 
-impl Morphism for Amend {
-    const CAPABILITY: Capability = Capability::Pure;
-    type In = Entry<Rejected>;
-    type Out = Entry<Draft>;
-    type Residual = Unit;
-
-    fn forward(&self, input: &Entry<Rejected>) -> (Entry<Draft>, Unit) {
-        (Entry(input.0.clone(), PhantomData), Unit)
-    }
-
-    fn backward(&self, out: &Entry<Draft>, _residual: &Unit) -> Option<Entry<Rejected>> {
-        Some(Entry(out.0.clone(), PhantomData))
-    }
-}
-
-impl Morphism for Void {
-    const CAPABILITY: Capability = Capability::Pure;
-    type In = Entry<Posted>;
-    type Out = Entry<Voided>;
-    type Residual = Unit;
-
-    fn forward(&self, input: &Entry<Posted>) -> (Entry<Voided>, Unit) {
-        (Entry(input.0.clone(), PhantomData), Unit)
-    }
-
-    fn backward(&self, out: &Entry<Voided>, _residual: &Unit) -> Option<Entry<Posted>> {
-        Some(Entry(out.0.clone(), PhantomData))
-    }
-}
+crate::transition!(
+    /// `Draft -> Submitted`. No precondition and a `Unit` residual, so it is a
+    /// reversible `Morphism`: `backward` returns to `Draft`. The typestate gates
+    /// ORDER — `Submit::In` is `Entry<Draft>`, so an already-submitted entry has the
+    /// wrong type.
+    Submit: EntryFlow, Draft => Submitted
+);
+crate::transition!(
+    /// `Rejected -> Draft` — the CYCLE. The only legal way back to `Draft`, and only
+    /// from `Rejected`; reopens a rejected entry for amendment. Reversible.
+    Amend: EntryFlow, Rejected => Draft
+);
+crate::transition!(
+    /// `Posted -> Voided` — the REVERSAL. `backward` restores it to `Posted`, so the
+    /// undo is the morphism's own inverse.
+    Void: EntryFlow, Posted => Voided
+);
 
 // ===== the branch proofs (GDP tokens, realized as value objects) =========
 

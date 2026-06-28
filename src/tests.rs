@@ -355,3 +355,79 @@ mod instrumentation {
         assert!(has("progress:", "Round"));
     }
 }
+
+/// Generality check for the `StateMachine` grammar: a SECOND machine over a
+/// different carrier and payload reuses `transition!` to get reversible edges with
+/// no hand-written `Morphism`. If the abstraction were secretly tied to the ledger
+/// `Entry`, this would not compile — proving it before client code relies on it.
+mod state_machine {
+    use crate::boundary::{run, sealed, Morphism, StateMachine, Typestate, ValueObject};
+    use crate::ledger::boundary::Cents;
+    use core::marker::PhantomData;
+
+    // states of an unrelated little protocol
+    pub struct Lo;
+    pub struct Hi;
+    crate::typestate!(Lo, Hi);
+
+    // a different carrier: a `Cents` reading indexed by a phantom level
+    pub struct Gauge<S>(Cents, PhantomData<S>);
+    impl<S> Clone for Gauge<S> {
+        fn clone(&self) -> Self {
+            Gauge(self.0, PhantomData)
+        }
+    }
+    impl<S> PartialEq for Gauge<S> {
+        fn eq(&self, other: &Self) -> bool {
+            self.0 == other.0
+        }
+    }
+    impl<S> core::fmt::Debug for Gauge<S> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.debug_tuple("Gauge").field(&self.0).finish()
+        }
+    }
+    impl<S> sealed::Sealed for Gauge<S> {}
+    impl<S> ValueObject for Gauge<S> {}
+    impl Gauge<Lo> {
+        fn new(reading: Cents) -> Self {
+            Gauge(reading, PhantomData)
+        }
+    }
+    impl<S> Gauge<S> {
+        fn reading(&self) -> Cents {
+            self.0
+        }
+    }
+
+    // the machine descriptor + its reversible edges — the only per-machine cost
+    pub struct GaugeFlow;
+    crate::value_operator!(GaugeFlow);
+    impl StateMachine for GaugeFlow {
+        type Data = Cents;
+        type At<S: Typestate> = Gauge<S>;
+
+        fn at<S: Typestate>(data: Cents) -> Gauge<S> {
+            Gauge(data, PhantomData)
+        }
+
+        fn data<S: Typestate>(at: &Gauge<S>) -> &Cents {
+            &at.0
+        }
+    }
+    crate::transition!(Raise: GaugeFlow, Lo => Hi);
+    crate::transition!(Lower: GaugeFlow, Hi => Lo);
+
+    /// A different carrier (`Gauge` over `Cents`) gets reversible transitions purely
+    /// from the grammar: the payload survives the retag, and the move inverts.
+    #[test]
+    fn a_second_machine_reuses_the_grammar() {
+        let lo = Gauge::<Lo>::new(Cents::new(42).unwrap());
+        let raised = run(&Raise, &lo);
+        assert_eq!(raised.out().reading(), Cents::new(42).unwrap()); // payload preserved
+        assert_eq!(raised.invert(&Raise).unwrap(), lo); // reversible
+                                                        // `Lower` is the opposite edge; `Raise.forward(&hi)` would not type-check.
+        let hi = Raise.forward(&lo).0;
+        assert_eq!(Lower.forward(&hi).0, lo);
+    }
+}

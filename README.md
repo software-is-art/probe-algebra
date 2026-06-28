@@ -108,7 +108,7 @@ Mutation testing certifies the suite and *discovers* missing checks. Wired with
 cargo mutants        # plant bugs; every survivor is a missing relation/DOF
 ```
 
-A full-crate run kills **251 of 255** viable mutants (a further one is a timeout —
+A full-crate run kills **248 of 252** viable mutants (a further one is a timeout —
 an infinite loop, effectively caught); the three survivors are provably
 **equivalent** mutants, which no test can kill: an empty-source declaration
 replaced by another empty (`SecretStamp` genuinely declares none), a monotonic
@@ -256,8 +256,13 @@ Four transition **shapes** fall out, and only the first is a plain `Morphism`:
 - **Reversible** (`Submit`, `Amend`, `Void`): data invariant, `Unit` residual, so
   `backward` returns to the prior state — phantom transitions that round-trip and
   probe like any morphism. (`Amend` is the *cycle* `Rejected → Draft`; `Void` the
-  *reversal* `Posted → Voided`.) The three near-identical impls are the signal a
-  first-class `Transition<From, To>` could be lifted into the grammar.
+  *reversal* `Posted → Voided`.) These are **lifted into the grammar**: a machine
+  implements `StateMachine` once (`EntryFlow`: payload `Transaction`, carrier
+  `Entry<S>`), then each reversible edge is one line of the `transition!` macro —
+  its name and endpoints. Writing the macro *is* adding the edge; an undeclared
+  edge has no operator, so the legal graph stays exactly the set of declarations.
+  (A second machine in `src/tests.rs` reuses the same grammar over a different
+  carrier, proving it isn't `Entry`-specific.)
 - **Branching** (`Validate::classify`): one input, one of several next states. It
   is the GDP total-`classify` lesson *as a transition* — the failure case is a
   `Flagged<N>` state-proof carried in the `Err` arm, not a discarded `None`.
@@ -306,7 +311,7 @@ module interior.
 
 | Path | Role |
 | --- | --- |
-| `src/boundary.rs` | the grammar: sealed markers + `Morphism` / `probe` / `commutes` / `coefficient_holds` / `Compose` / retention typestate / `Qty` tagged primitives / `Meter`+`Profiled` instrumentation seam |
+| `src/boundary.rs` | the grammar: sealed markers + `Morphism` / `probe` / `commutes` / `coefficient_holds` / `Compose` / retention typestate / `Qty` tagged primitives / `StateMachine`+`transition!` (a boundary as a state graph) / `Meter`+`Profiled` instrumentation seam |
 | `src/ledger/` | lossy worked example: aggregation, its residual, and the complementary mutants |
 | `src/linear/` | lossless transport: the decisive coefficient bug (`Scale::skew`) |
 | `src/journal/` | state as loss: a state overwrite's residual is the prior it forgot |
