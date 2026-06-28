@@ -6,25 +6,39 @@
 //! and the capability law (`Pure => Unit residual`); being a `Construction` entails
 //! the parse round-trip (`reconstruct . parse == id`); registering a `Perturbation`
 //! entails the completeness probe. So a NEW edge gets its whole structural suite by
-//! REGISTERING it with an input strategy — one line in `registry` below — instead of
-//! re-writing the same assertions. The harnesses are generic over the trait, so they
-//! apply to every present and future edge uniformly.
+//! REGISTERING it in `registry` below — and, because each input type supplies its own
+//! generator via `Sampled`, the round-trip and capability laws take NO argument at
+//! all: `morphism_laws(&Aggregate);` is the entire registration. The harnesses are
+//! generic over the trait, so they apply to every present and future edge uniformly,
+//! and this `registry` SUBSUMES the per-edge round-trip/completeness demos that used
+//! to live in `properties.rs`/`tests.rs`.
 //!
-//! Division of labour with the rest of the suite: these are the STRUCTURAL laws that
-//! follow from the algebra; the DOMAIN laws that don't (commutativity, involution,
-//! the quantitative coefficient) stay hand-written in `properties.rs`. cargo-mutants
-//! then certifies these derived laws are strong and surfaces any degree of freedom a
-//! generated suite still misses (the generation+selection loop, `select`/`synth`).
+//! Division of labour: these are the STRUCTURAL laws that follow from the algebra; the
+//! DOMAIN laws that don't (commutativity, involution, the quantitative coefficient)
+//! and the NEGATIVE tests (a probe CATCHING a planted bug) stay hand-written.
+//! cargo-mutants then certifies these derived laws are strong and surfaces any degree
+//! of freedom a generated suite still misses (the `select`/`synth` loop).
 
 use core::any::TypeId;
 
 use proptest::prelude::*;
+use proptest::strategy::BoxedStrategy;
 use proptest::test_runner::TestRunner;
 
 use crate::boundary::{
     construction_probe, probe, reconstructs, run, Capability, Construction, Morphism, Perturbation,
     RawPerturbation, Unit,
 };
+
+// ===== Sampled: a type supplies its OWN canonical input distribution =======
+
+/// A canonical distribution of VALID inputs for a type, built through its own
+/// constructor — so a law harness needs no per-edge strategy argument: the input type
+/// supplies its generator. "Valid" means *admitted* (a parse accepts it, an operator's
+/// precondition holds), so the derived round-trip law is meaningful.
+pub trait Sampled: Sized + core::fmt::Debug {
+    fn sampled() -> BoxedStrategy<Self>;
+}
 
 // ===== the generic law harnesses (derived from the traits) ===============
 
@@ -102,7 +116,7 @@ where
 
 /// LAW (every `Morphism`): a `Pure` edge loses nothing, so its residual MUST be
 /// `Unit`. A static, input-free consistency check between the declared capability and
-/// the residual type — it catches a `Pure` declared on a lossy map (or vice versa).
+/// the residual type — it catches a `Pure` declared on a lossy map.
 pub fn capability_matches_residual<M: Morphism>()
 where
     M::Residual: 'static,
@@ -130,108 +144,186 @@ where
     }
 }
 
-// ===== the registry: one line per edge, the laws come for free ===========
+// ===== argument-free registration: the laws a TYPE already entails =========
+
+/// Every structural law a `Morphism` entails, with the input drawn from `Sampled` —
+/// so registering an edge is one argument-free call.
+pub fn morphism_laws<M>(m: &M)
+where
+    M: Morphism,
+    M::In: Sampled + 'static,
+    M::Residual: 'static,
+{
+    morphism_round_trips(m, M::In::sampled());
+    capability_matches_residual::<M>();
+}
+
+/// Every structural law a `Construction` entails, input drawn from `Sampled`.
+pub fn construction_laws<C>(c: &C)
+where
+    C: Construction,
+    C::Raw: Sampled + 'static,
+    C::Residual: 'static,
+{
+    construction_round_trips(c, C::Raw::sampled());
+    construction_capability_matches_residual::<C>();
+}
+
+// ===== the input distributions, each built through a smart constructor =====
+
+#[cfg(test)]
+use crate::ledger::boundary::{Account, AccountSummary, Aggregate, Cents, Posting, Transaction};
+#[cfg(test)]
+use crate::lifecycle::boundary::{Draft, Entry};
+#[cfg(test)]
+use crate::linear::boundary::Quantity;
+
+#[cfg(test)]
+fn account_raw() -> impl Strategy<Value = String> {
+    (
+        prop_oneof![Just(""), Just(" "), Just("  "), Just("\t")],
+        prop_oneof![Just("Cash"), Just("Revenue"), Just("Tax"), Just("Fees")],
+        prop_oneof![Just(""), Just(" "), Just("  ")],
+    )
+        .prop_map(|(lead, name, trail)| format!("{lead}{name}{trail}"))
+}
+
+#[cfg(test)]
+fn posting(amount: impl Strategy<Value = i64>) -> impl Strategy<Value = Posting> {
+    (
+        prop_oneof![Just("Cash"), Just("Revenue"), Just("Tax"), Just("Fees")],
+        amount,
+    )
+        .prop_map(|(a, m)| Posting::new(Account::new(a).unwrap(), Cents::new(m).unwrap()))
+}
+
+#[cfg(test)]
+fn postings(min: usize) -> impl Strategy<Value = Vec<Posting>> {
+    prop::collection::vec(posting(-1_000_000i64..=1_000_000), min..=8)
+}
+
+#[cfg(test)]
+fn transaction() -> impl Strategy<Value = Transaction> {
+    postings(1).prop_map(|p| Transaction::new(p).unwrap())
+}
+
+/// Substantial amounts so the `Split` perturbation actually moves multiplicity.
+#[cfg(test)]
+fn tx_substantial() -> impl Strategy<Value = Transaction> {
+    prop::collection::vec(
+        posting(prop_oneof![1_000i64..=1_000_000, -1_000_000i64..=-1_000]),
+        2..=8,
+    )
+    .prop_map(|p| Transaction::new(p).unwrap())
+}
+
+#[cfg(test)]
+impl Sampled for i64 {
+    fn sampled() -> BoxedStrategy<Self> {
+        (-100_000_000i64..=100_000_000).boxed() // the valid `Cents` range
+    }
+}
+#[cfg(test)]
+impl Sampled for String {
+    fn sampled() -> BoxedStrategy<Self> {
+        account_raw().boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for Vec<Posting> {
+    fn sampled() -> BoxedStrategy<Self> {
+        postings(1).boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for Transaction {
+    fn sampled() -> BoxedStrategy<Self> {
+        transaction().boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for AccountSummary {
+    fn sampled() -> BoxedStrategy<Self> {
+        transaction().prop_map(|t| Aggregate.forward(&t).0).boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for Quantity {
+    fn sampled() -> BoxedStrategy<Self> {
+        (-50_000i64..=50_000)
+            .prop_map(|n| Quantity::new(n).unwrap())
+            .boxed()
+    }
+}
+#[cfg(test)]
+impl Sampled for Entry<Draft> {
+    fn sampled() -> BoxedStrategy<Self> {
+        transaction().prop_map(Entry::<Draft>::draft).boxed()
+    }
+}
+
+// ===== the registry: register an edge; the laws are automatic =============
 
 #[cfg(test)]
 mod registry {
     use super::*;
+    use crate::boundary::Compose;
     use crate::ledger::boundary::{
-        Account, AccountSummary, Aggregate, Cents, PadName, ParseAccount, ParseCents,
-        ParseTransaction, Posting, ReorderPostings, Round, Split, Transaction,
+        PadName, ParseAccount, ParseCents, ParseTransaction, ReorderPostings, Round, Split,
     };
-    use crate::linear::boundary::{Quantity, Scale};
+    use crate::lifecycle::boundary::Submit;
+    use crate::linear::boundary::Scale;
 
-    // ----- strategies: the ONLY per-edge input. The laws themselves are derived. ---
-
-    fn cents_raw() -> impl Strategy<Value = i64> {
-        -100_000_000i64..=100_000_000
-    }
-
-    fn account_raw() -> impl Strategy<Value = String> {
-        (
-            prop_oneof![Just(""), Just(" "), Just("  "), Just("\t")],
-            prop_oneof!["Cash", "Revenue", "Tax", "Fees"],
-            prop_oneof![Just(""), Just(" "), Just("  ")],
-        )
-            .prop_map(|(lead, name, trail)| format!("{lead}{name}{trail}"))
-    }
-
-    fn posting(amount: impl Strategy<Value = i64>) -> impl Strategy<Value = Posting> {
-        (
-            prop_oneof![Just("Cash"), Just("Revenue"), Just("Tax"), Just("Fees")],
-            amount,
-        )
-            .prop_map(|(a, m)| Posting::new(Account::new(a).unwrap(), Cents::new(m).unwrap()))
-    }
-
-    fn postings(min: usize) -> impl Strategy<Value = Vec<Posting>> {
-        prop::collection::vec(posting(-1_000_000i64..=1_000_000), min..=8)
-    }
-
-    fn transaction() -> impl Strategy<Value = Transaction> {
-        postings(1).prop_map(|p| Transaction::new(p).unwrap())
-    }
-
-    /// Substantial amounts so the `Split` perturbation actually moves multiplicity.
-    fn tx_substantial() -> impl Strategy<Value = Transaction> {
-        prop::collection::vec(
-            posting(prop_oneof![1_000i64..=1_000_000, -1_000_000i64..=-1_000]),
-            2..=8,
-        )
-        .prop_map(|p| Transaction::new(p).unwrap())
-    }
-
-    fn summary() -> impl Strategy<Value = AccountSummary> {
-        transaction().prop_map(|t| Aggregate.forward(&t).0)
-    }
-
-    fn quantity() -> impl Strategy<Value = Quantity> {
-        (-50_000i64..=50_000).prop_map(|n| Quantity::new(n).unwrap())
-    }
-
-    // ----- each edge: register it; the laws are automatic (no assertions here) -----
+    // Each edge: ONE registration. Round-trip + capability are argument-free
+    // (`Sampled` supplies the input); completeness adds its matched perturbation.
 
     #[test]
     fn aggregate_is_probed() {
-        morphism_round_trips(&Aggregate, transaction());
+        morphism_laws(&Aggregate);
         morphism_residual_complete(&Aggregate, &Split, tx_substantial());
-        capability_matches_residual::<Aggregate>();
     }
 
     #[test]
     fn round_is_probed() {
-        morphism_round_trips(&Round, summary());
-        // NB: completeness needs a perturbation matched to the lost dimension. A bare
-        // +1c `NudgeCents` can cross a dollar boundary (changing the rounded output),
-        // so it is NOT complete over arbitrary summaries — the matched perturbation is
-        // the domain input, not auto-derivable. Round-trip + capability are.
-        capability_matches_residual::<Round>();
+        // Completeness needs a perturbation matched to the lost dimension; a bare +1c
+        // can cross a dollar boundary, so it is NOT complete over arbitrary summaries.
+        // Round-trip + capability are.
+        morphism_laws(&Round);
     }
 
     #[test]
     fn scale_is_probed() {
-        // A Pure, lossless transport: round-trip + the Pure => Unit-residual law.
-        morphism_round_trips(&Scale::honest(), quantity());
-        capability_matches_residual::<Scale>();
+        morphism_laws(&Scale::honest());
+        morphism_laws(&Scale::skew()); // a wrong coefficient still round-trips
+    }
+
+    #[test]
+    fn compose_is_probed() {
+        morphism_laws(&Compose {
+            f: Aggregate,
+            g: Round,
+        });
+    }
+
+    #[test]
+    fn submit_transition_is_probed() {
+        morphism_laws(&Submit); // a reversible typestate transition is just a Morphism
     }
 
     #[test]
     fn parse_cents_is_probed() {
-        construction_round_trips(&ParseCents, cents_raw());
-        construction_capability_matches_residual::<ParseCents>();
+        construction_laws(&ParseCents);
     }
 
     #[test]
     fn parse_account_is_probed() {
-        construction_round_trips(&ParseAccount, account_raw());
+        construction_laws(&ParseAccount);
         construction_residual_complete(&ParseAccount, &PadName, account_raw());
-        construction_capability_matches_residual::<ParseAccount>();
     }
 
     #[test]
     fn parse_transaction_is_probed() {
-        construction_round_trips(&ParseTransaction, postings(1));
+        construction_laws(&ParseTransaction);
         construction_residual_complete(&ParseTransaction, &ReorderPostings, postings(2));
-        construction_capability_matches_residual::<ParseTransaction>();
     }
 }

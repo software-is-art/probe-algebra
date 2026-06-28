@@ -4,22 +4,22 @@
 //! many generated transactions. Strategies build value objects ONLY through
 //! their public smart constructors, exactly as another module would.
 //!
-//! Two amount regimes:
-//!   - `tx_broad`        : any valid amount (incl. 0 and ±1) — for round-trip laws.
-//!   - `tx_substantial`  : |amount| in [1000, 1_000_000] — guarantees the Split
-//!     perturbation actually moves multiplicity and that a count-only residual
-//!     cannot masquerade as complete, so the completeness laws are exercised
-//!     without degenerate inputs muddying them.
+//! The STRUCTURAL round-trip/completeness laws are now derived generically in
+//! `laws.rs`; what remains here is the DOMAIN laws (operator arithmetic, the
+//! quantitative coefficient) and the NEGATIVE tests (a probe catching a planted
+//! bug). `tx_substantial` (|amount| in [1000, 1_000_000]) guarantees the `Split`
+//! perturbation actually moves multiplicity, so a count-only residual cannot
+//! masquerade as complete in the negative tests.
 
 use proptest::prelude::*;
 
 use crate::boundary::{
-    coefficient_holds, commutes, construction_probe, probe, reconstructs, run, Compose,
-    Construction, Morphism,
+    coefficient_holds, commutes, construction_probe, probe, reconstructs, run, Construction,
+    Morphism,
 };
 use crate::ledger::boundary::{
-    Account, Aggregate, AggregateDropsAmounts, Balance, Cents, PadName, ParseAccount,
-    ParseAccountDropsPadding, ParseCents, ParseTransaction, Posting, Round, Split, Transaction,
+    Account, AggregateDropsAmounts, Balance, Cents, PadName, ParseAccount,
+    ParseAccountDropsPadding, ParseCents, ParseTransaction, Posting, Split, Transaction,
 };
 use crate::linear::boundary::{Double, Quantity, Scale, UnitResponse};
 
@@ -61,10 +61,6 @@ fn transaction(amount: impl Strategy<Value = i64>) -> impl Strategy<Value = Tran
         .prop_map(|p| Transaction::new(p).expect("non-empty postings"))
 }
 
-fn tx_broad() -> impl Strategy<Value = Transaction> {
-    transaction(amount_broad())
-}
-
 fn tx_substantial() -> impl Strategy<Value = Transaction> {
     transaction(amount_substantial())
 }
@@ -100,44 +96,11 @@ fn raw_postings() -> impl Strategy<Value = Vec<Posting>> {
 // ===== laws ==============================================================
 
 proptest! {
-    /// An honest residual makes the lossy map invertible for EVERY input.
-    #[test]
-    fn honest_aggregate_round_trips(x in tx_broad()) {
-        let carried = run(&Aggregate, &x);
-        let recovered = carried.invert(&Aggregate);
-        prop_assert_eq!(recovered.as_ref(), Some(&x));
-    }
-
-    /// Rounding is invertible given its residual, for every summary.
-    #[test]
-    fn round_round_trips(x in tx_broad()) {
-        let summary = run(&Aggregate, &x).out().clone();
-        let (rounded, residual) = Round.forward(&summary);
-        let recovered = Round.backward(&rounded, &residual);
-        prop_assert_eq!(recovered.as_ref(), Some(&summary));
-    }
-
-    /// Composition: invertibility flows through TWO lossy stages when the paired
-    /// residual is retained.
-    #[test]
-    fn compose_round_trips(x in tx_broad()) {
-        let pipeline = Compose { f: Aggregate, g: Round };
-        let (out, res) = pipeline.forward(&x);
-        let recovered = pipeline.backward(&out, &res);
-        prop_assert_eq!(recovered.as_ref(), Some(&x));
-    }
-
-    /// The honest residual is COMPLETE under multiplicity perturbation, for
-    /// every non-degenerate input: output invariant, residual responds, and the
-    /// perturbed input round-trips.
-    #[test]
-    fn honest_probe_is_complete(x in tx_substantial()) {
-        let pr = probe(&Aggregate, &Split, &x).unwrap();
-        prop_assert!(pr.output_invariant, "summary moved under split: {:?}", x);
-        prop_assert!(pr.residual_responds, "residual ignored the split: {:?}", x);
-        prop_assert!(pr.round_trips, "honest residual failed to reconstruct: {:?}", x);
-        prop_assert!(pr.residual_complete());
-    }
+    // The structural round-trip + completeness laws for Aggregate, Round, and
+    // Compose now live GENERICALLY in `laws.rs` (`morphism_laws` /
+    // `morphism_residual_complete`, registered argument-free). Only the NEGATIVE
+    // tests (a probe CATCHING a planted bug) and the DOMAIN laws that don't follow
+    // from the algebra remain hand-written here.
 
     /// The probe CATCHES the count-only residual on every non-degenerate input:
     /// it cannot reconstruct, so it is never reported complete.
@@ -150,7 +113,8 @@ proptest! {
 
     /// The SAME bug is caught with NO perturbation operator at all — a plain
     /// round-trip over randomly generated inputs already witnesses the
-    /// incompleteness. (Contrast `honest_aggregate_round_trips`, which holds.)
+    /// incompleteness. (Contrast the honest `Aggregate`, whose generic round-trip law
+    /// in `laws.rs` holds.)
     #[test]
     fn buggy_fails_plain_round_trip(x in tx_substantial()) {
         let (summary, residual) = AggregateDropsAmounts.forward(&x);
@@ -212,13 +176,14 @@ proptest! {
         }
     }
 
-    // ----- construction (entry-edge) round-trip laws -----
+    // ----- construction delegation + rejection (the parts the generic laws don't cover) -----
+    // The construction round-trip + completeness laws are generic in `laws.rs`; what
+    // remains here is what's UNIQUE: that each `new` facade routes through its parse,
+    // and that rejection matches the facade.
 
-    /// `ParseCents` is a PURE refinement: every admitted integer round-trips through
-    /// the `Unit` residual, and the refined value matches the `Cents::new` facade.
+    /// `Cents::new` routes through `ParseCents` (single source of truth for the parse).
     #[test]
-    fn parse_cents_round_trips(c in -100_000_000i64..=100_000_000i64) {
-        prop_assert_eq!(reconstructs(&ParseCents, &c), Some(true));
+    fn parse_cents_delegates_to_new(c in -100_000_000i64..=100_000_000i64) {
         prop_assert_eq!(ParseCents.parse(&c).map(|(v, _)| v), Cents::new(c));
     }
 
@@ -230,34 +195,16 @@ proptest! {
         prop_assert_eq!(Cents::new(c), None);
     }
 
-    /// `ParseAccount` is a NORMALIZING parse whose residual is COMPLETE: it recovers
-    /// the exact padded original for every padded name, and the refined value equals
-    /// the trimmed `Account::new` facade.
+    /// `Account::new` routes through `ParseAccount` (the refined value matches the facade).
     #[test]
-    fn parse_account_round_trips(raw in padded_name()) {
-        prop_assert_eq!(reconstructs(&ParseAccount, &raw), Some(true));
+    fn parse_account_delegates_to_new(raw in padded_name()) {
         prop_assert_eq!(ParseAccount.parse(&raw).map(|(v, _)| v), Account::new(&raw));
     }
 
-    /// `ParseTransaction` is a NORMALIZING parse whose permutation residual is
-    /// COMPLETE: it restores the exact input ordering for every raw posting list, and
-    /// the refined value equals the sorted `Transaction::new` facade.
+    /// `Transaction::new` routes through `ParseTransaction`.
     #[test]
-    fn parse_transaction_round_trips(raw in raw_postings()) {
-        prop_assert_eq!(reconstructs(&ParseTransaction, &raw), Some(true));
+    fn parse_transaction_delegates_to_new(raw in raw_postings()) {
         prop_assert_eq!(ParseTransaction.parse(&raw).map(|(v, _)| v), Transaction::new(raw.clone()));
-    }
-
-    /// `ParseAccount`'s residual is COMPLETE under the completeness probe for every
-    /// padded name: the account is invariant, the affix residual responds, and the
-    /// padded raw round-trips.
-    #[test]
-    fn parse_account_probe_is_complete(raw in padded_name()) {
-        let pr = construction_probe(&ParseAccount, &PadName, &raw).unwrap();
-        prop_assert!(pr.output_invariant, "trim must normalize the pad away: {:?}", raw);
-        prop_assert!(pr.residual_responds, "residual ignored the pad: {:?}", raw);
-        prop_assert!(pr.round_trips, "padded raw failed to reconstruct: {:?}", raw);
-        prop_assert!(pr.residual_complete());
     }
 
     /// The completeness probe CATCHES the lying `Unit`-residual parse on every padded
