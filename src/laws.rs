@@ -184,6 +184,34 @@ where
         .unwrap();
 }
 
+// ===== per-shape laws: the structure each edge SHAPE already entails =======
+
+/// A value object that WRAPS a raw value with a smart constructor and an accessor. The
+/// law: `unwrap . wrap == id` for every valid raw — an accessor must report the real
+/// contents, not a constant. The autogen analog of the hand-written "accessors return
+/// the wrapped value" test, and the cheapest kill for an accessor-to-constant mutant.
+pub trait Wrapped: Sized {
+    type Raw: Clone + PartialEq + core::fmt::Debug;
+    fn wrap(raw: Self::Raw) -> Option<Self>;
+    fn unwrap(&self) -> Self::Raw;
+}
+
+/// LAW (every `Wrapped`): an admitted raw round-trips through construct-then-read.
+pub fn accessor_round_trips<T, S>(strategy: S)
+where
+    T: Wrapped,
+    S: Strategy<Value = T::Raw>,
+{
+    TestRunner::default()
+        .run(&strategy, |raw| {
+            if let Some(v) = T::wrap(raw.clone()) {
+                prop_assert_eq!(v.unwrap(), raw, "accessor does not report the wrapped value");
+            }
+            Ok(())
+        })
+        .unwrap();
+}
+
 // ===== argument-free registration: the laws a TYPE already entails =========
 
 /// Every structural law a `Morphism` entails, with the input drawn from `Sampled` —
@@ -302,6 +330,38 @@ impl Sampled for Entry<Draft> {
     }
 }
 
+// `Wrapped` impls: each value object's raw round-trip, for `accessor_round_trips`.
+#[cfg(test)]
+impl Wrapped for Cents {
+    type Raw = i64;
+    fn wrap(raw: i64) -> Option<Self> {
+        Cents::new(raw)
+    }
+    fn unwrap(&self) -> i64 {
+        self.get()
+    }
+}
+#[cfg(test)]
+impl Wrapped for crate::interp::boundary::Int {
+    type Raw = i64;
+    fn wrap(raw: i64) -> Option<Self> {
+        crate::interp::boundary::Int::new(raw)
+    }
+    fn unwrap(&self) -> i64 {
+        self.get()
+    }
+}
+#[cfg(test)]
+impl Wrapped for crate::interp::boundary::Ident {
+    type Raw = String;
+    fn wrap(raw: String) -> Option<Self> {
+        crate::interp::boundary::Ident::new(&raw)
+    }
+    fn unwrap(&self) -> String {
+        self.get().to_string()
+    }
+}
+
 // ===== the registry: register an edge; the laws are automatic =============
 
 #[cfg(test)]
@@ -309,7 +369,7 @@ mod registry {
     use super::*;
     use crate::boundary::Compose;
     use crate::gdp::with_seed;
-    use crate::interp::boundary::{Check, Eval, Expr, Ident, Op, Parse, Value};
+    use crate::interp::boundary::{Check, Eval, Expr, Ident, Int, Op, Parse, Value};
     use crate::ledger::boundary::{
         PadName, ParseAccount, ParseCents, ParseTransaction, ReorderPostings, Round, Split,
     };
@@ -546,5 +606,69 @@ mod registry {
         assert_eq!(relation_holds(&AddIdentity, &five), Some(true));
         assert_eq!(relation_holds(&Increment, &five), Some(false));
         assert_eq!(relation_holds(&NeverApplies, &five), None);
+    }
+
+    // ===== per-shape laws: SHAPES the autogen registry didn't cover before ====
+
+    /// Every `Wrapped` value object's accessor reports the real contents
+    /// (`unwrap . wrap == id`) — the shape law that kills an accessor-to-constant mutant.
+    #[test]
+    fn accessors_round_trip() {
+        accessor_round_trips::<Cents, _>(-100_000i64..=100_000);
+        accessor_round_trips::<Int, _>(0i64..=100_000);
+        accessor_round_trips::<Ident, _>(prop_oneof![
+            Just("x".to_string()),
+            Just("foo".to_string()),
+            Just("bar".to_string())
+        ]);
+    }
+
+    /// CATEGORY law: composition is associative — `(f;g);h` and `f;(g;h)` produce the
+    /// same output for every input. (`Compose` was only round-trip tested before.)
+    #[test]
+    fn compose_is_associative() {
+        TestRunner::default()
+            .run(&transaction(), |x| {
+                let left = Compose {
+                    f: Compose {
+                        f: Aggregate,
+                        g: Round,
+                    },
+                    g: Round,
+                };
+                let right = Compose {
+                    f: Aggregate,
+                    g: Compose {
+                        f: Round,
+                        g: Round,
+                    },
+                };
+                prop_assert_eq!(left.forward(&x).0, right.forward(&x).0);
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    /// BRANCH/GUARDED coherence: a value the `Branch` (`Check`) admits, the `Guarded`
+    /// edge (`Eval`) can process — the witness makes evaluation TOTAL. The first autogen
+    /// law over these two shapes (the registry was Morphism/Construction only).
+    #[test]
+    fn branch_guard_coheres() {
+        TestRunner::default()
+            .run(&int_expr(), |e| {
+                let evaluable = with_seed(|seed| {
+                    let named = seed.new_named(e.clone());
+                    match Check.classify(&named) {
+                        Ok(proof) => {
+                            Eval.run(&named, &proof);
+                            true
+                        }
+                        Err(_) => false,
+                    }
+                });
+                prop_assert!(evaluable, "an int expr must type-check and evaluate: {:?}", e);
+                Ok(())
+            })
+            .unwrap();
     }
 }
