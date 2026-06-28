@@ -5,7 +5,7 @@
 
 use core::marker::PhantomData;
 
-use probe_algebra::lifecycle::boundary::Cleared;
+use boundary_algebra::lifecycle::boundary::Cleared;
 
 struct Name;
 

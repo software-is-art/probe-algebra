@@ -1,16 +1,16 @@
 //! demo — exercises the morphological-testing algebra THROUGH the published
-//! boundaries. The bin can name only `probe_algebra::boundary` (the grammar) and
-//! `probe_algebra::ledger::boundary` (the ledger's interface); the aggregation
+//! boundaries. The bin can name only `boundary_algebra::boundary` (the grammar) and
+//! `boundary_algebra::ledger::boundary` (the ledger's interface); the aggregation
 //! algorithm in `ledger::internal` is private and unreachable from here.
 
-use probe_algebra::boundary::{
+use boundary_algebra::boundary::{
     coefficient_holds, commutes, probe, run, Compose, Morphism, ProbeResult,
 };
-use probe_algebra::ledger::boundary::{
+use boundary_algebra::ledger::boundary::{
     Account, Aggregate, AggregateDropsAmounts, AggregateOffsetsTotals, Cents, DoublePostings,
     NudgeCents, Posting, Round, Split, Transaction,
 };
-use probe_algebra::linear::boundary::{Double, Quantity, Scale, UnitResponse};
+use boundary_algebra::linear::boundary::{Double, Quantity, Scale, UnitResponse};
 
 fn banner(s: &str) {
     println!("\n=== {} ===", s);

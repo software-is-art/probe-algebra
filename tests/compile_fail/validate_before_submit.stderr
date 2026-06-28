@@ -11,8 +11,8 @@ error[E0308]: mismatched types
    |     pub fn new_named<T>(self, value: T) -> Named<impl Name, T> {
    |                                                  --------- the found opaque type
    |
-   = note: expected reference `&Named<_, probe_algebra::lifecycle::boundary::Entry<Submitted>>`
-              found reference `&Named<impl Name, probe_algebra::lifecycle::boundary::Entry<Draft>>`
+   = note: expected reference `&Named<_, boundary_algebra::lifecycle::boundary::Entry<Submitted>>`
+              found reference `&Named<impl Name, boundary_algebra::lifecycle::boundary::Entry<Draft>>`
 note: method defined here
   --> src/lifecycle/boundary.rs
    |

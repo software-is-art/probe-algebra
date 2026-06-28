@@ -1,19 +1,19 @@
-error[E0277]: the trait bound `OutputOnlyCheck: CoversAll<DofCons<probe_algebra::synth::Totals, DofCons<probe_algebra::synth::Multiplicity, DofNil>>>` is not satisfied
+error[E0277]: the trait bound `OutputOnlyCheck: CoversAll<DofCons<boundary_algebra::synth::Totals, DofCons<boundary_algebra::synth::Multiplicity, DofNil>>>` is not satisfied
   --> tests/compile_fail/incomplete_probe_rejected.rs:16:37
    |
 16 |     require_complete::<Transaction, _>(&OutputOnlyCheck);
-   |                                     ^ the trait `Covers<probe_algebra::synth::Multiplicity>` is not implemented for `OutputOnlyCheck`
+   |                                     ^ the trait `Covers<boundary_algebra::synth::Multiplicity>` is not implemented for `OutputOnlyCheck`
    |
-help: the trait `Covers<probe_algebra::synth::Multiplicity>` is not implemented for `OutputOnlyCheck`
-      but trait `Covers<probe_algebra::synth::Totals>` is implemented for it
+help: the trait `Covers<boundary_algebra::synth::Multiplicity>` is not implemented for `OutputOnlyCheck`
+      but trait `Covers<boundary_algebra::synth::Totals>` is implemented for it
   --> src/synth.rs
    |
    | impl Covers<Totals> for OutputOnlyCheck {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = help: for that trait implementation, expected `probe_algebra::synth::Totals`, found `probe_algebra::synth::Multiplicity`
-   = note: required for `OutputOnlyCheck` to implement `CoversAll<DofCons<probe_algebra::synth::Multiplicity, DofNil>>`
+   = help: for that trait implementation, expected `boundary_algebra::synth::Totals`, found `boundary_algebra::synth::Multiplicity`
+   = note: required for `OutputOnlyCheck` to implement `CoversAll<DofCons<boundary_algebra::synth::Multiplicity, DofNil>>`
    = note: 1 redundant requirement hidden
-   = note: required for `OutputOnlyCheck` to implement `CoversAll<DofCons<probe_algebra::synth::Totals, DofCons<probe_algebra::synth::Multiplicity, DofNil>>>`
+   = note: required for `OutputOnlyCheck` to implement `CoversAll<DofCons<boundary_algebra::synth::Totals, DofCons<boundary_algebra::synth::Multiplicity, DofNil>>>`
 note: required by a bound in `require_complete`
   --> src/boundary.rs
    |

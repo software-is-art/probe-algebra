@@ -1,4 +1,4 @@
-# probe-algebra
+# boundary-algebra
 
 Experiments with constraining bugs by making module boundaries an algebra, and
 catching bugs in (especially AI-generated) transformation code by **generating

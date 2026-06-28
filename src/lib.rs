@@ -1,4 +1,4 @@
-//! probe-algebra — a boundary-discipline experiment plus a layered probe method.
+//! boundary-algebra — a boundary-discipline experiment plus a layered probe method.
 //!
 //! Two constraints under study together:
 //!   1. every primitive that means something in the domain is a VALUE OBJECT and

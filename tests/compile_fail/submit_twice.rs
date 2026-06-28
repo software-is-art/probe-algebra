@@ -2,9 +2,9 @@
 //! `Submit::In` is `Entry<Draft>`, so a second submission has the wrong input type.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use probe_algebra::boundary::Morphism;
-use probe_algebra::ledger::boundary::{Account, Cents, Posting, Transaction};
-use probe_algebra::lifecycle::boundary::{Draft, Entry, Submit};
+use boundary_algebra::boundary::Morphism;
+use boundary_algebra::ledger::boundary::{Account, Cents, Posting, Transaction};
+use boundary_algebra::lifecycle::boundary::{Draft, Entry, Submit};
 
 fn tx() -> Transaction {
     Transaction::new(vec![

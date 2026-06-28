@@ -4,8 +4,8 @@
 //! before any test runs, the capability twin of the typestate/provenance contracts.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use probe_algebra::boundary::run_pure;
-use probe_algebra::ledger::boundary::{Account, Aggregate, Cents, Posting, Transaction};
+use boundary_algebra::boundary::run_pure;
+use boundary_algebra::ledger::boundary::{Account, Aggregate, Cents, Posting, Transaction};
 
 fn tx() -> Transaction {
     Transaction::new(vec![

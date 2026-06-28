@@ -2,9 +2,9 @@
 //! `Void::forward` wants `&Entry<Posted>`; a draft is in the wrong state.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use probe_algebra::boundary::Morphism;
-use probe_algebra::ledger::boundary::{Account, Cents, Posting, Transaction};
-use probe_algebra::lifecycle::boundary::{Draft, Entry, Void};
+use boundary_algebra::boundary::Morphism;
+use boundary_algebra::ledger::boundary::{Account, Cents, Posting, Transaction};
+use boundary_algebra::lifecycle::boundary::{Draft, Entry, Void};
 
 fn tx() -> Transaction {
     Transaction::new(vec![

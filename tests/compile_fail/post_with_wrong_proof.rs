@@ -4,10 +4,10 @@
 //! seam — the precondition is tied to a specific value, not to the type in general.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use probe_algebra::boundary::Morphism;
-use probe_algebra::gdp::with_seed;
-use probe_algebra::ledger::boundary::{Account, Cents, Posting, Transaction};
-use probe_algebra::lifecycle::boundary::{Draft, Entry, Post, Submit, Validate};
+use boundary_algebra::boundary::Morphism;
+use boundary_algebra::gdp::with_seed;
+use boundary_algebra::ledger::boundary::{Account, Cents, Posting, Transaction};
+use boundary_algebra::lifecycle::boundary::{Draft, Entry, Post, Submit, Validate};
 
 fn tx() -> Transaction {
     Transaction::new(vec![

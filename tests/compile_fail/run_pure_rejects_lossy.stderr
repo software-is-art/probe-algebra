@@ -1,8 +1,8 @@
-error[E0277]: the trait bound `probe_algebra::boundary::Lossy: AtMost<probe_algebra::boundary::Pure>` is not satisfied
+error[E0277]: the trait bound `boundary_algebra::boundary::Lossy: AtMost<boundary_algebra::boundary::Pure>` is not satisfied
   --> tests/compile_fail/run_pure_rejects_lossy.rs:20:22
    |
 20 |     let _ = run_pure(&Aggregate, &tx());
-   |             -------- ^^^^^^^^^^ the trait `AtMost<probe_algebra::boundary::Pure>` is not implemented for `probe_algebra::boundary::Lossy`
+   |             -------- ^^^^^^^^^^ the trait `AtMost<boundary_algebra::boundary::Pure>` is not implemented for `boundary_algebra::boundary::Lossy`
    |             |
    |             required by a bound introduced by this call
    |
@@ -10,11 +10,11 @@ help: the following other types implement trait `AtMost<Ceiling>`
   --> src/boundary.rs
    |
    | impl AtMost<Lossy> for Lossy {}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `probe_algebra::boundary::Lossy` implements `AtMost<probe_algebra::boundary::Lossy>`
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `boundary_algebra::boundary::Lossy` implements `AtMost<boundary_algebra::boundary::Lossy>`
    | impl AtMost<Stateful> for Lossy {}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `probe_algebra::boundary::Lossy` implements `AtMost<probe_algebra::boundary::Stateful>`
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `boundary_algebra::boundary::Lossy` implements `AtMost<boundary_algebra::boundary::Stateful>`
    | impl AtMost<Effectful> for Lossy {}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `probe_algebra::boundary::Lossy` implements `AtMost<probe_algebra::boundary::Effectful>`
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `boundary_algebra::boundary::Lossy` implements `AtMost<boundary_algebra::boundary::Effectful>`
 note: required by a bound in `run_pure`
   --> src/boundary.rs
    |

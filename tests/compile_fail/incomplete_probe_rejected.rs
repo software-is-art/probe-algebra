@@ -6,9 +6,9 @@
 //! agent gets for an incomplete probe before any test runs.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use probe_algebra::boundary::require_complete;
-use probe_algebra::ledger::boundary::Transaction;
-use probe_algebra::synth::OutputOnlyCheck;
+use boundary_algebra::boundary::require_complete;
+use boundary_algebra::ledger::boundary::Transaction;
+use boundary_algebra::synth::OutputOnlyCheck;
 
 fn main() {
     // `OutputOnlyCheck` is blind to multiplicity, so it does not `CoversAll` the DOFs

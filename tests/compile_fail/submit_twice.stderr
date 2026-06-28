@@ -6,8 +6,8 @@ error[E0308]: mismatched types
    |                         |
    |                         arguments to this method are incorrect
    |
-   = note: expected reference `&probe_algebra::lifecycle::boundary::Entry<Draft>`
-              found reference `&probe_algebra::lifecycle::boundary::Entry<Submitted>`
+   = note: expected reference `&boundary_algebra::lifecycle::boundary::Entry<Draft>`
+              found reference `&boundary_algebra::lifecycle::boundary::Entry<Submitted>`
 note: method defined here
   --> src/boundary.rs
    |
