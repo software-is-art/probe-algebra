@@ -116,6 +116,64 @@ macro_rules! proof_token {
     };
 }
 
+/// Declare an oracle-free `Relation` (see below) as a grammar line instead of a ~12-line
+/// `impl`. Every value relation has the same skeleton — `apply` a map, `vary` the input,
+/// `rewrite` the expected output — and only the three closures carry information; the
+/// `type In`/`type Out`/method ceremony is pure repetition. This lifts that the way
+/// `proof_token!` lifts a branded witness:
+///
+/// ```ignore
+/// relation!(/// additive identity
+///     AddIdentity: Expr => Value,
+///     apply = |x| eval_closed(x),
+///     vary = |x| Some(Expr::bin(Op::Add, x.clone(), Expr::int(0).unwrap())),
+///     rewrite = |y| y);
+/// ```
+///
+/// (Used only for the laws REGISTRY's relations. Edge SHAPES — the morphism families — are
+/// deliberately left explicit: their per-variant `type Capability` and residual choices are
+/// the demonstration, not boilerplate, so a macro would hide exactly what they teach.)
+#[macro_export]
+macro_rules! relation {
+    ($(#[$meta:meta])* $name:ident : $In:ty => $Out:ty,
+     apply = $apply:expr, vary = $vary:expr, rewrite = $rewrite:expr $(,)?) => {
+        $(#[$meta])*
+        struct $name;
+        impl $crate::boundary::Relation for $name {
+            type In = $In;
+            type Out = $Out;
+            fn apply(&self, x: &$In) -> $Out {
+                ($apply)(x)
+            }
+            fn vary(&self, x: &$In) -> ::core::option::Option<$In> {
+                ($vary)(x)
+            }
+            fn rewrite(&self, y: $Out) -> $Out {
+                ($rewrite)(y)
+            }
+        }
+    };
+}
+
+/// Declare an edge's TIME and SPACE cost carriers in one grammar line instead of two
+/// near-identical `Graded` impls. The carrier types are the information; the
+/// `impl Graded<TimeCost>/<SpaceCost>` scaffolding is repetition:
+///
+/// ```ignore
+/// cost!(Eval, time = CostCons<Nodes, S<Z>, CostNil>, space = CostCons<Depth, S<Z>, CostNil>);
+/// ```
+#[macro_export]
+macro_rules! cost {
+    ($edge:ty, time = $time:ty, space = $space:ty $(,)?) => {
+        impl $crate::boundary::Graded<$crate::boundary::TimeCost> for $edge {
+            type Carrier = $time;
+        }
+        impl $crate::boundary::Graded<$crate::boundary::SpaceCost> for $edge {
+            type Carrier = $space;
+        }
+    };
+}
+
 // ===== generic morphism: In -> (Out, Residual) ===========================
 
 /// The capability chain, least-power first: each step adds a capability and

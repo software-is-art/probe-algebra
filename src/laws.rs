@@ -216,78 +216,39 @@ mod registry {
         })
     }
 
-    // oracle-free RELATIONS over the interpreter's value frontier.
-    struct AddIdentity;
-    impl Relation for AddIdentity {
-        type In = Expr;
-        type Out = Value;
-        fn apply(&self, x: &Expr) -> Value {
-            eval_closed(x)
-        }
-        fn vary(&self, x: &Expr) -> Option<Expr> {
-            Some(Expr::bin(Op::Add, x.clone(), Expr::int(0).unwrap()))
-        }
-        fn rewrite(&self, y: Value) -> Value {
-            y
-        }
-    }
-    struct MulIdentity;
-    impl Relation for MulIdentity {
-        type In = Expr;
-        type Out = Value;
-        fn apply(&self, x: &Expr) -> Value {
-            eval_closed(x)
-        }
-        fn vary(&self, x: &Expr) -> Option<Expr> {
-            Some(Expr::bin(Op::Mul, x.clone(), Expr::int(1).unwrap()))
-        }
-        fn rewrite(&self, y: Value) -> Value {
-            y
-        }
-    }
-    struct LtIrreflexive;
-    impl Relation for LtIrreflexive {
-        type In = Expr;
-        type Out = Value;
-        fn apply(&self, x: &Expr) -> Value {
-            eval_closed(&Expr::bin(Op::Lt, x.clone(), x.clone()))
-        }
-        fn vary(&self, x: &Expr) -> Option<Expr> {
-            Some(x.clone())
-        }
-        fn rewrite(&self, _y: Value) -> Value {
-            Value::Bool(false)
-        }
-    }
+    // oracle-free RELATIONS over the interpreter's value frontier, each one grammar line
+    // via `relation!` — only `apply`/`vary`/`rewrite` carry information.
+    crate::relation!(
+        /// Additive identity: `x + 0` evaluates as `x`.
+        AddIdentity: Expr => Value,
+        apply = eval_closed,
+        vary = |x: &Expr| Some(Expr::bin(Op::Add, x.clone(), Expr::int(0).unwrap())),
+        rewrite = |y| y);
+    crate::relation!(
+        /// Multiplicative identity: `x * 1` evaluates as `x`.
+        MulIdentity: Expr => Value,
+        apply = eval_closed,
+        vary = |x: &Expr| Some(Expr::bin(Op::Mul, x.clone(), Expr::int(1).unwrap())),
+        rewrite = |y| y);
+    crate::relation!(
+        /// Strict `<` is irreflexive: `x < x` is always `false`.
+        LtIrreflexive: Expr => Value,
+        apply = |x: &Expr| eval_closed(&Expr::bin(Op::Lt, x.clone(), x.clone())),
+        vary = |x: &Expr| Some(x.clone()),
+        rewrite = |_y| Value::Bool(false));
     // a deliberately FALSE relation and an inapplicable one, to pin `relation_holds`.
-    struct Increment;
-    impl Relation for Increment {
-        type In = Expr;
-        type Out = Value;
-        fn apply(&self, x: &Expr) -> Value {
-            eval_closed(x)
-        }
-        fn vary(&self, x: &Expr) -> Option<Expr> {
-            Some(Expr::bin(Op::Add, x.clone(), Expr::int(1).unwrap()))
-        }
-        fn rewrite(&self, y: Value) -> Value {
-            y
-        }
-    }
-    struct NeverApplies;
-    impl Relation for NeverApplies {
-        type In = Expr;
-        type Out = Value;
-        fn apply(&self, x: &Expr) -> Value {
-            eval_closed(x)
-        }
-        fn vary(&self, _x: &Expr) -> Option<Expr> {
-            None
-        }
-        fn rewrite(&self, y: Value) -> Value {
-            y
-        }
-    }
+    crate::relation!(
+        /// FALSE by construction: `x + 1` does not evaluate as `x`.
+        Increment: Expr => Value,
+        apply = eval_closed,
+        vary = |x: &Expr| Some(Expr::bin(Op::Add, x.clone(), Expr::int(1).unwrap())),
+        rewrite = |y| y);
+    crate::relation!(
+        /// Never applicable: `vary` always declines.
+        NeverApplies: Expr => Value,
+        apply = eval_closed,
+        vary = |_x: &Expr| None,
+        rewrite = |y| y);
 
     /// The interpreter's entry edge: `render . parse == id` over generated canonical
     /// source. This single registration certifies the whole lex/parse/unparse path.

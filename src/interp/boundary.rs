@@ -23,8 +23,8 @@
 use core::marker::PhantomData;
 
 use crate::boundary::{
-    Axis, Branch, Construction, CostCons, CostNil, Covers, DofCons, DofNil, Graded, Guarded,
-    HasDofs, Lossy, Morphism, Pure, SpaceCost, Stateful, TimeCost, Unit, S, Z,
+    Axis, Branch, Construction, CostCons, CostNil, Covers, DofCons, DofNil, Guarded, HasDofs,
+    Lossy, Morphism, Pure, Stateful, Unit, S, Z,
 };
 use crate::gdp::Named;
 
@@ -601,20 +601,10 @@ impl Axis for Depth {
 
 // `Parse` scans the source once and builds a tree of `Nodes` cells: linear in `Nodes` in
 // both time and space.
-impl Graded<TimeCost> for Parse {
-    type Carrier = CostCons<Nodes, S<Z>, CostNil>;
-}
-impl Graded<SpaceCost> for Parse {
-    type Carrier = CostCons<Nodes, S<Z>, CostNil>;
-}
+crate::cost!(Parse, time = CostCons<Nodes, S<Z>, CostNil>, space = CostCons<Nodes, S<Z>, CostNil>);
 // `Eval` walks the tree once (linear TIME in `Nodes`) but holds only the current path's
 // recursion and bindings (linear SPACE in `Depth`, NOT in `Nodes`).
-impl Graded<TimeCost> for Eval {
-    type Carrier = CostCons<Nodes, S<Z>, CostNil>;
-}
-impl Graded<SpaceCost> for Eval {
-    type Carrier = CostCons<Depth, S<Z>, CostNil>;
-}
+crate::cost!(Eval, time = CostCons<Nodes, S<Z>, CostNil>, space = CostCons<Depth, S<Z>, CostNil>);
 
 // ===== degrees of freedom of an `Expr`, and the coverage demand ===========
 //
