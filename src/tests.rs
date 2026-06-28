@@ -261,7 +261,7 @@ fn the_brand_threads_parse_check_eval() {
 mod blind_spot {
     use super::{int, Expr, Op};
     use crate::boundary::{
-        coefficient_holds, commutes, Capability, Coefficient, Metamorphic, Morphism,
+        coefficient_holds, commutes, Capability, Coefficient, Metamorphic, Morphism, Unit,
     };
     use crate::interp::boundary::{ConstFold, ConstFoldDoubles, ConstFoldForgetful, Int, Lit};
 
@@ -384,5 +384,332 @@ mod blind_spot {
             Some(false),
             "the quantitative probe pins the coefficient the structural checks missed"
         );
+    }
+
+    /// A relation `ConstFold` does NOT commute with (bump the left addend, expect the sum
+    /// unchanged) — so `commutes` returns `Some(false)`; and an inapplicable input returns
+    /// `None`. Pins `commutes` against a constant-`Some(true)` collapse.
+    struct BumpLeftExpectSame;
+    crate::value_operator!(BumpLeftExpectSame);
+    impl<M: Morphism<In = Expr, Out = Expr>> Metamorphic<M> for BumpLeftExpectSame {
+        fn input_op(&self, x: &Expr) -> Option<Expr> {
+            match x {
+                Expr::Bin(Op::Add, a, b) => match &**a {
+                    Expr::Lit(Lit::Int(ai)) => Some(Expr::bin(
+                        Op::Add,
+                        Expr::Lit(Lit::Int(ai.plus(Int::new(1)?))),
+                        (**b).clone(),
+                    )),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        fn output_op(&self, y: &Expr) -> Expr {
+            y.clone() // expect NO change — wrong, so the fold does not commute.
+        }
+    }
+
+    #[test]
+    fn commutes_distinguishes_outcomes() {
+        let x = sum(2, 3);
+        assert_eq!(
+            commutes(&ConstFold, &BumpLeftExpectSame, &x),
+            Some(false),
+            "bumping an addend changes the sum, so the fold does not commute with it"
+        );
+        // inapplicable: a bare literal has no top-level Add to perturb.
+        assert_eq!(commutes(&ConstFold, &SwapAddends, &int(5)), None);
+    }
+
+    /// The forgetful folder's `backward` returns the folded OUTPUT (it has no residual to do
+    /// better) — distinct from `None`. Pins it so a `-> None` mutant cannot hide behind the
+    /// round-trip, which is false either way.
+    #[test]
+    fn forgetful_backward_returns_the_output() {
+        let x = sum(2, 3);
+        let (out, _unit) = ConstFoldForgetful.forward(&x);
+        assert_eq!(ConstFoldForgetful.backward(&out, &Unit), Some(out.clone()));
+        assert_ne!(out, x, "the fold did change the expression");
+    }
+}
+
+// ===== the rest of the algebra, exercised on the interpreter ==============
+//
+// With interp the sole substrate, the generic grammar (residual probe, DOF synthesis,
+// Compose/run/Carried, Then, construction_probe, the profiling wrapper, provenance
+// lineage, the type-level degree) must be exercised HERE or it is dead. These tests run
+// each on the `ConstFold`/`Parse` edges; mutation testing then certifies the grammar is
+// covered, not merely present. Plus the direct pins for the `Expr` cost measures.
+mod algebra_surface {
+    use super::{int, name, Expr, Op};
+    use crate::boundary::{
+        construction_probe, dof_covered, probe, probe_declared_dofs, reconstructs, run,
+        stamp_through, Compose, Construction, Degree, DofProbe, Meter, Morphism, Perturbation,
+        ProbeResult, Profiled, RawPerturbation, Stamped, Then, S, Z,
+    };
+    use crate::interp::boundary::{ConstFold, Lit, Literals, Parse, Shape};
+
+    fn sum() -> Expr {
+        Expr::bin(Op::Add, int(2), int(3))
+    }
+    fn five() -> Expr {
+        Expr::int(5).unwrap() // sum() folded: 2 + 3
+    }
+    fn three() -> Expr {
+        Expr::int(3).unwrap() // "(1 + 2)" folded
+    }
+
+    // --- perturbations on the ConstFold morphism (for probe / DOF synthesis) ---
+
+    /// Shape perturbation: swap the top operator (Add <-> Mul) — changes the folded value.
+    pub struct PerturbOp;
+    crate::value_operator!(PerturbOp);
+    impl<M: Morphism<In = Expr, Out = Expr>> Perturbation<M> for PerturbOp {
+        fn perturb(&self, x: &Expr) -> Option<Expr> {
+            match x {
+                Expr::Bin(Op::Add, a, b) => Some(Expr::bin(Op::Mul, (**a).clone(), (**b).clone())),
+                Expr::Bin(Op::Mul, a, b) => Some(Expr::bin(Op::Add, (**a).clone(), (**b).clone())),
+                _ => None,
+            }
+        }
+    }
+
+    /// Literal perturbation: bump the left integer literal — changes the folded value.
+    pub struct PerturbLit;
+    crate::value_operator!(PerturbLit);
+    impl<M: Morphism<In = Expr, Out = Expr>> Perturbation<M> for PerturbLit {
+        fn perturb(&self, x: &Expr) -> Option<Expr> {
+            match x {
+                Expr::Bin(op, a, b) => match &**a {
+                    Expr::Lit(Lit::Int(ai)) => Some(Expr::bin(
+                        *op,
+                        Expr::Lit(Lit::Int(ai.plus(crate::interp::boundary::Int::new(1)?))),
+                        (**b).clone(),
+                    )),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+    }
+
+    impl DofProbe<ConstFold> for Shape {
+        type Perturb = PerturbOp;
+        fn perturbation() -> PerturbOp {
+            PerturbOp
+        }
+    }
+    impl DofProbe<ConstFold> for Literals {
+        type Perturb = PerturbLit;
+        fn perturbation() -> PerturbLit {
+            PerturbLit
+        }
+    }
+
+    /// The residual-completeness `probe` on `ConstFold`: bumping a literal moves the folded
+    /// OUTPUT (the residual is not a hidden lost dimension here), and the original-keeping
+    /// residual still reconstructs the perturbed input. The exact `ProbeResult` is pinned so
+    /// every comparison inside `probe` is load-bearing.
+    #[test]
+    fn probe_reports_each_field() {
+        let r = probe(&ConstFold, &PerturbLit, &sum()).expect("perturbation applies");
+        assert!(
+            !r.output_invariant,
+            "folding is sensitive to the bumped literal"
+        );
+        assert!(
+            r.residual_responds,
+            "the residual keeps the (changed) original"
+        );
+        assert!(
+            r.round_trips,
+            "the residual reconstructs the perturbed input"
+        );
+    }
+
+    /// `residual_complete` is the strict conjunction — pinned on hand-built results so each
+    /// `&&` and the bare return are exercised.
+    #[test]
+    fn residual_complete_is_the_conjunction() {
+        let yes = ProbeResult {
+            output_invariant: true,
+            residual_responds: true,
+            round_trips: true,
+        };
+        assert!(yes.residual_complete());
+        for r in [
+            ProbeResult {
+                output_invariant: false,
+                residual_responds: true,
+                round_trips: true,
+            },
+            ProbeResult {
+                output_invariant: true,
+                residual_responds: false,
+                round_trips: true,
+            },
+            ProbeResult {
+                output_invariant: true,
+                residual_responds: true,
+                round_trips: false,
+            },
+        ] {
+            assert!(!r.residual_complete());
+        }
+    }
+
+    /// DOF SYNTHESIS: the completeness suite is generated from `Expr`'s declared DOF set —
+    /// both `Shape` and `Literals` are observable through `ConstFold` (the output responds),
+    /// so the synthesized verdicts are both `Some(true)`.
+    #[test]
+    fn declared_dofs_synthesize_their_probes() {
+        let verdicts = probe_declared_dofs::<Expr, ConstFold>(&ConstFold, &sum());
+        assert_eq!(verdicts, vec![Some(true), Some(true)]);
+        // a single DOF directly: covered at a foldable node...
+        assert_eq!(
+            dof_covered::<ConstFold, Literals>(&ConstFold, &sum()),
+            Some(true)
+        );
+        // ...but INAPPLICABLE at a bare literal (no operator to perturb) — `None`, which
+        // pins `dof_covered` against an always-`Some(true)` collapse.
+        assert_eq!(dof_covered::<ConstFold, Shape>(&ConstFold, &int(5)), None);
+    }
+
+    /// COMPOSE + run + Carried::invert: two folds compose into one morphism whose retained
+    /// residual still inverts back to the original — end-to-end invertibility through a
+    /// lossy stage.
+    #[test]
+    fn compose_run_and_invert() {
+        let comp = Compose {
+            f: ConstFold,
+            g: ConstFold,
+        };
+        let x = sum();
+        let carried = run(&comp, &x);
+        assert_eq!(carried.out(), &five());
+        assert_eq!(carried.invert(&comp), Some(x));
+    }
+
+    /// THEN: a `Construction` composed with a `Morphism` is itself one construction —
+    /// parse-then-fold, and its product residual reconstructs the raw source.
+    #[test]
+    fn then_composes_construction_with_morphism() {
+        let then = Then {
+            construct: Parse,
+            then: ConstFold,
+        };
+        let (refined, residual) = then.parse(&"(1 + 2)".to_string()).expect("valid source");
+        assert_eq!(refined, three());
+        assert_eq!(
+            then.reconstruct(&refined, &residual),
+            Some("(1 + 2)".to_string())
+        );
+    }
+
+    /// reconstructs: a valid source round-trips; a REJECTED source has no obligation
+    /// (`None`), which also pins the probe against a constant-`Some(true)` collapse.
+    #[test]
+    fn reconstructs_round_trips_or_abstains() {
+        assert_eq!(reconstructs(&Parse, &"(1 + 2)".to_string()), Some(true));
+        assert_eq!(reconstructs(&Parse, &"@".to_string()), None);
+    }
+
+    /// construction_probe on `Parse`: changing a digit changes the REFINED expr (the parse
+    /// normalizes nothing — its `Unit` residual does not respond), and the canonical
+    /// perturbed source still round-trips.
+    struct SwapDigit;
+    crate::value_operator!(SwapDigit);
+    impl RawPerturbation<Parse> for SwapDigit {
+        fn perturb(&self, raw: &String) -> Option<String> {
+            if raw.contains('2') {
+                Some(raw.replace('2', "3"))
+            } else {
+                None
+            }
+        }
+    }
+    #[test]
+    fn construction_probe_reports_each_field() {
+        let r = construction_probe(&Parse, &SwapDigit, &"(1 + 2)".to_string()).expect("applies");
+        assert!(
+            !r.output_invariant,
+            "a different digit parses to a different expr"
+        );
+        assert!(!r.residual_responds, "the pure parse has a Unit residual");
+        assert!(
+            r.round_trips,
+            "the perturbed source is canonical, so it round-trips"
+        );
+    }
+
+    /// PROFILED + Meter: wrapping a morphism meters every `forward`/`backward` transparently.
+    /// A counting meter confirms `progress` fires and `backward` still returns its result.
+    #[test]
+    fn profiled_meters_without_changing_behaviour() {
+        use std::cell::Cell;
+        struct CountMeter {
+            progressed: Cell<u32>,
+        }
+        impl Meter for CountMeter {
+            fn measured<R>(&self, _label: &'static str, body: impl FnOnce() -> R) -> R {
+                body()
+            }
+            fn progress(&self, _label: &'static str) {
+                self.progressed.set(self.progressed.get() + 1);
+            }
+        }
+        let meter = CountMeter {
+            progressed: Cell::new(0),
+        };
+        let p = Profiled::metered(ConstFold, &meter); // &meter -> exercises `impl Meter for &T`
+        let x = sum();
+        let (out, residual) = p.forward(&x);
+        assert_eq!(out, five());
+        assert_eq!(meter.progressed.get(), 1, "forward marks one progress unit");
+        // backward is transparent: it still reconstructs via ConstFold's residual.
+        assert_eq!(p.backward(&out, &residual), Some(x));
+    }
+
+    /// PROVENANCE: stamping a value through an edge extends its type-level lineage, and the
+    /// reflected `Provenance` names the edge it crossed.
+    #[test]
+    fn stamp_through_records_the_lineage() {
+        let stamped = Stamped::origin(sum());
+        let folded = stamp_through(&stamped, &ConstFold);
+        assert_eq!(folded.value(), &five());
+        let lineage = folded.lineage();
+        assert_eq!(lineage.steps().len(), 1);
+        assert!(
+            lineage.steps()[0].contains("ConstFold"),
+            "the lineage names the edge crossed: {:?}",
+            lineage.steps()
+        );
+    }
+
+    /// The type-level degree reflects to its number — the `D::N + 1` recursion.
+    #[test]
+    fn degree_reflects_to_its_number() {
+        assert_eq!(<Z as Degree>::N, 0);
+        assert_eq!(<S<Z> as Degree>::N, 1);
+        assert_eq!(<S<S<Z>> as Degree>::N, 2);
+    }
+
+    /// `Expr::node_count` / `Expr::depth` report the real structure (the cost axes). Pinned
+    /// directly because the cost grading consumes them only at the type level.
+    #[test]
+    fn node_count_and_depth_measure_the_tree() {
+        assert_eq!(int(1).node_count(), 1);
+        assert_eq!(int(1).depth(), 1);
+        assert_eq!(sum().node_count(), 3);
+        let nested = Expr::bin(Op::Add, int(1), Expr::bin(Op::Mul, int(2), int(3)));
+        assert_eq!(nested.node_count(), 5);
+        assert_eq!(nested.depth(), 3);
+        let iff = Expr::cond(Expr::boolean(true), int(1), int(2));
+        assert_eq!(iff.node_count(), 4);
+        assert_eq!(iff.depth(), 2);
+        let lett = Expr::bind(name("x"), int(1), Expr::var(name("x")));
+        assert_eq!(lett.node_count(), 3);
+        assert_eq!(lett.depth(), 2);
     }
 }
