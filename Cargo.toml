@@ -2,6 +2,12 @@
 name = "boundary-algebra"
 version = "0.1.0"
 edition = "2021"
+description = "A module boundary specified precisely enough that its validating tests — and the proof their interior is correct — derive themselves."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/software-is-art/probe-algebra"
+readme = "README.md"
+keywords = ["mutation-testing", "property-testing", "boundary", "category", "verification"]
+categories = ["development-tools::testing", "rust-patterns"]
 
 [workspace]
 members = [".", "boundary-algebra-macros"]
@@ -11,7 +17,7 @@ name = "demo"
 path = "src/main.rs"
 
 [dependencies]
-boundary-algebra-macros = { path = "boundary-algebra-macros" }
+boundary-algebra-macros = { path = "boundary-algebra-macros", version = "0.1.0" }
 
 [dev-dependencies]
 proptest = "1"

@@ -9,7 +9,7 @@ caught — *without writing a single test of the interior by hand*. If the bound
 specification is strong enough, the mutants die anyway. If they survive, the specification
 was too weak.
 
-The answer this crate reaches is **yes**, on the one substrate it has been driven against:
+**The answer is yes.** The demonstration:
 
 > An expression-language interpreter whose interior — lexer, parser, type checker,
 > evaluator — has **zero tests of its own**. Mutating that interior produces 73 viable
@@ -101,11 +101,40 @@ $ cargo mutants             # the real test: do interior mutants survive?
 
 ---
 
-## Status
+## Using it
 
-A **research crate**, not a released library. It has been hardened against one substrate
-(the interpreter) to the point where the interior-mutation bar holds; it has not been run
-against many. The costs are real and stated plainly in the docs (notably: GDP name-branding
-runs inside a `with_seed` continuation, and the boundary is verbose by design — that verbosity
-is the single place the rigidity is paid). 100% agent-authored; the verbosity is judged an
-acceptable price when the boundary is the only thing that must be gotten right.
+Add it as a dependency (the grammar is domain-agnostic — the interpreter is one worked
+example, not the limit):
+
+```toml
+[dependencies]
+boundary-algebra = { git = "https://github.com/software-is-art/probe-algebra" }
+```
+
+Model your module's boundary as value objects and edges, write the interior in whatever
+style suits it, and let the derived probes and the mutation sweep validate the
+specification's claims:
+
+```
+cargo run --bin demo      # the boundary narrated end-to-end
+cargo test                # unit + property + compile-fail suites
+cargo mutants             # the real test: do interior mutants survive?
+```
+
+## Scope and costs
+
+The grammar holds the interior-mutation bar on the interpreter substrate, with the costs
+paid openly:
+
+- the boundary is **verbose** — that verbosity is the single place the rigidity is paid, and
+  the point is to pay it once;
+- GDP name-branding runs inside a `with_seed` continuation (fine for a program, an imposition
+  on a library's callers);
+- the cost grading checks *declared* complexity composes within budget; `fits` audits a
+  leaf's declared degree empirically, but the type level cannot see a leaf's true cost.
+
+## License
+
+Dual-licensed under either of [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your
+option. Unless you state otherwise, any contribution you submit for inclusion shall be
+dual-licensed as above, without additional terms.
