@@ -939,12 +939,16 @@ where
 /// a `Linear`-declared edge that is secretly quadratic is caught — the transpiler bug.
 /// (Measure a deterministic STEP count, not wall-clock, so the verdict is reproducible.)
 pub fn fits(measure: impl Fn(usize) -> u64, declared: BigO) -> bool {
+    // Each rung's bound is its EXACT doubling ratio (2^degree): a pure O(n^k) edge's
+    // step count exactly k-tuples when n doubles, and a real edge with positive
+    // lower-order terms ratios STRICTLY below it — so `>` (not `>=`) is the honest
+    // boundary, and an n·log n edge declared `Linear` (ratio just over 2) is rejected.
     let sizes = [16usize, 32, 64, 128];
     let bound = match declared {
-        BigO::Constant => 1.5,
-        BigO::Linear => 2.5,
-        BigO::Quadratic => 4.5,
-        BigO::Cubic => 8.5,
+        BigO::Constant => 1.0,
+        BigO::Linear => 2.0,
+        BigO::Quadratic => 4.0,
+        BigO::Cubic => 8.0,
         BigO::Exponential => f64::INFINITY,
     };
     let mut prev: Option<u64> = None;
