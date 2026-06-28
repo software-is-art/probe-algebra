@@ -889,3 +889,73 @@ mod interp {
         });
     }
 }
+
+/// cost — the time/space budget grading. The type level checks costs COMPOSE within
+/// budget (sequential = max, iteration = multiply, collect-vs-fold splits space); `fits`
+/// audits a declared class against measured growth.
+mod cost {
+    use crate::boundary::{
+        fits, require_within_space, require_within_time, BigO, Compose, Costed, Fold, Linear,
+        MapCollect, Quadratic,
+    };
+    use crate::ledger::boundary::{Aggregate, Round};
+
+    /// Sequential composition takes the MAX on both axes: aggregate (O(n)/O(n)) then
+    /// round (O(n)/O(1)) is O(n) time and O(n) space, and stays within an O(n) budget.
+    #[test]
+    fn compose_takes_the_sequential_max() {
+        assert_eq!(<Compose<Aggregate, Round> as Costed>::TIME, BigO::Linear);
+        assert_eq!(<Compose<Aggregate, Round> as Costed>::SPACE, BigO::Linear);
+        let pipeline = Compose {
+            f: Aggregate,
+            g: Round,
+        };
+        require_within_time::<Linear, _>(&pipeline);
+        require_within_space::<Linear, _>(&pipeline);
+    }
+
+    /// Iteration multiplies time on both combinators, but space splits: `MapCollect`
+    /// materializes n results (quadratic space) while `Fold` streams (space stays linear).
+    /// This is the type-level "stream, don't materialize" an agent can be held to.
+    #[test]
+    fn iteration_multiplies_time_collect_vs_fold_splits_space() {
+        assert_eq!(<MapCollect<Aggregate> as Costed>::TIME, BigO::Quadratic);
+        assert_eq!(<MapCollect<Aggregate> as Costed>::SPACE, BigO::Quadratic);
+        assert_eq!(<Fold<Aggregate> as Costed>::TIME, BigO::Quadratic);
+        assert_eq!(<Fold<Aggregate> as Costed>::SPACE, BigO::Linear);
+        require_within_time::<Quadratic, _>(&MapCollect(Aggregate));
+        // the fold keeps space within linear; the collect would NOT compile here
+        // (pinned in tests/compile_fail/cost_over_budget).
+        require_within_space::<Linear, _>(&Fold(Aggregate));
+    }
+
+    /// The honesty audit: `fits` measures work growth and catches a declared class that
+    /// does not match reality — a `Linear`-declared edge that is secretly quadratic.
+    #[test]
+    fn fits_audits_declared_against_measured_growth() {
+        let constant = |_n: usize| 1u64;
+        let linear = |n: usize| n as u64;
+        let quadratic = |n: usize| (n as u64) * (n as u64);
+        let cubic = |n: usize| (n as u64).pow(3);
+        let exponential = |n: usize| 1u64 << n.min(40); // capped to avoid overflow
+                                                        // each class fits its own declared bound...
+        assert!(fits(constant, BigO::Constant));
+        assert!(fits(linear, BigO::Linear));
+        assert!(fits(quadratic, BigO::Quadratic));
+        assert!(fits(cubic, BigO::Cubic));
+        assert!(fits(exponential, BigO::Exponential));
+        // ...and a class declared too LOW is caught (the honesty check at every rung):
+        assert!(
+            !fits(linear, BigO::Constant),
+            "a linear edge is not constant"
+        );
+        assert!(
+            !fits(quadratic, BigO::Linear),
+            "a quadratic edge is not linear"
+        );
+        assert!(
+            !fits(cubic, BigO::Quadratic),
+            "a cubic edge is not quadratic"
+        );
+    }
+}

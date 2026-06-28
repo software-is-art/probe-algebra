@@ -17,7 +17,8 @@
 use std::collections::BTreeMap;
 
 use crate::boundary::{
-    Construction, Lossy, Metamorphic, Morphism, Pair, Perturbation, Pure, RawPerturbation, Unit,
+    Constant, Construction, Costed, Linear, Lossy, Metamorphic, Morphism, Pair, Perturbation, Pure,
+    RawPerturbation, Unit,
 };
 
 // ===== value objects =====================================================
@@ -390,6 +391,21 @@ impl Morphism for Round {
         }
         Some(AccountSummary { totals })
     }
+}
+
+// ===== cost budgets (opt-in): these edges declare their time/space class ====
+// `Aggregate` folds every posting once and keeps a per-account breakdown — linear in
+// both. `Round` maps over the accounts in place — linear time, constant extra space. So
+// `Compose<Aggregate, Round>` is linear in both (the sequential max), and a consumer can
+// demand it stays `Within<Linear>`.
+
+impl Costed for Aggregate {
+    type Time = Linear;
+    type Space = Linear;
+}
+impl Costed for Round {
+    type Time = Linear;
+    type Space = Constant;
 }
 
 // ===== value operators: perturbations ====================================

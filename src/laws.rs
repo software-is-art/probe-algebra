@@ -205,7 +205,11 @@ where
     TestRunner::default()
         .run(&strategy, |raw| {
             if let Some(v) = T::wrap(raw.clone()) {
-                prop_assert_eq!(v.unwrap(), raw, "accessor does not report the wrapped value");
+                prop_assert_eq!(
+                    v.unwrap(),
+                    raw,
+                    "accessor does not report the wrapped value"
+                );
             }
             Ok(())
         })
@@ -465,7 +469,9 @@ mod registry {
     fn eval_closed(e: &Expr) -> Value {
         with_seed(|seed| {
             let named = seed.new_named(e.clone());
-            let proof = Check.classify(&named).expect("a closed int expr is well-typed");
+            let proof = Check
+                .classify(&named)
+                .expect("a closed int expr is well-typed");
             *Eval.run(&named, &proof).value()
         })
     }
@@ -688,10 +694,7 @@ mod registry {
                 };
                 let right = Compose {
                     f: Aggregate,
-                    g: Compose {
-                        f: Round,
-                        g: Round,
-                    },
+                    g: Compose { f: Round, g: Round },
                 };
                 prop_assert_eq!(left.forward(&x).0, right.forward(&x).0);
                 Ok(())
@@ -716,7 +719,11 @@ mod registry {
                         Err(_) => false,
                     }
                 });
-                prop_assert!(evaluable, "an int expr must type-check and evaluate: {:?}", e);
+                prop_assert!(
+                    evaluable,
+                    "an int expr must type-check and evaluate: {:?}",
+                    e
+                );
                 Ok(())
             })
             .unwrap();

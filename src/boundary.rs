@@ -767,6 +767,200 @@ pub fn relation_holds<R: Relation>(r: &R, x: &R::In) -> Option<bool> {
     Some(r.apply(&varied) == r.rewrite(r.apply(x)))
 }
 
+// ===== the COST grading: time and space budgets at the type level =========
+//
+// The fifth grading, and the same shape as capability — a lattice of marker types,
+// composed by the type system, demandable as a bound — but split across TWO axes that
+// share the lattice and the ceiling yet compose by DIFFERENT rules. The point is the
+// DEMAND: a coding agent (or a human) can be held to "this path is at most O(n^2)" as a
+// COMPILE error, so a stage that drifts from linear to quadratic refuses to build until
+// it is brought back under budget. (Polynomial lattice for now; log / n-log-n are a
+// documented extension. The type level checks the ARITHMETIC of composition stays under
+// budget given honest leaf declarations; `fits` keeps the leaves honest empirically.)
+
+/// The runtime complexity class a marker reflects to (the audit/laws read this).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BigO {
+    Constant,
+    Linear,
+    Quadratic,
+    Cubic,
+    Exponential,
+}
+
+/// A type-level complexity class, reflecting to `BigO`. Sealed — the lattice is closed.
+pub trait Complexity: sealed::Sealed {
+    const CLASS: BigO;
+}
+/// The classes as marker types (one lattice, shared by the time and space axes).
+pub struct Constant;
+pub struct Linear;
+pub struct Quadratic;
+pub struct Cubic;
+pub struct Exponential;
+macro_rules! complexity {
+    ($($t:ty => $c:expr);+ $(;)?) => {$(
+        impl sealed::Sealed for $t {}
+        impl Complexity for $t { const CLASS: BigO = $c; }
+    )+};
+}
+complexity!(
+    Constant => BigO::Constant; Linear => BigO::Linear; Quadratic => BigO::Quadratic;
+    Cubic => BigO::Cubic; Exponential => BigO::Exponential;
+);
+
+/// `Self <= Ceiling` on the lattice — the demandable budget bound (the cost twin of
+/// capability's `AtMost`). `where E::Time: Within<Quadratic>` accepts only paths that
+/// stay at most quadratic; a cubic path fails to compile.
+pub trait Within<Ceiling> {}
+macro_rules! within {
+    ($($lo:ty , $hi:ty);+ $(;)?) => {$( impl Within<$hi> for $lo {} )+};
+}
+within!(
+    Constant, Constant; Constant, Linear; Constant, Quadratic; Constant, Cubic; Constant, Exponential;
+    Linear, Linear; Linear, Quadratic; Linear, Cubic; Linear, Exponential;
+    Quadratic, Quadratic; Quadratic, Cubic; Quadratic, Exponential;
+    Cubic, Cubic; Cubic, Exponential;
+    Exponential, Exponential;
+);
+
+/// SEQUENTIAL composition: two stages each run once on the data, so the cost is the
+/// MAX of the two (the higher degree dominates). Used for both axes under `Compose`.
+pub trait Seq<Other> {
+    type Out: Complexity;
+}
+macro_rules! seq {
+    ($($a:ty , $b:ty => $o:ty);+ $(;)?) => {$( impl Seq<$b> for $a { type Out = $o; } )+};
+}
+seq!(
+    Constant,Constant=>Constant; Constant,Linear=>Linear; Constant,Quadratic=>Quadratic; Constant,Cubic=>Cubic; Constant,Exponential=>Exponential;
+    Linear,Constant=>Linear; Linear,Linear=>Linear; Linear,Quadratic=>Quadratic; Linear,Cubic=>Cubic; Linear,Exponential=>Exponential;
+    Quadratic,Constant=>Quadratic; Quadratic,Linear=>Quadratic; Quadratic,Quadratic=>Quadratic; Quadratic,Cubic=>Cubic; Quadratic,Exponential=>Exponential;
+    Cubic,Constant=>Cubic; Cubic,Linear=>Cubic; Cubic,Quadratic=>Cubic; Cubic,Cubic=>Cubic; Cubic,Exponential=>Exponential;
+    Exponential,Constant=>Exponential; Exponential,Linear=>Exponential; Exponential,Quadratic=>Exponential; Exponential,Cubic=>Exponential; Exponential,Exponential=>Exponential;
+);
+
+/// PER-ELEMENT application: running an edge once per element of an n-sized collection
+/// MULTIPLIES its cost by `n` (bumps the polynomial degree). This is where the time and
+/// space axes part ways — and where a pathological pipeline is built one nesting at a
+/// time. (`Cubic` rounds up to `Exponential`: a sound over-approximation, since the
+/// lattice tops out and a too-cautious "over budget" is the safe failure direction.)
+pub trait PerElement {
+    type Out: Complexity;
+}
+impl PerElement for Constant {
+    type Out = Linear;
+}
+impl PerElement for Linear {
+    type Out = Quadratic;
+}
+impl PerElement for Quadratic {
+    type Out = Cubic;
+}
+impl PerElement for Cubic {
+    type Out = Exponential;
+}
+impl PerElement for Exponential {
+    type Out = Exponential;
+}
+
+/// An edge that declares a TIME and a SPACE budget — opt-in (not every edge needs a
+/// stated budget, unlike capability which every edge has). The runtime consts are
+/// derived so an audit reads them unchanged.
+pub trait Costed {
+    type Time: Complexity;
+    type Space: Complexity;
+    const TIME: BigO = <Self::Time as Complexity>::CLASS;
+    const SPACE: BigO = <Self::Space as Complexity>::CLASS;
+}
+
+// `Compose` threads cost on BOTH axes by the SAME sequential rule (max): the composite
+// is as costly as its dearer stage, in time and in space alike.
+impl<F, G> Costed for Compose<F, G>
+where
+    F: Costed,
+    G: Costed,
+    F::Time: Seq<G::Time>,
+    F::Space: Seq<G::Space>,
+{
+    type Time = <F::Time as Seq<G::Time>>::Out;
+    type Space = <F::Space as Seq<G::Space>>::Out;
+}
+
+/// Apply an edge once per element and COLLECT the results: time multiplies by `n` AND
+/// space multiplies by `n` (the n outputs are materialized).
+pub struct MapCollect<E>(pub E);
+impl<E> Costed for MapCollect<E>
+where
+    E: Costed,
+    E::Time: PerElement,
+    E::Space: PerElement,
+{
+    type Time = <E::Time as PerElement>::Out;
+    type Space = <E::Space as PerElement>::Out;
+}
+
+/// Apply an edge once per element but FOLD (stream) the results: time still multiplies
+/// by `n`, but space stays flat — the inner outputs are consumed, not held. This is the
+/// type-level statement of "stream, don't materialize", a space win an agent can be held
+/// to.
+pub struct Fold<E>(pub E);
+impl<E> Costed for Fold<E>
+where
+    E: Costed,
+    E::Time: PerElement,
+{
+    type Time = <E::Time as PerElement>::Out;
+    type Space = E::Space;
+}
+
+/// Demand a TIME budget: this only compiles if `E`'s time stays within `Ceiling`. A path
+/// that drifts over budget is a build error — the pressure a complexity-blind agent
+/// lacks. (`require_within_space` is the space twin.)
+pub fn require_within_time<Ceiling, E>(_e: &E)
+where
+    E: Costed,
+    E::Time: Within<Ceiling>,
+{
+}
+
+/// Demand a SPACE budget — the space twin of `require_within_time`.
+pub fn require_within_space<Ceiling, E>(_e: &E)
+where
+    E: Costed,
+    E::Space: Within<Ceiling>,
+{
+}
+
+/// The empirical honesty audit (the cost twin of the residual probe): the type level
+/// checks declared costs COMPOSE within budget, but cannot see whether a leaf's declared
+/// class matches reality. `fits` does: it measures a deterministic work count at growing
+/// sizes and checks the doubling ratio stays within the declared class's (with slack), so
+/// a `Linear`-declared edge that is secretly quadratic is caught — the transpiler bug.
+/// (Measure a deterministic STEP count, not wall-clock, so the verdict is reproducible.)
+pub fn fits(measure: impl Fn(usize) -> u64, declared: BigO) -> bool {
+    let sizes = [16usize, 32, 64, 128];
+    let bound = match declared {
+        BigO::Constant => 1.5,
+        BigO::Linear => 2.5,
+        BigO::Quadratic => 4.5,
+        BigO::Cubic => 8.5,
+        BigO::Exponential => f64::INFINITY,
+    };
+    let mut prev: Option<u64> = None;
+    for &n in &sizes {
+        let work = measure(n);
+        if let Some(p) = prev {
+            let ratio = work as f64 / (p.max(1)) as f64;
+            if ratio > bound {
+                return false;
+            }
+        }
+        prev = Some(work);
+    }
+    true
+}
+
 // ===== composition: loss composes as a value object ======================
 
 /// Product of two residuals — loss COMPOSES as a value object.

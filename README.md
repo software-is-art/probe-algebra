@@ -333,6 +333,31 @@ The audit verifies a *declared* channel (it cannot infer a channel's role from
 the type), so it catches taking the wrong amount of power once the channels are
 named — the same perturb-and-observe machinery as every other probe.
 
+## Cost budgets (time and space)
+
+The fifth grading, and the same shape as capability — a lattice of marker types
+(`Constant`/`Linear`/`Quadratic`/`Cubic`/`Exponential`), composed by the type system,
+demandable as a `Within<Ceiling>` *bound* — but split across **two axes** (`type Time`,
+`type Space`) that share the lattice yet compose by **different rules**:
+
+- **Sequential** (`Compose`) takes the **max** on both axes — the composite is as costly
+  as its dearer stage.
+- **Iteration** is where they part. Running an inner edge per element always **multiplies
+  time** (`PerElement`, degree +1); for **space it depends on the combinator** —
+  `MapCollect` materializes n results (space bumps too) while `Fold` streams (space stays
+  flat). That makes *"stream, don't materialize"* a type-level fact.
+
+The point is the **demand**: `require_within_time::<Quadratic, _>` (and the space twin)
+is a *compile* error if the path exceeds the budget, so a stage that drifts from linear
+to quadratic refuses to build until it is brought back under — the pressure a
+complexity-blind agent otherwise lacks (pinned in `tests/compile_fail/cost_over_budget`).
+As with capability, the type level only checks that *declared* costs **compose** within
+budget; **`fits`** keeps the leaf declarations honest empirically — it measures a
+deterministic step count at growing sizes and rejects a `Linear`-declared edge that is
+secretly quadratic. (Polynomial lattice for now; log / n-log-n are a documented
+extension. `Cubic·n` rounds up to `Exponential` — a sound over-approximation, since
+"too cautious" is the safe failure direction for a budget.)
+
 ## Carried proofs (a GDP spike)
 
 Value objects enforce *single-value* invariants by construction; they cannot
