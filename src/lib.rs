@@ -43,6 +43,8 @@ pub mod synth;
 #[cfg(test)]
 mod blindspot;
 #[cfg(test)]
+mod laws;
+#[cfg(test)]
 mod properties;
 #[cfg(test)]
 mod tests;
