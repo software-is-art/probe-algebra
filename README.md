@@ -335,28 +335,37 @@ named — the same perturb-and-observe machinery as every other probe.
 
 ## Cost budgets (time and space)
 
-The fifth grading, and the same shape as capability — a lattice of marker types
-(`Constant`/`Linear`/`Quadratic`/`Cubic`/`Exponential`), composed by the type system,
-demandable as a `Within<Ceiling>` *bound* — but split across **two axes** (`type Time`,
-`type Space`) that share the lattice yet compose by **different rules**:
+The fifth grading — and the first built as a **pluggable** grading, plus an **open keyed
+map** for the carrier. Both choices matter:
 
-- **Sequential** (`Compose`) takes the **max** on both axes — the composite is as costly
-  as its dearer stage.
-- **Iteration** is where they part. Running an inner edge per element always **multiplies
-  time** (`PerElement`, degree +1); for **space it depends on the combinator** —
-  `MapCollect` materializes n results (space bumps too) while `Fold` streams (space stays
-  flat). That makes *"stream, don't materialize"* a type-level fact.
+- **Pluggable.** A grading is a marker `G`; an edge declares `Graded<G> { type Carrier }`,
+  each grading names its own `Combine` rule, and **one blanket `Compose` impl threads
+  every grading**. Adding a grading touches neither `Morphism` nor the other gradings.
+  This was *unblocked* by the earlier type-level lifts: once capability moved off `const`
+  to a type, the operator gradings all live at one level, dissolving the heterogeneity
+  that once forced each grading to be hand-wired. (Provenance stays separate — it grades a
+  *value's journey*, not an operator.) Cost rides in as two gradings, `TimeCost` and
+  `SpaceCost`, on the one blanket `Compose`.
+- **Open keyed map.** A cost is a type-level map from named **size axes** (`Postings`,
+  or a transpiler's `Nodes`/`Depth`/`TyVars`) to a **polynomial degree** that is an open
+  type-level nat — *any* `n^k`, no fixed lattice cap. Axes are tracked **independently**,
+  so a recursive descent that is `depth^3` while staying `nodes^1` shows the depth blowup
+  with nodes still linear — the monomorphization-style failure a single-`n` cost is blind
+  to. Lookup takes the per-axis **max**, so sequential composition is just append.
 
-The point is the **demand**: `require_within_time::<Quadratic, _>` (and the space twin)
-is a *compile* error if the path exceeds the budget, so a stage that drifts from linear
-to quadratic refuses to build until it is brought back under — the pressure a
-complexity-blind agent otherwise lacks (pinned in `tests/compile_fail/cost_over_budget`).
-As with capability, the type level only checks that *declared* costs **compose** within
-budget; **`fits`** keeps the leaf declarations honest empirically — it measures a
-deterministic step count at growing sizes and rejects a `Linear`-declared edge that is
-secretly quadratic. (Polynomial lattice for now; log / n-log-n are a documented
-extension. `Cubic·n` rounds up to `Exponential` — a sound over-approximation, since
-"too cautious" is the safe failure direction for a budget.)
+Composition: **sequential** (`Compose`) is the per-axis max; **iteration** bumps the
+iterated axis — `MapCollect<E, Axis>` bumps it on **both** time and space (n results
+materialized) while `Fold<E, Axis>` bumps only **time** (it streams), making *"stream,
+don't materialize"* a type-level fact. The **demand** is
+`require_within::<TimeCost, E, Budget>()` (and `SpaceCost`): a compile error unless the
+cost's degree on every budgeted axis is `<=` the budget's, so a stage that drifts over
+budget refuses to build (pinned in `tests/compile_fail/cost_over_budget`) — the pressure a
+complexity-blind agent lacks. As with capability, the type level only checks declared
+costs **compose** within budget; **`fits`** keeps the leaf declarations honest — it
+measures a deterministic step count at growing sizes and rejects a declared degree below
+the observed growth (a degree-1 edge that is secretly quadratic). (Worst-case asymptotic,
+single size measure per axis; recurrence/divide-and-conquer composition and constant
+factors are documented non-goals — see the cost grading's module docs.)
 
 ## Carried proofs (a GDP spike)
 

@@ -890,72 +890,100 @@ mod interp {
     }
 }
 
-/// cost — the time/space budget grading. The type level checks costs COMPOSE within
-/// budget (sequential = max, iteration = multiply, collect-vs-fold splits space); `fits`
-/// audits a declared class against measured growth.
+/// cost — the open keyed time/space budget grading, built as a PLUGGABLE grading. The
+/// type level checks costs COMPOSE within budget per axis (sequential = per-axis max,
+/// iteration = bump the iterated axis, collect-vs-fold splits space); `fits` audits a
+/// declared degree against measured growth.
 mod cost {
     use crate::boundary::{
-        fits, require_within_space, require_within_time, BigO, Compose, Costed, Fold, Linear,
-        MapCollect, Quadratic,
+        fits, require_within, Axis, Compose, CostCons, CostNil, Degree, Fold, Graded, Lookup,
+        MapCollect, SpaceCost, TimeCost, S, Z,
     };
-    use crate::ledger::boundary::{Aggregate, Round};
+    use crate::ledger::boundary::{Aggregate, Postings, Round};
 
-    /// Sequential composition takes the MAX on both axes: aggregate (O(n)/O(n)) then
-    /// round (O(n)/O(1)) is O(n) time and O(n) space, and stays within an O(n) budget.
-    #[test]
-    fn compose_takes_the_sequential_max() {
-        assert_eq!(<Compose<Aggregate, Round> as Costed>::TIME, BigO::Linear);
-        assert_eq!(<Compose<Aggregate, Round> as Costed>::SPACE, BigO::Linear);
-        let pipeline = Compose {
-            f: Aggregate,
-            g: Round,
-        };
-        require_within_time::<Linear, _>(&pipeline);
-        require_within_space::<Linear, _>(&pipeline);
+    // demo axes for a multi-axis edge (a transpiler's AST nodes vs nesting depth).
+    struct Nodes;
+    struct Depth;
+    impl Axis for Nodes {
+        type Id = Z;
+    }
+    impl Axis for Depth {
+        type Id = S<Z>;
     }
 
-    /// Iteration multiplies time on both combinators, but space splits: `MapCollect`
-    /// materializes n results (quadratic space) while `Fold` streams (space stays linear).
-    /// This is the type-level "stream, don't materialize" an agent can be held to.
+    // the degree a carrier `C` assigns axis `A`, as a number.
+    fn deg<A, C>() -> u32
+    where
+        C: Lookup<A>,
+        <C as Lookup<A>>::Deg: Degree,
+    {
+        <<C as Lookup<A>>::Deg as Degree>::N
+    }
+
+    /// Sequential composition appends the maps, so a per-axis degree is the max of the
+    /// stages'. Aggregate (postings^1, both resources) then Round (postings^1 time,
+    /// postings^0 space) composes to postings^1 in both, within a {postings <= 1} budget.
     #[test]
-    fn iteration_multiplies_time_collect_vs_fold_splits_space() {
-        assert_eq!(<MapCollect<Aggregate> as Costed>::TIME, BigO::Quadratic);
-        assert_eq!(<MapCollect<Aggregate> as Costed>::SPACE, BigO::Quadratic);
-        assert_eq!(<Fold<Aggregate> as Costed>::TIME, BigO::Quadratic);
-        assert_eq!(<Fold<Aggregate> as Costed>::SPACE, BigO::Linear);
-        require_within_time::<Quadratic, _>(&MapCollect(Aggregate));
-        // the fold keeps space within linear; the collect would NOT compile here
+    fn compose_takes_the_per_axis_max() {
+        type P = Compose<Aggregate, Round>;
+        assert_eq!(deg::<Postings, <P as Graded<TimeCost>>::Carrier>(), 1);
+        assert_eq!(deg::<Postings, <P as Graded<SpaceCost>>::Carrier>(), 1);
+        require_within::<TimeCost, P, CostCons<Postings, S<Z>, CostNil>>();
+        require_within::<SpaceCost, P, CostCons<Postings, S<Z>, CostNil>>();
+    }
+
+    /// Iteration bumps the iterated axis; `MapCollect` bumps BOTH resources (materializes
+    /// n results) while `Fold` bumps only time (streams) — "stream, don't materialize" as
+    /// a type-level fact.
+    #[test]
+    fn iteration_bumps_the_axis_collect_vs_fold_splits_space() {
+        type MC = MapCollect<Aggregate, Postings>;
+        assert_eq!(deg::<Postings, <MC as Graded<TimeCost>>::Carrier>(), 2);
+        assert_eq!(deg::<Postings, <MC as Graded<SpaceCost>>::Carrier>(), 2);
+        type FD = Fold<Aggregate, Postings>;
+        assert_eq!(deg::<Postings, <FD as Graded<TimeCost>>::Carrier>(), 2);
+        assert_eq!(deg::<Postings, <FD as Graded<SpaceCost>>::Carrier>(), 1);
+        require_within::<TimeCost, MC, CostCons<Postings, S<S<Z>>, CostNil>>();
+        // the fold keeps space within postings^1, where the collect would not
         // (pinned in tests/compile_fail/cost_over_budget).
-        require_within_space::<Linear, _>(&Fold(Aggregate));
+        require_within::<SpaceCost, FD, CostCons<Postings, S<Z>, CostNil>>();
     }
 
-    /// The honesty audit: `fits` measures work growth and catches a declared class that
-    /// does not match reality — a `Linear`-declared edge that is secretly quadratic.
+    // a demo pass that is linear in nodes but CUBIC in depth (a recursive descent).
+    struct Lower;
+    impl Graded<TimeCost> for Lower {
+        type Carrier = CostCons<Nodes, S<Z>, CostCons<Depth, S<S<S<Z>>>, CostNil>>;
+    }
+
+    /// Axes are tracked INDEPENDENTLY: `Lower` is degree 1 in nodes but degree 3 in
+    /// depth, so the depth blowup is visible while nodes stays linear — the
+    /// monomorphization-style failure a single-`n` cost is blind to.
     #[test]
-    fn fits_audits_declared_against_measured_growth() {
-        let constant = |_n: usize| 1u64;
+    fn axes_are_tracked_independently() {
+        assert_eq!(deg::<Nodes, <Lower as Graded<TimeCost>>::Carrier>(), 1);
+        assert_eq!(deg::<Depth, <Lower as Graded<TimeCost>>::Carrier>(), 3);
+        // within {nodes <= 1, depth <= 3}
+        require_within::<
+            TimeCost,
+            Lower,
+            CostCons<Nodes, S<Z>, CostCons<Depth, S<S<S<Z>>>, CostNil>>,
+        >();
+        // a budget that names only nodes ignores depth — per-axis, not global.
+        require_within::<TimeCost, Lower, CostCons<Nodes, S<Z>, CostNil>>();
+    }
+
+    /// The empirical audit, now over an open polynomial DEGREE: `fits` catches a declared
+    /// degree lower than the measured growth.
+    #[test]
+    fn fits_audits_declared_degree_against_growth() {
         let linear = |n: usize| n as u64;
         let quadratic = |n: usize| (n as u64) * (n as u64);
         let cubic = |n: usize| (n as u64).pow(3);
-        let exponential = |n: usize| 1u64 << n.min(40); // capped to avoid overflow
-                                                        // each class fits its own declared bound...
-        assert!(fits(constant, BigO::Constant));
-        assert!(fits(linear, BigO::Linear));
-        assert!(fits(quadratic, BigO::Quadratic));
-        assert!(fits(cubic, BigO::Cubic));
-        assert!(fits(exponential, BigO::Exponential));
-        // ...and a class declared too LOW is caught (the honesty check at every rung):
-        assert!(
-            !fits(linear, BigO::Constant),
-            "a linear edge is not constant"
-        );
-        assert!(
-            !fits(quadratic, BigO::Linear),
-            "a quadratic edge is not linear"
-        );
-        assert!(
-            !fits(cubic, BigO::Quadratic),
-            "a cubic edge is not quadratic"
-        );
+        assert!(fits(linear, 1));
+        assert!(fits(quadratic, 2));
+        assert!(fits(cubic, 3));
+        assert!(!fits(quadratic, 1), "quadratic is not degree 1");
+        assert!(!fits(cubic, 2), "cubic is not degree 2");
+        assert!(!fits(linear, 0), "linear is not degree 0");
     }
 }

@@ -17,8 +17,8 @@
 use std::collections::BTreeMap;
 
 use crate::boundary::{
-    Constant, Construction, Costed, Linear, Lossy, Metamorphic, Morphism, Pair, Perturbation, Pure,
-    RawPerturbation, Unit,
+    Axis, Construction, CostCons, CostNil, Graded, Lossy, Metamorphic, Morphism, Pair,
+    Perturbation, Pure, RawPerturbation, SpaceCost, TimeCost, Unit, S, Z,
 };
 
 // ===== value objects =====================================================
@@ -393,19 +393,30 @@ impl Morphism for Round {
     }
 }
 
-// ===== cost budgets (opt-in): these edges declare their time/space class ====
-// `Aggregate` folds every posting once and keeps a per-account breakdown — linear in
-// both. `Round` maps over the accounts in place — linear time, constant extra space. So
-// `Compose<Aggregate, Round>` is linear in both (the sequential max), and a consumer can
-// demand it stays `Within<Linear>`.
+// ===== cost budgets (opt-in): these edges declare their time/space cost map ===
+// The ledger's size axis is the number of POSTINGS. `Aggregate` folds every posting once
+// and keeps a per-account breakdown — degree 1 (linear) in postings, in both time and
+// space. `Round` maps over accounts in place — linear time, constant (degree 0) extra
+// space, so its space map is empty. `Compose<Aggregate, Round>` then composes to linear
+// in both via the one blanket `Graded` impl, and a consumer can demand `Postings <= 1`.
 
-impl Costed for Aggregate {
-    type Time = Linear;
-    type Space = Linear;
+/// The ledger's one size axis: the number of postings.
+pub struct Postings;
+impl Axis for Postings {
+    type Id = Z;
 }
-impl Costed for Round {
-    type Time = Linear;
-    type Space = Constant;
+
+impl Graded<TimeCost> for Aggregate {
+    type Carrier = CostCons<Postings, S<Z>, CostNil>;
+}
+impl Graded<SpaceCost> for Aggregate {
+    type Carrier = CostCons<Postings, S<Z>, CostNil>;
+}
+impl Graded<TimeCost> for Round {
+    type Carrier = CostCons<Postings, S<Z>, CostNil>;
+}
+impl Graded<SpaceCost> for Round {
+    type Carrier = CostNil;
 }
 
 // ===== value operators: perturbations ====================================

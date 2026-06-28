@@ -767,190 +767,277 @@ pub fn relation_holds<R: Relation>(r: &R, x: &R::In) -> Option<bool> {
     Some(r.apply(&varied) == r.rewrite(r.apply(x)))
 }
 
-// ===== the COST grading: time and space budgets at the type level =========
+// ===== the COST grading: open keyed time/space budgets at the type level ===
 //
-// The fifth grading, and the same shape as capability — a lattice of marker types,
-// composed by the type system, demandable as a bound — but split across TWO axes that
-// share the lattice and the ceiling yet compose by DIFFERENT rules. The point is the
-// DEMAND: a coding agent (or a human) can be held to "this path is at most O(n^2)" as a
-// COMPILE error, so a stage that drifts from linear to quadratic refuses to build until
-// it is brought back under budget. (Polynomial lattice for now; log / n-log-n are a
-// documented extension. The type level checks the ARITHMETIC of composition stays under
-// budget given honest leaf declarations; `fits` keeps the leaves honest empirically.)
+// Cost is the fifth grading, and the first built as a PLUGGABLE grading: a grading is a
+// marker `G`, an edge declares `Graded<G> { type Carrier }`, each grading names its own
+// `Combine` rule, and ONE blanket `Compose` impl threads every grading. Adding a grading
+// touches neither `Morphism` nor the other gradings — the level-heterogeneity that once
+// blocked this was dissolved when capability was lifted to the type level.
+//
+// A cost is an OPEN keyed map from named SIZE AXES to a polynomial DEGREE (a type-level
+// nat, so any n^k — no fixed lattice cap). Two resources ride the one map machinery as
+// the gradings `TimeCost` and `SpaceCost`, differing only at iteration: mapping an edge
+// per element multiplies BOTH (n results materialized) while folding multiplies only
+// time (it streams). The point is the DEMAND: a path whose degree on some axis exceeds
+// the budget is a COMPILE error — the pressure a complexity-blind agent otherwise lacks.
 
-/// The runtime complexity class a marker reflects to (the audit/laws read this).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BigO {
-    Constant,
-    Linear,
-    Quadratic,
-    Cubic,
-    Exponential,
+// --- type-level naturals: the open polynomial degree ---
+pub struct Z;
+pub struct S<N>(PhantomData<N>);
+/// Reflect a type-level degree to its number (for the audit / diagnostics).
+pub trait Degree {
+    const N: u32;
 }
-
-/// A type-level complexity class, reflecting to `BigO`. Sealed — the lattice is closed.
-pub trait Complexity: sealed::Sealed {
-    const CLASS: BigO;
+impl Degree for Z {
+    const N: u32 = 0;
 }
-/// The classes as marker types (one lattice, shared by the time and space axes).
-pub struct Constant;
-pub struct Linear;
-pub struct Quadratic;
-pub struct Cubic;
-pub struct Exponential;
-macro_rules! complexity {
-    ($($t:ty => $c:expr);+ $(;)?) => {$(
-        impl sealed::Sealed for $t {}
-        impl Complexity for $t { const CLASS: BigO = $c; }
-    )+};
-}
-complexity!(
-    Constant => BigO::Constant; Linear => BigO::Linear; Quadratic => BigO::Quadratic;
-    Cubic => BigO::Cubic; Exponential => BigO::Exponential;
-);
-
-/// `Self <= Ceiling` on the lattice — the demandable budget bound (the cost twin of
-/// capability's `AtMost`). `where E::Time: Within<Quadratic>` accepts only paths that
-/// stay at most quadratic; a cubic path fails to compile.
-pub trait Within<Ceiling> {}
-macro_rules! within {
-    ($($lo:ty , $hi:ty);+ $(;)?) => {$( impl Within<$hi> for $lo {} )+};
-}
-within!(
-    Constant, Constant; Constant, Linear; Constant, Quadratic; Constant, Cubic; Constant, Exponential;
-    Linear, Linear; Linear, Quadratic; Linear, Cubic; Linear, Exponential;
-    Quadratic, Quadratic; Quadratic, Cubic; Quadratic, Exponential;
-    Cubic, Cubic; Cubic, Exponential;
-    Exponential, Exponential;
-);
-
-/// SEQUENTIAL composition: two stages each run once on the data, so the cost is the
-/// MAX of the two (the higher degree dominates). Used for both axes under `Compose`.
-pub trait Seq<Other> {
-    type Out: Complexity;
-}
-macro_rules! seq {
-    ($($a:ty , $b:ty => $o:ty);+ $(;)?) => {$( impl Seq<$b> for $a { type Out = $o; } )+};
-}
-seq!(
-    Constant,Constant=>Constant; Constant,Linear=>Linear; Constant,Quadratic=>Quadratic; Constant,Cubic=>Cubic; Constant,Exponential=>Exponential;
-    Linear,Constant=>Linear; Linear,Linear=>Linear; Linear,Quadratic=>Quadratic; Linear,Cubic=>Cubic; Linear,Exponential=>Exponential;
-    Quadratic,Constant=>Quadratic; Quadratic,Linear=>Quadratic; Quadratic,Quadratic=>Quadratic; Quadratic,Cubic=>Cubic; Quadratic,Exponential=>Exponential;
-    Cubic,Constant=>Cubic; Cubic,Linear=>Cubic; Cubic,Quadratic=>Cubic; Cubic,Cubic=>Cubic; Cubic,Exponential=>Exponential;
-    Exponential,Constant=>Exponential; Exponential,Linear=>Exponential; Exponential,Quadratic=>Exponential; Exponential,Cubic=>Exponential; Exponential,Exponential=>Exponential;
-);
-
-/// PER-ELEMENT application: running an edge once per element of an n-sized collection
-/// MULTIPLIES its cost by `n` (bumps the polynomial degree). This is where the time and
-/// space axes part ways — and where a pathological pipeline is built one nesting at a
-/// time. (`Cubic` rounds up to `Exponential`: a sound over-approximation, since the
-/// lattice tops out and a too-cautious "over budget" is the safe failure direction.)
-pub trait PerElement {
-    type Out: Complexity;
-}
-impl PerElement for Constant {
-    type Out = Linear;
-}
-impl PerElement for Linear {
-    type Out = Quadratic;
-}
-impl PerElement for Quadratic {
-    type Out = Cubic;
-}
-impl PerElement for Cubic {
-    type Out = Exponential;
-}
-impl PerElement for Exponential {
-    type Out = Exponential;
+impl<D: Degree> Degree for S<D> {
+    const N: u32 = D::N + 1;
 }
 
-/// An edge that declares a TIME and a SPACE budget — opt-in (not every edge needs a
-/// stated budget, unlike capability which every edge has). The runtime consts are
-/// derived so an audit reads them unchanged.
-pub trait Costed {
-    type Time: Complexity;
-    type Space: Complexity;
-    const TIME: BigO = <Self::Time as Complexity>::CLASS;
-    const SPACE: BigO = <Self::Space as Complexity>::CLASS;
+// --- type-level booleans + selection ---
+pub struct True;
+pub struct False;
+/// Pick `T` on `True`, `E` on `False` — the type-level conditional.
+pub trait Select<T, E> {
+    type Out;
+}
+impl<T, E> Select<T, E> for True {
+    type Out = T;
+}
+impl<T, E> Select<T, E> for False {
+    type Out = E;
 }
 
-// `Compose` threads cost on BOTH axes by the SAME sequential rule (max): the composite
-// is as costly as its dearer stage, in time and in space alike.
-impl<F, G> Costed for Compose<F, G>
+// --- nat equality / <= / max (overlap-free: disjoint head constructors) ---
+pub trait NatEq<B> {
+    type Out;
+}
+impl NatEq<Z> for Z {
+    type Out = True;
+}
+impl<B> NatEq<S<B>> for Z {
+    type Out = False;
+}
+impl<A> NatEq<Z> for S<A> {
+    type Out = False;
+}
+impl<A, B> NatEq<S<B>> for S<A>
 where
-    F: Costed,
-    G: Costed,
-    F::Time: Seq<G::Time>,
-    F::Space: Seq<G::Space>,
+    A: NatEq<B>,
 {
-    type Time = <F::Time as Seq<G::Time>>::Out;
-    type Space = <F::Space as Seq<G::Space>>::Out;
+    type Out = <A as NatEq<B>>::Out;
+}
+/// `Self <= B` at the type level (reflected to a `Bool`).
+pub trait Le<B> {
+    type Out;
+}
+impl<B> Le<B> for Z {
+    type Out = True;
+}
+impl<A> Le<Z> for S<A> {
+    type Out = False;
+}
+impl<A, B> Le<S<B>> for S<A>
+where
+    A: Le<B>,
+{
+    type Out = <A as Le<B>>::Out;
+}
+/// The larger of two degrees.
+pub trait Max<B> {
+    type Out;
+}
+impl<B> Max<B> for Z {
+    type Out = B;
+}
+impl<A> Max<Z> for S<A> {
+    type Out = S<A>;
+}
+impl<A, B> Max<S<B>> for S<A>
+where
+    A: Max<B>,
+{
+    type Out = S<<A as Max<B>>::Out>;
 }
 
-/// Apply an edge once per element and COLLECT the results: time multiplies by `n` AND
-/// space multiplies by `n` (the n outputs are materialized).
-pub struct MapCollect<E>(pub E);
-impl<E> Costed for MapCollect<E>
-where
-    E: Costed,
-    E::Time: PerElement,
-    E::Space: PerElement,
-{
-    type Time = <E::Time as PerElement>::Out;
-    type Space = <E::Space as PerElement>::Out;
+// --- size axes: a named dimension of the input, with a unique type-level Id ---
+/// A named size axis (e.g. AST nodes, nesting depth, type variables). The `Id`
+/// distinguishes axes in the cost map's overlap-free lookup.
+pub trait Axis {
+    type Id;
 }
 
-/// Apply an edge once per element but FOLD (stream) the results: time still multiplies
-/// by `n`, but space stays flat — the inner outputs are consumed, not held. This is the
-/// type-level statement of "stream, don't materialize", a space win an agent can be held
-/// to.
-pub struct Fold<E>(pub E);
-impl<E> Costed for Fold<E>
+// --- the cost map: a type-level multimap (axis, degree); lookup takes the MAX per ---
+// axis, so sequential composition is just append (no map merge needed).
+pub struct CostNil;
+pub struct CostCons<Ax, Deg, Rest>(PhantomData<(Ax, Deg, Rest)>);
+
+/// The degree a cost map assigns axis `Q` — the max over matching entries, `Z` if absent.
+pub trait Lookup<Q> {
+    type Deg;
+}
+impl<Q> Lookup<Q> for CostNil {
+    type Deg = Z;
+}
+impl<Q, Ax, Deg, Rest> Lookup<Q> for CostCons<Ax, Deg, Rest>
 where
-    E: Costed,
-    E::Time: PerElement,
+    Q: Axis,
+    Ax: Axis,
+    <Q as Axis>::Id: NatEq<<Ax as Axis>::Id>,
+    Rest: Lookup<Q>,
+    Deg: Max<<Rest as Lookup<Q>>::Deg>,
+    <<Q as Axis>::Id as NatEq<<Ax as Axis>::Id>>::Out:
+        Select<<Deg as Max<<Rest as Lookup<Q>>::Deg>>::Out, <Rest as Lookup<Q>>::Deg>,
 {
-    type Time = <E::Time as PerElement>::Out;
-    type Space = E::Space;
+    type Deg = <<<Q as Axis>::Id as NatEq<<Ax as Axis>::Id>>::Out as Select<
+        <Deg as Max<<Rest as Lookup<Q>>::Deg>>::Out,
+        <Rest as Lookup<Q>>::Deg,
+    >>::Out;
 }
 
-/// Demand a TIME budget: this only compiles if `E`'s time stays within `Ceiling`. A path
-/// that drifts over budget is a build error — the pressure a complexity-blind agent
-/// lacks. (`require_within_space` is the space twin.)
-pub fn require_within_time<Ceiling, E>(_e: &E)
+/// Append two cost maps (sequential composition's combine; per-axis max is folded into
+/// `Lookup`, so this needs no merge).
+pub trait AppendCost<B> {
+    type Out;
+}
+impl<B> AppendCost<B> for CostNil {
+    type Out = B;
+}
+impl<Ax, Deg, Rest, B> AppendCost<B> for CostCons<Ax, Deg, Rest>
 where
-    E: Costed,
-    E::Time: Within<Ceiling>,
+    Rest: AppendCost<B>,
+{
+    type Out = CostCons<Ax, Deg, <Rest as AppendCost<B>>::Out>;
+}
+
+/// A cost map is WITHIN a `Ceiling` iff, for every axis the ceiling names, the cost's
+/// degree for that axis is `<=` the ceiling's. The demandable budget bound.
+pub trait WithinBudget<Ceiling> {}
+impl<Cost> WithinBudget<CostNil> for Cost {}
+impl<Cost, Ax, CDeg, Rest> WithinBudget<CostCons<Ax, CDeg, Rest>> for Cost
+where
+    Cost: Lookup<Ax>,
+    <Cost as Lookup<Ax>>::Deg: Le<CDeg, Out = True>,
+    Cost: WithinBudget<Rest>,
 {
 }
 
-/// Demand a SPACE budget — the space twin of `require_within_time`.
-pub fn require_within_space<Ceiling, E>(_e: &E)
+// --- the pluggable grading core ---
+/// A grading KIND (a marker): residual, capability, cost, ... Each names a `Combine`
+/// rule and edges declare a `Graded` carrier — which is what makes gradings PLUGGABLE: a
+/// new grading needs no edit to `Morphism` or the other gradings.
+pub trait Grading {}
+/// Edge `Self` carries a type-level value for grading `G`.
+pub trait Graded<G: Grading> {
+    type Carrier;
+}
+/// How two carriers combine under grading `G` when edges run in SEQUENCE.
+pub trait Combine<G: Grading, Rhs> {
+    type Out;
+}
+/// ONE blanket impl threads EVERY present and future grading through `Compose`.
+impl<G, F, T> Graded<G> for Compose<F, T>
 where
-    E: Costed,
-    E::Space: Within<Ceiling>,
+    G: Grading,
+    F: Graded<G>,
+    T: Graded<G>,
+    <F as Graded<G>>::Carrier: Combine<G, <T as Graded<G>>::Carrier>,
 {
+    type Carrier = <<F as Graded<G>>::Carrier as Combine<G, <T as Graded<G>>::Carrier>>::Out;
+}
+
+// --- cost as two pluggable gradings, time and space, over the one map ---
+/// The time-complexity grading (carrier: a cost map).
+pub struct TimeCost;
+/// The space-complexity grading (carrier: a cost map).
+pub struct SpaceCost;
+impl Grading for TimeCost {}
+impl Grading for SpaceCost {}
+// Sequential composition appends the maps for BOTH resources (max folded into lookup).
+impl<A, B> Combine<TimeCost, B> for A
+where
+    A: AppendCost<B>,
+{
+    type Out = <A as AppendCost<B>>::Out;
+}
+impl<A, B> Combine<SpaceCost, B> for A
+where
+    A: AppendCost<B>,
+{
+    type Out = <A as AppendCost<B>>::Out;
+}
+
+/// Demand a budget on grading `G`: a compile error unless `E`'s `G`-carrier is within
+/// `Ceiling`. `require_within::<TimeCost, E, Budget>()` is the time demand; pass
+/// `SpaceCost` for space. (Argument-free, so it works on cost-only marker combinators.)
+pub fn require_within<G, E, Ceiling>()
+where
+    G: Grading,
+    E: Graded<G>,
+    <E as Graded<G>>::Carrier: WithinBudget<Ceiling>,
+{
+}
+
+// --- iteration combinators: where time and space part ways ---
+/// Apply an edge once per element along axis `A` and COLLECT the results: BOTH time and
+/// space gain a degree on `A` (the n results are materialized).
+pub struct MapCollect<E, A>(PhantomData<(E, A)>);
+impl<E, A> Graded<TimeCost> for MapCollect<E, A>
+where
+    E: Graded<TimeCost>,
+    <E as Graded<TimeCost>>::Carrier: Lookup<A>,
+{
+    type Carrier = CostCons<
+        A,
+        S<<<E as Graded<TimeCost>>::Carrier as Lookup<A>>::Deg>,
+        <E as Graded<TimeCost>>::Carrier,
+    >;
+}
+impl<E, A> Graded<SpaceCost> for MapCollect<E, A>
+where
+    E: Graded<SpaceCost>,
+    <E as Graded<SpaceCost>>::Carrier: Lookup<A>,
+{
+    type Carrier = CostCons<
+        A,
+        S<<<E as Graded<SpaceCost>>::Carrier as Lookup<A>>::Deg>,
+        <E as Graded<SpaceCost>>::Carrier,
+    >;
+}
+/// Apply an edge once per element along axis `A` but FOLD (stream): time gains a degree
+/// on `A`, space stays flat (results are consumed, not held) — "stream, don't
+/// materialize" as a type-level fact.
+pub struct Fold<E, A>(PhantomData<(E, A)>);
+impl<E, A> Graded<TimeCost> for Fold<E, A>
+where
+    E: Graded<TimeCost>,
+    <E as Graded<TimeCost>>::Carrier: Lookup<A>,
+{
+    type Carrier = CostCons<
+        A,
+        S<<<E as Graded<TimeCost>>::Carrier as Lookup<A>>::Deg>,
+        <E as Graded<TimeCost>>::Carrier,
+    >;
+}
+impl<E, A> Graded<SpaceCost> for Fold<E, A>
+where
+    E: Graded<SpaceCost>,
+{
+    type Carrier = <E as Graded<SpaceCost>>::Carrier;
 }
 
 /// The empirical honesty audit (the cost twin of the residual probe): the type level
 /// checks declared costs COMPOSE within budget, but cannot see whether a leaf's declared
-/// class matches reality. `fits` does: it measures a deterministic work count at growing
-/// sizes and checks the doubling ratio stays within the declared class's (with slack), so
-/// a `Linear`-declared edge that is secretly quadratic is caught — the transpiler bug.
-/// (Measure a deterministic STEP count, not wall-clock, so the verdict is reproducible.)
-pub fn fits(measure: impl Fn(usize) -> u64, declared: BigO) -> bool {
-    // Each rung's bound is its EXACT doubling ratio (2^degree): a pure O(n^k) edge's
-    // step count exactly k-tuples when n doubles, and a real edge with positive
-    // lower-order terms ratios STRICTLY below it — so `>` (not `>=`) is the honest
-    // boundary, and an n·log n edge declared `Linear` (ratio just over 2) is rejected.
+/// degree matches reality. `fits` does: it measures a deterministic step count at growing
+/// sizes and rejects a `degree` lower than the observed growth — a `degree`-1 edge that
+/// is secretly quadratic is caught. (Deterministic STEP count, not wall-clock, so the
+/// verdict is reproducible; the bound for a degree-k claim is the exact doubling ratio
+/// 2^k, which a real edge with positive lower-order terms ratios strictly below.)
+pub fn fits(measure: impl Fn(usize) -> u64, degree: u32) -> bool {
     let sizes = [16usize, 32, 64, 128];
-    let bound = match declared {
-        BigO::Constant => 1.0,
-        BigO::Linear => 2.0,
-        BigO::Quadratic => 4.0,
-        BigO::Cubic => 8.0,
-        BigO::Exponential => f64::INFINITY,
-    };
+    let bound = 2f64.powi(degree as i32);
     let mut prev: Option<u64> = None;
     for &n in &sizes {
         let work = measure(n);

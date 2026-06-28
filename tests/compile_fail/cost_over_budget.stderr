@@ -1,35 +1,15 @@
-error[E0277]: the trait bound `boundary_algebra::boundary::Quadratic: Within<boundary_algebra::boundary::Linear>` is not satisfied
-  --> tests/compile_fail/cost_over_budget.rs:13:38
+error[E0271]: type mismatch resolving `<S<S<Z>> as Le<S<Z>>>::Out == True`
+  --> tests/compile_fail/cost_over_budget.rs:14:32
    |
-13 |     require_within_time::<Linear, _>(&MapCollect(Aggregate));
-   |     -------------------------------- ^^^^^^^^^^^^^^^^^^^^^^ the trait `Within<boundary_algebra::boundary::Linear>` is not implemented for `boundary_algebra::boundary::Quadratic`
-   |     |
-   |     required by a bound introduced by this call
+14 |     require_within::<TimeCost, MapCollect<Aggregate, Postings>, CostCons<Postings, S<Z>, CostNil>>();
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `True`, found `False`
    |
-help: the following other types implement trait `Within<Ceiling>`
+   = note: required for `CostCons<Postings, S<S<Z>>, CostCons<Postings, S<Z>, CostNil>>` to implement `WithinBudget<CostCons<Postings, S<Z>, CostNil>>`
+note: required by a bound in `require_within`
   --> src/boundary.rs
    |
-   |       ($($lo:ty , $hi:ty);+ $(;)?) => {$( impl Within<$hi> for $lo {} )+};
-   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^
-   |                                           |
-   |                                           `boundary_algebra::boundary::Quadratic` implements `Within<boundary_algebra::boundary::Cubic>`
-   |                                           `boundary_algebra::boundary::Quadratic` implements `Within<boundary_algebra::boundary::Exponential>`
-   |                                           `boundary_algebra::boundary::Quadratic` implements `Within<boundary_algebra::boundary::Quadratic>`
-   |   }
-   | / within!(
-   | |     Constant, Constant; Constant, Linear; Constant, Quadratic; Constant, Cubic; Constant, Exponential;
-   | |     Linear, Linear; Linear, Quadratic; Linear, Cubic; Linear, Exponential;
-   | |     Quadratic, Quadratic; Quadratic, Cubic; Quadratic, Exponential;
-   | |     Cubic, Cubic; Cubic, Exponential;
-   | |     Exponential, Exponential;
-   | | );
-   | |_- in this macro invocation
-note: required by a bound in `require_within_time`
-  --> src/boundary.rs
-   |
-   | pub fn require_within_time<Ceiling, E>(_e: &E)
-   |        ------------------- required by a bound in this function
+   | pub fn require_within<G, E, Ceiling>()
+   |        -------------- required by a bound in this function
 ...
-   |     E::Time: Within<Ceiling>,
-   |              ^^^^^^^^^^^^^^^ required by this bound in `require_within_time`
-   = note: this error originates in the macro `within` (in Nightly builds, run with -Z macro-backtrace for more info)
+   |     <E as Graded<G>>::Carrier: WithinBudget<Ceiling>,
+   |                                ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `require_within`
