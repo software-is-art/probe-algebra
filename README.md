@@ -225,6 +225,35 @@ because that law's generator is built from `render`). Each was closed by a small
 *boundary* test (an accessor oracle, an equal-operands case), never an internal one. The
 bug-catching budget moves to the edge; the inside comes nearly for free.
 
+### What this demonstrates, plainly (and what it doesn't)
+
+On *one* module, with **zero tests written inside it**, the boundary's probes killed
+**every viable, non-equivalent mutant** — the theoretical ceiling of mutation testing
+(the lone survivor is *provably equivalent*: a mutation that produces identical
+behaviour, which no test can kill because it is not a defect). Stated carefully, in three
+parts:
+
+- **Structural defects — caught by probes generated fully automatically.** Round-trip,
+  residual-completeness, composition, capability: these are *derived from an edge's type*.
+  Register the edge, get the laws, no per-case code.
+- **Value and semantic defects — caught by probes auto-*amplified* from a one-line
+  declared invariant.** The abstraction cannot invent *what the program should compute*;
+  you state an invariant once (`eval(a + 0) == eval(a)`, `unwrap . wrap == id`) and it
+  generates the cases, runs them over the whole input space, and places them at the seam.
+  The oracle is declared; the testing is automatic.
+- **There is an irreducible floor.** A genuinely arbitrary constant with no algebraic
+  relation and no reference (an accessor returning a wrong-but-consistent value) cannot be
+  pinned by structure alone — it needs a declared accessor law or a differential oracle.
+  No abstraction removes that floor; it only makes *declaring* the oracle a one-liner.
+
+So the honest claim is **not** "it eliminates defects." It is: *the discipline removes the
+need to **write the tests**, not the need to **say what correct means** — and it shows, on
+one module, that doing the latter at the boundary is enough to leave the inside untested
+yet defect-free under mutation.* (Caveats: mutation testing certifies a suite against a
+fixed operator set on existing code — it is strong evidence of a strong suite, not a proof
+of absence of missing-feature, spec, or concurrency bugs; and this is n=1 on a small
+language.)
+
 ## The worked example
 
 `src/ledger/` aggregates a `Transaction` (a multiset of postings) into an
