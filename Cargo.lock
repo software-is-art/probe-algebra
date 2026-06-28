@@ -33,9 +33,19 @@ checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 name = "boundary-algebra"
 version = "0.1.0"
 dependencies = [
+ "boundary-algebra-macros",
  "proptest",
  "syn",
  "trybuild",
+]
+
+[[package]]
+name = "boundary-algebra-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

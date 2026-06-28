@@ -632,6 +632,74 @@ where
     })
 }
 
+// ===== the FUSED universal probe: structure derives the probe surface =====
+//
+// The probes above each target ONE bug class with a HAND-WRITTEN perturbation. `Shaped`
+// derives the perturbation surface from a value object's own STRUCTURE, and the fused probe
+// below collapses the structural, value, and semantic layers into a SINGLE operator: a map
+// is faithful iff it responds to every derived degree of freedom. `#[derive(Shaped)]`
+// (in `boundary-algebra-macros`) generates it for composites; leaves with smart-constructor
+// invariants impl it by hand.
+
+/// A value object whose probe surface is its STRUCTURE. `inhabitant` is one canonical seed
+/// (so generation needs no argument); `perturbation_classes` returns one neighbour-GROUP
+/// per degree of freedom — the variant choice (STRUCTURE) and each field (VALUE / deeper
+/// SEMANTICS). Derivable: `#[derive(Shaped)]` reads the variants and fields.
+pub trait Shaped: Sized + Clone + PartialEq {
+    /// One canonical inhabitant — the first variant / the struct of field inhabitants.
+    fn inhabitant() -> Self;
+    /// Neighbours grouped by degree of freedom (one group per variant-choice and per field).
+    fn perturbation_classes(&self) -> Vec<Vec<Self>>;
+    /// All neighbours, flattened across dimensions (what a field threads back upward).
+    fn all_perturbations(&self) -> Vec<Self> {
+        self.perturbation_classes().into_iter().flatten().collect()
+    }
+}
+
+/// A boolean varies one way: to its negation.
+impl Shaped for bool {
+    fn inhabitant() -> Self {
+        false
+    }
+    fn perturbation_classes(&self) -> Vec<Vec<Self>> {
+        vec![vec![!*self]]
+    }
+}
+
+/// A boxed value is shaped exactly as its contents (the box is transparent to probing).
+impl<T: Shaped> Shaped for Box<T> {
+    fn inhabitant() -> Self {
+        Box::new(T::inhabitant())
+    }
+    fn perturbation_classes(&self) -> Vec<Vec<Self>> {
+        (**self)
+            .perturbation_classes()
+            .into_iter()
+            .map(|group| group.into_iter().map(Box::new).collect())
+            .collect()
+    }
+}
+
+/// The FUSED universal probe: a map is FAITHFUL at `x` iff it is SENSITIVE to every degree
+/// of freedom — for each derived perturbation class (the variant choice = STRUCTURE, each
+/// field = VALUE / deeper SEMANTICS) SOME neighbour changes the output. One operator,
+/// derived from `Shaped`, that fuses the three probe layers: a map silently collapsing ANY
+/// dimension fails, because that dimension's class has no responding neighbour. Sensitivity
+/// is PER-CLASS, not global injectivity, so a map MAY identify genuinely-equivalent inputs
+/// within a class (e.g. eval and commutativity) and still be sensitive to the dimension.
+/// (An empty class — a dimension with no neighbours — imposes no obligation.)
+pub fn sensitive_to_all<T, Y>(map: impl Fn(&T) -> Y, x: &T) -> bool
+where
+    T: Shaped,
+    Y: PartialEq,
+{
+    let fx = map(x);
+    x.perturbation_classes()
+        .into_iter()
+        .filter(|class| !class.is_empty())
+        .all(|class| class.iter().any(|n| map(n) != fx))
+}
+
 // ===== layer 2: structural / variational probes (reference-FREE) ==========
 
 /// A METAMORPHIC RELATION (structural / variational): an input perturbation

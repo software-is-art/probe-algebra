@@ -27,6 +27,7 @@ use crate::boundary::{
     Lossy, Morphism, Pure, Stateful, Unit, S, Z,
 };
 use crate::gdp::Named;
+use crate::Shaped; // the `#[derive(Shaped)]` macro (the trait is `crate::boundary::Shaped`)
 
 // ===== value objects: the language's nouns ================================
 
@@ -87,7 +88,7 @@ impl Ident {
 }
 
 /// A binary operator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Shaped)]
 pub enum Op {
     Add,
     Mul,
@@ -105,7 +106,7 @@ impl Op {
 }
 
 /// A literal: an integer or a boolean.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Shaped)]
 pub enum Lit {
     Int(Int),
     Bool(bool),
@@ -119,7 +120,7 @@ pub enum Ty {
 }
 
 /// The abstract syntax tree — the central value object the boundary edges transform.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Shaped)]
 pub enum Expr {
     Lit(Lit),
     Var(Ident),
@@ -199,7 +200,7 @@ impl Expr {
 }
 
 /// A runtime value — the result of evaluation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Shaped)]
 pub enum Value {
     Int(Int),
     Bool(bool),
@@ -290,6 +291,34 @@ impl Pos {
 }
 
 crate::value_object!(Int, Ident, Op, Lit, Ty, Expr, Value, Env, Bound, Source, Pos);
+
+// The probe surface (`Shaped`) is DERIVED for the composites (`Op`, `Lit`, `Value`, `Expr`)
+// but the two leaves carry smart-constructor INVARIANTS the derive cannot see (an `Int` is
+// non-negative; an `Ident` is non-empty, alphabetic, non-keyword), so their inhabitants and
+// perturbations are written by hand to stay inside the valid set — the one place structure
+// alone is not enough.
+impl crate::boundary::Shaped for Int {
+    fn inhabitant() -> Self {
+        Int::new(0).expect("0 is a valid Int")
+    }
+    fn perturbation_classes(&self) -> Vec<Vec<Self>> {
+        // bump and halve — two valid neighbours that move the value in both directions.
+        vec![vec![
+            Int::new(self.0 + 1).expect("successor stays non-negative"),
+            Int::new(self.0 / 2).expect("halving stays non-negative"),
+        ]]
+    }
+}
+impl crate::boundary::Shaped for Ident {
+    fn inhabitant() -> Self {
+        Ident::new("x").expect("x is a valid identifier")
+    }
+    fn perturbation_classes(&self) -> Vec<Vec<Self>> {
+        // a different valid, non-keyword name (distinct from the canonical inhabitant).
+        let other = if self.0 == "y" { "z" } else { "y" };
+        vec![vec![Ident::new(other).expect("valid identifier")]]
+    }
+}
 
 // ===== the proof tokens: the type-correctness witnesses ===================
 

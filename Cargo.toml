@@ -3,9 +3,15 @@ name = "boundary-algebra"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = [".", "boundary-algebra-macros"]
+
 [[bin]]
 name = "demo"
 path = "src/main.rs"
+
+[dependencies]
+boundary-algebra-macros = { path = "boundary-algebra-macros" }
 
 [dev-dependencies]
 proptest = "1"

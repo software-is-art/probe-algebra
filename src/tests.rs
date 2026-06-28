@@ -713,3 +713,84 @@ mod algebra_surface {
         assert_eq!(lett.depth(), 2);
     }
 }
+
+// ===== the FUSED universal probe (derived from structure) =================
+//
+// `#[derive(Shaped)]` generates each value object's probe surface from its variants and
+// fields; `sensitive_to_all` fuses the structural, value, and semantic layers into ONE
+// operator. A faithful map responds to every derived degree of freedom; a map that
+// silently collapses any dimension is caught — without a hand-written perturbation.
+mod fused_probe {
+    use super::{int, Expr, Op};
+    use crate::boundary::{sensitive_to_all, Shaped};
+    use crate::interp::boundary::{Int, Lit};
+
+    /// `(1 + (2 * 3))` — an operator, two operands, and a nested subtree, so the derived
+    /// classes span structure, value, and depth.
+    fn deep() -> Expr {
+        Expr::bin(Op::Add, int(1), Expr::bin(Op::Mul, int(2), int(3)))
+    }
+
+    /// The derive produces a real seed and one non-empty neighbour-group per degree of
+    /// freedom (a `Bin` has four: the variant choice, the operator, and the two operands).
+    #[test]
+    fn derive_generates_the_probe_surface() {
+        assert_eq!(
+            Expr::inhabitant(),
+            Expr::Lit(Lit::Int(Int::new(0).unwrap()))
+        );
+        assert_eq!(deep().perturbation_classes().len(), 4);
+        assert!(deep().perturbation_classes().iter().all(|c| !c.is_empty()));
+    }
+
+    /// A FAITHFUL map (`render`) responds to every dimension — structure AND value.
+    #[test]
+    fn render_is_sensitive_to_every_dimension() {
+        assert!(sensitive_to_all(|e: &Expr| e.render(), &deep()));
+    }
+
+    /// `node_count` COLLAPSES the operator and the literal VALUES (Add vs Mul, 2 vs 3 share
+    /// a count), so the operator/value classes have no responding neighbour — caught.
+    #[test]
+    fn node_count_collapses_value_and_operator() {
+        assert!(!sensitive_to_all(|e: &Expr| e.node_count(), &deep()));
+    }
+
+    /// A top-constructor-only map is blind to the OPERANDS (deep structure / semantics): the
+    /// operand classes never change the discriminant, so it is caught.
+    #[test]
+    fn shallow_map_misses_the_deep_dimensions() {
+        assert!(!sensitive_to_all(
+            |e: &Expr| core::mem::discriminant(e),
+            &deep()
+        ));
+    }
+
+    /// A constant map responds to nothing.
+    #[test]
+    fn constant_map_is_caught() {
+        assert!(!sensitive_to_all(|_: &Expr| 0u8, &deep()));
+    }
+
+    /// The two leaves impl `Shaped` by hand (smart-constructor invariants), so their seed
+    /// and neighbours are pinned directly — the derive cannot certify them.
+    #[test]
+    fn leaf_shapes_are_pinned() {
+        use crate::interp::boundary::Ident;
+        assert_eq!(Int::inhabitant(), Int::new(0).unwrap());
+        // Int neighbours: successor and half (both stay non-negative, both move the value).
+        assert_eq!(
+            Int::new(4).unwrap().all_perturbations(),
+            vec![Int::new(5).unwrap(), Int::new(2).unwrap()]
+        );
+        // Ident neighbour: a distinct valid name ("y", or "z" when self is "y").
+        assert_eq!(Ident::inhabitant(), super::name("x"));
+        assert_eq!(super::name("a").all_perturbations(), vec![super::name("y")]);
+        assert_eq!(super::name("y").all_perturbations(), vec![super::name("z")]);
+        // bool (the primitive leaf): each value's one neighbour is its negation. (Its
+        // `inhabitant` is `false`, which `Default::default()` also yields — a documented
+        // equivalent mutant, like the lexer's alphabetic guard.)
+        assert_eq!(true.all_perturbations(), vec![false]);
+        assert_eq!(false.all_perturbations(), vec![true]);
+    }
+}

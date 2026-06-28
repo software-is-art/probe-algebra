@@ -35,6 +35,11 @@ pub mod gdp;
 pub mod interp;
 pub mod select;
 
+/// `#[derive(Shaped)]` — generate a value object's probe surface (the fused universal
+/// probe's `inhabitant` + `perturbation_classes`) from its structure. The companion of the
+/// `crate::boundary::Shaped` trait, re-exported here so edges write `#[derive(Shaped)]`.
+pub use boundary_algebra_macros::Shaped;
+
 #[cfg(test)]
 mod laws;
 #[cfg(test)]

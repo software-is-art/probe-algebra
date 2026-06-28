@@ -12,7 +12,9 @@ use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
 use proptest::test_runner::TestRunner;
 
-use crate::boundary::{reconstructs, relation_holds, Capability, Construction, Relation, Unit};
+use crate::boundary::{
+    reconstructs, relation_holds, sensitive_to_all, Capability, Construction, Relation, Unit,
+};
 
 // ===== Sampled: a type supplies its OWN canonical input distribution =======
 
@@ -256,6 +258,23 @@ mod registry {
     fn parse_is_probed() {
         construction_round_trips(&Parse, canonical_source());
         construction_capability_matches_residual::<Parse>();
+    }
+
+    /// The FUSED universal probe over RANDOM structures: a faithful map (`render`) is
+    /// sensitive to every derived degree of freedom at every generated `Expr` — random input
+    /// generation (proptest) crossed with the structure-derived per-dimension perturbations.
+    #[test]
+    fn render_is_universally_sensitive() {
+        TestRunner::default()
+            .run(&<Expr as Sampled>::sampled(), |e| {
+                prop_assert!(
+                    sensitive_to_all(|x: &Expr| x.render(), &e),
+                    "render missed a dimension at {:?}",
+                    e
+                );
+                Ok(())
+            })
+            .unwrap();
     }
 
     /// `parse . render == id` on the AST, oracle = `Expr` equality, generator
