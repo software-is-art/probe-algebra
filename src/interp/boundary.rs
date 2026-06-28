@@ -24,7 +24,7 @@ use core::marker::PhantomData;
 
 use crate::boundary::{
     Axis, Branch, Construction, CostCons, CostNil, Covers, DofCons, DofNil, Graded, Guarded,
-    HasDofs, Lossy, Morphism, Pure, SpaceCost, TimeCost, Unit, S, Z,
+    HasDofs, Lossy, Morphism, Pure, SpaceCost, Stateful, TimeCost, Unit, S, Z,
 };
 use crate::gdp::Named;
 
@@ -205,6 +205,51 @@ pub enum Value {
     Bool(bool),
 }
 
+/// An ENVIRONMENT: variable bindings carried as STATE. It is a value object (the carried
+/// state is a citizen, not a loose `HashMap`), and it is what makes `Resolve` `Stateful` —
+/// an edge that reads it produces output depending on more than its expression argument.
+/// Last binding for a name wins, so `bind` models shadowing.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Env(Vec<(Ident, Int)>);
+impl Env {
+    pub fn new() -> Self {
+        Env(Vec::new())
+    }
+    /// Bind `name` to `val`, shadowing any earlier binding for the same name.
+    pub fn bind(mut self, name: Ident, val: Int) -> Self {
+        self.0.push((name, val));
+        self
+    }
+    /// The value bound to `name` (the most recent), or `None` if unbound.
+    pub fn get(&self, name: &Ident) -> Option<Int> {
+        self.0
+            .iter()
+            .rev()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| *v)
+    }
+}
+
+/// An expression PAIRED with the environment it is to be resolved against — the input to
+/// the `Stateful` `Resolve` edge. Bundling the state INTO the input keeps `Morphism`'s pure
+/// `forward` signature while still modelling an edge whose result depends on carried state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bound {
+    env: Env,
+    expr: Expr,
+}
+impl Bound {
+    pub fn new(env: Env, expr: Expr) -> Self {
+        Bound { env, expr }
+    }
+    pub fn env(&self) -> &Env {
+        &self.env
+    }
+    pub fn expr(&self) -> &Expr {
+        &self.expr
+    }
+}
+
 /// The raw source text as a value object — the lexer's substrate. Modelling it (rather
 /// than passing a bare `&str`) is what lets the scanner read characters through a
 /// sanctioned ACCESSOR (`at`) instead of a primitive-returning helper the inward rule
@@ -244,7 +289,7 @@ impl Pos {
     }
 }
 
-crate::value_object!(Int, Ident, Op, Lit, Ty, Expr, Value, Source, Pos);
+crate::value_object!(Int, Ident, Op, Lit, Ty, Expr, Value, Env, Bound, Source, Pos);
 
 // ===== the proof tokens: the type-correctness witnesses ===================
 
@@ -286,7 +331,10 @@ crate::value_operator!(
     Eval,
     ConstFold,
     ConstFoldDoubles,
-    ConstFoldForgetful
+    ConstFoldForgetful,
+    Resolve,
+    ResolveIgnoresEnv,
+    ResolvePretendsPure
 );
 
 impl Construction for Parse {
@@ -463,6 +511,72 @@ impl Morphism for ConstFoldForgetful {
     fn backward(&self, out: &Expr, _residual: &Unit) -> Option<Expr> {
         // All it has is the folded output; it cannot recover the collapsed structure.
         Some(out.clone())
+    }
+}
+
+// ===== Resolve: a STATEFUL edge, and the claim-vs-behaviour audit ==========
+//
+// `ConstFold` reached the `Lossy` rung; `Resolve` reaches `Stateful`. It substitutes a
+// carried `Env` into an expression (`internal::subst`), so its output depends on more than
+// its expression argument — the definition of stateful. The capability LATTICE is now
+// populated Pure → Lossy → Stateful on the one substrate.
+//
+// But a declared capability is only a CLAIM; the type system trusts it. Two dishonest
+// twins make the behavioural audit (`crate::capability`) load-bearing:
+//   - `ResolveIgnoresEnv` declares `Stateful` but ignores the environment — OVER-claiming
+//     (capability-slop: needless guards, a false barrier to composition); and
+//   - `ResolvePretendsPure` declares `Pure` but secretly reads the environment —
+//     UNDER-claiming, the dangerous case: a hidden dependency the type system happily
+//     accepts (it would even pass `run_pure`), caught only by perturbing the state and
+//     seeing the output move.
+
+/// The honest variable resolver: a `Stateful` `Morphism` that reads its carried `Env`.
+pub struct Resolve;
+/// OVER-claims: declares `Stateful` but returns the expression untouched (ignores state).
+pub struct ResolveIgnoresEnv;
+/// UNDER-claims: declares `Pure` but actually reads the environment — a hidden dependency.
+pub struct ResolvePretendsPure;
+
+impl Morphism for Resolve {
+    type Capability = Stateful;
+    type In = Bound;
+    type Out = Expr;
+    type Residual = Unit;
+
+    fn forward(&self, input: &Bound) -> (Expr, Unit) {
+        (super::internal::subst(input.expr(), input.env()), Unit)
+    }
+    fn backward(&self, _out: &Expr, _residual: &Unit) -> Option<Bound> {
+        None // substitution discards which leaves were variables — irreversible.
+    }
+}
+
+impl Morphism for ResolveIgnoresEnv {
+    type Capability = Stateful; // DECLARED stateful…
+    type In = Bound;
+    type Out = Expr;
+    type Residual = Unit;
+
+    fn forward(&self, input: &Bound) -> (Expr, Unit) {
+        (input.expr().clone(), Unit) // …but it never reads the env — over-claim.
+    }
+    fn backward(&self, _out: &Expr, _residual: &Unit) -> Option<Bound> {
+        None
+    }
+}
+
+impl Morphism for ResolvePretendsPure {
+    type Capability = Pure; // DECLARED pure…
+    type In = Bound;
+    type Out = Expr;
+    type Residual = Unit;
+
+    fn forward(&self, input: &Bound) -> (Expr, Unit) {
+        // …but it reads the carried state — a hidden dependency the declaration hides.
+        (super::internal::subst(input.expr(), input.env()), Unit)
+    }
+    fn backward(&self, _out: &Expr, _residual: &Unit) -> Option<Bound> {
+        None
     }
 }
 

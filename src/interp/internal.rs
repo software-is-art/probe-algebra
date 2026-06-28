@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use crate::interp::boundary::{Expr, Ident, Int, Lit, Op, Pos, Source, Ty, Value};
+use crate::interp::boundary::{Env, Expr, Ident, Int, Lit, Op, Pos, Source, Ty, Value};
 
 // ===== lexer ==============================================================
 
@@ -335,5 +335,25 @@ pub(super) fn fold(e: &Expr, combine: &dyn Fn(Op, Int, Int) -> Option<Lit>) -> E
         }
         Expr::If(c, t, f) => Expr::cond(fold(c, combine), fold(t, combine), fold(f, combine)),
         Expr::Let(name, v, body) => Expr::bind(name.clone(), fold(v, combine), fold(body, combine)),
+    }
+}
+
+// ===== substitution (the Stateful `Resolve` edge's engine) =================
+
+/// Substitute the bindings carried in `env` into an expression: every free `Var(name)`
+/// for which `env` has a value becomes that integer literal; unbound variables and all
+/// other nodes are left as-is. This is the `Resolve` edge READING its carried state, which
+/// is exactly why that edge is `Stateful` — its output depends on the environment, not the
+/// expression alone.
+pub(super) fn subst(e: &Expr, env: &Env) -> Expr {
+    match e {
+        Expr::Var(name) => match env.get(name) {
+            Some(v) => Expr::Lit(Lit::Int(v)),
+            None => e.clone(),
+        },
+        Expr::Lit(_) => e.clone(),
+        Expr::Bin(op, a, b) => Expr::bin(*op, subst(a, env), subst(b, env)),
+        Expr::If(c, t, f) => Expr::cond(subst(c, env), subst(t, env), subst(f, env)),
+        Expr::Let(name, v, body) => Expr::bind(name.clone(), subst(v, env), subst(body, env)),
     }
 }

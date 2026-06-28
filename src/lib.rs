@@ -24,10 +24,13 @@
 //! language whose boundary is `Parse` (a `Construction`), `Check` (a `Branch`), and
 //! `Eval` (a `Guarded` edge), and whose private internals carry ZERO tests of their own —
 //! the boundary rigour plus the autogen `laws` registry are their entire verification,
-//! measured by mutation. `gdp` is the name-branding machinery the edges use; `select` is
-//! the kill-matrix set-cover meta-tooling.
+//! measured by mutation. `gdp` is the name-branding machinery the edges use; `capability`
+//! is the behavioural audit that reconciles an edge's declared capability with what it
+//! actually does (over- and under-claim detection); `select` is the kill-matrix set-cover
+//! meta-tooling.
 
 pub mod boundary;
+pub mod capability;
 pub mod gdp;
 pub mod interp;
 pub mod select;
