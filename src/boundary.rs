@@ -668,6 +668,38 @@ where
     Some(c.observed_delta(&y, &y_stepped) == c.expected_delta())
 }
 
+// ===== oracle-free RELATIONS over an arbitrary map (any edge shape) ========
+
+/// A metamorphic `Metamorphic<M>` relation is tied to a `Morphism`; but the value
+/// frontier the interpreter exposed sits behind a `Guarded` edge (evaluation is admitted
+/// by a `WellTyped` witness), and SHAPE laws — round-trip, completeness — certify that an
+/// edge is structurally faithful, never that it computes the RIGHT value. A `Relation`
+/// is the oracle-FREE way to pin value behaviour for ANY pure map regardless of edge
+/// shape: it states that two routes to a result must AGREE — `apply(vary(x))` equals
+/// `rewrite(apply(x))` — so it catches a wrong constant or a non-strict comparison
+/// without ever naming the correct answer (the only structural attack on the VALUE
+/// frontier, e.g. `eval(a + b) == eval(b + a)`). `apply` may itself drive a whole
+/// `Parse`/`Check`/`Eval` pipeline; the relation does not care.
+pub trait Relation {
+    /// The relation's input domain.
+    type In: Clone + Debug;
+    /// The observed result the two routes must agree on.
+    type Out: PartialEq + Debug;
+    /// The map under test (an arbitrary pure function — eval, a pipeline, a morphism).
+    fn apply(&self, x: &Self::In) -> Self::Out;
+    /// Perturb the input along the relation's dimension (`None` if it does not apply).
+    fn vary(&self, x: &Self::In) -> Option<Self::In>;
+    /// The output transform the perturbation MUST induce (identity for a symmetry).
+    fn rewrite(&self, y: Self::Out) -> Self::Out;
+}
+
+/// Oracle-free relation probe: `Some(true)` iff the two routes agree at `x` —
+/// `apply(vary(x)) == rewrite(apply(x))`. `None` if the perturbation does not apply.
+pub fn relation_holds<R: Relation>(r: &R, x: &R::In) -> Option<bool> {
+    let varied = r.vary(x)?;
+    Some(r.apply(&varied) == r.rewrite(r.apply(x)))
+}
+
 // ===== composition: loss composes as a value object ======================
 
 /// Product of two residuals — loss COMPOSES as a value object.

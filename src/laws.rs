@@ -26,8 +26,8 @@ use proptest::strategy::BoxedStrategy;
 use proptest::test_runner::TestRunner;
 
 use crate::boundary::{
-    construction_probe, probe, reconstructs, run, Capability, Construction, Morphism, Perturbation,
-    RawPerturbation, Unit,
+    commutes, construction_probe, probe, reconstructs, relation_holds, run, Capability,
+    Construction, Metamorphic, Morphism, Perturbation, RawPerturbation, Relation, Unit,
 };
 
 // ===== Sampled: a type supplies its OWN canonical input distribution =======
@@ -142,6 +142,46 @@ where
             "a Pure construction must have a Unit residual (it loses nothing)"
         );
     }
+}
+
+/// LAW (a `Morphism` + a `Metamorphic` relation): the morphism COMMUTES with the
+/// relation on every generated input — `forward(input_op x) == output_op(forward x)`.
+/// Reference-free (no oracle): it pins how the output VARIES, the structural attack on
+/// value behaviour. Derived from the trait, so registering it is one call.
+pub fn metamorphic_laws<M, R>(m: &M, r: &R)
+where
+    M: Morphism,
+    R: Metamorphic<M>,
+    M::In: Sampled + 'static,
+{
+    TestRunner::default()
+        .run(&M::In::sampled(), |x| {
+            if let Some(holds) = commutes(m, r, &x) {
+                prop_assert!(holds, "metamorphic relation fails at {:?}", x);
+            }
+            Ok(())
+        })
+        .unwrap();
+}
+
+/// LAW (any `Relation`): the two routes AGREE on every generated input —
+/// `apply(vary x) == rewrite(apply x)`. Oracle-free value testing for ANY edge shape,
+/// including a `Guarded` edge whose `apply` drives a whole `Parse`/`Check`/`Eval`
+/// pipeline. This is how a VALUE-level fact (the interpreter actually computes the right
+/// thing) is tested without an oracle and without per-input code.
+pub fn relation_laws<R, S>(r: &R, strategy: S)
+where
+    R: Relation,
+    S: Strategy<Value = R::In>,
+{
+    TestRunner::default()
+        .run(&strategy, |x| {
+            if let Some(holds) = relation_holds(r, &x) {
+                prop_assert!(holds, "relation fails at {:?}", x);
+            }
+            Ok(())
+        })
+        .unwrap();
 }
 
 // ===== argument-free registration: the laws a TYPE already entails =========
@@ -268,12 +308,13 @@ impl Sampled for Entry<Draft> {
 mod registry {
     use super::*;
     use crate::boundary::Compose;
-    use crate::interp::boundary::{Expr, Ident, Op, Parse};
+    use crate::gdp::with_seed;
+    use crate::interp::boundary::{Check, Eval, Expr, Ident, Op, Parse, Value};
     use crate::ledger::boundary::{
         PadName, ParseAccount, ParseCents, ParseTransaction, ReorderPostings, Round, Split,
     };
     use crate::lifecycle::boundary::Submit;
-    use crate::linear::boundary::Scale;
+    use crate::linear::boundary::{Double, Scale};
 
     // A generator of well-formed `Expr` trees, and the CANONICAL source they render to —
     // the input distribution for the interpreter's `Parse` round-trip. (`Parse::Raw` is
@@ -302,6 +343,117 @@ mod registry {
     }
     fn canonical_source() -> impl Strategy<Value = String> {
         expr().prop_map(|e| e.render())
+    }
+
+    // ===== oracle-free RELATIONS over the interpreter's value frontier ======
+    //
+    // The zero-internal-test experiment showed the boundary buys SHAPE for free but not
+    // VALUE. A `Relation` closes that: each is declared ONCE and property-tested over
+    // generated inputs, pinning what `eval` computes without ever naming the answer —
+    // and it drives the whole `Check`/`Eval` pipeline, so the `Guarded` edge (which the
+    // morphism-shaped harnesses cannot reach) is finally in the autogen suite.
+
+    /// A generator of CLOSED, INT-typed expressions (literals composed with `+`/`*`), so
+    /// `Check` always admits them and `eval` is total.
+    fn int_expr() -> impl Strategy<Value = Expr> {
+        let leaf = (0i64..=99).prop_map(|n| Expr::int(n).unwrap());
+        leaf.prop_recursive(3, 16, 2, |inner| {
+            prop_oneof![
+                (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
+                (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
+            ]
+        })
+    }
+
+    /// Evaluate a closed, well-typed expression through the BOUNDARY (`Check` then the
+    /// `WellTyped`-guarded `Eval`) — the `apply` the relations probe.
+    fn eval_closed(e: &Expr) -> Value {
+        with_seed(|seed| {
+            let named = seed.new_named(e.clone());
+            let proof = Check.classify(&named).expect("a closed int expr is well-typed");
+            *Eval.run(&named, &proof).value()
+        })
+    }
+
+    /// `eval(a + 0) == eval(a)` — additive identity. Catches `+`→`*` (since `a*0 == 0`).
+    struct AddIdentity;
+    impl Relation for AddIdentity {
+        type In = Expr;
+        type Out = Value;
+        fn apply(&self, x: &Expr) -> Value {
+            eval_closed(x)
+        }
+        fn vary(&self, x: &Expr) -> Option<Expr> {
+            Some(Expr::bin(Op::Add, x.clone(), Expr::int(0).unwrap()))
+        }
+        fn rewrite(&self, y: Value) -> Value {
+            y
+        }
+    }
+
+    /// `eval(a * 1) == eval(a)` — multiplicative identity. Catches `*`→`+` (`a+1 != a`).
+    struct MulIdentity;
+    impl Relation for MulIdentity {
+        type In = Expr;
+        type Out = Value;
+        fn apply(&self, x: &Expr) -> Value {
+            eval_closed(x)
+        }
+        fn vary(&self, x: &Expr) -> Option<Expr> {
+            Some(Expr::bin(Op::Mul, x.clone(), Expr::int(1).unwrap()))
+        }
+        fn rewrite(&self, y: Value) -> Value {
+            y
+        }
+    }
+
+    /// A deliberately FALSE relation (`eval(a + 1) != eval(a)`) — used to pin that
+    /// `relation_holds` actually reports failure, not a vacuous pass.
+    struct Increment;
+    impl Relation for Increment {
+        type In = Expr;
+        type Out = Value;
+        fn apply(&self, x: &Expr) -> Value {
+            eval_closed(x)
+        }
+        fn vary(&self, x: &Expr) -> Option<Expr> {
+            Some(Expr::bin(Op::Add, x.clone(), Expr::int(1).unwrap()))
+        }
+        fn rewrite(&self, y: Value) -> Value {
+            y
+        }
+    }
+
+    /// A relation whose perturbation never applies — pins the `None` (inapplicable) path.
+    struct NeverApplies;
+    impl Relation for NeverApplies {
+        type In = Expr;
+        type Out = Value;
+        fn apply(&self, x: &Expr) -> Value {
+            eval_closed(x)
+        }
+        fn vary(&self, _x: &Expr) -> Option<Expr> {
+            None
+        }
+        fn rewrite(&self, y: Value) -> Value {
+            y
+        }
+    }
+
+    /// `eval(a < a) == false` — strict-less-than is irreflexive. Catches `<`→`<=`.
+    struct LtIrreflexive;
+    impl Relation for LtIrreflexive {
+        type In = Expr;
+        type Out = Value;
+        fn apply(&self, x: &Expr) -> Value {
+            eval_closed(&Expr::bin(Op::Lt, x.clone(), x.clone()))
+        }
+        fn vary(&self, x: &Expr) -> Option<Expr> {
+            Some(x.clone())
+        }
+        fn rewrite(&self, _y: Value) -> Value {
+            Value::Bool(false)
+        }
     }
 
     // Each edge: ONE registration. Round-trip + capability are argument-free
@@ -365,5 +517,34 @@ mod registry {
     fn parse_is_probed() {
         construction_round_trips(&Parse, canonical_source());
         construction_capability_matches_residual::<Parse>();
+    }
+
+    /// A `Metamorphic` relation, now an autogen law: `Scale` commutes with doubling on
+    /// every generated `Quantity` (linearity — reference-free, holds for honest and skew).
+    #[test]
+    fn scale_metamorphic_is_probed() {
+        metamorphic_laws(&Scale::honest(), &Double);
+    }
+
+    /// The interpreter's VALUE frontier as oracle-free `Relation` laws: each is declared
+    /// once and property-tested over generated int expressions, pinning what `eval`
+    /// computes (additive/multiplicative identity, strict-`<`) without an oracle and
+    /// without per-input tests — the autogen attack on the value gap the experiment found.
+    #[test]
+    fn eval_relations_are_probed() {
+        relation_laws(&AddIdentity, int_expr());
+        relation_laws(&MulIdentity, int_expr());
+        relation_laws(&LtIrreflexive, int_expr());
+    }
+
+    /// NEGATIVE: `relation_holds` must distinguish all three outcomes — a holding
+    /// relation (`Some(true)`), a violated one (`Some(false)`), and an inapplicable one
+    /// (`None`). This pins the probe itself so a vacuous-pass mutant cannot survive.
+    #[test]
+    fn relation_holds_distinguishes_outcomes() {
+        let five = Expr::int(5).unwrap();
+        assert_eq!(relation_holds(&AddIdentity, &five), Some(true));
+        assert_eq!(relation_holds(&Increment, &five), Some(false));
+        assert_eq!(relation_holds(&NeverApplies, &five), None);
     }
 }
