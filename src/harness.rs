@@ -447,19 +447,41 @@ mod registry {
     /// operators, and `cargo mutants` judges their kill power.
     #[test]
     fn eval_laws_are_probed() {
+        use crate::discover::Law;
         for law in crate::discover::discover_laws() {
-            TestRunner::default()
-                .run(&(0i64..=20, 0i64..=20, 0i64..=20), |(a, b, c)| {
-                    let (lhs, rhs) = (law.schema)(a, b, c);
-                    prop_assert_eq!(
-                        eval_closed(&lhs),
-                        eval_closed(&rhs),
-                        "discovered law failed: {}",
-                        law.equation
-                    );
-                    Ok(())
-                })
-                .unwrap();
+            match law {
+                // an equational law: `eval(lhs) == eval(rhs)` over random assignments.
+                Law::Equation {
+                    schema, equation, ..
+                } => {
+                    TestRunner::default()
+                        .run(&(0i64..=20, 0i64..=20, 0i64..=20), |(a, b, c)| {
+                            let (lhs, rhs) = schema(a, b, c);
+                            prop_assert_eq!(
+                                eval_closed(&lhs),
+                                eval_closed(&rhs),
+                                "discovered law failed: {}",
+                                equation
+                            );
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+                // the universal-observer law: the faithful rendering is sensitive to every
+                // structural/semantic perturbation (the fused universal probe, discovered).
+                Law::Sensitivity { .. } => {
+                    TestRunner::default()
+                        .run(&<Expr as Sampled>::sampled(), |e| {
+                            prop_assert!(
+                                sensitive_to_all(|x: &Expr| x.render(), &e),
+                                "the universal observer missed a dimension at {:?}",
+                                e
+                            );
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+            }
         }
     }
 

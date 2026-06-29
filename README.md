@@ -87,19 +87,31 @@ mutation sweep, so the bought correctness is *measured*, not asserted.
 
 ## The laws discover themselves — and read in plain language
 
-You don't even state the algebra. `discover` instantiates the universal algebraic shapes over the
-operators and keeps the ones that **run true**, found by evaluating both sides over a grid — so the
-spec falls out of the operators' behaviour, not a human's list. `cargo run --example discovered_spec`
-prints it as a contract a non-mathematical stakeholder can audit:
+You don't even state the algebra — and there's no catalog of shapes to match against either.
+`discover` **enumerates terms** over the operators, variables, and constants (QuickSpec-style),
+groups them by how they behave on a grid of inputs, and reads each equality between distinct terms
+as a candidate law. It then folds the swamp of redundant equalities — up to renaming, commutativity,
+and associativity — to **one clean representative per shape**, counting the rest as consequences. So
+the spec falls out of the operators' behaviour, not a human's list. `cargo run --example
+discovered_spec` prints it as a contract a non-mathematical stakeholder can audit:
 
 ```
-Adding zero leaves a value unchanged.            x + 0 = x
-Addition gives the same result in either order.  x + y = y + x
-Multiplying by one leaves a value unchanged.     x * 1 = x
-Multiplying by zero always gives zero.           x * 0 = 0
-Multiplying a sum is the same as multiplying the parts and adding.   x*(y+z) = x*y + x*z
-A value is never less than itself.               x < x = false
+Adding zero leaves a value unchanged.            (0 + x) = x
+Multiplying by one leaves a value unchanged.     (1 * x) = x
+Multiplying by zero always gives zero.           (0 * x) = 0
+Addition gives the same result in either order.  (x + y) = (y + x)
+Multiplication gives the same result in either order.   (x * y) = (y * x)
+When combining three values with Addition, the grouping doesn't matter.        (x + (y + z)) = …
+Multiplying a sum is the same as multiplying each part and adding.   (x * (y + z)) = (x*y) + (x*z)
+A value is never less than itself.               (x < x) = false
 ```
+
+The same mechanism discovers one structural law too. `eval` collapses structure (`2+3` and `5` are
+equal to it), so the equational laws are blind to a transform that computes the right value but
+mangles the tree. So the signature includes a synthetic **universal observer `U`** — the program's
+faithful rendering, virtually treated as one more operator — and discovery surfaces its law: *no two
+distinct programs look the same to `U`*. One discovery engine yields the whole probe taxonomy,
+algebraic and structural.
 
 Each discovered law is re-probed as an oracle-free equation and judged by mutation, so the author
 can't weaken a probe by accident — they write none of them. The only human acts left are the
