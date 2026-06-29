@@ -615,6 +615,10 @@ pub struct EdgeCons<E, Rest>(PhantomData<(E, Rest)>);
 /// head constructors, like `CoversAll` for DOFs).
 pub trait AllProbed {}
 impl AllProbed for EdgeNil {}
+// NB: do NOT add `#[diagnostic::do_not_recommend]` here — on this recursive cons impl it
+// SUPPRESSES the recursion into the `E: Probed` requirement, which discards the helpful
+// `Probed` on_unimplemented message and degrades the error to a generic `AllProbed` failure.
+// (do_not_recommend helps for flat blanket impls; it backfires for recursive machinery.)
 impl<E: Probed, Rest: AllProbed> AllProbed for EdgeCons<E, Rest> {}
 
 /// The edge-completeness statement: every edge in `L` is `Probed`. The edge analog of
