@@ -180,18 +180,26 @@ impl Audit {
 // one perturbation (bump a binding). The audit over that single channel separates the
 // honest edge from the over- and under-claiming ones.
 
-use crate::interp::boundary::{Bound, Ident, Int, Resolve, ResolveIgnoresEnv, ResolvePretendsPure};
+use crate::interp::boundary::{Bound, Ident, Int, Resolve};
 
 impl Declares for Resolve {
     fn declared_sources(&self) -> &'static [Source] {
         &[Source::State] // honest: it reads the carried environment.
     }
 }
+
+// The over-/under-claiming subjects are TEST-ONLY counterexamples (they exercise the audit's
+// detection logic; they are not production edges). Retired by capability inference — see
+// `interp::boundary`'s Resolve section.
+#[cfg(test)]
+use crate::interp::boundary::{ResolveIgnoresEnv, ResolvePretendsPure};
+#[cfg(test)]
 impl Declares for ResolveIgnoresEnv {
     fn declared_sources(&self) -> &'static [Source] {
         &[Source::State] // OVER-claim: demands state it never reads.
     }
 }
+#[cfg(test)]
 impl Declares for ResolvePretendsPure {
     fn declared_sources(&self) -> &'static [Source] {
         &[] // UNDER-claim: hides that it reads the environment.

@@ -350,17 +350,7 @@ pub struct Check;
 /// SAME name. You cannot evaluate an expression that has not been proven well-typed —
 /// the witness comes from `Check`, exactly as a `Construction` mints its own. Pure.
 pub struct Eval;
-crate::value_operator!(
-    Parse,
-    Check,
-    Eval,
-    ConstFold,
-    ConstFoldDoubles,
-    ConstFoldForgetful,
-    Resolve,
-    ResolveIgnoresEnv,
-    ResolvePretendsPure
-);
+crate::value_operator!(Parse, Check, Eval, ConstFold, Resolve);
 
 impl Construction for Parse {
     type Capability = Pure;
@@ -434,35 +424,23 @@ impl Eval {
 
 // ===== ConstFold: a LOSSY optimization edge, and the capability lattice ====
 //
-// `Parse`/`Check`/`Eval` are all `Pure`; nothing yet exercised a higher rung of the
-// capability lattice or the `Morphism` shape (lossy projection + residual witness).
-// `ConstFold` does both. It is an optimizer `Expr -> Expr` that collapses constant
-// subexpressions — a real loss (you cannot recover `(2 + 3)` from `5`), so it is declared
-// `Lossy` and keeps a `Residual` that witnesses what it collapsed, restoring
-// invertibility. Because it is `Lossy`, `run_pure` REFUSES it at compile time
-// (`tests/compile_fail/run_pure_rejects_lossy`): the capability ceiling is an enforced
-// contract, not a comment.
+// `Parse`/`Check`/`Eval` are all `Pure`; `ConstFold` exercises a higher rung of the
+// capability lattice and the `Morphism` shape (lossy projection + residual witness). It is an
+// optimizer `Expr -> Expr` that collapses constant subexpressions — a real loss (you cannot
+// recover `(2 + 3)` from `5`), so it is declared `Lossy` and keeps a `Residual` that witnesses
+// what it collapsed, restoring invertibility. Because it is `Lossy`, `run_pure` REFUSES it at
+// compile time (`tests/compile_fail/run_pure_rejects_lossy`): the ceiling is enforced, not a
+// comment. Its probe (`harness`) is oracle-free: folding PRESERVES the value (`eval . fold ==
+// eval`, which a wrong constant fails) and its residual RECONSTRUCTS the input.
 //
-// Three variants make the BLIND-SPOT MAP executable on this substrate — no single probe
-// flavour is highest-assurance:
-//   - `ConstFold` is honest;
-//   - `ConstFoldForgetful` folds correctly but throws its residual away (`Unit`), so it
-//     cannot reconstruct — the residual ROUND-TRIP catches it, while a value-only probe
-//     is blind (the folded value is right);
-//   - `ConstFoldDoubles` keeps a complete residual AND is symmetric, so it round-trips
-//     AND commutes with operand-swap, yet computes the WRONG constant — both structural
-//     probes are blind and only the reference-bearing COEFFICIENT probe catches it. That
-//     is the project's decisive negative result, re-homed onto the interpreter.
+// (The old hand-rolled `ConstFold` counterexamples — a doubling folder, a residual-forgetful
+// folder — were RETIRED: they were manual stand-ins for mutants, and `cargo-mutants` plants
+// equivalent body-mutants automatically. The blind-spot map is now read off the real mutation
+// kill matrix instead of asserted with crafted bugs; see `examples/suite_audit`.)
 
 /// The honest constant folder: a `Lossy` `Morphism` whose residual is the ORIGINAL
 /// expression, so `backward` reconstructs exactly.
 pub struct ConstFold;
-/// A WRONG-coefficient folder: doubles every folded result. Keeps a complete residual and
-/// is symmetric, so it survives BOTH structural probes; only the coefficient probe pins it.
-pub struct ConstFoldDoubles;
-/// A residual-INCOMPLETE folder: folds correctly but declares a `Unit` residual, so it
-/// cannot reconstruct a folded input — the round-trip probe catches the dropped dimension.
-pub struct ConstFoldForgetful;
 
 impl ConstFold {
     /// The honest arithmetic at a reducible node — the reference combiner the engine
@@ -471,17 +449,6 @@ impl ConstFold {
         match op {
             Op::Add => Some(Lit::Int(x.plus(y))),
             Op::Mul => Some(Lit::Int(x.times(y))),
-            Op::Lt => Some(Lit::Bool(x.less_than(y))),
-        }
-    }
-}
-impl ConstFoldDoubles {
-    /// The skewed combiner: the right SHAPE (still linear, still symmetric) but the wrong
-    /// CONSTANT — every folded integer is doubled.
-    fn combine(op: Op, x: Int, y: Int) -> Option<Lit> {
-        match op {
-            Op::Add => Some(Lit::Int(x.plus(y).times(Int::new(2)?))),
-            Op::Mul => Some(Lit::Int(x.times(y).times(Int::new(2)?))),
             Op::Lt => Some(Lit::Bool(x.less_than(y))),
         }
     }
@@ -505,62 +472,26 @@ impl Morphism for ConstFold {
     }
 }
 
-impl Morphism for ConstFoldDoubles {
-    type Capability = Lossy;
-    type In = Expr;
-    type Out = Expr;
-    type Residual = Expr;
-
-    fn forward(&self, input: &Expr) -> (Expr, Expr) {
-        (
-            super::internal::fold(input, &ConstFoldDoubles::combine),
-            input.clone(),
-        )
-    }
-    fn backward(&self, _out: &Expr, residual: &Expr) -> Option<Expr> {
-        Some(residual.clone())
-    }
-}
-
-impl Morphism for ConstFoldForgetful {
-    type Capability = Lossy;
-    type In = Expr;
-    type Out = Expr;
-    // It THROWS AWAY the witness — a `Unit` residual, the claim "I lost nothing
-    // reconstructible". For a foldable input that is a lie, and the round-trip exposes it.
-    type Residual = Unit;
-
-    fn forward(&self, input: &Expr) -> (Expr, Unit) {
-        (super::internal::fold(input, &ConstFold::combine), Unit)
-    }
-    fn backward(&self, out: &Expr, _residual: &Unit) -> Option<Expr> {
-        // All it has is the folded output; it cannot recover the collapsed structure.
-        Some(out.clone())
-    }
-}
-
 // ===== Resolve: a STATEFUL edge, and the claim-vs-behaviour audit ==========
 //
 // `ConstFold` reached the `Lossy` rung; `Resolve` reaches `Stateful`. It substitutes a
 // carried `Env` into an expression (`internal::subst`), so its output depends on more than
 // its expression argument — the definition of stateful. The capability LATTICE is now
-// populated Pure → Lossy → Stateful on the one substrate.
+// populated Pure → Lossy → Stateful on the one substrate. Its probe (`harness`) is the
+// oracle-free two-route law: substitute-then-eval equals let-bind-then-eval.
 //
-// But a declared capability is only a CLAIM; the type system trusts it. Two dishonest
-// twins make the behavioural audit (`crate::capability`) load-bearing:
-//   - `ResolveIgnoresEnv` declares `Stateful` but ignores the environment — OVER-claiming
-//     (capability-slop: needless guards, a false barrier to composition); and
-//   - `ResolvePretendsPure` declares `Pure` but secretly reads the environment —
-//     UNDER-claiming, the dangerous case: a hidden dependency the type system happily
-//     accepts (it would even pass `run_pure`), caught only by perturbing the state and
-//     seeing the output move.
+// A declared capability is only a CLAIM; the type system trusts it, and the `capability`
+// module's behavioural audit checks the claim against behaviour. Its two dishonest subjects
+// (`ResolveIgnoresEnv` over-claims `Stateful` but ignores the env; `ResolvePretendsPure`
+// under-claims `Pure` but secretly reads it) live below under `#[cfg(test)]`: they are
+// COUNTEREXAMPLES that exercise the audit, NOT spec edges — they carry no probe, so they are
+// kept out of the production edge set `build.rs` enumerates. Unlike the `ConstFold`
+// counterexamples, mutation cannot retire them (it mutates bodies, not declarations); they are
+// retired only once the capability is INFERRED from structure, making a mis-declaration a
+// compile error with no counterexample left to write.
 
 /// The honest variable resolver: a `Stateful` `Morphism` that reads its carried `Env`.
 pub struct Resolve;
-/// OVER-claims: declares `Stateful` but returns the expression untouched (ignores state).
-pub struct ResolveIgnoresEnv;
-/// UNDER-claims: declares `Pure` but actually reads the environment — a hidden dependency.
-pub struct ResolvePretendsPure;
 
 impl Morphism for Resolve {
     type Capability = Stateful;
@@ -576,6 +507,22 @@ impl Morphism for Resolve {
     }
 }
 
+// Capability-audit COUNTEREXAMPLES — dishonest `Resolve` twins, TEST-ONLY (flat, so the
+// boundary stays flat). They are the subjects the `capability` audit must catch (over- and
+// under-claiming); they carry no probe and are NOT part of the production edge set, so
+// `build.rs`'s edge enumeration does not demand one. Retired by capability inference.
+
+/// OVER-claims: declares `Stateful` but returns the expression untouched (ignores state).
+#[cfg(test)]
+pub struct ResolveIgnoresEnv;
+/// UNDER-claims: declares `Pure` but actually reads the environment — a hidden dependency.
+#[cfg(test)]
+pub struct ResolvePretendsPure;
+
+#[cfg(test)]
+crate::value_operator!(ResolveIgnoresEnv, ResolvePretendsPure);
+
+#[cfg(test)]
 impl Morphism for ResolveIgnoresEnv {
     type Capability = Stateful; // DECLARED stateful…
     type In = Bound;
@@ -590,6 +537,7 @@ impl Morphism for ResolveIgnoresEnv {
     }
 }
 
+#[cfg(test)]
 impl Morphism for ResolvePretendsPure {
     type Capability = Pure; // DECLARED pure…
     type In = Bound;

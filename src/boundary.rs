@@ -845,10 +845,13 @@ where
 // Edges have NO single definition site (each is a separate `impl`), so the same idea needs the
 // edge set declared once: the `edges!` macro. Over that single-source list, `AllProbed` makes
 // "every edge is probed" a BOUND — an edge in the list that does not impl `Probed` fails to
-// COMPILE, the same push-back a missing DOF gives, before any test runs. (The open-world
-// residue — an edge `impl` written OUTSIDE the `edges!` list — is closeable only by sealing /
-// `build.rs` source-scanning; the type system cannot enumerate impls, so this is the honest
-// ceiling, mirroring the capability axis: declared in the type, audited by the method.)
+// COMPILE, the same push-back a missing DOF gives, before any test runs. The open-world residue
+// — a production edge `impl` written OUTSIDE the `edges!` list — is now CLOSED by `build.rs`,
+// which enumerates every concrete edge impl in the source and rejects any without an
+// `impl Probed` (a build error). The type system cannot enumerate impls; the build step can, so
+// the two together make edge-completeness TOTAL: the list gives the in-language bound, the
+// enumeration catches anything left off it. (Counterexamples/fixtures are `#[cfg(test)]`, so the
+// enumeration skips them — they are not spec edges.)
 
 /// An edge covered by a probe. Impling `Probed` means WRITING the probe (`fn probe`), so it
 /// cannot be claimed without one; the probe's STRENGTH is then audited by mutation, exactly as

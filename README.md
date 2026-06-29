@@ -85,7 +85,12 @@ And it **enforces**, at compile time:
   `Max` cell all fail to compile. Over the *open* type families (Peano degrees, lineages) the core
   laws are proven **total, by structural induction** — for every inhabitant, not a sample —
   while the sealed capability lattice is exhaustive by cases and residual (a free product) is
-  proven up to isomorphism by proptest. See [docs/concepts.md](docs/concepts.md#the-gradings).
+  proven up to isomorphism by proptest. See [docs/concepts.md](docs/concepts.md#the-gradings);
+- **every production edge carries a probe** — `build.rs` enumerates every concrete `Morphism` /
+  `Construction` / `Branch` / `Guarded` impl in the source and rejects any without an
+  `impl Probed` (a build error), so a new edge a probe cannot kill cannot be merged. The
+  blind-spot map itself is *derived* from the real mutation kill matrix
+  (`examples/suite_audit`), not asserted with hand-rolled counterexamples.
 
 The interior that backs these edges — `interp::internal` — is private, untested, and stays
 in the mutation sweep so the bought correctness is *measured*, not asserted.

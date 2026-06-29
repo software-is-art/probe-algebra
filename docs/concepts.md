@@ -104,9 +104,14 @@ as a **blind-spot map**. Each flavour catches a bug class another is blind to:
 | quantitative coefficient (`coefficient_holds`) | a wrong constant | (reference-bearing; needs a spec) |
 | oracle-free relation (`relation_holds`) | a broken value law (`x+0≠x`) | what no stated relation covers |
 
-The **decisive negative result**, re-homed onto the interpreter's constant folder: a folder
-that doubles every result keeps a complete residual *and* is symmetric, so it survives both
-structural probes — and dies only to the coefficient probe. (`src/tests.rs::blind_spot`.)
+The blind-spot map is **derived from real mutation data**, not asserted with hand-rolled
+counterexamples. `cargo-mutants` plants the bugs; each mutant's per-mutant log names which
+probe(s) caught it, giving a real `[probe × mutant]` kill matrix. `examples/suite_audit` feeds
+that matrix to `select` and reports the **minimal attributing suite** — the few probes that, each
+catching what the others miss, still kill every killable mutant. That partition *is* the
+blind-spot map, in real data. (The earlier hand-rolled counterexamples — a doubling folder, a
+residual-forgetful folder — were manual stand-ins for mutants; against the real kill matrix they
+added zero kill power, so they were retired.)
 
 Above these sits the **fused universal probe** (`sensitive_to_all`): one operator, derived
 from a value object's structure, that is sensitive to structure, value, and (through
@@ -145,9 +150,11 @@ What is **irreducible** — what *cannot* be self-hosted, by nature, not for lac
 - the **grammar** (`boundary.rs`): the probe primitives cannot be defined in terms of
   themselves without circularity. It is the host, kept under the mutation lens but not
   re-specified in itself.
-- **negative tests**: "input X is *rejected*" and the blind-spot map ("probe P is *blind* to
-  bug B") cannot be derived from the thing under test — you cannot generate a counterexample to
-  a property from the property. These stay hand-written, in `tests.rs`.
+- **rejection tests**: "input X is *rejected*" cannot be derived from the thing under test — you
+  cannot generate a counterexample to a property from the property. These stay hand-written, in
+  `tests.rs`. (The blind-spot map is no longer in this category: it is *derived* from the real
+  mutation kill matrix — `cargo-mutants` plants the bugs, `suite_audit` reads which probe caught
+  which — so the hand-rolled counterexamples that used to stand in for mutants were retired.)
 
 So `sensitive_to_all` and the laws make a *weak specification* hard to express; they do not
 make *wrong meaning* impossible — the meaning (a validity rule, a declared law) is the one
