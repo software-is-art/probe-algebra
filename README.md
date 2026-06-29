@@ -12,10 +12,12 @@ was too weak.
 **The answer is yes.** The demonstration:
 
 > An expression-language interpreter whose interior — lexer, parser, type checker,
-> evaluator — has **zero tests of its own**. Mutating that interior produces 73 viable
-> mutants; the boundary specification plus its *derived* probes kill **72 of 73**, and the
-> lone survivor is provably equivalent (a relaxed lexer guard whose only newly-reachable
-> inputs `Ident::new` already rejects). No test of the interior was written by hand.
+> evaluator — has **zero tests of its own**, and whose entire *positive* behaviour
+> (evaluation, parsing, type-checker acceptance) is certified with **zero hand-written
+> examples** too: only declared laws and structure-derived probes. Mutating the interior,
+> **every viable mutant is killed** — the one equivalent (a relaxed lexer guard whose
+> newly-reachable inputs `Ident::new` already rejects) is the single carve-out, documented in
+> `.cargo/mutants.toml`. Not one positive test of the interpreter was written by hand.
 
 ---
 
@@ -89,6 +91,55 @@ $ cargo mutants             # the real test: do interior mutants survive?
 
 ---
 
+## Declare the law; the probe is generated
+
+You never hand-write a probe's plumbing. For the value frontier you state the *meaning* — an
+algebraic law the operator obeys — and the harness mints the probe around it:
+
+```rust,ignore
+// The only hand-written part: the meaning itself.
+Law::Identity    { op: Op::Add, element: Expr::int(0) }   // x + 0 == x
+Law::Commutative { op: Op::Mul }                          // x * y == y * x
+Law::Reflexive   { op: Op::Lt,  value: false }            // x < x == false
+```
+
+Each `Law` fans out into a first-class relation, run over a derived generator, with the
+applicability guard *and the non-vacuity check owned by the harness*. A probe whose guard
+never fires — the hand-written-guard antipattern, a "passing" test that never actually
+ran — is rejected on an ordinary `cargo test`, no mutation needed. The author cannot weaken
+a probe by accident, because the author does not write the part that could be weak.
+
+---
+
+## Where mutation lives — and why consumers don't pay for it
+
+Mutation testing is expensive, so it must run where it pays. Here it is a function of the
+**specification**, not the interior:
+
+- it certifies that the spec's *derived* probes are strong enough to kill any interior bug;
+- once a module passes, an *interior-only* change cannot weaken that guarantee — the probes
+  come from the spec, not the code — so the sweep only needs to re-run when the **boundary**
+  changes, never on an interior-only PR.
+
+That is the payoff. You pay the mutation cost once, against the abstraction; consumers of the
+abstraction inherit the assurance for free and keep their CI fast.
+
+The strongest evidence for this is that the method is **turned on its own kernel**. The
+selector that picks a minimal, *attributing* probe set from a kill matrix (`src/select/`) is
+specified in the very discipline it serves: its data are value objects, its interior carries
+no example tests, and only its oracle-free probes — judged by the mutation sweep — certify
+it, the way a compiler is compiled by itself.
+
+And the gate runs **all the time** ([`ci.yml`](.github/workflows/ci.yml)): fmt + clippy +
+test on every push and PR, the mutation gate on each PR's *changed lines* (cheap, per-change),
+and a full-crate sweep on the default branch and a weekly schedule. The whole-crate sweep is
+green — `0 missed` — because the only three equivalents left are genuine free choices (a
+`bool` seed value, a deliberately-empty capability declaration, a guard `Ident::new` already
+subsumes), carved out by function in `.cargo/mutants.toml`; everything else is killed or
+detected.
+
+---
+
 ## How the pieces fit
 
 - **[docs/concepts.md](docs/concepts.md)** — the precise model: the boundary as a *graded
@@ -121,10 +172,28 @@ cargo test                # unit + property + compile-fail suites
 cargo mutants             # the real test: do interior mutants survive?
 ```
 
+## The whole runtime is self-hosted
+
+The method is turned on *every part of its own runtime*, not just the interpreter. Each
+runtime module is certified by oracle-free probes with zero hand-written example tests, judged
+by mutation:
+
+- **`interp`** and **`select`** are *structural* self-hosts — boundary plus a private interior
+  with no interior tests.
+- **`gdp`** (the Ghosts-of-Departed-Proofs name/proof vocabulary) and **`capability`** (the
+  declared-vs-behavioural capability audit) are crate-level grammar, self-hosted by replacing
+  their example tests with oracle-free property probes.
+
+And gdp's relational proof is now *load-bearing*, not a demo: `select`'s kernel reads its kill
+matrix entirely through gdp's `InBounds` proof (`positions` ⇒ `at_in_bounds`), so an
+out-of-range matrix read is a **type error, not a panic** — a value object enforces a
+single-value invariant; this enforces a *relation between two values* (an index belongs to
+*that* matrix).
+
 ## Scope and costs
 
-The grammar holds the interior-mutation bar on the interpreter substrate, with the costs
-paid openly:
+The grammar holds the interior-mutation bar across the whole runtime, with the costs paid
+openly:
 
 - the boundary is **verbose** — that verbosity is the single place the rigidity is paid, and
   the point is to pay it once;

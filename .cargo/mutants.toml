@@ -2,48 +2,61 @@
 #
 # Mutation testing is the engine of this method: it certifies that the probe
 # suite actually kills planted bugs, and any SURVIVING mutant points at a
-# missing relation or degree of freedom (see src/select.rs::uncoverable).
+# missing relation or degree of freedom (see src/select/boundary.rs::uncoverable).
 #
-# WHERE mutations are generated — scoped to the DOMAIN ALGEBRA, not the whole
-# crate. The boundary discipline concentrates behaviour at the edges (morphisms,
-# constructions, branches, guards) and the probes, so that surface is exactly
-# where a surviving mutant is a genuine signal. We exclude:
+# WHERE mutations are generated — the WHOLE runtime library is in scope. Every part
+# of the runtime is now SELF-HOSTED: certified by oracle-free probes (round-trips,
+# exact partitions, declared laws) with zero hand-written example tests, and judged
+# here by mutation. The interpreter (`interp/`) and the kill-matrix selector
+# (`select/`) are structural self-hosts (boundary + interior, no interior tests);
+# `gdp` (the name/proof vocabulary) and `capability` (the claim-vs-behaviour audit)
+# are crate-level grammar that `build.rs` exempts from the structural rules, so they
+# are self-hosted by VERIFICATION — their example tests replaced with oracle-free
+# property probes, kept in scope here. We exclude only:
 #
 #   - `src/main.rs` — the `demo` binary only prints, no assertions, so its
 #     mutants are noise.
-#   - `src/select.rs` / `src/capability.rs` — the method's META-TOOLING (kill-matrix
-#     set-cover selection; the claim-vs-behaviour capability audit). These are
-#     demonstrations OF the method, not domain behaviour; they carry their own unit
-#     tests, but their mutants are internal heuristics that earlier full-crate runs
-#     showed to be provably EQUIVALENT (a monotonic tie-break that is `-`/`/`
-#     invariant; an `under-claim` edge whose `declared_sources` is legitimately the
-#     empty slice, so an empty-body mutant is indistinguishable) or a
-#     non-terminating `&&`/`||` swap. Excluding them keeps every survivor on the
-#     DOMAIN surface meaningful rather than mixing in equivalent-mutant noise.
-#   - `boundary-algebra-macros/**` — the `#[derive(Shaped)]` proc-macro. It is
-#     code-GENERATION tooling, not domain behaviour; its output is exercised
-#     transitively (every derived `Shaped` is hit by the fused-probe and
-#     universal-sensitivity tests), so a real generation bug still surfaces on the
-#     domain surface, while the macro's own internals are not domain signal.
 #
-# The rest of the library — the grammar (`boundary.rs`), the interpreter's edges and
-# probes, and `gdp` — stays in scope, so a domain bug still cannot hide. (The one
-# equivalent survivor on the grammar surface is `Shaped for bool`'s `inhabitant`,
-# whose canonical seed `false` equals `Default::default()` — documented, not excluded.)
+# The `#[derive(Shaped)]` proc-macro (`boundary-algebra-macros`) is NO LONGER excluded,
+# but it generates ZERO mutants: its functions return `proc_macro2::TokenStream` (built
+# with `quote!`), which cargo-mutants cannot synthesize a replacement for, so there is no
+# mutable surface. Its OUTPUT is dogfooded instead — every derived `Shaped` impl is hit by
+# the fused-probe and universal-sensitivity oracle-free tests.
 #
-# `interp/internal.rs` is DELIBERATELY kept in scope despite being module-internal:
-# the interpreter is the experiment that MEASURES whether the boundary rigour buys
-# zero internal testing. `interp/internal.rs` has no tests of its own, so its
-# mutation score quantifies exactly how much internal correctness the boundary
-# contracts (the autogen `Parse` round-trip law + the `WellTyped` evaluation guard)
-# certify for free. The only survivors there are provably-equivalent (an empty
-# identifier still rejected by `Ident::new`; the evaluator's `_` arms that the
-# `WellTyped` guard makes unreachable).
+# `interp/internal.rs` and `select/internal.rs` are DELIBERATELY kept in scope despite
+# being module-internal: the interpreter is the experiment that MEASURES whether the
+# boundary rigour buys zero internal testing, and the selector is the method turned on
+# its own kernel. Their mutation scores quantify exactly how much internal correctness
+# the boundary contracts certify for free.
 exclude_globs = [
     "src/main.rs",
-    "src/select.rs",
-    "src/capability.rs",
-    "boundary-algebra-macros/**",
+]
+
+# The full sweep is a GREEN GATE on "0 MISSED". Inherent non-termination mutants — a greedy
+# loop's termination guard relaxed to "never stop", or a `Pos::index` pinned to a constant so
+# the lexer never reaches the end — are reported as TIMEOUT: a detection (the mutant hangs, the
+# original terminates), not a miss. `cargo mutants` still exits non-zero on a timeout, so CI
+# runs it through `.github/mutants-gate.sh`, which passes on a timeout-only exit and fails only
+# on a real survivor in `missed.txt`.
+#
+# Three EQUIVALENT mutants remain that no probe can (or should) kill — each a genuine
+# free choice or a redundant guard, documented here and carved out by FUNCTION (robust to
+# line edits) so they do not mask a real survivor. They are findings, not gaps:
+#   - `Shaped for bool::inhabitant` — the canonical seed is an arbitrary `bool`; `false`
+#     equals `Default::default()`, so the value is unobservable by any sensitivity probe.
+#   - `Declares for ResolvePretendsPure::declared_sources` — it legitimately declares
+#     NOTHING (that is the under-claim being demonstrated), so an empty-slice mutant is
+#     indistinguishable.
+#   - the interpreter lexer's `is_ascii_alphabetic` first-char guard relaxed to `true` —
+#     every newly-admitted identifier is still rejected by `Ident::new`, so the guard is
+#     redundant and the relaxation is behaviour-preserving.
+# (`select`'s former three equivalents were ELIMINATED, not excluded — the selector now
+# uses `Reverse` and `max_by_key` and drops a redundant guard, so it has no mutable
+# arithmetic/comparison left to survive.)
+exclude_re = [
+    "<impl Shaped for bool>::inhabitant",
+    "<impl Declares for ResolvePretendsPure>::declared_sources",
+    "match guard c.is_ascii_alphabetic",
 ]
 
 # Mutation testing certifies the LIBRARY against the unit + property suites, so

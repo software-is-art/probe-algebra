@@ -49,7 +49,13 @@ Four annotations ride the edges, each a monoid that `Compose` threads:
 - **capability** — *how much power an edge claims*: the lattice
   `pure ⊂ lossy ⊂ stateful ⊂ effectful`, at the type level (`Effect` / `AtMost` / `Join`)
   with a runtime reflection. A ceiling is *demandable* (`run_pure` accepts only `AtMost<Pure>`),
-  and the `capability` module *audits* the declaration against behaviour (below).
+  and the `capability` module *audits* the declaration against behaviour (below). The `Join`
+  table has no runtime body, so mutation can't reach it — instead it is **proven at compile
+  time**: `typewit::TypeEq` witnesses certify the algebraic laws (commutativity, identity,
+  idempotence, and associativity over all 64 triples), and a `const` assertion certifies the
+  type-level table reflects to the same `Capability` the runtime `Capability::join` computes —
+  so the two definitions cannot drift. A mistyped cell, or a type↔runtime disagreement, fails
+  to build. The one law the mutation gate cannot certify, certified by the type system instead.
 - **cost** — *time and space complexity*, as an **open keyed map** from named size axes to a
   polynomial degree (`CostCons` / `Lookup` / `WithinBudget`). Time and space diverge at
   iteration (mapping materializes n results; folding streams), so they are two gradings over
@@ -82,9 +88,40 @@ fails it. See [how-it-works](how-it-works.md).
 
 Probes claim to catch bugs; **mutation testing checks the probes**. `cargo mutants` plants a
 bug (negate a condition, swap an operator, return a constant) and asks whether some probe
-notices. A surviving mutant is a hole in the specification, not noise — so the suite is
-scoped to the algebra surface, and the interpreter's interior is deliberately *kept in
-scope with no tests of its own*, to measure exactly how much the boundary buys.
+notices. A surviving mutant is a hole in the specification, not noise — so the interpreter's
+interior is deliberately *kept in scope with no tests of its own*, to measure exactly how much
+the boundary buys. The whole-crate sweep is a **green gate** (`0 missed`), wired into CI to run
+per-PR over the changed lines and as a full sweep on a schedule.
+
+## Self-hosting, and the irreducible base
+
+The method is turned on **every part of its own runtime**. There are two grades of self-host:
+
+- **structural** — a module is re-specified as a boundary (value objects + edges) with a
+  private interior that carries *no example tests*: `interp` and `select` (the kill-matrix
+  selector that chooses the probes — the method applied to its own kernel).
+- **by verification** — crate-level grammar that `build.rs` exempts from the structural rules
+  (`gdp`, `capability`) has its example tests replaced with oracle-free property probes and is
+  kept in the mutation sweep.
+
+The interpreter's entire *positive* surface — evaluation, parsing, type-checker acceptance —
+is certified by the autogen `harness` (declared laws + structure-derived probes) with **zero
+hand-written positive examples**: the strongest form of "the tests generate themselves."
+
+What is **irreducible** — what *cannot* be self-hosted, by nature, not for lack of effort:
+
+- the **trust root**: `rustc` and `cargo-mutants`. The method is measured by them; it cannot
+  certify them (the trusting-trust limit).
+- the **grammar** (`boundary.rs`): the probe primitives cannot be defined in terms of
+  themselves without circularity. It is the host, kept under the mutation lens but not
+  re-specified in itself.
+- **negative tests**: "input X is *rejected*" and the blind-spot map ("probe P is *blind* to
+  bug B") cannot be derived from the thing under test — you cannot generate a counterexample to
+  a property from the property. These stay hand-written, in `tests.rs`.
+
+So `sensitive_to_all` and the laws make a *weak specification* hard to express; they do not
+make *wrong meaning* impossible — the meaning (a validity rule, a declared law) is the one
+thing an author still writes, and it is the smallest irreducible input.
 
 ## The inward rule
 

@@ -62,8 +62,18 @@ checked by probes, and the probes are checked by mutation.
 - the **fused universal probe** `sensitive_to_all(map, x)` runs a map against every derived
   perturbation class: a faithful map (`render`) responds to all; a map that collapses a
   dimension (`node_count`, which ignores the operator and literal values) is caught.
-- the **law registry** (`src/laws.rs`) registers each edge once and gets its whole structural
-  suite — the parse round-trip, the value relations — generically.
+- the **autogen harness** (`src/harness.rs`) registers each edge once and gets its whole
+  structural suite — the parse round-trip, the capability/residual law — generically. Plus
+  `eval_semantics_are_probed`, which pins every evaluator arm (arithmetic, comparison, the
+  conditional, `let`/`var`) oracle-free against an independent computation — so the
+  interpreter's evaluation needs *no hand-written examples*.
+- **value laws are declared, not plumbed.** For the value frontier you write only the
+  *meaning* — `Law::Identity { op: Add, element: 0 }`, `Law::Commutative { op: Mul }` — and
+  the harness mints a first-class `Relation` around it, over a derived generator. The
+  applicability guard and the **non-vacuity check** are the harness's job: `relation_laws`
+  counts how many generated inputs the probe actually fired on and fails if that count is
+  zero. A probe whose guard never holds — the hand-written-guard antipattern — is rejected on
+  an ordinary run, so the author cannot ship a vacuously-passing test.
 - **`cargo mutants` judges all of it.** The interpreter's interior carries no tests; the
   sweep reports how many of its mutants the boundary kills.
 
@@ -82,12 +92,22 @@ The only thing left hand-writable is a *partial* `Covers` set, and `require_comp
 it at compile time. An agent therefore cannot specify a probe that misses a dimension: the
 complete one is derived, and the incomplete one does not compile.
 
+The same shape applies one level up, to the **edge set**. DOF-completeness is sound because
+the list is read from a type's one definition; edges have no single definition site, so the
+`edges!` macro gives them one. Over that single-source list, `assert_all_probed::<Edges>()`
+makes "every edge carries a probe" a compile-time bound — an edge added without a probe fails
+to build (`tests/compile_fail/forgotten_probe_rejected`), the edge analog of a missing DOF.
+The residue Rust's type system can't close — an edge `impl` written *outside* the list — is
+left to `build.rs`/sealing, the only tools that can enumerate impls; in the type system,
+verification is declared and the method audits it, exactly as capability is.
+
 ## 5. The interior is free — and that freedom is audited
 
 `interp::internal` is ordinary imperative Rust: `HashMap` environments, mutable cursors,
 recursion, allocation. It has **zero tests**. Its correctness is entirely a consequence of
-the boundary, *measured* by the interior mutation sweep (72 of 73 viable mutants killed; the
-one survivor provably equivalent).
+the boundary, *measured* by the interior mutation sweep: **every viable mutant is killed**,
+the single equivalent (a redundant lexer guard `Ident::new` subsumes) carved out by
+`.cargo/mutants.toml`.
 
 Freedom does not mean the interior can lie about its capability. The `capability` module
 *audits a declaration against behaviour*: perturb a declared capability source and watch
@@ -97,5 +117,46 @@ whether the output moves. It catches both directions —
 - **under-claiming** (declares `Pure`, secretly reads the environment) → a hidden dependency
   the type system trusted, surfaced by the probe.
 
-So the boundary is paid once, the interior stays free, and the claims in the specification
-are validated at compile time *and* at autotest time — which was the whole question.
+## 6. The whole runtime is self-hosted
+
+The discipline is applied to *every* runtime module, not just the interpreter. `select` (the
+kill-matrix set-cover selector) is a second structural self-host — boundary plus a tested-only-
+by-mutation interior. `gdp` (the name/proof vocabulary) and `capability` (the audit above) are
+crate-level grammar `build.rs` exempts from the structural rules, so they are self-hosted by
+*verification*: their example tests are replaced with oracle-free property probes
+(`permute ∘ unpermute == id`, the liveness rule, the audit's claim/behaviour reconciliation)
+and kept in the mutation sweep. The only survivors anywhere are documented equivalents.
+
+And the proof vocabulary is load-bearing, not ornamental. `gdp` extends "make illegal states
+unrepresentable" from one value (a value object) to a *relation between two values*: `select`'s
+kernel reads its matrix through gdp's `InBounds` proof (`positions` ⇒ `at_in_bounds`), so an
+index proven for one matrix cannot index another and an out-of-range read is a type error, not
+a panic — the same proof-carrying that makes `Eval` uncallable without `Check`'s `WellTyped`.
+
+So the boundary is paid once, the interior stays free, the method certifies its own runtime,
+and the claims in the specification are validated at compile time *and* at autotest time —
+which was the whole question.
+
+## 7. What self-hosting unlocks
+
+Once the abstraction certifies itself, several things follow:
+
+- **Consumers stop paying for mutation.** Mutation is expensive; it validates the *abstraction*,
+  once. A module built on this discipline inherits the guarantee — an interior-only change
+  cannot weaken probes derived from the spec — so a consumer runs the cheap derived probes
+  (`cargo test`) per PR and never the sweep. The cost moves from every consumer's CI to the
+  abstraction's, paid once.
+- **A new verified module is nearly free.** Declaring value objects (`refined!` / `derive
+  Shaped`) and the laws is the *whole* authoring cost; the harness mints the probes and CI's
+  per-PR `--in-diff` sweep certifies them immediately. The crate is a framework, not just a
+  demo.
+- **The selector closes the loop on real data** (`cargo run --example suite_audit`). It reads
+  cargo-mutants' own `mutants.out/` — `outcomes.json` plus the per-mutant logs, which name the
+  failing tests — to build a *real* kill matrix (tests × mutants), then runs `select` over it:
+  the minimal attributing suite (here, 37 of 50 tests retain full kill power) and the survivors
+  as *missing-relation* signals (here, none). The method optimizing its own tests. It also
+  surfaced a real subtlety — mutants caught by a process *abort* have no single owning test, so
+  they are detected but not attributable, and are bucketed apart from genuine survivors.
+- **The trusted base is small and explicit.** Everything else is certified by mutation, so a
+  reviewer's scrutiny narrows to exactly: `rustc`, `cargo-mutants`, the grammar (`boundary.rs`),
+  and the hand-written negative tests. Nothing else has to be taken on faith.

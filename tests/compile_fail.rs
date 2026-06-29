@@ -1,6 +1,6 @@
 //! Compile-fail suite for the interpreter boundary — the NEGATIVE specification.
 //!
-//! The runtime tests in `tests` and `laws` show the legal path works. These
+//! The runtime tests in `tests` and `harness` show the legal path works. These
 //! fixtures pin the other half: the illegal uses must NOT compile. They are the
 //! typestate analog of a perturbation probe — each fixture perturbs a boundary
 //! invariant (here: feeding `Eval` a `WellTyped` witness minted for a DIFFERENT

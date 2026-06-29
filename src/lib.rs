@@ -20,14 +20,26 @@
 //! analogs). Each module's `boundary.rs` is its only public surface; `build.rs`
 //! enforces the grammar and the inward "no raw primitive escapes" rule.
 //!
-//! The interpreter (`interp`) is the sole demonstration substrate: an expression
-//! language whose boundary is `Parse` (a `Construction`), `Check` (a `Branch`), and
-//! `Eval` (a `Guarded` edge), and whose private internals carry ZERO tests of their own —
-//! the boundary rigour plus the autogen `laws` registry are their entire verification,
-//! measured by mutation. `gdp` is the name-branding machinery the edges use; `capability`
-//! is the behavioural audit that reconciles an edge's declared capability with what it
-//! actually does (over- and under-claim detection); `select` is the kill-matrix set-cover
-//! meta-tooling.
+//! Every part of the runtime is SELF-HOSTED — certified by oracle-free probes with no
+//! hand-written example tests, judged by mutation. The interpreter (`interp`) is the lead
+//! demonstration substrate: an expression language whose boundary is `Parse` (a
+//! `Construction`), `Check` (a `Branch`), and `Eval` (a `Guarded` edge). Its private internals
+//! carry zero tests, and its entire POSITIVE surface — evaluation, parsing, type-checker
+//! acceptance — carries no hand-written examples either: the autogen `harness` registry
+//! (declared laws + structure-derived probes) is its whole verification. `select` is a second
+//! structural self-host: the kill-matrix set-cover selector, specified in the discipline with
+//! no interior tests. Only the IRREDUCIBLE base is hand-written — the negative tests
+//! (rejection of ill-typed / malformed input, the blind-spot map) and the grammar itself —
+//! and the trust root (rustc + cargo-mutants) cannot be self-hosted away.
+//!
+//! `gdp` is the name/proof vocabulary (Ghosts of Departed Proofs): unique type-level names
+//! and proofs phrased about a named value. It is load-bearing two ways — `interp`'s
+//! `WellTyped`/`IllTyped` are gdp proofs, and `select`'s kernel indexes its matrix entirely
+//! through gdp's `InBounds` relational proof (`positions`/`at_in_bounds`), so an out-of-range
+//! read is a type error, not a panic. `capability` is the behavioural audit that reconciles
+//! an edge's declared capability with what it actually does (over- and under-claim
+//! detection). Both are crate-level grammar (`build.rs` exempts them from the structural
+//! rules), self-hosted by replacing their example tests with oracle-free property probes.
 
 pub mod boundary;
 pub mod capability;
@@ -41,6 +53,6 @@ pub mod select;
 pub use boundary_algebra_macros::Shaped;
 
 #[cfg(test)]
-mod laws;
+mod harness;
 #[cfg(test)]
 mod tests;

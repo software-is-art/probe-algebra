@@ -1,0 +1,77 @@
+name: ci
+
+# Dogfood everywhere, all the time. The fast gate (fmt + clippy + test) runs on every
+# push and PR; the mutation gate — the method's own "the real test" — runs per-change on
+# PRs (only the changed lines, since mutation is expensive) and as a full-crate sweep on
+# the default branch and a weekly schedule.
+#
+# The Rust toolchain is PINNED (not `@stable`): the `tests/compile_fail` trybuild suite
+# matches saved `.stderr` files, and rustc's diagnostic rendering changes between versions,
+# so a floating toolchain makes that suite spuriously fail. Bump this pin in lockstep with
+# regenerating the `.stderr` files (TRYBUILD=overwrite).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC — the periodic whole-crate guarantee
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  check:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo test --all-targets
+
+  # Per-change dogfood: mutate only the lines this PR touches. New code that a probe
+  # cannot kill fails the gate; pre-existing documented equivalents are not in the diff,
+  # so they never re-trip it.
+  mutants-diff:
+    name: dogfood (changed lines)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: mutate the diff
+        run: |
+          git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
+          .github/mutants-gate.sh --in-diff pr.diff
+
+  # Whole-crate dogfood: the green gate is "0 MISSED". Timeouts (non-termination mutants —
+  # a relaxed greedy-loop guard, or a constant `Pos::index` that hangs the lexer) are
+  # DETECTIONS, not survivors: the original terminates, the mutant does not. cargo-mutants
+  # nonetheless exits non-zero on a timeout, so `.github/mutants-gate.sh` distinguishes a
+  # timeout-only exit (pass) from a real survivor in `missed.txt` (fail). The three inherent
+  # equivalents are carved out by `.cargo/mutants.toml`, so a clean crate passes the gate.
+  mutants-full:
+    name: dogfood (full sweep)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - run: .github/mutants-gate.sh
