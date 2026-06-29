@@ -439,18 +439,13 @@ mod registry {
             .unwrap();
     }
 
-    /// The value frontier, certified by DISCOVERED LAWS: the generic engine found, by running the
-    /// operators, every algebraic law they satisfy (identity, commutativity, associativity,
-    /// annihilation, distributivity, irreflexivity). `replay_interpreter_laws` re-probes each as an
-    /// oracle-free equation over the engine's grid, and the universal-observer (`U`) law is re-probed
-    /// as a structural-sensitivity property over random programs. The author wrote NONE of these
-    /// laws; they fell out of the operators (per-arm evaluator correctness is pinned independently by
-    /// `eval_semantics_are_probed`).
+    /// The structural `U` law, re-probed: the faithful rendering is sensitive to every structural
+    /// and semantic perturbation, over random programs. The interpreter's VALUE-algebra laws are
+    /// discovered and pinned by `discover`'s exact-spec test (re-derived against the real
+    /// interpreter, so a mutant that breaks the algebra changes the discovered set), and per-arm
+    /// evaluator correctness is pinned by `eval_semantics_are_probed` — the author wrote no law.
     #[test]
     fn eval_laws_are_probed() {
-        // the value-algebra laws, re-probed against the interpreter.
-        crate::discover::replay_interpreter_laws().expect("a discovered law failed on replay");
-        // the structural `U` law: the faithful rendering is sensitive to every perturbation.
         TestRunner::default()
             .run(&<Expr as Sampled>::sampled(), |e| {
                 prop_assert!(

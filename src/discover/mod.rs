@@ -19,11 +19,12 @@
 pub mod arithmetic;
 pub mod date;
 pub mod engine;
+pub mod freeze;
 pub mod router;
 
 use crate::boundary::sensitive_to_all;
 use crate::discover::arithmetic::Arithmetic;
-use crate::discover::engine::Engine;
+use crate::discover::engine::{Engine, Theory};
 use crate::interp::boundary::{Expr, Ident, Op};
 
 /// A discovered law in rendered form — a plain-language sentence and its symbolic equation. This is
@@ -51,51 +52,59 @@ pub struct Spec {
     pub uncovered_ops: Vec<&'static str>,
 }
 
+/// Discover the named value-algebra laws of any theory, rendered into a `Spec`.
+fn theory_spec<T: Theory>() -> Spec {
+    let discovered = Engine::<T>::new().discover();
+    Spec {
+        theory: T::name(),
+        laws: discovered
+            .laws
+            .iter()
+            .map(|l| Law {
+                prose: l.prose.clone(),
+                equation: l.equation.clone(),
+            })
+            .collect(),
+        consequences: discovered.consequences,
+        uncovered_ops: discovered.uncovered_ops,
+    }
+}
+
 /// The interpreter's discovered spec: the named value-algebra laws (from the generic engine over
 /// the `Arithmetic` theory) plus the structural `U` law. The author supplied only the operators;
 /// everything here was found by running them, not declared.
 pub fn interpreter_spec() -> Spec {
-    let engine = Engine::<Arithmetic>::new();
-    let discovered = engine.discover();
-    let mut laws: Vec<Law> = discovered
-        .laws
-        .iter()
-        .map(|l| Law {
-            prose: l.prose.clone(),
-            equation: l.equation.clone(),
-        })
-        .collect();
-
+    let mut spec = theory_spec::<Arithmetic>();
     if observer_is_sensitive(render()) {
-        laws.push(Law {
+        spec.laws.push(Law {
             prose: "No two distinct programs look the same — the faithful rendering distinguishes \
                     every structural and semantic difference."
                 .to_string(),
             equation: "U(p) = U(q)  ⟹  p = q   (U = faithful render)".to_string(),
         });
     }
+    spec
+}
 
-    Spec {
-        theory: <Arithmetic as engine::Theory>::name(),
-        laws,
-        consequences: discovered.consequences,
-        uncovered_ops: discovered.uncovered_ops,
-    }
+/// The router's discovered spec (a non-commutative monoid).
+pub fn router_spec() -> Spec {
+    theory_spec::<router::Router>()
+}
+
+/// The date calculus's discovered spec (a multi-sorted domain with a partial operator).
+pub fn date_spec() -> Spec {
+    theory_spec::<date::Calendar>()
+}
+
+/// Every theory's discovered spec — what the freeze records and the staleness gate checks.
+pub fn all_specs() -> Vec<Spec> {
+    vec![interpreter_spec(), router_spec(), date_spec()]
 }
 
 /// The interpreter's discovered laws (named value-algebra laws + the `U` law), for consumers that
-/// only need the law list (the example, the harness probe, the freeze).
+/// only need the law list (the example, the freeze).
 pub fn discover_laws() -> Vec<Law> {
     interpreter_spec().laws
-}
-
-/// Re-probe the interpreter's named value-algebra laws over the engine's grid — a supplementary,
-/// oracle-free check that the discovered algebra still holds (the interpreter's per-arm correctness
-/// is pinned independently by the harness's `eval_semantics_are_probed`). Returns the first failure.
-pub fn replay_interpreter_laws() -> Result<(), String> {
-    let engine = Engine::<Arithmetic>::new();
-    let laws = engine.discover().laws;
-    engine.check(&laws)
 }
 
 // ----- the universal observer U: structure + semantics sensitivity --------
@@ -218,11 +227,13 @@ mod tests {
         );
     }
 
-    /// The discovered laws actually hold when re-probed (replay), and the U observer is load-bearing:
-    /// the faithful render is universally sensitive, a collapsing one (`node_count`) is not.
+    /// The discovered laws actually hold when re-probed against the interpreter, and the U observer
+    /// is load-bearing: the faithful render is universally sensitive, a collapsing one
+    /// (`node_count`) is not.
     #[test]
     fn the_spec_replays_and_u_is_load_bearing() {
-        assert_eq!(replay_interpreter_laws(), Ok(()));
+        let engine = Engine::<Arithmetic>::new();
+        assert_eq!(engine.check(&engine.discover().laws), Ok(()));
         assert!(observer_is_sensitive(render()), "render should be faithful");
         assert!(
             !observer_is_sensitive(|x: &Expr| x.node_count()),

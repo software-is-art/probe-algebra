@@ -1,41 +1,36 @@
-//! discovered_spec — print the interpreter's algebraic spec, DISCOVERED by running the operators.
+//! discovered_spec — print every theory's algebraic spec, DISCOVERED by running its operators.
 //!
-//! Nothing here is hand-written: `discover::discover_laws()` instantiated the universal algebraic
-//! shapes over the operators and kept the ones that ran true. The output is a plain-language
-//! contract a non-mathematical stakeholder can read and ratify — and an *expected* law that is
-//! ABSENT (e.g. if the folder doubled, there would be no "adding zero leaves a value unchanged")
-//! is a bug surfaced.
+//! Nothing here is hand-written: the generic engine (`discover::engine`) instantiated the universal
+//! algebraic shapes over each domain's operators and kept the ones that ran true. The interpreter's
+//! arithmetic, a non-commutative router monoid, and a multi-sorted date calculus all fall out of the
+//! SAME mechanism — and each renders as a plain-language contract a non-mathematical stakeholder can
+//! ratify. An expected law that is ABSENT (or, for the router, a commutativity that must NOT appear)
+//! is a bug surfaced. The committed `spec/*.spec` locks freeze these; CI fails if they drift.
 //!
 //! Run `cargo run --example discovered_spec`.
 
-use boundary_algebra::discover::interpreter_spec;
+use boundary_algebra::discover::all_specs;
 
 fn main() {
-    let spec = interpreter_spec();
-    println!(
-        "The {} obeys these laws (discovered by running it):\n",
-        spec.theory
-    );
-    for law in &spec.laws {
-        println!("  • {}", law.prose());
-        println!("      {}", law.equation());
-    }
-    println!(
-        "\n{} named laws, none hand-written — found by the generic engine enumerating terms over \
-         the operators and keeping the equalities that ran true.",
-        spec.laws.len()
-    );
-    println!(
-        "({} further equalities were discovered too — every one a consequence of the laws above, \
-         so they are counted, not listed.)",
-        spec.consequences
-    );
-    if spec.uncovered_ops.is_empty() {
-        println!("Every operator participates in a law.");
-    } else {
+    for spec in all_specs() {
+        println!("══ {} ══\n", spec.theory);
+        for law in &spec.laws {
+            println!("  • {}", law.prose());
+            println!("      {}", law.equation());
+        }
         println!(
-            "Operators in no law (where the spec is silent): {:?}",
-            spec.uncovered_ops
+            "\n  {} named laws (none hand-written) + {} further consequence equalities.",
+            spec.laws.len(),
+            spec.consequences
         );
+        if spec.uncovered_ops.is_empty() {
+            println!("  Every operator participates in a law.\n");
+        } else {
+            println!(
+                "  Operators in no law (where the spec is silent): {}\n",
+                spec.uncovered_ops.join(", ")
+            );
+        }
     }
+    println!("All discovered by running the operators — one engine, three very different algebras.");
 }
