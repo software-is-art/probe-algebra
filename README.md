@@ -12,10 +12,12 @@ was too weak.
 **The answer is yes.** The demonstration:
 
 > An expression-language interpreter whose interior — lexer, parser, type checker,
-> evaluator — has **zero tests of its own**. Mutating that interior produces 73 viable
-> mutants; the boundary specification plus its *derived* probes kill **72 of 73**, and the
-> lone survivor is provably equivalent (a relaxed lexer guard whose only newly-reachable
-> inputs `Ident::new` already rejects). No test of the interior was written by hand.
+> evaluator — has **zero tests of its own**, and whose entire *positive* behaviour
+> (evaluation, parsing, type-checker acceptance) is certified with **zero hand-written
+> examples** too: only declared laws and structure-derived probes. Mutating the interior,
+> **every viable mutant is killed** — the one equivalent (a relaxed lexer guard whose
+> newly-reachable inputs `Ident::new` already rejects) is the single carve-out, documented in
+> `.cargo/mutants.toml`. Not one positive test of the interpreter was written by hand.
 
 ---
 

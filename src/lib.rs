@@ -23,10 +23,14 @@
 //! Every part of the runtime is SELF-HOSTED — certified by oracle-free probes with no
 //! hand-written example tests, judged by mutation. The interpreter (`interp`) is the lead
 //! demonstration substrate: an expression language whose boundary is `Parse` (a
-//! `Construction`), `Check` (a `Branch`), and `Eval` (a `Guarded` edge), and whose private
-//! internals carry ZERO tests of their own — the boundary rigour plus the autogen `laws`
-//! registry are their entire verification. `select` is a second structural self-host: the
-//! kill-matrix set-cover selector, specified in the discipline with no interior tests.
+//! `Construction`), `Check` (a `Branch`), and `Eval` (a `Guarded` edge). Its private internals
+//! carry zero tests, and its entire POSITIVE surface — evaluation, parsing, type-checker
+//! acceptance — carries no hand-written examples either: the autogen `harness` registry
+//! (declared laws + structure-derived probes) is its whole verification. `select` is a second
+//! structural self-host: the kill-matrix set-cover selector, specified in the discipline with
+//! no interior tests. Only the IRREDUCIBLE base is hand-written — the negative tests
+//! (rejection of ill-typed / malformed input, the blind-spot map) and the grammar itself —
+//! and the trust root (rustc + cargo-mutants) cannot be self-hosted away.
 //!
 //! `gdp` is the name/proof vocabulary (Ghosts of Departed Proofs): unique type-level names
 //! and proofs phrased about a named value. It is load-bearing two ways — `interp`'s
@@ -49,6 +53,6 @@ pub mod select;
 pub use boundary_algebra_macros::Shaped;
 
 #[cfg(test)]
-mod laws;
+mod harness;
 #[cfg(test)]
 mod tests;

@@ -62,8 +62,11 @@ checked by probes, and the probes are checked by mutation.
 - the **fused universal probe** `sensitive_to_all(map, x)` runs a map against every derived
   perturbation class: a faithful map (`render`) responds to all; a map that collapses a
   dimension (`node_count`, which ignores the operator and literal values) is caught.
-- the **law registry** (`src/laws.rs`) registers each edge once and gets its whole structural
-  suite — the parse round-trip, the capability/residual law — generically.
+- the **autogen harness** (`src/harness.rs`) registers each edge once and gets its whole
+  structural suite — the parse round-trip, the capability/residual law — generically. Plus
+  `eval_semantics_are_probed`, which pins every evaluator arm (arithmetic, comparison, the
+  conditional, `let`/`var`) oracle-free against an independent computation — so the
+  interpreter's evaluation needs *no hand-written examples*.
 - **value laws are declared, not plumbed.** For the value frontier you write only the
   *meaning* — `Law::Identity { op: Add, element: 0 }`, `Law::Commutative { op: Mul }` — and
   the harness mints a first-class `Relation` around it, over a derived generator. The
@@ -93,8 +96,9 @@ complete one is derived, and the incomplete one does not compile.
 
 `interp::internal` is ordinary imperative Rust: `HashMap` environments, mutable cursors,
 recursion, allocation. It has **zero tests**. Its correctness is entirely a consequence of
-the boundary, *measured* by the interior mutation sweep (72 of 73 viable mutants killed; the
-one survivor provably equivalent).
+the boundary, *measured* by the interior mutation sweep: **every viable mutant is killed**,
+the single equivalent (a redundant lexer guard `Ident::new` subsumes) carved out by
+`.cargo/mutants.toml`.
 
 Freedom does not mean the interior can lie about its capability. The `capability` module
 *audits a declaration against behaviour*: perturb a declared capability source and watch
@@ -123,3 +127,25 @@ a panic — the same proof-carrying that makes `Eval` uncallable without `Check`
 So the boundary is paid once, the interior stays free, the method certifies its own runtime,
 and the claims in the specification are validated at compile time *and* at autotest time —
 which was the whole question.
+
+## 7. What self-hosting unlocks
+
+Once the abstraction certifies itself, several things follow:
+
+- **Consumers stop paying for mutation.** Mutation is expensive; it validates the *abstraction*,
+  once. A module built on this discipline inherits the guarantee — an interior-only change
+  cannot weaken probes derived from the spec — so a consumer runs the cheap derived probes
+  (`cargo test`) per PR and never the sweep. The cost moves from every consumer's CI to the
+  abstraction's, paid once.
+- **A new verified module is nearly free.** Declaring value objects (`refined!` / `derive
+  Shaped`) and the laws is the *whole* authoring cost; the harness mints the probes and CI's
+  per-PR `--in-diff` sweep certifies them immediately. The crate is a framework, not just a
+  demo.
+- **The selector can close the loop on real data.** `select` already chooses a minimal,
+  attributing probe set from a kill matrix. The natural next step is to feed it cargo-mutants'
+  actual `outcomes.json` (every probe × every mutant): it would then prune the project's own
+  suite to the smallest set that retains full kill power and surface uncoverable mutants as
+  *missing-relation* signals — the method optimizing its own tests.
+- **The trusted base is small and explicit.** Everything else is certified by mutation, so a
+  reviewer's scrutiny narrows to exactly: `rustc`, `cargo-mutants`, the grammar (`boundary.rs`),
+  and the hand-written negative tests. Nothing else has to be taken on faith.

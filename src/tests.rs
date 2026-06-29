@@ -2,7 +2,7 @@
 //! demonstration substrate. These import ONLY through `interp::boundary`, exactly as
 //! another module would, and test the PUBLIC edges (`Parse`/`Check`/`Eval`). The
 //! lexer/parser/checker/evaluator in `interp::internal` have no tests of their own; this
-//! file plus the autogen `laws` registry are the entire rigour they get, and mutation
+//! file plus the autogen `harness` registry are the entire rigour they get, and mutation
 //! testing measures how much that buys.
 
 use crate::boundary::{
@@ -40,80 +40,16 @@ fn well_typed(expr: Expr) -> bool {
     })
 }
 
-#[test]
-fn evaluates_arithmetic() {
-    assert_eq!(eval(int(2)), num(2));
-    assert_eq!(eval(Expr::bin(Op::Add, int(2), int(3))), num(5));
-    assert_eq!(eval(Expr::bin(Op::Mul, int(2), int(3))), num(6));
-}
-
-#[test]
-fn evaluates_comparison_and_if() {
-    assert_eq!(eval(Expr::bin(Op::Lt, int(1), int(2))), Value::Bool(true));
-    assert_eq!(eval(Expr::bin(Op::Lt, int(2), int(1))), Value::Bool(false));
-    // EQUAL operands pin `<` against `<=` (strict less-than).
-    assert_eq!(eval(Expr::bin(Op::Lt, int(2), int(2))), Value::Bool(false));
-    let cond = Expr::bin(Op::Lt, int(1), int(2));
-    assert_eq!(eval(Expr::cond(cond.clone(), int(7), int(9))), num(7));
-    let cond_false = Expr::bin(Op::Lt, int(2), int(1));
-    assert_eq!(eval(Expr::cond(cond_false, int(7), int(9))), num(9));
-}
-
-#[test]
-fn evaluates_let_and_var() {
-    let prog = Expr::bind(
-        name("x"),
-        int(4),
-        Expr::bin(Op::Add, Expr::var(name("x")), int(1)),
-    );
-    assert_eq!(eval(prog), num(5));
-    let shadow = Expr::bind(
-        name("x"),
-        int(1),
-        Expr::bind(name("x"), int(2), Expr::var(name("x"))),
-    );
-    assert_eq!(eval(shadow), num(2));
-    let square = Expr::bind(
-        name("x"),
-        int(3),
-        Expr::bin(Op::Mul, Expr::var(name("x")), Expr::var(name("x"))),
-    );
-    assert_eq!(eval(square), num(9));
-}
-
-/// The value-object accessors and the canonical `render` report the REAL contents, not a
-/// constant. (`render` is pinned here directly because the round-trip law's generator is
-/// itself built from `render`.)
-#[test]
-fn accessors_and_render_report_the_real_value() {
-    assert_eq!(Int::new(7).unwrap().get(), 7);
-    assert_eq!(name("foo").get(), "foo");
-    assert_eq!(Expr::bin(Op::Add, int(1), int(2)).render(), "(1 + 2)");
-    assert_eq!(Expr::bin(Op::Mul, int(2), int(3)).render(), "(2 * 3)");
-    assert_eq!(Expr::bin(Op::Lt, int(1), int(2)).render(), "(1 < 2)");
-    assert_eq!(
-        Expr::cond(Expr::boolean(true), int(1), int(2)).render(),
-        "(if true then 1 else 2)"
-    );
-    assert_eq!(
-        Expr::bind(name("x"), int(1), Expr::var(name("x"))).render(),
-        "(let x = 1 in x)"
-    );
-}
-
-#[test]
-fn accepts_well_typed() {
-    assert!(well_typed(Expr::bin(Op::Add, int(1), int(2))));
-    assert!(well_typed(Expr::bin(Op::Lt, int(1), int(2))));
-    let if_ok = Expr::cond(Expr::bin(Op::Lt, int(1), int(2)), int(1), int(2));
-    assert!(well_typed(if_ok));
-    let let_ok = Expr::bind(
-        name("x"),
-        int(1),
-        Expr::bin(Op::Add, Expr::var(name("x")), int(1)),
-    );
-    assert!(well_typed(let_ok));
-}
+// The interpreter's POSITIVE surface — arithmetic, comparison, the conditional, `let`/`var`,
+// shadowing, type-checker ACCEPTANCE, accessors, `render`, and parsing — is no longer pinned
+// by hand-written examples here. It is all certified ORACLE-FREE by the `harness` registry:
+// `eval_semantics_are_probed` compares every evaluator arm to an independent computation (and
+// only well-typed programs reach it, so `Check`'s acceptance is exercised too),
+// `parse_inverts_render` round-trips parsing against rendering, and `accessors_round_trip`
+// pins the accessors. What remains in this file is the IRREDUCIBLE hand-written layer:
+// NEGATIVE tests (ill-typed / malformed rejection — you cannot derive "X is rejected" from
+// the thing under test), the grammar-combinator exercises (`algebra_surface`), and the
+// blind-spot map (`blind_spot`).
 
 #[test]
 fn rejects_ill_typed() {
@@ -134,27 +70,6 @@ fn rejects_ill_typed() {
         Expr::bin(Op::Add, Expr::var(name("x")), int(1)),
     );
     assert!(!well_typed(bad_let));
-}
-
-#[test]
-fn parses_and_runs_a_program() {
-    let e = Parse
-        .parse_str("(let x = 5 in (if (x < 10) then (x + 1) else 0))")
-        .unwrap();
-    assert_eq!(eval(e), num(6));
-}
-
-#[test]
-fn parse_builds_the_expected_structure() {
-    assert_eq!(
-        Parse.parse_str("(1 + (2 * 3))").unwrap(),
-        Expr::bin(Op::Add, int(1), Expr::bin(Op::Mul, int(2), int(3)))
-    );
-    assert_eq!(Parse.parse_str("true").unwrap(), Expr::boolean(true));
-    assert_eq!(
-        Parse.parse_str("(x < y)").unwrap(),
-        Expr::bin(Op::Lt, Expr::var(name("x")), Expr::var(name("y")))
-    );
 }
 
 #[test]
@@ -435,11 +350,12 @@ mod blind_spot {
 
 // ===== the rest of the algebra, exercised on the interpreter ==============
 //
-// With interp the sole substrate, the generic grammar (residual probe, DOF synthesis,
-// Compose/run/Carried, Then, construction_probe, the profiling wrapper, provenance
-// lineage, the type-level degree) must be exercised HERE or it is dead. These tests run
-// each on the `ConstFold`/`Parse` edges; mutation testing then certifies the grammar is
-// covered, not merely present. Plus the direct pins for the `Expr` cost measures.
+// The generic grammar (residual probe, DOF synthesis, Compose/run/Carried, Then,
+// construction_probe, the profiling wrapper, provenance lineage, the type-level degree) is
+// exercised on the interpreter's `ConstFold`/`Parse` edges — these combinator exercises are
+// part of the irreducible hand-written layer (the grammar is the host, not a self-hosted
+// module). Mutation testing then certifies the grammar is covered, not merely present. Plus
+// the direct pins for the `Expr` cost measures.
 mod algebra_surface {
     use super::{int, name, Expr, Op};
     use crate::boundary::{
