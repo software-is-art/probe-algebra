@@ -1,0 +1,21 @@
+error[E0277]: the trait bound `boundary_algebra::boundary::Stateful: AtMost<boundary_algebra::boundary::Pure>` is not satisfied
+  --> tests/compile_fail/under_claimed_capability.rs:25:25
+   |
+25 |     demand_pure_input::<Bound>();
+   |                         ^^^^^ the trait `AtMost<boundary_algebra::boundary::Pure>` is not implemented for `boundary_algebra::boundary::Stateful`
+   |
+help: the following other types implement trait `AtMost<Ceiling>`
+  --> src/boundary.rs
+   |
+   | impl AtMost<Stateful> for Stateful {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `boundary_algebra::boundary::Stateful` implements `AtMost<boundary_algebra::boundary::Stateful>`
+   | impl AtMost<Effectful> for Stateful {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `boundary_algebra::boundary::Stateful` implements `AtMost<boundary_algebra::boundary::Effectful>`
+note: required by a bound in `demand_pure_input`
+  --> tests/compile_fail/under_claimed_capability.rs:19:30
+   |
+16 | fn demand_pure_input<T>()
+   |    ----------------- required by a bound in this function
+...
+19 |     <T as InputEffect>::Eff: AtMost<Pure>,
+   |                              ^^^^^^^^^^^^ required by this bound in `demand_pure_input`

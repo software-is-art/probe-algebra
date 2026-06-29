@@ -188,21 +188,16 @@ impl Declares for Resolve {
     }
 }
 
-// The over-/under-claiming subjects are TEST-ONLY counterexamples (they exercise the audit's
-// detection logic; they are not production edges). Retired by capability inference — see
-// `interp::boundary`'s Resolve section.
+// The OVER-claiming subject is a TEST-ONLY counterexample exercising the audit's detection logic
+// (it is not a production edge). The under-claiming twin is gone — v4 catches under-claiming
+// structurally via the input-effect floor (see `boundary::InputEffect`), so the audit's remaining
+// job is the over-claim a negative type fact can't express.
 #[cfg(test)]
-use crate::interp::boundary::{ResolveIgnoresEnv, ResolvePretendsPure};
+use crate::interp::boundary::ResolveIgnoresEnv;
 #[cfg(test)]
 impl Declares for ResolveIgnoresEnv {
     fn declared_sources(&self) -> &'static [Source] {
         &[Source::State] // OVER-claim: demands state it never reads.
-    }
-}
-#[cfg(test)]
-impl Declares for ResolvePretendsPure {
-    fn declared_sources(&self) -> &'static [Source] {
-        &[] // UNDER-claim: hides that it reads the environment.
     }
 }
 
@@ -311,9 +306,13 @@ mod tests {
             prop_assert_eq!(audit.declared(), declared);
         }
 
-        /// END-TO-END over random bindings: auditing the real `Resolve` family along the
-        /// `State` channel separates the honest edge from its over- and under-claiming twins —
-        /// pinning `observe`, `audit_channel`, `BumpBinding`, and each `Declares` claim.
+        /// END-TO-END over random bindings: auditing the real `Resolve` family along the `State`
+        /// channel separates the honest edge from its OVER-claiming twin — pinning `observe`,
+        /// `audit_channel`, `BumpBinding`, and the `Declares` claims. (The under-claiming twin is
+        /// gone: v4 catches under-claiming structurally via the input-effect floor, so the audit's
+        /// end-to-end job here is the over-claim a negative type fact can't express. The
+        /// claimed/live detection logic itself is pinned exhaustively by the per-channel property
+        /// test above, over arbitrary `claimed`×`live` combinations.)
         #[test]
         fn the_resolve_family_audits_as_specified(v in 0i64..10_000) {
             let x = name("x");
@@ -323,7 +322,6 @@ mod tests {
 
             let honest = one(audit_channel(Source::State, &Resolve, &BumpBinding(x.clone()), &bound).unwrap());
             let over = one(audit_channel(Source::State, &ResolveIgnoresEnv, &BumpBinding(x.clone()), &bound).unwrap());
-            let under = one(audit_channel(Source::State, &ResolvePretendsPure, &BumpBinding(x.clone()), &bound).unwrap());
 
             prop_assert!(honest.is_honest());
             prop_assert_eq!(honest.observed(), Capability::Stateful);
@@ -333,11 +331,6 @@ mod tests {
             prop_assert!(over.under_claimed().is_empty());
             prop_assert_eq!(over.observed(), Capability::Pure);
             prop_assert!(over_declared(over.declared(), over.observed()));
-
-            prop_assert_eq!(under.under_claimed(), vec![Source::State]);
-            prop_assert!(under.over_claimed().is_empty());
-            prop_assert_eq!(under.declared(), Capability::Pure);
-            prop_assert_eq!(under.observed(), Capability::Stateful);
         }
     }
 
