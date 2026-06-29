@@ -127,8 +127,14 @@ What is **irreducible** — by nature, not for lack of effort:
   without circularity — the host, kept under the mutation lens but not re-specified in itself.
 - **rejection tests**: "input X is *rejected*" can't be derived from the thing under test (you
   cannot generate a counterexample to a property from the property). These stay hand-written.
-- the **meaning** itself — a validity rule, a declared law — the one thing an author always
-  writes, and the smallest irreducible input.
+- the **meaning** itself — but it has shrunk. The algebraic laws are no longer authored: `discover`
+  instantiates the universal shapes over the operators and keeps the ones that RUN true, so the law
+  set falls out of the operators' behaviour (and renders as a readable, non-mathy report). What an
+  author still supplies is the **validity rule** (`Int ≥ 0`) and the act of **ratifying** the
+  discovered set — recognizing whether it is the algebra they meant (a law you expect but don't see
+  is a bug). Discovery's reference frame is the baseline, so it catches *deviations* (mutation) and
+  *surprises* (ratification); it cannot conjure a law the operators don't exhibit. That is the
+  precise edge where "the tests write themselves" ends and "what did you mean" begins.
 
 ## The inward rule
 
