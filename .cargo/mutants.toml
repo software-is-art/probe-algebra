@@ -32,9 +32,12 @@ exclude_globs = [
     "src/main.rs",
 ]
 
-# The full sweep is a GREEN GATE (0 missed ⇒ exit 0), so CI can gate on it. Inherent
-# infinite-loop mutants (a greedy loop's termination guard relaxed to "never stop") are
-# reported as TIMEOUT — a detection, not a miss — and do not fail the gate.
+# The full sweep is a GREEN GATE on "0 MISSED". Inherent non-termination mutants — a greedy
+# loop's termination guard relaxed to "never stop", or a `Pos::index` pinned to a constant so
+# the lexer never reaches the end — are reported as TIMEOUT: a detection (the mutant hangs, the
+# original terminates), not a miss. `cargo mutants` still exits non-zero on a timeout, so CI
+# runs it through `.github/mutants-gate.sh`, which passes on a timeout-only exit and fails only
+# on a real survivor in `missed.txt`.
 #
 # Three EQUIVALENT mutants remain that no probe can (or should) kill — each a genuine
 # free choice or a redundant guard, documented here and carved out by FUNCTION (robust to

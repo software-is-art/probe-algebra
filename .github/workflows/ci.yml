@@ -55,11 +55,14 @@ jobs:
       - name: mutate the diff
         run: |
           git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
-          cargo mutants --in-diff pr.diff
+          .github/mutants-gate.sh --in-diff pr.diff
 
-  # Whole-crate dogfood: the green gate (0 missed ⇒ exit 0). Timeouts (greedy-loop
-  # non-termination mutants) are detections, and the three inherent equivalents are
-  # carved out by `.cargo/mutants.toml`, so a clean crate exits 0.
+  # Whole-crate dogfood: the green gate is "0 MISSED". Timeouts (non-termination mutants —
+  # a relaxed greedy-loop guard, or a constant `Pos::index` that hangs the lexer) are
+  # DETECTIONS, not survivors: the original terminates, the mutant does not. cargo-mutants
+  # nonetheless exits non-zero on a timeout, so `.github/mutants-gate.sh` distinguishes a
+  # timeout-only exit (pass) from a real survivor in `missed.txt` (fail). The three inherent
+  # equivalents are carved out by `.cargo/mutants.toml`, so a clean crate passes the gate.
   mutants-full:
     name: dogfood (full sweep)
     if: github.event_name != 'pull_request'
@@ -71,4 +74,4 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
-      - run: cargo mutants
+      - run: .github/mutants-gate.sh
