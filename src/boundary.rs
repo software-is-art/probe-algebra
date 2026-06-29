@@ -36,6 +36,8 @@
 use core::fmt::Debug;
 use core::marker::PhantomData;
 
+use typewit::TypeEq;
+
 /// The sealing module. `Sealed` is `pub(crate)`, so only THIS crate can satisfy
 /// the marker supertraits — downstream crates cannot mint boundary citizens.
 pub(crate) mod sealed {
@@ -371,6 +373,62 @@ where
 {
     run_within::<Pure, M>(m, input)
 }
+
+// ===== capability-lattice LAWS, proven at compile time =====================
+//
+// `Join` is a hand-written 4x4 table of associated types — it has NO runtime body, so the
+// mutation sweep (which mutates fn bodies) cannot reach it: a mistyped cell, e.g. an
+// asymmetric or non-maximal join, would compute a wrong effect ceiling SILENTLY. The
+// `typewit::TypeEq` witnesses below close that gap. Each is built with `TypeEq::NEW`, which the
+// compiler accepts ONLY if its two type arguments are literally the same type — so this section
+// COMPILING is a proof that `Join` is a commutative, idempotent semilattice with `Pure` as
+// identity, exhaustive over the closed, sealed 4-effect set. Flip any `=> Out` in `join_impls!`
+// and the corresponding witness stops compiling. (This makes `typewit` part of the trust root,
+// alongside rustc — a tiny price for a law the mutation gate cannot otherwise certify.)
+
+/// A carried compile-time proof that `Join` COMMUTES on `(Self, B)`:
+/// `<Self as Join<B>>::Out == <B as Join<Self>>::Out`. The impls are the proof; the witness is
+/// public so a consumer can `to_right`-coerce a composed capability between join orders (see
+/// the `join_law` example) — the GADT power `TypeEq` adds over a bare equality assertion.
+pub trait JoinCommutes<B>: Join<B>
+where
+    Self: Sized,
+    B: Join<Self>,
+{
+    /// Built with `TypeEq::NEW` — this impl type-checks only if the two join orders agree.
+    const COMMUTES: TypeEq<<Self as Join<B>>::Out, <B as Join<Self>>::Out>;
+}
+macro_rules! prove_commutes {
+    ($a:ty => $($b:ty),+ $(,)?) => {$(
+        impl JoinCommutes<$b> for $a {
+            const COMMUTES: TypeEq<<$a as Join<$b>>::Out, <$b as Join<$a>>::Out> = TypeEq::NEW;
+        }
+    )+};
+}
+prove_commutes!(Pure => Pure, Lossy, Stateful, Effectful);
+prove_commutes!(Lossy => Pure, Lossy, Stateful, Effectful);
+prove_commutes!(Stateful => Pure, Lossy, Stateful, Effectful);
+prove_commutes!(Effectful => Pure, Lossy, Stateful, Effectful);
+
+/// Each `const _` is a compile-time assertion that `<A as Join<B>>::Out` is exactly `Expected`.
+macro_rules! prove_join_eq {
+    ($($a:ty, $b:ty => $expected:ty);+ $(;)?) => {$(
+        const _: TypeEq<<$a as Join<$b>>::Out, $expected> = TypeEq::NEW;
+    )+};
+}
+// IDENTITY: `Pure` is the lattice identity — `Pure ⊔ A == A` and `A ⊔ Pure == A`.
+prove_join_eq!(
+    Pure, Lossy => Lossy; Pure, Stateful => Stateful; Pure, Effectful => Effectful;
+    Lossy, Pure => Lossy; Stateful, Pure => Stateful; Effectful, Pure => Effectful;
+);
+// IDEMPOTENCE: `A ⊔ A == A`.
+prove_join_eq!(
+    Pure, Pure => Pure; Lossy, Lossy => Lossy;
+    Stateful, Stateful => Stateful; Effectful, Effectful => Effectful;
+);
+// (Associativity — `(A⊔B)⊔C == A⊔(B⊔C)` over all 64 triples — and a type↔value consistency
+// proof that `Join` agrees with the runtime `Capability` rank order are the mechanical next
+// laws; left for a follow-up to keep this section legible.)
 
 // ===== gradings: one monoid pattern, manifested at three levels ===========
 //

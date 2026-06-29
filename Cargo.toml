@@ -18,6 +18,9 @@ path = "src/main.rs"
 
 [dependencies]
 boundary-algebra-macros = { path = "boundary-algebra-macros", version = "0.1.0" }
+# `TypeEq` witnesses that PROVE the type-level capability-lattice laws at compile time (the
+# `Join` table has no runtime body, so mutation cannot reach it). Tiny, no-std-friendly.
+typewit = "1"
 
 [dev-dependencies]
 proptest = "1"
@@ -25,9 +28,6 @@ trybuild = "1.0.117"
 # Only the `suite_audit` example uses these — to parse cargo-mutants' `outcomes.json`
 # and feed the real kill matrix into `select`. Not a library dependency.
 serde_json = "1"
-# Only the `join_law` example uses this — a prototype lifting a type-level capability law
-# (Join commutativity) into a compile-time `TypeEq` witness. Not a library dependency.
-typewit = "1"
 
 [build-dependencies]
 syn = { version = "2", features = ["full", "visit"] }

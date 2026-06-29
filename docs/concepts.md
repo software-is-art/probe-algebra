@@ -49,7 +49,11 @@ Four annotations ride the edges, each a monoid that `Compose` threads:
 - **capability** — *how much power an edge claims*: the lattice
   `pure ⊂ lossy ⊂ stateful ⊂ effectful`, at the type level (`Effect` / `AtMost` / `Join`)
   with a runtime reflection. A ceiling is *demandable* (`run_pure` accepts only `AtMost<Pure>`),
-  and the `capability` module *audits* the declaration against behaviour (below).
+  and the `capability` module *audits* the declaration against behaviour (below). The `Join`
+  table has no runtime body, so mutation can't reach it — its laws (commutativity, identity,
+  idempotence) are instead **proven at compile time** by `typewit::TypeEq` witnesses
+  (`JoinCommutes` et al.): a mistyped cell fails to build. The one law the mutation gate cannot
+  certify, certified by the type system instead.
 - **cost** — *time and space complexity*, as an **open keyed map** from named size axes to a
   polynomial degree (`CostCons` / `Lookup` / `WithinBudget`). Time and space diverge at
   iteration (mapping materializes n results; folding streams), so they are two gradings over
