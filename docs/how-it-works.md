@@ -92,6 +92,15 @@ The only thing left hand-writable is a *partial* `Covers` set, and `require_comp
 it at compile time. An agent therefore cannot specify a probe that misses a dimension: the
 complete one is derived, and the incomplete one does not compile.
 
+The same shape applies one level up, to the **edge set**. DOF-completeness is sound because
+the list is read from a type's one definition; edges have no single definition site, so the
+`edges!` macro gives them one. Over that single-source list, `assert_all_probed::<Edges>()`
+makes "every edge carries a probe" a compile-time bound — an edge added without a probe fails
+to build (`tests/compile_fail/forgotten_probe_rejected`), the edge analog of a missing DOF.
+The residue Rust's type system can't close — an edge `impl` written *outside* the list — is
+left to `build.rs`/sealing, the only tools that can enumerate impls; in the type system,
+verification is declared and the method audits it, exactly as capability is.
+
 ## 5. The interior is free — and that freedom is audited
 
 `interp::internal` is ordinary imperative Rust: `HashMap` environments, mutable cursors,

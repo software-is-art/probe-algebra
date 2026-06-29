@@ -17,7 +17,8 @@ use proptest::strategy::BoxedStrategy;
 use proptest::test_runner::TestRunner;
 
 use crate::boundary::{
-    reconstructs, relation_holds, sensitive_to_all, Capability, Construction, Relation, Unit,
+    assert_all_probed, reconstructs, relation_holds, sensitive_to_all, Capability, Construction,
+    Probed, Relation, Unit,
 };
 
 // ===== Sampled: a type supplies its OWN canonical input distribution =======
@@ -354,12 +355,35 @@ mod registry {
         vary = |_x: &Expr| None,
         rewrite = |y| y);
 
+    // ===== edges declared once; each MUST carry a probe ====================
+    //
+    // `Edges` is the single source of truth for the interpreter's public edge set, and
+    // `every_edge_is_probed` makes covering it a compile-time obligation: each edge below impls
+    // `Probed` by WRITING its probe, so a new edge added to `Edges` without a probe will not
+    // build. The thin `#[test]`s run each probe (and kill the interior mutants); `Probed` is
+    // where the probe lives, so the obligation cannot be discharged emptily.
+
+    type Edges = crate::edges!(Parse, Check, Eval);
+
+    /// COMPLETENESS: every edge in `Edges` impls `Probed`. The edge analog of
+    /// `assert_complete::<Expr>()`; its negative twin is
+    /// `tests/compile_fail/forgotten_probe_rejected`.
+    #[test]
+    fn every_edge_is_probed() {
+        assert_all_probed::<Edges>();
+    }
+
     /// The interpreter's entry edge: `render . parse == id` over generated canonical
     /// source. This single registration certifies the whole lex/parse/unparse path.
+    impl Probed for Parse {
+        fn probe() {
+            construction_round_trips(&Parse, canonical_source());
+            construction_capability_matches_residual::<Parse>();
+        }
+    }
     #[test]
     fn parse_is_probed() {
-        construction_round_trips(&Parse, canonical_source());
-        construction_capability_matches_residual::<Parse>();
+        Parse::probe();
     }
 
     /// The FUSED universal probe over RANDOM structures: a faithful map (`render`) is
@@ -406,77 +430,82 @@ mod registry {
     /// branch the construct names), so `Add`/`Mul`/`Lt`, the conditional, and `let`/`var`
     /// (incl. shadowing) are all certified WITHOUT a hand-written example. This is what lets
     /// the interpreter's evaluation be self-hosted: the apparatus suffices, the examples go.
+    impl Probed for Eval {
+        fn probe() {
+            fn as_int(v: &Value) -> i64 {
+                match v {
+                    Value::Int(i) => i.get(),
+                    Value::Bool(_) => unreachable!("a closed int expr evaluates to an int"),
+                }
+            }
+            let x = Ident::new("x").expect("valid identifier");
+            // BOUNDED operands: small enough that the products below cannot overflow `i64`
+            // (the evaluator and the independent check both compute `av * bv`). Still compound
+            // (Add/Mul nesting), so the evaluator's recursion is exercised, not just leaves.
+            let bounded = {
+                let leaf = (0i64..=20).prop_map(|n| Expr::int(n).unwrap());
+                leaf.prop_recursive(2, 8, 2, |inner| {
+                    prop_oneof![
+                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
+                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
+                    ]
+                })
+            };
+            TestRunner::default()
+                .run(&(bounded.clone(), bounded.clone(), bounded), |(a, b, c)| {
+                    let (av, bv, cv) = (
+                        as_int(&eval_closed(&a)),
+                        as_int(&eval_closed(&b)),
+                        as_int(&eval_closed(&c)),
+                    );
+                    // arithmetic and comparison against the raw integer operations:
+                    prop_assert_eq!(
+                        eval_closed(&Expr::bin(Op::Add, a.clone(), b.clone())),
+                        Value::Int(Int::new(av + bv).unwrap())
+                    );
+                    prop_assert_eq!(
+                        eval_closed(&Expr::bin(Op::Mul, a.clone(), b.clone())),
+                        Value::Int(Int::new(av * bv).unwrap())
+                    );
+                    prop_assert_eq!(
+                        eval_closed(&Expr::bin(Op::Lt, a.clone(), b.clone())),
+                        Value::Bool(av < bv)
+                    );
+                    // the conditional selects the branch its (literal) condition names:
+                    prop_assert_eq!(
+                        eval_closed(&Expr::cond(Expr::boolean(true), a.clone(), b.clone())),
+                        eval_closed(&a)
+                    );
+                    prop_assert_eq!(
+                        eval_closed(&Expr::cond(Expr::boolean(false), a.clone(), b.clone())),
+                        eval_closed(&b)
+                    );
+                    // `let` binds and `var` resolves: `let x = a in (x + c) == a + c`:
+                    prop_assert_eq!(
+                        eval_closed(&Expr::bind(
+                            x.clone(),
+                            a.clone(),
+                            Expr::bin(Op::Add, Expr::var(x.clone()), c.clone())
+                        )),
+                        Value::Int(Int::new(av + cv).unwrap())
+                    );
+                    // shadowing: the inner binding wins:
+                    prop_assert_eq!(
+                        eval_closed(&Expr::bind(
+                            x.clone(),
+                            a.clone(),
+                            Expr::bind(x.clone(), b.clone(), Expr::var(x.clone()))
+                        )),
+                        eval_closed(&b)
+                    );
+                    Ok(())
+                })
+                .unwrap();
+        }
+    }
     #[test]
     fn eval_semantics_are_probed() {
-        fn as_int(v: &Value) -> i64 {
-            match v {
-                Value::Int(i) => i.get(),
-                Value::Bool(_) => unreachable!("a closed int expr evaluates to an int"),
-            }
-        }
-        let x = Ident::new("x").expect("valid identifier");
-        // BOUNDED operands: small enough that the products below cannot overflow `i64`
-        // (the evaluator and the independent check both compute `av * bv`). Still compound
-        // (Add/Mul nesting), so the evaluator's recursion is exercised, not just leaves.
-        let bounded = {
-            let leaf = (0i64..=20).prop_map(|n| Expr::int(n).unwrap());
-            leaf.prop_recursive(2, 8, 2, |inner| {
-                prop_oneof![
-                    (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
-                    (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
-                ]
-            })
-        };
-        TestRunner::default()
-            .run(&(bounded.clone(), bounded.clone(), bounded), |(a, b, c)| {
-                let (av, bv, cv) = (
-                    as_int(&eval_closed(&a)),
-                    as_int(&eval_closed(&b)),
-                    as_int(&eval_closed(&c)),
-                );
-                // arithmetic and comparison against the raw integer operations:
-                prop_assert_eq!(
-                    eval_closed(&Expr::bin(Op::Add, a.clone(), b.clone())),
-                    Value::Int(Int::new(av + bv).unwrap())
-                );
-                prop_assert_eq!(
-                    eval_closed(&Expr::bin(Op::Mul, a.clone(), b.clone())),
-                    Value::Int(Int::new(av * bv).unwrap())
-                );
-                prop_assert_eq!(
-                    eval_closed(&Expr::bin(Op::Lt, a.clone(), b.clone())),
-                    Value::Bool(av < bv)
-                );
-                // the conditional selects the branch its (literal) condition names:
-                prop_assert_eq!(
-                    eval_closed(&Expr::cond(Expr::boolean(true), a.clone(), b.clone())),
-                    eval_closed(&a)
-                );
-                prop_assert_eq!(
-                    eval_closed(&Expr::cond(Expr::boolean(false), a.clone(), b.clone())),
-                    eval_closed(&b)
-                );
-                // `let` binds and `var` resolves: `let x = a in (x + c) == a + c`:
-                prop_assert_eq!(
-                    eval_closed(&Expr::bind(
-                        x.clone(),
-                        a.clone(),
-                        Expr::bin(Op::Add, Expr::var(x.clone()), c.clone())
-                    )),
-                    Value::Int(Int::new(av + cv).unwrap())
-                );
-                // shadowing: the inner binding wins:
-                prop_assert_eq!(
-                    eval_closed(&Expr::bind(
-                        x.clone(),
-                        a.clone(),
-                        Expr::bind(x.clone(), b.clone(), Expr::var(x.clone()))
-                    )),
-                    eval_closed(&b)
-                );
-                Ok(())
-            })
-            .unwrap();
+        Eval::probe();
     }
 
     /// NEGATIVE: `relation_holds` distinguishes holds / violated / inapplicable, so a
@@ -529,29 +558,34 @@ mod registry {
         ]);
     }
 
-    /// BRANCH/GUARDED coherence: a value the `Branch` (`Check`) admits, the `Guarded`
-    /// edge (`Eval`) can total-ly process — the witness makes evaluation total.
+    /// The `Branch`: a value `Check` admits, the `Guarded` edge can total-ly process — the
+    /// witness makes evaluation total. (Coherence with `Eval`, so it probes the branch edge.)
+    impl Probed for Check {
+        fn probe() {
+            TestRunner::default()
+                .run(&int_expr(), |e| {
+                    let evaluable = with_seed(|seed| {
+                        let named = seed.new_named(e.clone());
+                        match Check.classify(&named) {
+                            Ok(proof) => {
+                                Eval.run(&named, &proof);
+                                true
+                            }
+                            Err(_) => false,
+                        }
+                    });
+                    prop_assert!(
+                        evaluable,
+                        "an int expr must type-check and evaluate: {:?}",
+                        e
+                    );
+                    Ok(())
+                })
+                .unwrap();
+        }
+    }
     #[test]
     fn branch_guard_coheres() {
-        TestRunner::default()
-            .run(&int_expr(), |e| {
-                let evaluable = with_seed(|seed| {
-                    let named = seed.new_named(e.clone());
-                    match Check.classify(&named) {
-                        Ok(proof) => {
-                            Eval.run(&named, &proof);
-                            true
-                        }
-                        Err(_) => false,
-                    }
-                });
-                prop_assert!(
-                    evaluable,
-                    "an int expr must type-check and evaluate: {:?}",
-                    e
-                );
-                Ok(())
-            })
-            .unwrap();
+        Check::probe();
     }
 }

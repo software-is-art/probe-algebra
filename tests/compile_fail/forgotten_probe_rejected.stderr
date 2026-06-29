@@ -1,0 +1,22 @@
+error[E0277]: the trait bound `Unprobed: Probed` is not satisfied
+  --> tests/compile_fail/forgotten_probe_rejected.rs:15:25
+   |
+15 |     assert_all_probed::<Edges>();
+   |                         ^^^^^ unsatisfied trait bound
+   |
+help: the trait `Probed` is not implemented for `Unprobed`
+  --> tests/compile_fail/forgotten_probe_rejected.rs:10:1
+   |
+10 | struct Unprobed; // an edge with no probe
+   | ^^^^^^^^^^^^^^^
+help: the trait `AllProbed` is implemented for `EdgeCons<E, Rest>`
+  --> src/boundary.rs
+   |
+   | impl<E: Probed, Rest: AllProbed> AllProbed for EdgeCons<E, Rest> {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `EdgeCons<Unprobed, EdgeNil>` to implement `AllProbed`
+note: required by a bound in `assert_all_probed`
+  --> src/boundary.rs
+   |
+   | pub fn assert_all_probed<L: AllProbed>() {}
+   |                             ^^^^^^^^^ required by this bound in `assert_all_probed`

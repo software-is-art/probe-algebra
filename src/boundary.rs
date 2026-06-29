@@ -85,6 +85,19 @@ macro_rules! value_operator {
     )+};
 }
 
+/// Declare a module's edge set in ONE place — the single source `assert_all_probed` checks
+/// completeness over: `type Edges = edges!(Parse, Check, Eval);` expands to
+/// `EdgeCons<Parse, EdgeCons<Check, EdgeCons<Eval, EdgeNil>>>`. Giving edges a single
+/// definition site is what makes "every edge is probed" as sound as DOF-completeness (whose
+/// list `derive(Shaped)` reads from the type's one definition).
+#[macro_export]
+macro_rules! edges {
+    () => { $crate::boundary::EdgeNil };
+    ($head:ty $(, $tail:ty)* $(,)?) => {
+        $crate::boundary::EdgeCons<$head, $crate::edges!($($tail),*)>
+    };
+}
+
 /// A NAME-BRANDED PROOF TOKEN realized as a value object: zero data, branded by a
 /// phantom `N`, so two tokens of the same name are the SAME fact and a token for name
 /// A cannot stand in for B. Its field is private to the defining module, so it is
@@ -561,6 +574,45 @@ where
     Complete<T>: CoversAll<<T as HasDofs>::Dofs>,
 {
 }
+
+// ===== edge completeness: every boundary edge must carry a probe ===========
+//
+// `Complete<T>` makes DOF-completeness SOUND because `derive(Shaped)` reads the DOF list from
+// the type's ONE definition — list and reality are the same source, so they cannot diverge.
+// Edges have NO single definition site (each is a separate `impl`), so the same idea needs the
+// edge set declared once: the `edges!` macro. Over that single-source list, `AllProbed` makes
+// "every edge is probed" a BOUND — an edge in the list that does not impl `Probed` fails to
+// COMPILE, the same push-back a missing DOF gives, before any test runs. (The open-world
+// residue — an edge `impl` written OUTSIDE the `edges!` list — is closeable only by sealing /
+// `build.rs` source-scanning; the type system cannot enumerate impls, so this is the honest
+// ceiling, mirroring the capability axis: declared in the type, audited by the method.)
+
+/// An edge covered by a probe. Impling `Probed` means WRITING the probe (`fn probe`), so it
+/// cannot be claimed without one; the probe's STRENGTH is then audited by mutation, exactly as
+/// a declared `Capability` is audited against behaviour. `edges!` + `assert_all_probed` force
+/// every declared edge to discharge this, so a new edge with no probe is a build error rather
+/// than a surviving mutant discovered later.
+pub trait Probed {
+    /// Run this edge's probe.
+    fn probe();
+}
+
+/// The empty type-level edge set.
+pub struct EdgeNil;
+/// A cons cell of a type-level edge set: head edge `E`, tail set `Rest`.
+pub struct EdgeCons<E, Rest>(PhantomData<(E, Rest)>);
+
+/// Every edge in the set `L` impls `Probed` — completeness over edges, by recursion (disjoint
+/// head constructors, like `CoversAll` for DOFs).
+pub trait AllProbed {}
+impl AllProbed for EdgeNil {}
+impl<E: Probed, Rest: AllProbed> AllProbed for EdgeCons<E, Rest> {}
+
+/// The edge-completeness statement: every edge in `L` is `Probed`. The edge analog of
+/// `assert_complete`. `assert_all_probed::<edges!(Parse, Check, Eval)>()` type-checks only if
+/// each edge impls `Probed`; a forgotten probe fails to compile
+/// (`tests/compile_fail/forgotten_probe_rejected`).
+pub fn assert_all_probed<L: AllProbed>() {}
 
 /// A possibly-lossy morphism whose `Residual` value object witnesses EXACTLY
 /// what the forward map collapsed. Retaining the residual restores
