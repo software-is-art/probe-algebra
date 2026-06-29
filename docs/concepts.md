@@ -45,7 +45,11 @@ Four annotations ride the edges, each a monoid that `Compose` threads:
 - **residual** — *what an edge discards*, at the type level (`Pair` / `Unit`). A `Unit`
   residual marks a lossless edge; a real residual witnesses exactly the collapsed dimension.
   "Discarded residual ⇒ not invertible" is a compile error (`Carried<M, Retained>` vs
-  `Discarded`).
+  `Discarded`). Its monoid is the one proven **up to isomorphism**, not strict equality: `Pair`
+  is a genuine product, so `Pair<Unit, R>` is not *literally* `R` — the unit and associativity
+  laws hold up to a canonical iso (`drop_unit_l`/`reassoc_residual` and their inverses), checked
+  by the `residual_iso_laws` proptest. An honest finding: the strict-equality technique that
+  certifies capability and cost does not reach a free product.
 - **capability** — *how much power an edge claims*: the lattice
   `pure ⊂ lossy ⊂ stateful ⊂ effectful`, at the type level (`Effect` / `AtMost` / `Join`)
   with a runtime reflection. A ceiling is *demandable* (`run_pure` accepts only `AtMost<Pure>`),
@@ -55,13 +59,31 @@ Four annotations ride the edges, each a monoid that `Compose` threads:
   idempotence, and associativity over all 64 triples), and a `const` assertion certifies the
   type-level table reflects to the same `Capability` the runtime `Capability::join` computes —
   so the two definitions cannot drift. A mistyped cell, or a type↔runtime disagreement, fails
-  to build. The one law the mutation gate cannot certify, certified by the type system instead.
+  to build. It also proves the order and the join AGREE — `AtMost` is reflexive and every
+  operand is `AtMost` its `Join` (the lub law) — so a `run_pure` ceiling check and a `Compose`
+  ceiling computation cannot disagree about what "at most" means.
 - **cost** — *time and space complexity*, as an **open keyed map** from named size axes to a
   polynomial degree (`CostCons` / `Lookup` / `WithinBudget`). Time and space diverge at
   iteration (mapping materializes n results; folding streams), so they are two gradings over
-  one map. A path over budget on any axis is a compile error.
+  one map. A path over budget on any axis is a compile error. Like `Join`, the map's machinery
+  is bodiless type functions the mutation sweep cannot reach, so it too is **proven at compile
+  time**: `TypeEq` witnesses certify `Max` is a commutative, associative, idempotent semilattice
+  with `Z` as identity, `AppendCost` is an associative monoid with `CostNil` as identity, and —
+  the load-bearing law — `Lookup` distributes over `AppendCost` as `Max` (so sequential
+  composition can be plain append, the per-axis max recovered at lookup), with a `const`
+  assertion pinning `Max` to the runtime maximum it reflects to.
 - **provenance** — *a value's journey*: a type-level lineage (`Stamped` / `Step`) that
-  records every edge a value crossed, reflectable to a runtime `Provenance`.
+  records every edge a value crossed, reflectable to a runtime `Provenance`. Lineages compose
+  by `AppendLineage` (a bodiless cons-concat), proven an associative monoid with `Origin` as
+  identity by `TypeEq`; a `#[test]` certifies `reflect` is a monoid **homomorphism** into the
+  runtime `Provenance`, so the type-level path and the value it reflects to cannot drift.
+
+So **every grading's laws are certified** — the part the mutation gate structurally cannot reach
+(a bodiless type table) is closed by the type system instead. Three are proven by *strict* type
+equality (`TypeEq::NEW` compiles only if its two arguments are one type); residual, a free
+product, is proven *up to isomorphism*. This is the second tier of the method's central claim:
+not only do the probes that validate the interior generate themselves — the algebra that *shapes*
+them proves its own laws, and `typewit` joins `rustc` and `cargo-mutants` as a (tiny) trust root.
 
 ## The probe taxonomy
 
@@ -110,8 +132,9 @@ hand-written positive examples**: the strongest form of "the tests generate them
 
 What is **irreducible** — what *cannot* be self-hosted, by nature, not for lack of effort:
 
-- the **trust root**: `rustc` and `cargo-mutants`. The method is measured by them; it cannot
-  certify them (the trusting-trust limit).
+- the **trust root**: `rustc`, `cargo-mutants`, and `typewit` (whose `TypeEq` witnesses certify
+  the grading laws mutation cannot reach). The method is measured by them; it cannot certify them
+  (the trusting-trust limit).
 - the **grammar** (`boundary.rs`): the probe primitives cannot be defined in terms of
   themselves without circularity. It is the host, kept under the mutation lens but not
   re-specified in itself.

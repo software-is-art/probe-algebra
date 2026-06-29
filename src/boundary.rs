@@ -473,6 +473,31 @@ prove_join_matches_runtime!(Lossy => Pure, Lossy, Stateful, Effectful);
 prove_join_matches_runtime!(Stateful => Pure, Lossy, Stateful, Effectful);
 prove_join_matches_runtime!(Effectful => Pure, Lossy, Stateful, Effectful);
 
+// AtMost <-> Join CONSISTENCY: `AtMost` is the lattice ORDER and `Join` is its least upper
+// bound, so the two must agree — every operand is `AtMost` the join (`A ⊑ A⊔B` and `B ⊑ A⊔B`),
+// and the order is reflexive. `AtMost` is a bare marker trait (no associated type for `TypeEq`
+// to compare), so the witness is a const that selects an impl GUARDED by the bound: referencing
+// `OrderWitness::<A, C>::OK` forces `A: AtMost<C>` at compile time, and a missing edge of the
+// order makes this section fail to build. Together with the semilattice laws above, this pins
+// `AtMost` and `Join` to the SAME partial order — a `run_pure` ceiling check and a `Compose`
+// ceiling computation cannot disagree about what "at most" means.
+struct OrderWitness<A, C>(PhantomData<(A, C)>);
+impl<A: AtMost<C>, C> OrderWitness<A, C> {
+    const OK: () = ();
+}
+macro_rules! prove_atmost_join {
+    ($a:ty => $($b:ty),+ $(,)?) => {$(
+        // reflexivity, and both operands below their join.
+        const _: () = OrderWitness::<$a, $a>::OK;
+        const _: () = OrderWitness::<$a, <$a as Join<$b>>::Out>::OK;
+        const _: () = OrderWitness::<$b, <$a as Join<$b>>::Out>::OK;
+    )+};
+}
+prove_atmost_join!(Pure => Pure, Lossy, Stateful, Effectful);
+prove_atmost_join!(Lossy => Pure, Lossy, Stateful, Effectful);
+prove_atmost_join!(Stateful => Pure, Lossy, Stateful, Effectful);
+prove_atmost_join!(Effectful => Pure, Lossy, Stateful, Effectful);
+
 // ===== gradings: one monoid pattern, manifested at three levels ===========
 //
 // Each edge carries ANNOTATIONS that accumulate — a GRADING, i.e. a monoid (`EMPTY`
@@ -561,6 +586,81 @@ impl Lineage for Origin {
 impl<Edge, Rest: Lineage> Lineage for Step<Edge, Rest> {
     fn reflect() -> Provenance {
         Rest::reflect().combine(Provenance::single(core::any::type_name::<Edge>()))
+    }
+}
+
+/// Concatenate two type-level lineages: `<Newer as AppendLineage<Older>>::Out` is `Older`'s
+/// history followed by `Newer`'s (recursing on `Newer`, substituting its `Origin` base with
+/// `Older`). This is the TYPE-level analogue of the runtime `Provenance::combine` — it lets two
+/// values' provenances join into one path at compile time, the provenance twin of `AppendCost`.
+///
+/// It is a bodiless type function (associated type only), so the mutation sweep cannot reach it;
+/// the `provenance_laws` proofs below certify it is an associative monoid with `Origin` as the
+/// two-sided identity, AND `lineage_append_is_homomorphism` certifies it agrees with the runtime
+/// `combine` (`reflect(append(N, O)) == reflect(O) ++ reflect(N)`), so the type-level path and
+/// the `Provenance` it reflects to cannot drift.
+pub trait AppendLineage<Older> {
+    type Out;
+}
+impl<Older> AppendLineage<Older> for Origin {
+    type Out = Older;
+}
+impl<Edge, Rest, Older> AppendLineage<Older> for Step<Edge, Rest>
+where
+    Rest: AppendLineage<Older>,
+{
+    type Out = Step<Edge, <Rest as AppendLineage<Older>>::Out>;
+}
+
+// ----- provenance composition LAWS, proven at compile time -----------------
+mod provenance_laws {
+    use super::{AppendLineage, Origin, Step};
+    use typewit::TypeEq;
+
+    // Proof-only edge markers (any distinct types; `reflect` reads their `type_name`).
+    struct A;
+    struct B;
+
+    // Representative lineages of length 0..2 (newest edge outermost, as `stamp` builds them).
+    type L0 = Origin;
+    type L1 = Step<A, Origin>;
+    type L2 = Step<B, Step<A, Origin>>;
+
+    // IDENTITY: `Origin` is the two-sided unit of `AppendLineage`.
+    const _: TypeEq<<L2 as AppendLineage<Origin>>::Out, L2> = TypeEq::NEW;
+    const _: TypeEq<<Origin as AppendLineage<L2>>::Out, L2> = TypeEq::NEW;
+
+    // ASSOCIATIVITY: `(C ++ B) ++ A == C ++ (B ++ A)` at the type level (list concat). The
+    // spelled-out associated-type chain IS the law, so the complexity is intentional.
+    #[allow(clippy::type_complexity)]
+    const _: TypeEq<
+        <<L2 as AppendLineage<L1>>::Out as AppendLineage<L0>>::Out,
+        <L2 as AppendLineage<<L1 as AppendLineage<L0>>::Out>>::Out,
+    > = TypeEq::NEW;
+
+    // HOMOMORPHISM (type-level monoid -> runtime `Provenance` monoid): reflecting an appended
+    // lineage equals combining the reflections. This is the one provenance law with a runtime
+    // body (`reflect`/`combine`), so it is a `#[test]` (mutation-reachable) rather than a
+    // `TypeEq` — it ties the two monoids together so neither can drift from the other.
+    #[cfg(test)]
+    #[test]
+    fn lineage_append_is_homomorphism() {
+        use super::{Lineage, Monoid};
+        fn check<N, O>()
+        where
+            N: Lineage + AppendLineage<O>,
+            O: Lineage,
+            <N as AppendLineage<O>>::Out: Lineage,
+        {
+            let appended = <<N as AppendLineage<O>>::Out as Lineage>::reflect();
+            let combined = O::reflect().combine(N::reflect());
+            assert_eq!(appended, combined);
+        }
+        check::<L0, L0>();
+        check::<L1, L0>();
+        check::<L0, L2>();
+        check::<L2, L1>();
+        check::<L1, L2>();
     }
 }
 
@@ -1261,6 +1361,201 @@ pub fn fits(measure: impl Fn(usize) -> u64, degree: u32) -> bool {
     true
 }
 
+// ===== cost-grading LAWS, proven at compile time ==========================
+//
+// The cost grading is built entirely from type-level FUNCTIONS with no runtime body — `Max`,
+// `NatEq`, `Le`, `Select` over the Peano degrees, and `Lookup` / `AppendCost` over the cost
+// map. Exactly like the capability `Join` table, the mutation sweep mutates fn bodies, so it
+// cannot reach any of these: a wrong cell (a `Max` that took the MIN, a `Lookup` that summed
+// instead of maxed) would mis-state a path's complexity SILENTLY, and `WithinBudget` would
+// then certify a budget against a lie. The `typewit::TypeEq` witnesses below close that gap the
+// same way `JoinCommutes` & co. do for capability: each compiles only if its two type arguments
+// are literally one type, so this section COMPILING is a proof of the cost algebra's laws.
+//
+// The Peano nats are an OPEN set (unlike the sealed 4-effect lattice), so these witnesses prove
+// the laws over a representative closed sample of small degrees; the recursive `impl`s carry the
+// induction, and the sample spot-checks the base + step the same way a finite proof-by-cases
+// would. The one law that is the cost grading's whole reason to exist — that looking up an axis
+// AFTER appending two maps equals the MAX of the two per-axis lookups ("per-axis max folded into
+// lookup", so sequential composition is plain append) — is proven exactly, per axis, below.
+mod cost_laws {
+    use super::{AppendCost, Axis, CostCons, CostNil, Degree, Le, Lookup, Max, NatEq, True, S, Z};
+    use typewit::TypeEq;
+
+    // A representative closed sample of the open degree set: 0, 1, 2, 3.
+    type D0 = Z;
+    type D1 = S<Z>;
+    type D2 = S<S<Z>>;
+    type D3 = S<S<S<Z>>>;
+
+    // --- cartesian expansion helpers: invoke a per-cell callback macro over a type list ---
+    macro_rules! for_each {
+        ($cb:ident; [$($t:ty),+ $(,)?]) => { $($cb!($t);)+ };
+    }
+    macro_rules! for_pairs {
+        ($cb:ident; [$($t:ty),+ $(,)?]) => { for_pairs!(@a $cb; [$($t),+] [$($t),+]); };
+        (@a $cb:ident; [$a:ty $(, $ar:ty)*] [$($l:ty),+]) => {
+            for_pairs!(@b $cb; [$a] [$($l),+]);
+            for_pairs!(@a $cb; [$($ar),*] [$($l),+]);
+        };
+        (@a $cb:ident; [] [$($l:ty),+]) => {};
+        (@b $cb:ident; [$a:ty] [$b:ty $(, $br:ty)*]) => {
+            $cb!($a, $b);
+            for_pairs!(@b $cb; [$a] [$($br),*]);
+        };
+        (@b $cb:ident; [$a:ty] []) => {};
+    }
+    macro_rules! for_triples {
+        ($cb:ident; [$($t:ty),+ $(,)?]) => { for_triples!(@a $cb; [$($t),+] [$($t),+]); };
+        (@a $cb:ident; [$a:ty $(, $ar:ty)*] [$($l:ty),+]) => {
+            for_triples!(@b $cb; [$a] [$($l),+] [$($l),+]);
+            for_triples!(@a $cb; [$($ar),*] [$($l),+]);
+        };
+        (@a $cb:ident; [] [$($l:ty),+]) => {};
+        (@b $cb:ident; [$a:ty] [$b:ty $(, $br:ty)*] [$($l:ty),+]) => {
+            for_triples!(@c $cb; [$a] [$b] [$($l),+]);
+            for_triples!(@b $cb; [$a] [$($br),*] [$($l),+]);
+        };
+        (@b $cb:ident; [$a:ty] [] [$($l:ty),+]) => {};
+        (@c $cb:ident; [$a:ty] [$b:ty] [$c:ty $(, $cr:ty)*]) => {
+            $cb!($a, $b, $c);
+            for_triples!(@c $cb; [$a] [$b] [$($cr),*]);
+        };
+        (@c $cb:ident; [$a:ty] [$b:ty] []) => {};
+    }
+
+    // MAX is a commutative, associative, idempotent monoid with `Z` as identity — a bounded
+    // join-semilattice on the degrees, the structure `Lookup` relies on to fold per-axis maxes.
+    macro_rules! max_comm {
+        ($a:ty, $b:ty) => {
+            const _: TypeEq<<$a as Max<$b>>::Out, <$b as Max<$a>>::Out> = TypeEq::NEW;
+        };
+    }
+    macro_rules! max_idem {
+        ($a:ty) => {
+            const _: TypeEq<<$a as Max<$a>>::Out, $a> = TypeEq::NEW;
+        };
+    }
+    macro_rules! max_ident {
+        ($a:ty) => {
+            const _: TypeEq<<$a as Max<Z>>::Out, $a> = TypeEq::NEW;
+            const _: TypeEq<<Z as Max<$a>>::Out, $a> = TypeEq::NEW;
+        };
+    }
+    macro_rules! max_assoc {
+        ($a:ty, $b:ty, $c:ty) => {
+            const _: TypeEq<
+                <<$a as Max<$b>>::Out as Max<$c>>::Out,
+                <$a as Max<<$b as Max<$c>>::Out>>::Out,
+            > = TypeEq::NEW;
+        };
+    }
+    for_pairs!(max_comm; [D0, D1, D2, D3]);
+    for_each!(max_idem; [D0, D1, D2, D3]);
+    for_each!(max_ident; [D0, D1, D2, D3]);
+    for_triples!(max_assoc; [D0, D1, D2, D3]);
+
+    // NATEQ is reflexive and symmetric (a decidable equality on degrees).
+    macro_rules! nateq_refl {
+        ($a:ty) => {
+            const _: TypeEq<<$a as NatEq<$a>>::Out, True> = TypeEq::NEW;
+        };
+    }
+    macro_rules! nateq_symm {
+        ($a:ty, $b:ty) => {
+            const _: TypeEq<<$a as NatEq<$b>>::Out, <$b as NatEq<$a>>::Out> = TypeEq::NEW;
+        };
+    }
+    for_each!(nateq_refl; [D0, D1, D2, D3]);
+    for_pairs!(nateq_symm; [D0, D1, D2, D3]);
+
+    // LE is reflexive and consistent with `Max`: every operand is `<=` the max (the lub
+    // property that makes `WithinBudget`'s per-axis `Le` check sound).
+    macro_rules! le_refl {
+        ($a:ty) => {
+            const _: TypeEq<<$a as Le<$a>>::Out, True> = TypeEq::NEW;
+        };
+    }
+    macro_rules! le_below_max {
+        ($a:ty, $b:ty) => {
+            const _: TypeEq<<$a as Le<<$a as Max<$b>>::Out>>::Out, True> = TypeEq::NEW;
+            const _: TypeEq<<$b as Le<<$a as Max<$b>>::Out>>::Out, True> = TypeEq::NEW;
+        };
+    }
+    for_each!(le_refl; [D0, D1, D2, D3]);
+    for_pairs!(le_below_max; [D0, D1, D2, D3]);
+
+    // TYPE<->VALUE CONSISTENCY: the type-level `Max` reflects (via `Degree::N`) to the SAME
+    // number the obvious runtime maximum computes — so the Peano table and the `u32` degree it
+    // stands for cannot drift (the const-eval-as-typecheck twin of `prove_join_matches_runtime`).
+    const fn const_max(a: u32, b: u32) -> u32 {
+        if a >= b {
+            a
+        } else {
+            b
+        }
+    }
+    macro_rules! max_reflects {
+        ($a:ty, $b:ty) => {
+            const _: () = {
+                assert!(
+                    <<$a as Max<$b>>::Out as Degree>::N
+                        == const_max(<$a as Degree>::N, <$b as Degree>::N)
+                );
+            };
+        };
+    }
+    for_pairs!(max_reflects; [D0, D1, D2, D3]);
+
+    // --- the cost map laws, over representative maps and query axes ---
+    // Proof-only axes (their `Id`s are distinct degrees, exactly as `axis!` would assign).
+    struct Ax0;
+    struct Ax1;
+    struct Ax2;
+    impl Axis for Ax0 {
+        type Id = D0;
+    }
+    impl Axis for Ax1 {
+        type Id = D1;
+    }
+    impl Axis for Ax2 {
+        type Id = D2;
+    }
+
+    // Representative maps, including a DUPLICATE axis (`Ma` lists `Ax0` twice at different
+    // degrees) so the per-axis `Max`-fold in `Lookup` is actually exercised.
+    type Ma = CostCons<Ax0, D1, CostCons<Ax1, D2, CostCons<Ax0, D3, CostNil>>>;
+    type Mb = CostCons<Ax1, D1, CostCons<Ax2, D2, CostNil>>;
+    type Mc = CostCons<Ax2, D3, CostCons<Ax0, D1, CostNil>>;
+
+    // APPENDCOST: associative, with `CostNil` as the two-sided identity (the cost monoid that
+    // `Compose` threads for both `TimeCost` and `SpaceCost`).
+    const _: TypeEq<<CostNil as AppendCost<Mb>>::Out, Mb> = TypeEq::NEW;
+    const _: TypeEq<<Ma as AppendCost<CostNil>>::Out, Ma> = TypeEq::NEW;
+    // The spelled-out associated-type chain IS the associativity law; the complexity is the point.
+    #[allow(clippy::type_complexity)]
+    const _: TypeEq<
+        <<Ma as AppendCost<Mb>>::Out as AppendCost<Mc>>::Out,
+        <Ma as AppendCost<<Mb as AppendCost<Mc>>::Out>>::Out,
+    > = TypeEq::NEW;
+
+    // THE LOAD-BEARING LAW: `Lookup<Q>` distributes over `AppendCost` as `Max` —
+    //   lookup(append(A, B), Q) == max(lookup(A, Q), lookup(B, Q))
+    // for every query axis. This is exactly why sequential composition is plain append with no
+    // map merge: the per-axis max is recovered at lookup time. Proven per axis over `Ma`/`Mb`.
+    macro_rules! lookup_append_is_max {
+        ($q:ty) => {
+            const _: TypeEq<
+                <<Ma as AppendCost<Mb>>::Out as Lookup<$q>>::Deg,
+                <<Ma as Lookup<$q>>::Deg as Max<<Mb as Lookup<$q>>::Deg>>::Out,
+            > = TypeEq::NEW;
+        };
+    }
+    lookup_append_is_max!(Ax0);
+    lookup_append_is_max!(Ax1);
+    lookup_append_is_max!(Ax2);
+}
+
 // ===== composition: loss composes as a value object ======================
 
 /// Product of two residuals — loss COMPOSES as a value object.
@@ -1305,6 +1600,85 @@ where
     fn backward(&self, out: &Self::Out, r: &Self::Residual) -> Option<Self::In> {
         let mid = self.g.backward(out, &r.1)?;
         self.f.backward(&mid, &r.0)
+    }
+}
+
+// ===== residual monoid LAWS — the ONE grading proven UP TO ISOMORPHISM =====
+//
+// Residual is the OUTLIER among the four gradings. Capability (`Join`) and cost (`Max` /
+// `AppendCost`) are STRICT type-level functions, so their monoid laws are exact type EQUALITIES
+// a `TypeEq` can witness. Residual's combine is `Pair`, a genuine PRODUCT type — and a product
+// is a monoid only UP TO ISOMORPHISM: `Pair<Unit, R>` is not literally `R`, and
+// `Pair<Pair<A, B>, C>` is not literally `Pair<A, Pair<B, C>>`. So the strict-equality technique
+// does NOT apply here — an honest finding, not a gap. The laws hold up to a canonical iso, and
+// the witnesses below MAKE that iso executable: total, generic conversions whose round-trips are
+// the unit and associativity laws. Unlike the type-level proofs, these have runtime bodies, so
+// the mutation sweep judges them directly — and being fully generic (no `Default` to fabricate a
+// return from), each admits no viable mutant but the correct one. The `residual_iso_laws`
+// proptest exercises the round-trips so the laws are checked, not merely asserted.
+
+/// Drop a left `Unit` residual: `Pair<Unit, R> ≅ R` (left identity), forward.
+pub fn drop_unit_l<R>(p: Pair<Unit, R>) -> R {
+    p.1
+}
+/// Re-introduce a left `Unit` residual (the inverse of `drop_unit_l`).
+pub fn add_unit_l<R>(r: R) -> Pair<Unit, R> {
+    Pair(Unit, r)
+}
+/// Drop a right `Unit` residual: `Pair<R, Unit> ≅ R` (right identity), forward.
+pub fn drop_unit_r<R>(p: Pair<R, Unit>) -> R {
+    p.0
+}
+/// Re-introduce a right `Unit` residual (the inverse of `drop_unit_r`).
+pub fn add_unit_r<R>(r: R) -> Pair<R, Unit> {
+    Pair(r, Unit)
+}
+/// Re-associate a composite residual: `Pair<Pair<A, B>, C> ≅ Pair<A, Pair<B, C>>`, forward —
+/// the associativity iso. Lets a consumer normalize the residual of a left-nested `Compose`
+/// chain into right-nested form without touching the carried data.
+pub fn reassoc_residual<A, B, C>(p: Pair<Pair<A, B>, C>) -> Pair<A, Pair<B, C>> {
+    let Pair(Pair(a, b), c) = p;
+    Pair(a, Pair(b, c))
+}
+/// The inverse re-association (`Pair<A, Pair<B, C>> -> Pair<Pair<A, B>, C>`).
+pub fn reassoc_residual_back<A, B, C>(p: Pair<A, Pair<B, C>>) -> Pair<Pair<A, B>, C> {
+    let Pair(a, Pair(b, c)) = p;
+    Pair(Pair(a, b), c)
+}
+
+#[cfg(test)]
+mod residual_iso_laws {
+    use super::{
+        add_unit_l, add_unit_r, drop_unit_l, drop_unit_r, reassoc_residual, reassoc_residual_back,
+        Pair, Unit,
+    };
+    use proptest::prelude::*;
+
+    proptest! {
+        /// LEFT IDENTITY iso: `drop_unit_l` and `add_unit_l` are mutually inverse.
+        #[test]
+        fn unit_l_is_an_iso(r in any::<i32>()) {
+            prop_assert_eq!(drop_unit_l(add_unit_l(r)), r);
+            let p = Pair(Unit, r);
+            prop_assert_eq!(add_unit_l(drop_unit_l(p.clone())), p);
+        }
+
+        /// RIGHT IDENTITY iso: `drop_unit_r` and `add_unit_r` are mutually inverse.
+        #[test]
+        fn unit_r_is_an_iso(r in any::<i32>()) {
+            prop_assert_eq!(drop_unit_r(add_unit_r(r)), r);
+            let p = Pair(r, Unit);
+            prop_assert_eq!(add_unit_r(drop_unit_r(p.clone())), p);
+        }
+
+        /// ASSOCIATIVITY iso: re-association round-trips in both directions.
+        #[test]
+        fn reassoc_is_an_iso(a in any::<i32>(), b in any::<u8>(), c in any::<bool>()) {
+            let left = Pair(Pair(a, b), c);
+            prop_assert_eq!(reassoc_residual_back(reassoc_residual(left.clone())), left);
+            let right = Pair(a, Pair(b, c));
+            prop_assert_eq!(reassoc_residual(reassoc_residual_back(right.clone())), right);
+        }
     }
 }
 
