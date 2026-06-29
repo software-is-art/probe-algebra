@@ -128,6 +128,14 @@ specified in the very discipline it serves: its data are value objects, its inte
 no example tests, and only its oracle-free probes — judged by the mutation sweep — certify
 it, the way a compiler is compiled by itself.
 
+And the gate runs **all the time** ([`ci.yml`](.github/workflows/ci.yml)): fmt + clippy +
+test on every push and PR, the mutation gate on each PR's *changed lines* (cheap, per-change),
+and a full-crate sweep on the default branch and a weekly schedule. The whole-crate sweep is
+green — `0 missed` — because the only three equivalents left are genuine free choices (a
+`bool` seed value, a deliberately-empty capability declaration, a guard `Ident::new` already
+subsumes), carved out by function in `.cargo/mutants.toml`; everything else is killed or
+detected.
+
 ---
 
 ## How the pieces fit

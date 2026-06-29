@@ -1,0 +1,69 @@
+name: ci
+
+# Dogfood everywhere, all the time. The fast gate (fmt + clippy + test) runs on every
+# push and PR; the mutation gate — the method's own "the real test" — runs per-change on
+# PRs (only the changed lines, since mutation is expensive) and as a full-crate sweep on
+# the default branch and a weekly schedule.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC — the periodic whole-crate guarantee
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  check:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo test --all-targets
+
+  # Per-change dogfood: mutate only the lines this PR touches. New code that a probe
+  # cannot kill fails the gate; pre-existing documented equivalents are not in the diff,
+  # so they never re-trip it.
+  mutants-diff:
+    name: dogfood (changed lines)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: mutate the diff
+        run: |
+          git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
+          cargo mutants --in-diff pr.diff
+
+  # Whole-crate dogfood: the green gate (0 missed ⇒ exit 0). Timeouts (greedy-loop
+  # non-termination mutants) are detections, and the three inherent equivalents are
+  # carved out by `.cargo/mutants.toml`, so a clean crate exits 0.
+  mutants-full:
+    name: dogfood (full sweep)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - run: cargo mutants

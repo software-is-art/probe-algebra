@@ -5,17 +5,14 @@
 //! entire verification, and `cargo mutants` (now scoped over this file) measures whether
 //! that suffices. This is the method turned on its own kernel.
 //!
-//! Result of that sweep: every NON-equivalent mutant of this file dies to the probes. Three
-//! survivors remain, all provably equivalent or spec-permitted — they are the findings, not
-//! gaps:
-//!   - `mutants > 0` → `>= 0` in the in-loop noise check: differs only at zero mutants,
-//!     where nothing is ever picked, so the output is identical.
-//!   - `usize::MAX - total_kills` → `usize::MAX / total_kills` in the discrimination key:
-//!     the same monotone ordering (fewer kills ranks higher), so the selection is identical.
-//!   - `key > best` → `key >= best`: flips the tie-break from lowest- to highest-index. The
-//!     spec pins "a minimal discriminating cover", not WHICH one when two relations tie, so
-//!     this yields an equally valid cover — a genuine degree of freedom in the output that
-//!     no oracle-free probe can (or should) pin without a reference implementation.
+//! Result of that sweep: EVERY mutant of this file is detected — zero survivors. The three
+//! equivalents earlier runs found were not excluded but ENGINEERED AWAY: the discrimination
+//! key uses `Reverse(total_kills)` (no `usize::MAX - x` arithmetic to mutate), selection uses
+//! `max_by_key` (no hand-written `>` whose tie-break a `>=` mutant could flip), and the noise
+//! check drops its redundant `mutants > 0` guard (a row only reaches it with `new > 0`, which
+//! already implies a mutant). What remains as TIMEOUT — relaxing the loop's termination guard
+//! (`new > 0`) or its coverage test (`row[m] && !covered[m]`) so the greedy never stops — is a
+//! genuine detection (the mutant hangs; the original terminates), not a gap.
 
 use crate::gdp::{at_in_bounds, positions, prove_position, with_region};
 use crate::select::boundary::{Index, KillMatrix};
@@ -57,24 +54,29 @@ pub(super) fn select(matrix: &KillMatrix) -> Vec<Index> {
         let mut selected: Vec<Index> = Vec::new();
 
         loop {
-            let mut best: Option<(usize, (bool, usize, usize))> = None;
-            for w in &row_positions {
-                let row = at_in_bounds(&rows, w.named(), w.proof());
-                let new = (0..mutants).filter(|&m| row[m] && !covered[m]).count();
-                if new == 0 {
-                    continue;
-                }
-                let noisy = mutants > 0 && total_kills(row) == mutants;
-                // Ranking key, compared lexicographically, larger wins:
-                //   1. non-noisy preferred (defer kill-everything relations),
-                //   2. more newly-covered mutants,
-                //   3. fewer total kills = more discriminating,
-                //   4. (implicit) lower index, via strict-greater keeping the first.
-                let key = (!noisy, new, usize::MAX - total_kills(row));
-                if best.map(|(_, bk)| key > bk).unwrap_or(true) {
-                    best = Some((*w.named().value(), key));
-                }
-            }
+            // Rank every row that still covers something and take the best. The key is
+            // compared by `max_by_key` (no hand-written comparison to mutate), larger wins:
+            //   1. non-noisy preferred (defer kill-everything relations),
+            //   2. more newly-covered mutants,
+            //   3. fewer total kills = more discriminating (`Reverse`, no arithmetic to
+            //      mutate),
+            //   4. (implicit) ties resolved by `max_by_key`, an equally valid cover.
+            // `noisy` needs no `mutants > 0` guard: a row only reaches here with `new > 0`,
+            // which already implies at least one mutant.
+            let best = row_positions
+                .iter()
+                .filter_map(|w| {
+                    let row = at_in_bounds(&rows, w.named(), w.proof());
+                    let new = (0..mutants).filter(|&m| row[m] && !covered[m]).count();
+                    (new > 0).then(|| {
+                        let noisy = total_kills(row) == mutants;
+                        (
+                            *w.named().value(),
+                            (!noisy, new, core::cmp::Reverse(total_kills(row))),
+                        )
+                    })
+                })
+                .max_by_key(|&(_, key)| key);
 
             match best {
                 Some((r, _)) => {

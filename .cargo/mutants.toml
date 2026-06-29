@@ -16,18 +16,12 @@
 #
 #   - `src/main.rs` — the `demo` binary only prints, no assertions, so its
 #     mutants are noise.
-#   - `boundary-algebra-macros/**` — the `#[derive(Shaped)]` proc-macro. It is
-#     code-GENERATION tooling, not domain behaviour; its output is exercised
-#     transitively (every derived `Shaped` is hit by the fused-probe and
-#     universal-sensitivity tests), so a real generation bug still surfaces on the
-#     domain surface, while the macro's own internals are not domain signal.
 #
-# Documented equivalent survivors (findings, not gaps — none are excluded):
-#   - the grammar's `Shaped for bool::inhabitant`, whose canonical seed `false`
-#     equals `Default::default()`;
-#   - `capability`'s `Declares for ResolvePretendsPure`, whose `declared_sources`
-#     is legitimately the empty slice, so an empty-body mutant is indistinguishable;
-#   - `select/internal.rs`'s three monotone/tie-break mutants (see its module doc).
+# The `#[derive(Shaped)]` proc-macro (`boundary-algebra-macros`) is NO LONGER excluded,
+# but it generates ZERO mutants: its functions return `proc_macro2::TokenStream` (built
+# with `quote!`), which cargo-mutants cannot synthesize a replacement for, so there is no
+# mutable surface. Its OUTPUT is dogfooded instead — every derived `Shaped` impl is hit by
+# the fused-probe and universal-sensitivity oracle-free tests.
 #
 # `interp/internal.rs` and `select/internal.rs` are DELIBERATELY kept in scope despite
 # being module-internal: the interpreter is the experiment that MEASURES whether the
@@ -36,7 +30,30 @@
 # the boundary contracts certify for free.
 exclude_globs = [
     "src/main.rs",
-    "boundary-algebra-macros/**",
+]
+
+# The full sweep is a GREEN GATE (0 missed ⇒ exit 0), so CI can gate on it. Inherent
+# infinite-loop mutants (a greedy loop's termination guard relaxed to "never stop") are
+# reported as TIMEOUT — a detection, not a miss — and do not fail the gate.
+#
+# Three EQUIVALENT mutants remain that no probe can (or should) kill — each a genuine
+# free choice or a redundant guard, documented here and carved out by FUNCTION (robust to
+# line edits) so they do not mask a real survivor. They are findings, not gaps:
+#   - `Shaped for bool::inhabitant` — the canonical seed is an arbitrary `bool`; `false`
+#     equals `Default::default()`, so the value is unobservable by any sensitivity probe.
+#   - `Declares for ResolvePretendsPure::declared_sources` — it legitimately declares
+#     NOTHING (that is the under-claim being demonstrated), so an empty-slice mutant is
+#     indistinguishable.
+#   - the interpreter lexer's `is_ascii_alphabetic` first-char guard relaxed to `true` —
+#     every newly-admitted identifier is still rejected by `Ident::new`, so the guard is
+#     redundant and the relaxation is behaviour-preserving.
+# (`select`'s former three equivalents were ELIMINATED, not excluded — the selector now
+# uses `Reverse` and `max_by_key` and drops a redundant guard, so it has no mutable
+# arithmetic/comparison left to survive.)
+exclude_re = [
+    "<impl Shaped for bool>::inhabitant",
+    "<impl Declares for ResolvePretendsPure>::declared_sources",
+    "match guard c.is_ascii_alphabetic",
 ]
 
 # Mutation testing certifies the LIBRARY against the unit + property suites, so
