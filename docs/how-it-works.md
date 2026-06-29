@@ -63,7 +63,14 @@ checked by probes, and the probes are checked by mutation.
   perturbation class: a faithful map (`render`) responds to all; a map that collapses a
   dimension (`node_count`, which ignores the operator and literal values) is caught.
 - the **law registry** (`src/laws.rs`) registers each edge once and gets its whole structural
-  suite — the parse round-trip, the value relations — generically.
+  suite — the parse round-trip, the capability/residual law — generically.
+- **value laws are declared, not plumbed.** For the value frontier you write only the
+  *meaning* — `Law::Identity { op: Add, element: 0 }`, `Law::Commutative { op: Mul }` — and
+  the harness mints a first-class `Relation` around it, over a derived generator. The
+  applicability guard and the **non-vacuity check** are the harness's job: `relation_laws`
+  counts how many generated inputs the probe actually fired on and fails if that count is
+  zero. A probe whose guard never holds — the hand-written-guard antipattern — is rejected on
+  an ordinary run, so the author cannot ship a vacuously-passing test.
 - **`cargo mutants` judges all of it.** The interpreter's interior carries no tests; the
   sweep reports how many of its mutants the boundary kills.
 
