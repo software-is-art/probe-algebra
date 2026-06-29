@@ -439,50 +439,28 @@ mod registry {
             .unwrap();
     }
 
-    /// The value frontier, certified by DISCOVERED LAWS: `discover::discover_laws()` found, by
-    /// running the operators, every algebraic law they satisfy (identity, commutativity,
-    /// associativity, annihilation, distributivity, irreflexivity). Each is re-probed here as an
-    /// oracle-free equation — `eval(lhs) == eval(rhs)` over random assignments — so a mutant that
-    /// breaks any of them is killed. The author wrote NONE of these laws; they fell out of the
-    /// operators, and `cargo mutants` judges their kill power.
+    /// The value frontier, certified by DISCOVERED LAWS: the generic engine found, by running the
+    /// operators, every algebraic law they satisfy (identity, commutativity, associativity,
+    /// annihilation, distributivity, irreflexivity). `replay_interpreter_laws` re-probes each as an
+    /// oracle-free equation over the engine's grid, and the universal-observer (`U`) law is re-probed
+    /// as a structural-sensitivity property over random programs. The author wrote NONE of these
+    /// laws; they fell out of the operators (per-arm evaluator correctness is pinned independently by
+    /// `eval_semantics_are_probed`).
     #[test]
     fn eval_laws_are_probed() {
-        use crate::discover::Law;
-        for law in crate::discover::discover_laws() {
-            match law {
-                // an equational law: `eval(lhs) == eval(rhs)` over random assignments.
-                Law::Equation {
-                    schema, equation, ..
-                } => {
-                    TestRunner::default()
-                        .run(&(0i64..=20, 0i64..=20, 0i64..=20), |(a, b, c)| {
-                            let (lhs, rhs) = schema(a, b, c);
-                            prop_assert_eq!(
-                                eval_closed(&lhs),
-                                eval_closed(&rhs),
-                                "discovered law failed: {}",
-                                equation
-                            );
-                            Ok(())
-                        })
-                        .unwrap();
-                }
-                // the universal-observer law: the faithful rendering is sensitive to every
-                // structural/semantic perturbation (the fused universal probe, discovered).
-                Law::Sensitivity { .. } => {
-                    TestRunner::default()
-                        .run(&<Expr as Sampled>::sampled(), |e| {
-                            prop_assert!(
-                                sensitive_to_all(|x: &Expr| x.render(), &e),
-                                "the universal observer missed a dimension at {:?}",
-                                e
-                            );
-                            Ok(())
-                        })
-                        .unwrap();
-                }
-            }
-        }
+        // the value-algebra laws, re-probed against the interpreter.
+        crate::discover::replay_interpreter_laws().expect("a discovered law failed on replay");
+        // the structural `U` law: the faithful rendering is sensitive to every perturbation.
+        TestRunner::default()
+            .run(&<Expr as Sampled>::sampled(), |e| {
+                prop_assert!(
+                    sensitive_to_all(|x: &Expr| x.render(), &e),
+                    "the universal observer missed a dimension at {:?}",
+                    e
+                );
+                Ok(())
+            })
+            .unwrap();
     }
 
     /// The generic `Relation` machinery itself — the metamorphic-probe runner with its non-vacuity
