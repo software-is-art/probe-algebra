@@ -141,11 +141,13 @@ Once the abstraction certifies itself, several things follow:
   Shaped`) and the laws is the *whole* authoring cost; the harness mints the probes and CI's
   per-PR `--in-diff` sweep certifies them immediately. The crate is a framework, not just a
   demo.
-- **The selector can close the loop on real data.** `select` already chooses a minimal,
-  attributing probe set from a kill matrix. The natural next step is to feed it cargo-mutants'
-  actual `outcomes.json` (every probe × every mutant): it would then prune the project's own
-  suite to the smallest set that retains full kill power and surface uncoverable mutants as
-  *missing-relation* signals — the method optimizing its own tests.
+- **The selector closes the loop on real data** (`cargo run --example suite_audit`). It reads
+  cargo-mutants' own `mutants.out/` — `outcomes.json` plus the per-mutant logs, which name the
+  failing tests — to build a *real* kill matrix (tests × mutants), then runs `select` over it:
+  the minimal attributing suite (here, 37 of 50 tests retain full kill power) and the survivors
+  as *missing-relation* signals (here, none). The method optimizing its own tests. It also
+  surfaced a real subtlety — mutants caught by a process *abort* have no single owning test, so
+  they are detected but not attributable, and are bucketed apart from genuine survivors.
 - **The trusted base is small and explicit.** Everything else is certified by mutation, so a
   reviewer's scrutiny narrows to exactly: `rustc`, `cargo-mutants`, the grammar (`boundary.rs`),
   and the hand-written negative tests. Nothing else has to be taken on faith.
