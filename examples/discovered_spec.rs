@@ -32,5 +32,7 @@ fn main() {
             );
         }
     }
-    println!("All discovered by running the operators — one engine, three very different algebras.");
+    println!(
+        "All discovered by running the operators — one engine, three very different algebras."
+    );
 }
