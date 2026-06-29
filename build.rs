@@ -20,10 +20,11 @@
 //! EXEMPT — files directly under `src/` (`main.rs`, the grammar `boundary.rs`,
 //! test files): the crate root / vocabulary definition, not a module interior.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Fields, Item, ReturnType, Signature, Type, Visibility};
+use syn::{Fields, Item, Meta, ReturnType, Signature, Type, Visibility};
 
 fn main() {
     let root = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
@@ -32,6 +33,25 @@ fn main() {
 
     let mut violations = Vec::new();
     walk(&src, &src, &root, &mut violations);
+
+    // EDGE-COMPLETENESS, by enumeration: every PRODUCTION boundary edge must carry a probe.
+    // This closes the open-world residue the `edges!` list left — a new edge impl that no probe
+    // can kill is now a BUILD ERROR, not a silently-missing line. `cargo-mutants` cannot reach
+    // this (it mutates bodies, not the set of impls), so it is the type/build analogue of the
+    // grading-law proofs.
+    let mut edges: Vec<EdgeImpl> = Vec::new();
+    let mut probed: HashSet<String> = HashSet::new();
+    collect_edges_and_probes(&src, &mut edges, &mut probed);
+    for e in &edges {
+        if !probed.contains(&e.ty) {
+            violations.push(format!(
+                "{}: boundary edge `{}` has no `impl Probed` — every production edge must carry a \
+                 probe. Add `impl Probed for {}` with its oracle-free probe, or, if it is a \
+                 counterexample/fixture rather than a spec edge, gate it behind `#[cfg(test)]`.",
+                e.loc, e.ty, e.ty
+            ));
+        }
+    }
 
     if !violations.is_empty() {
         violations.sort();
@@ -90,6 +110,102 @@ fn walk(dir: &Path, src_root: &Path, manifest: &str, out: &mut Vec<String>) {
 fn parse(path: &Path) -> Result<syn::File, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("cannot read ({e})"))?;
     syn::parse_file(&source).map_err(|e| format!("parse error ({e})"))
+}
+
+// ===== edge-completeness: enumerate edges, require a probe for each =======
+
+/// A concrete (non-generic, non-test) boundary edge impl: the type it is for, and where.
+struct EdgeImpl {
+    ty: String,
+    loc: String,
+}
+
+/// The edge marker traits — an `impl` of any of these (for a concrete type) is a boundary edge.
+const EDGE_TRAITS: &[&str] = &["Morphism", "Construction", "Branch", "Guarded"];
+
+/// Walk EVERY `.rs` under `src/` (including the crate-root files `walk` exempts, since the
+/// `Probed` impls live in `src/harness.rs`), collecting concrete production edges and the set of
+/// types that carry an `impl Probed`.
+fn collect_edges_and_probes(dir: &Path, edges: &mut Vec<EdgeImpl>, probed: &mut HashSet<String>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_edges_and_probes(&path, edges, probed);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        let loc = path.display().to_string();
+        if let Ok(file) = parse(&path) {
+            collect_items(&file.items, &loc, edges, probed);
+        }
+    }
+}
+
+/// Recurse over items (descending into inline modules, where the `Probed` impls live), recording
+/// concrete edge impls and `Probed` impls.
+fn collect_items(
+    items: &[Item],
+    loc: &str,
+    edges: &mut Vec<EdgeImpl>,
+    probed: &mut HashSet<String>,
+) {
+    for item in items {
+        match item {
+            Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    collect_items(inner, loc, edges, probed);
+                }
+            }
+            Item::Impl(im) => {
+                let Some((_, path, _)) = &im.trait_ else {
+                    continue;
+                };
+                let Some(trait_name) = path.segments.last().map(|s| s.ident.to_string()) else {
+                    continue;
+                };
+                let Some(ty) = self_type_name(&im.self_ty) else {
+                    continue;
+                };
+                if trait_name == "Probed" {
+                    probed.insert(ty);
+                } else if EDGE_TRAITS.contains(&trait_name.as_str())
+                    // skip GENERIC combinators (`Compose`, `Then`, `Profiled`, …) — they are
+                    // parametric, probed through the leaves they compose, not in their own right.
+                    && im.generics.type_params().next().is_none()
+                    // skip `#[cfg(test)]` impls — counterexamples/fixtures are not spec edges.
+                    && !is_cfg_test(&im.attrs)
+                {
+                    edges.push(EdgeImpl {
+                        ty,
+                        loc: loc.to_string(),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The bare type name an `impl ... for T` is for (the last path segment of `T`), or `None` for a
+/// non-path self type.
+fn self_type_name(ty: &Type) -> Option<String> {
+    match ty {
+        Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()),
+        _ => None,
+    }
+}
+
+/// Whether any attribute is `#[cfg(test)]`.
+fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|a| {
+        matches!(&a.meta, Meta::List(l) if l.path.is_ident("cfg") && l.tokens.to_string().contains("test"))
+    })
 }
 
 // ===== tier 1: the strict boundary grammar ===============================

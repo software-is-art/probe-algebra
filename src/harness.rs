@@ -220,8 +220,11 @@ impl Wrapped for crate::interp::boundary::Ident {
 
 mod registry {
     use super::*;
+    use crate::boundary::Morphism;
     use crate::gdp::with_seed;
-    use crate::interp::boundary::{Check, Eval, Expr, Ident, Int, Op, Parse, Value};
+    use crate::interp::boundary::{
+        Bound, Check, ConstFold, Env, Eval, Expr, Ident, Int, Op, Parse, Resolve, Value,
+    };
 
     // canonical source for the `Parse` round-trip: `Expr` is self-sampling, so the
     // generator is just `Expr::sampled().render()`.
@@ -363,7 +366,7 @@ mod registry {
     // build. The thin `#[test]`s run each probe (and kill the interior mutants); `Probed` is
     // where the probe lives, so the obligation cannot be discharged emptily.
 
-    type Edges = crate::edges!(Parse, Check, Eval);
+    type Edges = crate::edges!(Parse, Check, Eval, ConstFold, Resolve);
 
     /// COMPLETENESS: every edge in `Edges` impls `Probed`. The edge analog of
     /// `assert_complete::<Expr>()`; its negative twin is
@@ -371,6 +374,87 @@ mod registry {
     #[test]
     fn every_edge_is_probed() {
         assert_all_probed::<Edges>();
+    }
+
+    /// `ConstFold` — the `Lossy` optimizer. Two oracle-free laws: folding PRESERVES the value
+    /// (`eval . fold == eval`, so a wrong constant — e.g. a doubling fold — fails it, which is
+    /// why no separate coefficient probe is needed against this edge) and its residual
+    /// RECONSTRUCTS the input (the round-trip that a `Unit`-residual forgetful fold would fail).
+    impl Probed for ConstFold {
+        fn probe() {
+            TestRunner::default()
+                .run(&int_expr(), |e| {
+                    let (folded, residual) = ConstFold.forward(&e);
+                    prop_assert_eq!(
+                        eval_closed(&folded),
+                        eval_closed(&e),
+                        "fold changed the value at {:?}",
+                        e
+                    );
+                    prop_assert_eq!(
+                        ConstFold.backward(&folded, &residual),
+                        Some(e.clone()),
+                        "residual did not reconstruct {:?}",
+                        e
+                    );
+                    Ok(())
+                })
+                .unwrap();
+        }
+    }
+    #[test]
+    fn const_fold_is_probed() {
+        ConstFold::probe();
+    }
+
+    /// `Resolve` — the `Stateful`, irreversible edge. Oracle-free TWO-ROUTE law: substituting
+    /// the carried `Env` then evaluating equals let-binding the same env then evaluating — two
+    /// independent paths to one value, so a wrong `subst` (or one that ignores the env, like the
+    /// retired over-claiming counterexample) makes the routes diverge.
+    impl Probed for Resolve {
+        fn probe() {
+            let x = Ident::new("x").expect("valid ident");
+            let y = Ident::new("y").expect("valid ident");
+            // expressions over {x, y} and int leaves: closed once x, y are bound, and int-typed
+            // so `eval` is total down both routes.
+            let var_expr = {
+                let (xx, yy) = (x.clone(), y.clone());
+                let leaf = prop_oneof![
+                    (0i64..=20).prop_map(|n| Expr::int(n).unwrap()),
+                    Just(Expr::var(xx)),
+                    Just(Expr::var(yy)),
+                ];
+                leaf.prop_recursive(3, 12, 2, |inner| {
+                    prop_oneof![
+                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
+                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
+                    ]
+                })
+            };
+            TestRunner::default()
+                .run(&(0i64..=20i64, 0i64..=20i64, var_expr), |(vx, vy, e)| {
+                    let env = Env::new()
+                        .bind(x.clone(), Int::new(vx).unwrap())
+                        .bind(y.clone(), Int::new(vy).unwrap());
+                    // route 1: resolve (substitute the env), then evaluate.
+                    let (resolved, _unit) = Resolve.forward(&Bound::new(env, e.clone()));
+                    let via_resolve = eval_closed(&resolved);
+                    // route 2: let-bind the same env, then evaluate.
+                    let lets = Expr::bind(
+                        x.clone(),
+                        Expr::int(vx).unwrap(),
+                        Expr::bind(y.clone(), Expr::int(vy).unwrap(), e.clone()),
+                    );
+                    let via_let = eval_closed(&lets);
+                    prop_assert_eq!(via_resolve, via_let, "resolve diverged from let-binding");
+                    Ok(())
+                })
+                .unwrap();
+        }
+    }
+    #[test]
+    fn resolve_is_probed() {
+        Resolve::probe();
     }
 
     /// The interpreter's entry edge: `render . parse == id` over generated canonical
