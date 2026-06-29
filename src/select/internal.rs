@@ -17,68 +17,101 @@
 //!     this yields an equally valid cover — a genuine degree of freedom in the output that
 //!     no oracle-free probe can (or should) pin without a reference implementation.
 
+use crate::gdp::{at_in_bounds, positions, prove_position, with_region};
 use crate::select::boundary::{Index, KillMatrix};
 
-/// Whether relation `r` kills every mutant (noisy: kills all, attributes nothing).
+/// Whether relation `r` kills every mutant (noisy: kills all, attributes nothing). The row
+/// is read through a GDP `InBounds` proof tying `r` to THIS matrix (`prove_position` ⇒
+/// `at_in_bounds`), so an out-of-range relation is a defined `false` (it kills nothing)
+/// rather than the panic a raw `rows[r]` would risk — the bounds obligation discharged by a
+/// proof, not by trust.
 pub(super) fn is_noisy(matrix: &KillMatrix, relation: Index) -> bool {
     let mutants = matrix.mutants();
-    let kills = matrix.rows()[relation.get()].iter().filter(|&&k| k).count();
-    mutants > 0 && kills == mutants
+    with_region(|region| {
+        let rows = region.brand(matrix.rows().to_vec());
+        match prove_position(&rows, relation.get()) {
+            Some(w) => {
+                let row = at_in_bounds(&rows, w.named(), w.proof());
+                mutants > 0 && row.iter().filter(|&&k| k).count() == mutants
+            }
+            None => false,
+        }
+    })
 }
 
 /// Greedy set cover with the discrimination preference. Returns the selected relation
 /// indices in pick order; mutants no relation kills are skipped (see `uncoverable`).
+///
+/// The matrix is branded into a region and every row read through its `InBounds` proof
+/// (`positions` ⇒ `at_in_bounds`): the kernel indexes its own matrix entirely by proof, and
+/// a position witnessed for this matrix cannot index another.
 pub(super) fn select(matrix: &KillMatrix) -> Vec<Index> {
-    let rows = matrix.rows();
     let mutants = matrix.mutants();
     let total_kills = |row: &[bool]| row.iter().filter(|&&k| k).count();
 
-    let mut covered = vec![false; mutants];
-    let mut selected: Vec<Index> = Vec::new();
+    with_region(|region| {
+        let rows = region.brand(matrix.rows().to_vec());
+        let row_positions = positions(&rows);
 
-    loop {
-        let mut best: Option<(usize, (bool, usize, usize))> = None;
-        for (r, row) in rows.iter().enumerate() {
-            let new = (0..mutants).filter(|&m| row[m] && !covered[m]).count();
-            if new == 0 {
-                continue;
-            }
-            let noisy = mutants > 0 && total_kills(row) == mutants;
-            // Ranking key, compared lexicographically, larger wins:
-            //   1. non-noisy preferred (defer kill-everything relations),
-            //   2. more newly-covered mutants,
-            //   3. fewer total kills = more discriminating,
-            //   4. (implicit) lower index, via strict-greater keeping the first.
-            let key = (!noisy, new, usize::MAX - total_kills(row));
-            if best.map(|(_, bk)| key > bk).unwrap_or(true) {
-                best = Some((r, key));
-            }
-        }
+        let mut covered = vec![false; mutants];
+        let mut selected: Vec<Index> = Vec::new();
 
-        match best {
-            Some((r, _)) => {
-                for (slot, &killed) in covered.iter_mut().zip(rows[r].iter()) {
-                    if killed {
-                        *slot = true;
-                    }
+        loop {
+            let mut best: Option<(usize, (bool, usize, usize))> = None;
+            for w in &row_positions {
+                let row = at_in_bounds(&rows, w.named(), w.proof());
+                let new = (0..mutants).filter(|&m| row[m] && !covered[m]).count();
+                if new == 0 {
+                    continue;
                 }
-                selected.push(Index::new(r).expect("a row index is non-negative"));
+                let noisy = mutants > 0 && total_kills(row) == mutants;
+                // Ranking key, compared lexicographically, larger wins:
+                //   1. non-noisy preferred (defer kill-everything relations),
+                //   2. more newly-covered mutants,
+                //   3. fewer total kills = more discriminating,
+                //   4. (implicit) lower index, via strict-greater keeping the first.
+                let key = (!noisy, new, usize::MAX - total_kills(row));
+                if best.map(|(_, bk)| key > bk).unwrap_or(true) {
+                    best = Some((*w.named().value(), key));
+                }
             }
-            None => break,
-        }
-    }
 
-    selected
+            match best {
+                Some((r, _)) => {
+                    // re-read the chosen row by a fresh proof (it came from a proven position).
+                    let chosen = prove_position(&rows, r).expect("r is a proven row position");
+                    let row = at_in_bounds(&rows, chosen.named(), chosen.proof());
+                    for (slot, &killed) in covered.iter_mut().zip(row.iter()) {
+                        if killed {
+                            *slot = true;
+                        }
+                    }
+                    selected.push(Index::new(r).expect("a row index is non-negative"));
+                }
+                None => break,
+            }
+        }
+
+        selected
+    })
 }
 
 /// Mutants no relation kills — surviving mutants, each evidence that a relation or a degree
-/// of freedom is MISSING.
+/// of freedom is MISSING. Rows are read by proof, exactly as in `select`.
 pub(super) fn uncoverable(matrix: &KillMatrix) -> Vec<Index> {
-    let rows = matrix.rows();
-    (0..matrix.mutants())
-        .filter(|&m| !rows.iter().any(|row| row[m]))
-        .map(|m| Index::new(m).expect("a column index is non-negative"))
-        .collect()
+    let mutants = matrix.mutants();
+    with_region(|region| {
+        let rows = region.brand(matrix.rows().to_vec());
+        let row_positions = positions(&rows);
+        (0..mutants)
+            .filter(|&m| {
+                !row_positions
+                    .iter()
+                    .any(|w| at_in_bounds(&rows, w.named(), w.proof())[m])
+            })
+            .map(|m| Index::new(m).expect("a column index is non-negative"))
+            .collect()
+    })
 }
 
 #[cfg(test)]

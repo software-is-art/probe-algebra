@@ -162,10 +162,28 @@ cargo test                # unit + property + compile-fail suites
 cargo mutants             # the real test: do interior mutants survive?
 ```
 
+## The whole runtime is self-hosted
+
+The method is turned on *every part of its own runtime*, not just the interpreter. Each
+runtime module is certified by oracle-free probes with zero hand-written example tests, judged
+by mutation:
+
+- **`interp`** and **`select`** are *structural* self-hosts — boundary plus a private interior
+  with no interior tests.
+- **`gdp`** (the Ghosts-of-Departed-Proofs name/proof vocabulary) and **`capability`** (the
+  declared-vs-behavioural capability audit) are crate-level grammar, self-hosted by replacing
+  their example tests with oracle-free property probes.
+
+And gdp's relational proof is now *load-bearing*, not a demo: `select`'s kernel reads its kill
+matrix entirely through gdp's `InBounds` proof (`positions` ⇒ `at_in_bounds`), so an
+out-of-range matrix read is a **type error, not a panic** — a value object enforces a
+single-value invariant; this enforces a *relation between two values* (an index belongs to
+*that* matrix).
+
 ## Scope and costs
 
-The grammar holds the interior-mutation bar on two substrates — the interpreter and the
-self-hosted selector — with the costs paid openly:
+The grammar holds the interior-mutation bar across the whole runtime, with the costs paid
+openly:
 
 - the boundary is **verbose** — that verbosity is the single place the rigidity is paid, and
   the point is to pay it once;

@@ -17,8 +17,10 @@
 //!   - UNDER-claiming (used but undeclared) → a HIDDEN DEPENDENCY, the dangerous case: a
 //!     "pure" edge that secretly reads state or the world, which the type system accepts.
 //!
-//! Crate-level tooling, exempt from the per-module boundary discipline (it audits edges
-//! rather than being one). It is demonstrated on the interpreter's `Resolve` family.
+//! Crate-level tooling, exempt from the per-module boundary STRUCTURAL discipline (it audits
+//! edges rather than being one), but SELF-HOSTED by verification: its example tests are
+//! replaced with oracle-free property probes and it is kept in the mutation sweep. It is
+//! demonstrated on the interpreter's `Resolve` family.
 
 use crate::boundary::{Capability, Morphism, Perturbation};
 
@@ -213,56 +215,130 @@ impl<M: Morphism<In = Bound>> Perturbation<M> for BumpBinding {
 
 #[cfg(test)]
 mod tests {
+    //! Self-hosted: no example tests. The audit algebra (`is_live`, `cap_of`,
+    //! `source_capability`, `over_declared`, and the `Audit` combinators) is certified by the
+    //! ORACLE-FREE probes below — each recomputes the answer INDEPENDENTLY (the source rule,
+    //! an exhaustive enumeration, the rank order, a re-derived join) and compares — and the
+    //! `Resolve` family is audited over RANDOM bindings rather than one fixed example.
+    //! `cargo mutants` (now in scope over this file) judges whether that suffices.
     use super::*;
     use crate::interp::boundary::{Env, Expr, Op};
+    use proptest::prelude::*;
 
     fn name(s: &str) -> Ident {
         Ident::new(s).expect("valid identifier")
     }
-    fn int(v: i64) -> Expr {
-        Expr::int(v).expect("valid literal")
+
+    fn source() -> impl Strategy<Value = Source> {
+        prop_oneof![
+            Just(Source::LostInput),
+            Just(Source::State),
+            Just(Source::World)
+        ]
+    }
+    fn capability() -> impl Strategy<Value = Capability> {
+        prop_oneof![
+            Just(Capability::Pure),
+            Just(Capability::Lossy),
+            Just(Capability::Stateful),
+            Just(Capability::Effectful),
+        ]
+    }
+    fn response() -> impl Strategy<Value = Response> {
+        (any::<bool>(), any::<bool>()).prop_map(|(o, r)| Response {
+            output_moved: o,
+            residual_moved: r,
+        })
+    }
+    fn channel() -> impl Strategy<Value = Channel> {
+        (source(), any::<bool>(), any::<bool>()).prop_map(|(source, claimed, live)| Channel {
+            source,
+            claimed,
+            live,
+        })
     }
 
-    /// `(x + 1)` in an environment binding `x = 5`, audited along the `State` channel.
-    fn audit_state<M: Morphism<In = Bound> + Declares>(m: &M) -> Audit {
-        let x = name("x");
-        let env = Env::new().bind(x.clone(), Int::new(5).unwrap());
-        let bound = Bound::new(env, Expr::bin(Op::Add, Expr::var(x.clone()), int(1)));
-        let channel = audit_channel(Source::State, m, &BumpBinding(x), &bound).expect("applies");
-        Audit::new(vec![channel])
+    proptest! {
+        /// LIVENESS rule, restated independently: a lost input is live only when the residual
+        /// moves and the output does not; a state/world source when either moves.
+        #[test]
+        fn is_live_matches_the_source_rule(s in source(), r in response()) {
+            let expected = match s {
+                Source::LostInput => !r.output_moved && r.residual_moved,
+                Source::State | Source::World => r.output_moved || r.residual_moved,
+            };
+            prop_assert_eq!(is_live(s, &r), expected);
+        }
+
+        /// A source contributes `cap_of` when live, `Pure` otherwise — pins the gate.
+        #[test]
+        fn source_capability_gates_on_liveness(s in source(), r in response()) {
+            let expected = if is_live(s, &r) { cap_of(s) } else { Capability::Pure };
+            prop_assert_eq!(source_capability(s, &r), expected);
+        }
+
+        /// `over_declared` holds iff the actual capability ranks BELOW the declared one.
+        #[test]
+        fn over_declared_iff_actual_ranks_below_declared(d in capability(), a in capability()) {
+            prop_assert_eq!(over_declared(d, a), a.rank() < d.rank());
+        }
+
+        /// The AUDIT reconciles claim with behaviour: over-claimed = claimed-not-live,
+        /// under-claimed = live-not-claimed, honest = neither, and observed/declared are the
+        /// joins over the live/claimed channels — each recomputed independently here.
+        #[test]
+        fn audit_reconciles_claim_and_behaviour(channels in prop::collection::vec(channel(), 0..6)) {
+            let audit = Audit::new(channels.clone());
+            let over: Vec<Source> = channels.iter().filter(|c| c.claimed && !c.live).map(|c| c.source).collect();
+            let under: Vec<Source> = channels.iter().filter(|c| c.live && !c.claimed).map(|c| c.source).collect();
+            prop_assert_eq!(audit.over_claimed(), over.clone());
+            prop_assert_eq!(audit.under_claimed(), under.clone());
+            prop_assert_eq!(audit.is_honest(), over.is_empty() && under.is_empty());
+
+            let observed = channels.iter().filter(|c| c.live)
+                .fold(Capability::Pure, |acc, c| acc.join(cap_of(c.source)));
+            let declared = channels.iter().filter(|c| c.claimed)
+                .fold(Capability::Pure, |acc, c| acc.join(cap_of(c.source)));
+            prop_assert_eq!(audit.observed(), observed);
+            prop_assert_eq!(audit.declared(), declared);
+        }
+
+        /// END-TO-END over random bindings: auditing the real `Resolve` family along the
+        /// `State` channel separates the honest edge from its over- and under-claiming twins —
+        /// pinning `observe`, `audit_channel`, `BumpBinding`, and each `Declares` claim.
+        #[test]
+        fn the_resolve_family_audits_as_specified(v in 0i64..10_000) {
+            let x = name("x");
+            let env = Env::new().bind(x.clone(), Int::new(v).unwrap());
+            let bound = Bound::new(env, Expr::bin(Op::Add, Expr::var(x.clone()), Expr::int(1).unwrap()));
+            let one = |c| Audit::new(vec![c]);
+
+            let honest = one(audit_channel(Source::State, &Resolve, &BumpBinding(x.clone()), &bound).unwrap());
+            let over = one(audit_channel(Source::State, &ResolveIgnoresEnv, &BumpBinding(x.clone()), &bound).unwrap());
+            let under = one(audit_channel(Source::State, &ResolvePretendsPure, &BumpBinding(x.clone()), &bound).unwrap());
+
+            prop_assert!(honest.is_honest());
+            prop_assert_eq!(honest.observed(), Capability::Stateful);
+            prop_assert_eq!(honest.declared(), Capability::Stateful);
+
+            prop_assert_eq!(over.over_claimed(), vec![Source::State]);
+            prop_assert!(over.under_claimed().is_empty());
+            prop_assert_eq!(over.observed(), Capability::Pure);
+            prop_assert!(over_declared(over.declared(), over.observed()));
+
+            prop_assert_eq!(under.under_claimed(), vec![Source::State]);
+            prop_assert!(under.over_claimed().is_empty());
+            prop_assert_eq!(under.declared(), Capability::Pure);
+            prop_assert_eq!(under.observed(), Capability::Stateful);
+        }
     }
 
+    /// EXHAUSTIVE: the three sources map to three distinct capabilities — pins each `cap_of`
+    /// arm against a constant-return mutant (a total enumeration of a finite domain).
     #[test]
-    fn honest_resolve_claim_matches_behaviour() {
-        let audit = audit_state(&Resolve);
-        assert!(audit.is_honest());
-        assert!(audit.over_claimed().is_empty());
-        assert!(audit.under_claimed().is_empty());
-        assert_eq!(audit.observed(), Capability::Stateful);
-        assert_eq!(audit.declared(), Capability::Stateful);
-    }
-
-    /// OVER-claim: declares `State` but the perturbation moves nothing — slop.
-    #[test]
-    fn over_claim_is_flagged_as_slop() {
-        let audit = audit_state(&ResolveIgnoresEnv);
-        assert!(!audit.is_honest());
-        assert_eq!(audit.over_claimed(), vec![Source::State]);
-        assert!(audit.under_claimed().is_empty());
-        // declared further left is possible: behaviour is pure, declaration stateful.
-        assert!(over_declared(audit.declared(), audit.observed()));
-        assert_eq!(audit.observed(), Capability::Pure);
-    }
-
-    /// UNDER-claim: declared `Pure` yet the output moves when state is perturbed — the
-    /// hidden dependency the type system trusted and only the behavioural audit catches.
-    #[test]
-    fn under_claim_exposes_a_hidden_dependency() {
-        let audit = audit_state(&ResolvePretendsPure);
-        assert!(!audit.is_honest());
-        assert_eq!(audit.under_claimed(), vec![Source::State]);
-        assert!(audit.over_claimed().is_empty());
-        assert_eq!(audit.declared(), Capability::Pure);
-        assert_eq!(audit.observed(), Capability::Stateful);
+    fn cap_of_distinguishes_the_three_sources() {
+        assert_eq!(cap_of(Source::LostInput), Capability::Lossy);
+        assert_eq!(cap_of(Source::State), Capability::Stateful);
+        assert_eq!(cap_of(Source::World), Capability::Effectful);
     }
 }

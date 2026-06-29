@@ -104,5 +104,22 @@ whether the output moves. It catches both directions —
 - **under-claiming** (declares `Pure`, secretly reads the environment) → a hidden dependency
   the type system trusted, surfaced by the probe.
 
-So the boundary is paid once, the interior stays free, and the claims in the specification
-are validated at compile time *and* at autotest time — which was the whole question.
+## 6. The whole runtime is self-hosted
+
+The discipline is applied to *every* runtime module, not just the interpreter. `select` (the
+kill-matrix set-cover selector) is a second structural self-host — boundary plus a tested-only-
+by-mutation interior. `gdp` (the name/proof vocabulary) and `capability` (the audit above) are
+crate-level grammar `build.rs` exempts from the structural rules, so they are self-hosted by
+*verification*: their example tests are replaced with oracle-free property probes
+(`permute ∘ unpermute == id`, the liveness rule, the audit's claim/behaviour reconciliation)
+and kept in the mutation sweep. The only survivors anywhere are documented equivalents.
+
+And the proof vocabulary is load-bearing, not ornamental. `gdp` extends "make illegal states
+unrepresentable" from one value (a value object) to a *relation between two values*: `select`'s
+kernel reads its matrix through gdp's `InBounds` proof (`positions` ⇒ `at_in_bounds`), so an
+index proven for one matrix cannot index another and an out-of-range read is a type error, not
+a panic — the same proof-carrying that makes `Eval` uncallable without `Check`'s `WellTyped`.
+
+So the boundary is paid once, the interior stays free, the method certifies its own runtime,
+and the claims in the specification are validated at compile time *and* at autotest time —
+which was the whole question.
