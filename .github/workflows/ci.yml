@@ -4,6 +4,11 @@ name: ci
 # push and PR; the mutation gate — the method's own "the real test" — runs per-change on
 # PRs (only the changed lines, since mutation is expensive) and as a full-crate sweep on
 # the default branch and a weekly schedule.
+#
+# The Rust toolchain is PINNED (not `@stable`): the `tests/compile_fail` trybuild suite
+# matches saved `.stderr` files, and rustc's diagnostic rendering changes between versions,
+# so a floating toolchain makes that suite spuriously fail. Bump this pin in lockstep with
+# regenerating the `.stderr` files (TRYBUILD=overwrite).
 
 on:
   push:
@@ -23,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.94.1
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -42,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.94.1
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
@@ -61,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.94.1
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
