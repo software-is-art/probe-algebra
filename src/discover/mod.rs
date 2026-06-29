@@ -17,7 +17,9 @@
 //! resource limit, not a curated list).
 
 pub mod arithmetic;
+pub mod date;
 pub mod engine;
+pub mod router;
 
 use crate::boundary::sensitive_to_all;
 use crate::discover::arithmetic::Arithmetic;

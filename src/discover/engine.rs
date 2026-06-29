@@ -488,9 +488,17 @@ impl<T: Theory> Engine<T> {
                         .into_iter()
                         .filter(|(cid, _)| ops[*cid].output == r)
                     {
+                        // a relation collapsing to `false` is irreflexivity; any other constant is a
+                        // self-application law (`diff(x, x) = zero`).
+                        let cs = self.render(&c);
+                        let prose = if cs == "false" {
+                            format!("A value is never {} itself.", f.name)
+                        } else {
+                            format!("{} of a value with itself gives {}.", f.name, cs)
+                        };
                         push(
                             self,
-                            format!("A value is never {} itself.", f.name),
+                            prose,
                             Self::app(fid, vec![x.clone(), x.clone()]),
                             c.clone(),
                         );
