@@ -1,14 +1,16 @@
-error[E0277]: the trait bound `Unprobed: Probed` is not satisfied
+error[E0277]: boundary edge `Unprobed` has no probe
   --> tests/compile_fail/forgotten_probe_rejected.rs:15:25
    |
 15 |     assert_all_probed::<Edges>();
-   |                         ^^^^^ unsatisfied trait bound
+   |                         ^^^^^ this edge is declared in `edges!` but has no `impl Probed`
    |
 help: the trait `Probed` is not implemented for `Unprobed`
   --> tests/compile_fail/forgotten_probe_rejected.rs:10:1
    |
 10 | struct Unprobed; // an edge with no probe
    | ^^^^^^^^^^^^^^^
+   = note: every boundary edge must carry a probe: add `impl Probed for Unprobed { fn probe() { /* the edge's probe */ } }`
+   = note: a probe omitted here would otherwise surface only later, as a surviving mutant
 help: the trait `AllProbed` is implemented for `EdgeCons<E, Rest>`
   --> src/boundary.rs
    |

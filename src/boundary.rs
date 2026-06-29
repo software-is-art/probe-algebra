@@ -592,6 +592,15 @@ where
 /// a declared `Capability` is audited against behaviour. `edges!` + `assert_all_probed` force
 /// every declared edge to discharge this, so a new edge with no probe is a build error rather
 /// than a surviving mutant discovered later.
+///
+/// The `#[diagnostic::on_unimplemented]` attribute (stable since 1.78) shapes the failure so a
+/// forgotten probe reads as a spec violation, not a raw trait-bound error.
+#[diagnostic::on_unimplemented(
+    message = "boundary edge `{Self}` has no probe",
+    label = "this edge is declared in `edges!` but has no `impl Probed`",
+    note = "every boundary edge must carry a probe: add `impl Probed for {Self} {{ fn probe() {{ /* the edge's probe */ }} }}`",
+    note = "a probe omitted here would otherwise surface only later, as a surviving mutant"
+)]
 pub trait Probed {
     /// Run this edge's probe.
     fn probe();
