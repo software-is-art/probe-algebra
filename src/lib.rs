@@ -43,6 +43,7 @@
 
 pub mod boundary;
 pub mod capability;
+pub mod discover;
 pub mod gdp;
 pub mod interp;
 pub mod select;

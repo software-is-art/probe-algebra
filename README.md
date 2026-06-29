@@ -10,8 +10,8 @@ survive.
 
 **The answer is yes.** The demonstration is an expression-language interpreter — lexer,
 parser, type checker, evaluator — whose interior has **zero tests of its own**, and whose
-entire *positive* behaviour is certified with **zero hand-written examples**: only declared
-laws and structure-derived probes. Mutate the interior and **every viable mutant dies**; the
+entire *positive* behaviour is certified with **zero hand-written examples** — and its algebraic
+laws are **discovered by running the operators**, not declared, rendering as a plain-language spec. Mutate the interior and **every viable mutant dies**; the
 only survivors are a handful of documented equivalents (genuine free choices), carved out in
 `.cargo/mutants.toml`.
 
@@ -85,21 +85,26 @@ mutation sweep, so the bought correctness is *measured*, not asserted.
 
 ---
 
-## Declare the law; the probe is generated
+## The laws discover themselves — and read in plain language
 
-You never hand-write a probe's plumbing. For the value frontier you state the *meaning* — an
-algebraic law — and the harness mints the probe around it:
+You don't even state the algebra. `discover` instantiates the universal algebraic shapes over the
+operators and keeps the ones that **run true**, found by evaluating both sides over a grid — so the
+spec falls out of the operators' behaviour, not a human's list. `cargo run --example discovered_spec`
+prints it as a contract a non-mathematical stakeholder can audit:
 
-```rust,ignore
-Law::Identity    { op: Op::Add, element: Expr::int(0) }   // x + 0 == x
-Law::Commutative { op: Op::Mul }                          // x * y == y * x
-Law::Reflexive   { op: Op::Lt,  value: false }            // x < x == false
+```
+Adding zero leaves a value unchanged.            x + 0 = x
+Addition gives the same result in either order.  x + y = y + x
+Multiplying by one leaves a value unchanged.     x * 1 = x
+Multiplying by zero always gives zero.           x * 0 = 0
+Multiplying a sum is the same as multiplying the parts and adding.   x*(y+z) = x*y + x*z
+A value is never less than itself.               x < x = false
 ```
 
-Each `Law` fans out into a first-class relation over a derived generator, with the
-applicability guard *and the non-vacuity check owned by the harness*: a probe whose guard never
-fires — a "passing" test that never ran — is rejected on an ordinary `cargo test`. The author
-cannot weaken a probe by accident, because the author never writes the part that could be weak.
+Each discovered law is re-probed as an oracle-free equation and judged by mutation, so the author
+can't weaken a probe by accident — they write none of them. The only human acts left are the
+**validity rule** (`Int ≥ 0`) and **ratifying** the report: a law you expect but don't see (a folder
+that doubled would have no "adding zero leaves a value unchanged") is a bug surfaced.
 
 ---
 

@@ -64,10 +64,14 @@ by probes, and the probes are checked by mutation:
   parse round-trip, the capability/residual laws, `ConstFold`'s fold-preserves-value law,
   `Resolve`'s two-route law, and `eval_semantics_are_probed`, which pins every evaluator arm
   oracle-free against an independent computation — so evaluation needs *no hand-written examples*.
-- **value laws are declared, not plumbed** — you write `Law::Identity { op: Add, element: 0 }`
-  and the harness mints a `Relation` over a derived generator. The applicability guard and the
-  **non-vacuity check** are the harness's job (`relation_laws` fails if the probe fired zero
-  times), so a vacuously-passing test cannot ship.
+- **value laws are *discovered*, not declared** — `discover` instantiates the universal algebraic
+  shapes over the operators and keeps the ones that RUN true (identity, commutativity,
+  associativity, annihilation, distributivity, irreflexivity), found by evaluating both sides over
+  a grid. The author writes no law; the spec falls out of the operators and renders as a non-mathy
+  report (`cargo run --example discovered_spec`) a non-mathematical stakeholder can ratify. Each
+  discovered law is re-probed as an oracle-free equation, so mutation judges its kill power. (The
+  generic `Relation` runner with its **non-vacuity guard** remains for metamorphic relations that
+  only sometimes apply; `relation_laws` fails if a probe fired zero times.)
 - **`cargo mutants` judges all of it** — the interior carries no tests; the sweep reports how
   many of its mutants the boundary kills.
 

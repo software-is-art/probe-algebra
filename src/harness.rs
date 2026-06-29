@@ -255,96 +255,36 @@ mod registry {
         })
     }
 
-    // ===== algebraic LAWS: declare the invariant, the probe of it is GENERATED =====
+    // ===== algebraic LAWS: the spec is DISCOVERED, not declared =====================
     //
-    // The author states only the MEANING — an algebraic law the operator satisfies. Each
-    // `Law` fans out into a full probe: a first-class `Relation` run over a derived
-    // generator, with the applicability guard and the non-vacuity check owned by the
-    // harness. No `apply`/`vary`/`rewrite` is hand-written per law; declaring the law IS
-    // writing the probe.
+    // The interpreter's algebra is no longer hand-listed. `discover::discover_laws()` instantiates
+    // the universal algebraic shapes over the operators and keeps the ones that RUN true (see
+    // `eval_laws_are_probed`), so the author writes no law and names no structure — the spec falls
+    // out of the operators' behaviour and renders as a non-mathy report.
+    //
+    // What remains here is the generic `Relation` MACHINERY — the metamorphic-probe runner with its
+    // applicability guard and non-vacuity check — kept and demonstrated on the fixtures below. A
+    // discovered law is a universally-quantified equation, so it always applies; the guard earns
+    // its keep on metamorphic relations that only sometimes do, which these pin.
 
-    #[derive(Clone, Debug)]
-    enum Law {
-        /// `x op e == x` — `e` is a right identity for `op`.
-        Identity { op: Op, element: Expr },
-        /// `x op y == y op x`.
-        Commutative { op: Op },
-        /// `x op x == value` — equal operands collapse to a constant (e.g. `<` is
-        /// irreflexive, collapsing to `false`).
-        Reflexive { op: Op, value: Value },
-    }
-
-    /// The probe GENERATED from a law — a `Relation` over the evaluator. The author never
-    /// writes this; `Law` produces it.
-    struct LawProbe {
-        law: Law,
-    }
-    impl Relation for LawProbe {
-        type In = Expr;
-        type Out = Value;
-        fn apply(&self, x: &Expr) -> Value {
-            match &self.law {
-                Law::Reflexive { op, .. } => eval_closed(&Expr::bin(*op, x.clone(), x.clone())),
-                _ => eval_closed(x),
-            }
-        }
-        fn vary(&self, x: &Expr) -> Option<Expr> {
-            match &self.law {
-                Law::Identity { op, element } => Some(Expr::bin(*op, x.clone(), element.clone())),
-                Law::Commutative { op } => match x {
-                    Expr::Bin(o, a, b) if o == op => {
-                        Some(Expr::bin(*op, (**b).clone(), (**a).clone()))
-                    }
-                    _ => None,
-                },
-                Law::Reflexive { .. } => Some(x.clone()),
-            }
-        }
-        fn rewrite(&self, y: Value) -> Value {
-            match &self.law {
-                Law::Reflexive { value, .. } => *value,
-                _ => y,
-            }
-        }
-    }
-
-    /// Operand expressions built around a top-level `op` node, so a commutativity probe's
+    /// Operand expressions built around a top-level `op` node, so a metamorphic probe's
     /// perturbation always fires (non-vacuity).
     fn binary(op: Op) -> impl Strategy<Value = Expr> {
         (int_expr(), int_expr()).prop_map(move |(a, b)| Expr::bin(op, a, b))
     }
 
-    /// Generate and run the FULL probe of a declared law — the author wrote only the `Law`.
-    fn prove_law(law: &Law) {
-        let probe = LawProbe { law: law.clone() };
-        match law {
-            Law::Commutative { op } => relation_laws(&probe, binary(*op)),
-            _ => relation_laws(&probe, int_expr()),
-        }
-    }
-
-    /// The interpreter's declared algebra — the ONLY hand-written part (the meaning itself).
-    /// Each entry generates its whole probe.
-    fn interpreter_laws() -> Vec<Law> {
-        vec![
-            Law::Identity {
-                op: Op::Add,
-                element: Expr::int(0).unwrap(),
-            },
-            Law::Identity {
-                op: Op::Mul,
-                element: Expr::int(1).unwrap(),
-            },
-            Law::Commutative { op: Op::Add },
-            Law::Commutative { op: Op::Mul },
-            Law::Reflexive {
-                op: Op::Lt,
-                value: Value::Bool(false),
-            },
-        ]
-    }
-
-    // a deliberately FALSE relation and an inapplicable one, to pin `relation_holds`.
+    // A TRUE metamorphic relation (swapping a top-level `Add`'s operands preserves the value), and
+    // a FALSE one and an inapplicable one — the fixtures that pin the `Relation` machinery
+    // (`relation_laws`, `relation_holds`, the non-vacuity guard).
+    crate::relation!(
+        /// TRUE: `x + y` and `y + x` evaluate equal.
+        CommutesAdd: Expr => Value,
+        apply = eval_closed,
+        vary = |x: &Expr| match x {
+            Expr::Bin(Op::Add, a, b) => Some(Expr::bin(Op::Add, (**b).clone(), (**a).clone())),
+            _ => None,
+        },
+        rewrite = |y| y);
     crate::relation!(
         /// FALSE by construction: `x + 1` does not evaluate as `x`.
         Increment: Expr => Value,
@@ -499,14 +439,36 @@ mod registry {
             .unwrap();
     }
 
-    /// The value frontier, certified by DECLARED LAWS: each `Law` in the interpreter's
-    /// algebra generates and runs its own full probe — value testing with no oracle and no
-    /// per-law plumbing.
+    /// The value frontier, certified by DISCOVERED LAWS: `discover::discover_laws()` found, by
+    /// running the operators, every algebraic law they satisfy (identity, commutativity,
+    /// associativity, annihilation, distributivity, irreflexivity). Each is re-probed here as an
+    /// oracle-free equation — `eval(lhs) == eval(rhs)` over random assignments — so a mutant that
+    /// breaks any of them is killed. The author wrote NONE of these laws; they fell out of the
+    /// operators, and `cargo mutants` judges their kill power.
     #[test]
     fn eval_laws_are_probed() {
-        for law in interpreter_laws() {
-            prove_law(&law);
+        for law in crate::discover::discover_laws() {
+            TestRunner::default()
+                .run(&(0i64..=20, 0i64..=20, 0i64..=20), |(a, b, c)| {
+                    let (lhs, rhs) = (law.schema)(a, b, c);
+                    prop_assert_eq!(
+                        eval_closed(&lhs),
+                        eval_closed(&rhs),
+                        "discovered law failed: {}",
+                        law.equation
+                    );
+                    Ok(())
+                })
+                .unwrap();
         }
+    }
+
+    /// The generic `Relation` machinery itself — the metamorphic-probe runner with its non-vacuity
+    /// guard — demonstrated on a true relation. (The spec runs as discovered equations above; this
+    /// keeps the runner exercised, the way `Increment`/`NeverApplies` pin `relation_holds`.)
+    #[test]
+    fn relation_laws_runs_a_guarded_metamorphic_probe() {
+        relation_laws(&CommutesAdd, binary(Op::Add));
     }
 
     /// The evaluator's every arm, pinned ORACLE-FREE — each result compared to an
@@ -596,16 +558,10 @@ mod registry {
     /// vacuous-pass mutant cannot survive. The positive case is a generated law probe.
     #[test]
     fn relation_holds_distinguishes_outcomes() {
-        let five = Expr::int(5).unwrap();
-        let identity = LawProbe {
-            law: Law::Identity {
-                op: Op::Add,
-                element: Expr::int(0).unwrap(),
-            },
-        };
-        assert_eq!(relation_holds(&identity, &five), Some(true));
-        assert_eq!(relation_holds(&Increment, &five), Some(false));
-        assert_eq!(relation_holds(&NeverApplies, &five), None);
+        let add = Expr::bin(Op::Add, Expr::int(2).unwrap(), Expr::int(3).unwrap());
+        assert_eq!(relation_holds(&CommutesAdd, &add), Some(true));
+        assert_eq!(relation_holds(&Increment, &add), Some(false));
+        assert_eq!(relation_holds(&NeverApplies, &add), None);
     }
 
     /// The HARNESS owns the guard: a probe that never applies is rejected by the
@@ -614,15 +570,9 @@ mod registry {
     /// does not, so `relation_laws` would reject it.
     #[test]
     fn the_harness_rejects_a_vacuous_probe() {
-        let identity = LawProbe {
-            law: Law::Identity {
-                op: Op::Add,
-                element: Expr::int(0).unwrap(),
-            },
-        };
         assert!(
-            applications(&identity, int_expr()) > 0,
-            "a real law applies"
+            applications(&CommutesAdd, binary(Op::Add)) > 0,
+            "a real relation applies"
         );
         assert_eq!(
             applications(&NeverApplies, int_expr()),
