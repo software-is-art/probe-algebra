@@ -78,7 +78,12 @@ And it **enforces**, at compile time:
   programs don't go wrong”* becomes a build error, not a runtime hope
   (`tests/compile_fail/eval_wrong_program`);
 - effect ceilings (`run_pure` rejects a `Lossy` edge) and cost budgets (a quadratic pass
-  demanded to be linear) are build errors (`tests/compile_fail/`).
+  demanded to be linear) are build errors (`tests/compile_fail/`);
+- the **grading algebras prove their own laws** — the parts of capability, cost, and provenance
+  that are bodiless type tables (which mutation structurally cannot reach) are certified by
+  `typewit::TypeEq` witnesses: a non-commutative join, a `Lookup` that didn't fold the per-axis
+  max, a non-associative lineage concat all fail to compile (residual, a free product, is proven
+  up to isomorphism by proptest instead). See [docs/concepts.md](docs/concepts.md#the-gradings).
 
 The interior that backs these edges — `interp::internal` — is private, untested, and stays
 in the mutation sweep so the bought correctness is *measured*, not asserted.
