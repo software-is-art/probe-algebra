@@ -67,23 +67,30 @@ Four annotations ride the edges, each a monoid that `Compose` threads:
   iteration (mapping materializes n results; folding streams), so they are two gradings over
   one map. A path over budget on any axis is a compile error. Like `Join`, the map's machinery
   is bodiless type functions the mutation sweep cannot reach, so it too is **proven at compile
-  time**: `TypeEq` witnesses certify `Max` is a commutative, associative, idempotent semilattice
-  with `Z` as identity, `AppendCost` is an associative monoid with `CostNil` as identity, and —
-  the load-bearing law — `Lookup` distributes over `AppendCost` as `Max` (so sequential
-  composition can be plain append, the per-axis max recovered at lookup), with a `const`
-  assertion pinning `Max` to the runtime maximum it reflects to.
+  time** — and over the *open* set of Peano degrees these proofs are **total, by structural
+  induction**, not a finite sample: each law is a trait whose `Z` impl is the base case and whose
+  `S<N>` impl lifts `N`'s witness through the injective successor (`TypeEq::project`), so the
+  generic impl bodies prove the law for *every* degree. `Max` is a commutative, associative,
+  idempotent semilattice with `Z` as identity; `AppendCost` is an associative monoid with
+  `CostNil` as identity — both total. The load-bearing law — `Lookup` distributes over
+  `AppendCost` as `Max` (so sequential composition can be plain append, the per-axis max
+  recovered at lookup) — is still spot-checked: its total proof needs decidable-equality
+  reflection (case-splitting on `NatEq`), and now rests on the total `Max`/`AppendCost` base.
 - **provenance** — *a value's journey*: a type-level lineage (`Stamped` / `Step`) that
   records every edge a value crossed, reflectable to a runtime `Provenance`. Lineages compose
-  by `AppendLineage` (a bodiless cons-concat), proven an associative monoid with `Origin` as
-  identity by `TypeEq`; a `#[test]` certifies `reflect` is a monoid **homomorphism** into the
-  runtime `Provenance`, so the type-level path and the value it reflects to cannot drift.
+  by `AppendLineage` (a bodiless cons-concat), proven a **total** associative monoid with
+  `Origin` as identity (the same inductive technique, lifting through `Step<E, _>`); a `#[test]`
+  certifies `reflect` is a monoid **homomorphism** into the runtime `Provenance`, so the
+  type-level path and the value it reflects to cannot drift.
 
 So **every grading's laws are certified** — the part the mutation gate structurally cannot reach
-(a bodiless type table) is closed by the type system instead. Three are proven by *strict* type
-equality (`TypeEq::NEW` compiles only if its two arguments are one type); residual, a free
-product, is proven *up to isomorphism*. This is the second tier of the method's central claim:
-not only do the probes that validate the interior generate themselves — the algebra that *shapes*
-them proves its own laws, and `typewit` joins `rustc` and `cargo-mutants` as a (tiny) trust root.
+(a bodiless type table) is closed by the type system instead. Capability's lattice is sealed at
+four levels, so its `TypeEq` proofs are *exhaustive by cases*; the cost and provenance algebras
+range over *open* type families, so their core laws are *total by induction*; residual, a free
+product, is a monoid only *up to isomorphism* (proptest). This is the second tier of the method's
+central claim: not only do the probes that validate the interior generate themselves — the algebra
+that *shapes* them proves its own laws, for every inhabitant, and `typewit` joins `rustc` and
+`cargo-mutants` as a (tiny) trust root.
 
 ## The probe taxonomy
 

@@ -81,9 +81,11 @@ And it **enforces**, at compile time:
   demanded to be linear) are build errors (`tests/compile_fail/`);
 - the **grading algebras prove their own laws** — the parts of capability, cost, and provenance
   that are bodiless type tables (which mutation structurally cannot reach) are certified by
-  `typewit::TypeEq` witnesses: a non-commutative join, a `Lookup` that didn't fold the per-axis
-  max, a non-associative lineage concat all fail to compile (residual, a free product, is proven
-  up to isomorphism by proptest instead). See [docs/concepts.md](docs/concepts.md#the-gradings).
+  `typewit::TypeEq` witnesses: a non-commutative join, a non-associative lineage concat, a wrong
+  `Max` cell all fail to compile. Over the *open* type families (Peano degrees, lineages) the core
+  laws are proven **total, by structural induction** — for every inhabitant, not a sample —
+  while the sealed capability lattice is exhaustive by cases and residual (a free product) is
+  proven up to isomorphism by proptest. See [docs/concepts.md](docs/concepts.md#the-gradings).
 
 The interior that backs these edges — `interp::internal` — is private, untested, and stays
 in the mutation sweep so the bought correctness is *measured*, not asserted.

@@ -626,17 +626,79 @@ mod provenance_laws {
     type L1 = Step<A, Origin>;
     type L2 = Step<B, Step<A, Origin>>;
 
-    // IDENTITY: `Origin` is the two-sided unit of `AppendLineage`.
-    const _: TypeEq<<L2 as AppendLineage<Origin>>::Out, L2> = TypeEq::NEW;
-    const _: TypeEq<<Origin as AppendLineage<L2>>::Out, L2> = TypeEq::NEW;
+    // `Step<E, _>` as a type-level function, to lift a `TypeEq` over lineage tails (the inductive
+    // step for the lineage monoid — the provenance twin of `cost_laws::CostConsFn`).
+    typewit::type_fn! {
+        struct StepFn<E>;
+        impl<T> T => Step<E, T>
+    }
 
-    // ASSOCIATIVITY: `(C ++ B) ++ A == C ++ (B ++ A)` at the type level (list concat). The
-    // spelled-out associated-type chain IS the law, so the complexity is intentional.
+    // LEFT IDENTITY is definitional (`<Origin as AppendLineage<L>>::Out` IS `L`); the laws that
+    // need induction are proven TOTAL below — for every lineage, not the `L0..L2` sample.
+
+    /// `AppendLineage` is associative for EVERY triple of lineages (total). Induction on the first
+    /// (`Origin` definitional, `Step` projects the IH through `StepFn`).
     #[allow(clippy::type_complexity)]
-    const _: TypeEq<
-        <<L2 as AppendLineage<L1>>::Out as AppendLineage<L0>>::Out,
-        <L2 as AppendLineage<<L1 as AppendLineage<L0>>::Out>>::Out,
-    > = TypeEq::NEW;
+    pub trait AppendLineageAssoc<B_, A_>
+    where
+        Self: AppendLineage<B_>,
+        <Self as AppendLineage<B_>>::Out: AppendLineage<A_>,
+        B_: AppendLineage<A_>,
+        Self: AppendLineage<<B_ as AppendLineage<A_>>::Out>,
+    {
+        const EQ: TypeEq<
+            <<Self as AppendLineage<B_>>::Out as AppendLineage<A_>>::Out,
+            <Self as AppendLineage<<B_ as AppendLineage<A_>>::Out>>::Out,
+        >;
+    }
+    impl<B_, A_> AppendLineageAssoc<B_, A_> for Origin
+    where
+        B_: AppendLineage<A_>,
+    {
+        // both sides normalize to `<B_ as AppendLineage<A_>>::Out`.
+        const EQ: TypeEq<
+            <<Origin as AppendLineage<B_>>::Out as AppendLineage<A_>>::Out,
+            <Origin as AppendLineage<<B_ as AppendLineage<A_>>::Out>>::Out,
+        > = TypeEq::NEW;
+    }
+    #[allow(clippy::type_complexity)]
+    impl<E, Rest, B_, A_> AppendLineageAssoc<B_, A_> for Step<E, Rest>
+    where
+        Rest: AppendLineageAssoc<B_, A_>,
+        Rest: AppendLineage<B_>,
+        <Rest as AppendLineage<B_>>::Out: AppendLineage<A_>,
+        B_: AppendLineage<A_>,
+        Rest: AppendLineage<<B_ as AppendLineage<A_>>::Out>,
+    {
+        const EQ: TypeEq<
+            <<Step<E, Rest> as AppendLineage<B_>>::Out as AppendLineage<A_>>::Out,
+            <Step<E, Rest> as AppendLineage<<B_ as AppendLineage<A_>>::Out>>::Out,
+        > = Rest::EQ.project::<StepFn<E>>();
+    }
+
+    /// `AppendLineage<L, Origin> == L` for every lineage (right identity, total). Induction on `L`.
+    pub trait AppendLineageRightId
+    where
+        Self: AppendLineage<Origin>,
+    {
+        const EQ: TypeEq<<Self as AppendLineage<Origin>>::Out, Self>;
+    }
+    impl AppendLineageRightId for Origin {
+        const EQ: TypeEq<<Origin as AppendLineage<Origin>>::Out, Origin> = TypeEq::NEW;
+    }
+    impl<E, Rest> AppendLineageRightId for Step<E, Rest>
+    where
+        Rest: AppendLineageRightId + AppendLineage<Origin>,
+    {
+        const EQ: TypeEq<<Step<E, Rest> as AppendLineage<Origin>>::Out, Step<E, Rest>> =
+            Rest::EQ.project::<StepFn<E>>();
+    }
+
+    // Force instantiation (smoke-test the induction; the generic impls prove it for all lineages).
+    const _: () = {
+        let _ = <L2 as AppendLineageAssoc<L1, L0>>::EQ;
+        let _ = <L2 as AppendLineageRightId>::EQ;
+    };
 
     // HOMOMORPHISM (type-level monoid -> runtime `Provenance` monoid): reflecting an appended
     // lineage equals combining the reflections. This is the one provenance law with a runtime
@@ -1372,12 +1434,16 @@ pub fn fits(measure: impl Fn(usize) -> u64, degree: u32) -> bool {
 // same way `JoinCommutes` & co. do for capability: each compiles only if its two type arguments
 // are literally one type, so this section COMPILING is a proof of the cost algebra's laws.
 //
-// The Peano nats are an OPEN set (unlike the sealed 4-effect lattice), so these witnesses prove
-// the laws over a representative closed sample of small degrees; the recursive `impl`s carry the
-// induction, and the sample spot-checks the base + step the same way a finite proof-by-cases
-// would. The one law that is the cost grading's whole reason to exist — that looking up an axis
-// AFTER appending two maps equals the MAX of the two per-axis lookups ("per-axis max folded into
-// lookup", so sequential composition is plain append) — is proven exactly, per axis, below.
+// The Peano nats are an OPEN set (unlike the sealed 4-effect lattice). Rather than spot-check the
+// laws over a finite sample, the core laws are proven TOTAL by STRUCTURAL INDUCTION: each is a
+// trait carrying a `TypeEq`, whose `Z` impl is the base case and whose `S<N>` impl derives the
+// witness from `N`'s — lifting it through the injective successor `SFn` with the const `project`.
+// Rust type-checks the generic impl bodies at definition, so the law holds for EVERY degree, not a
+// representative few. The `Max` semilattice (idempotence, identity, commutativity, associativity),
+// `NatEq` reflexivity, and the `AppendCost` cost-monoid (associativity, identity) are total this
+// way. What remains SAMPLED is noted at each site (and why): the load-bearing
+// `Lookup`-distributes-over-`AppendCost` law, `NatEq` symmetry, `Le`, and the numeric type<->value
+// reflection — each now resting on these total foundations.
 mod cost_laws {
     use super::{AppendCost, Axis, CostCons, CostNil, Degree, Le, Lookup, Max, NatEq, True, S, Z};
     use typewit::TypeEq;
@@ -1387,6 +1453,247 @@ mod cost_laws {
     type D1 = S<Z>;
     type D2 = S<S<Z>>;
     type D3 = S<S<S<Z>>>;
+
+    // The successor as an INJECTIVE type-level function, so a `TypeEq<X, Y>` can be lifted to a
+    // `TypeEq<S<X>, S<Y>>` in a `const` (`project`). This is what turns a finite spot-check into a
+    // genuine induction: the step case wraps the inductive hypothesis through `SFn`.
+    typewit::inj_type_fn! {
+        struct SFn;
+        impl<T> T => S<T>;
+    }
+
+    // ----- INDUCTIVE totality: each law holds for EVERY degree, not a sample -----
+    // A law is a trait carrying a `TypeEq` witness; its `Z` impl is the base case and its `S<N>`
+    // impl derives the witness from `N`'s (the inductive step), so the trait being inhabited for
+    // all nats IS the law's proof over the whole open set. `TypeEq::NEW` still does the checking;
+    // induction supplies the witness the base case alone could not.
+
+    /// `Max<A, A> == A` for every degree `A` (idempotence, total).
+    pub trait MaxIdem
+    where
+        Self: Max<Self> + Sized,
+    {
+        const EQ: TypeEq<<Self as Max<Self>>::Out, Self>;
+    }
+    impl MaxIdem for Z {
+        const EQ: TypeEq<<Z as Max<Z>>::Out, Z> = TypeEq::NEW;
+    }
+    impl<A: MaxIdem> MaxIdem for S<A> {
+        // `<S<A> as Max<S<A>>>::Out` normalizes to `S<<A as Max<A>>::Out>`; project the IH.
+        const EQ: TypeEq<<S<A> as Max<S<A>>>::Out, S<A>> = A::EQ.project::<SFn>();
+    }
+
+    /// `Max<Z, A> == A` for every `A` (left identity, total) — definitional in one blanket impl:
+    /// `<Z as Max<A>>::Out` IS `A` by the `Max for Z` base case.
+    pub trait MaxLeftId: Sized {
+        const EQ: TypeEq<<Z as Max<Self>>::Out, Self>;
+    }
+    impl<A> MaxLeftId for A {
+        const EQ: TypeEq<<Z as Max<A>>::Out, A> = TypeEq::NEW;
+    }
+
+    /// `Max<A, Z> == A` for every `A` (right identity, total). Both constructors are definitional
+    /// (`<S<A> as Max<Z>>::Out` IS `S<A>`), so no induction is needed — two disjoint impls suffice.
+    pub trait MaxRightId
+    where
+        Self: Max<Z>,
+    {
+        const EQ: TypeEq<<Self as Max<Z>>::Out, Self>;
+    }
+    impl MaxRightId for Z {
+        const EQ: TypeEq<<Z as Max<Z>>::Out, Z> = TypeEq::NEW;
+    }
+    impl<A> MaxRightId for S<A> {
+        const EQ: TypeEq<<S<A> as Max<Z>>::Out, S<A>> = TypeEq::NEW;
+    }
+
+    /// `Max<A, B> == Max<B, A>` for every `A`, `B` (commutativity, total). The three base cases
+    /// (some operand `Z`) are definitional, split by constructor so each side normalizes; the
+    /// `S`/`S` step projects the IH on the predecessors.
+    pub trait MaxComm<B>
+    where
+        Self: Max<B> + Sized,
+        B: Max<Self>,
+    {
+        const EQ: TypeEq<<Self as Max<B>>::Out, <B as Max<Self>>::Out>;
+    }
+    impl MaxComm<Z> for Z {
+        const EQ: TypeEq<<Z as Max<Z>>::Out, <Z as Max<Z>>::Out> = TypeEq::NEW;
+    }
+    impl<B> MaxComm<S<B>> for Z {
+        // `<Z as Max<S<B>>>::Out == S<B>` and `<S<B> as Max<Z>>::Out == S<B>`.
+        const EQ: TypeEq<<Z as Max<S<B>>>::Out, <S<B> as Max<Z>>::Out> = TypeEq::NEW;
+    }
+    impl<A> MaxComm<Z> for S<A> {
+        const EQ: TypeEq<<S<A> as Max<Z>>::Out, <Z as Max<S<A>>>::Out> = TypeEq::NEW;
+    }
+    impl<A, B> MaxComm<S<B>> for S<A>
+    where
+        A: MaxComm<B> + Max<B>,
+        B: Max<A>,
+    {
+        // `<S<A> as Max<S<B>>>::Out` is `S<Max<A,B>>`, `<S<B> as Max<S<A>>>::Out` is `S<Max<B,A>>`.
+        const EQ: TypeEq<<S<A> as Max<S<B>>>::Out, <S<B> as Max<S<A>>>::Out> =
+            A::EQ.project::<SFn>();
+    }
+
+    /// `(A ⊔ B) ⊔ C == A ⊔ (B ⊔ C)` for every `A`, `B`, `C` (associativity, total). The three
+    /// base cases (the first `Z` encountered at each position) are definitional; the all-`S` step
+    /// projects the IH. The trait's `where` clauses are the bounds `Max` needs to even form both
+    /// sides; the all-`S` impl restates `B`/`C`'s share of them (Rust does not imply a trait's
+    /// `where` clauses at use sites).
+    #[allow(clippy::type_complexity)]
+    pub trait MaxAssoc<B, C>
+    where
+        Self: Max<B> + Sized,
+        <Self as Max<B>>::Out: Max<C>,
+        B: Max<C>,
+        Self: Max<<B as Max<C>>::Out>,
+    {
+        const EQ: TypeEq<
+            <<Self as Max<B>>::Out as Max<C>>::Out,
+            <Self as Max<<B as Max<C>>::Out>>::Out,
+        >;
+    }
+    impl<B: Max<C>, C> MaxAssoc<B, C> for Z {
+        // both sides normalize to `<B as Max<C>>::Out`.
+        const EQ: TypeEq<<<Z as Max<B>>::Out as Max<C>>::Out, <Z as Max<<B as Max<C>>::Out>>::Out> =
+            TypeEq::NEW;
+    }
+    impl<A, C> MaxAssoc<Z, C> for S<A>
+    where
+        S<A>: Max<C>,
+    {
+        // both sides normalize to `<S<A> as Max<C>>::Out`.
+        const EQ: TypeEq<
+            <<S<A> as Max<Z>>::Out as Max<C>>::Out,
+            <S<A> as Max<<Z as Max<C>>::Out>>::Out,
+        > = TypeEq::NEW;
+    }
+    impl<A, B> MaxAssoc<S<B>, Z> for S<A>
+    where
+        A: Max<B>,
+    {
+        // both sides normalize to `S<Max<A,B>>`.
+        const EQ: TypeEq<
+            <<S<A> as Max<S<B>>>::Out as Max<Z>>::Out,
+            <S<A> as Max<<S<B> as Max<Z>>::Out>>::Out,
+        > = TypeEq::NEW;
+    }
+    #[allow(clippy::type_complexity)]
+    impl<A, B, C> MaxAssoc<S<B>, S<C>> for S<A>
+    where
+        A: MaxAssoc<B, C>,
+        A: Max<B>,
+        <A as Max<B>>::Out: Max<C>,
+        B: Max<C>,
+        A: Max<<B as Max<C>>::Out>,
+    {
+        const EQ: TypeEq<
+            <<S<A> as Max<S<B>>>::Out as Max<S<C>>>::Out,
+            <S<A> as Max<<S<B> as Max<S<C>>>::Out>>::Out,
+        > = A::EQ.project::<SFn>();
+    }
+
+    /// `NatEq<A, A> == True` for every `A` (reflexivity, total) — the equality `Lookup`'s axis
+    /// matching rests on. The step needs no projection: `<S<A> as NatEq<S<A>>>::Out` already
+    /// normalizes to `<A as NatEq<A>>::Out`, so the IH witness is reused directly.
+    pub trait NatEqRefl
+    where
+        Self: NatEq<Self> + Sized,
+    {
+        const EQ: TypeEq<<Self as NatEq<Self>>::Out, True>;
+    }
+    impl NatEqRefl for Z {
+        const EQ: TypeEq<<Z as NatEq<Z>>::Out, True> = TypeEq::NEW;
+    }
+    impl<A: NatEqRefl> NatEqRefl for S<A> {
+        const EQ: TypeEq<<S<A> as NatEq<S<A>>>::Out, True> = A::EQ;
+    }
+
+    // `CostCons<Ax, Deg, _>` as a type-level function, to lift a `TypeEq` over cost-map TAILS the
+    // same way `SFn` lifts over nat successors — the inductive step for the cost-map monoid laws.
+    typewit::type_fn! {
+        struct CostConsFn<Ax, Deg>;
+        impl<T> T => CostCons<Ax, Deg, T>
+    }
+
+    /// `AppendCost` is associative for EVERY triple of maps (total) — the cost monoid `Compose`
+    /// threads. Induction on the first map; `CostNil` is definitional, the `CostCons` step projects
+    /// the IH through `CostConsFn`.
+    #[allow(clippy::type_complexity)]
+    pub trait AppendCostAssoc<B, C>
+    where
+        Self: AppendCost<B>,
+        <Self as AppendCost<B>>::Out: AppendCost<C>,
+        B: AppendCost<C>,
+        Self: AppendCost<<B as AppendCost<C>>::Out>,
+    {
+        const EQ: TypeEq<
+            <<Self as AppendCost<B>>::Out as AppendCost<C>>::Out,
+            <Self as AppendCost<<B as AppendCost<C>>::Out>>::Out,
+        >;
+    }
+    impl<B, C> AppendCostAssoc<B, C> for CostNil
+    where
+        B: AppendCost<C>,
+    {
+        // both sides normalize to `<B as AppendCost<C>>::Out`.
+        const EQ: TypeEq<
+            <<CostNil as AppendCost<B>>::Out as AppendCost<C>>::Out,
+            <CostNil as AppendCost<<B as AppendCost<C>>::Out>>::Out,
+        > = TypeEq::NEW;
+    }
+    #[allow(clippy::type_complexity)]
+    impl<Ax, Deg, Rest, B, C> AppendCostAssoc<B, C> for CostCons<Ax, Deg, Rest>
+    where
+        Rest: AppendCostAssoc<B, C>,
+        Rest: AppendCost<B>,
+        <Rest as AppendCost<B>>::Out: AppendCost<C>,
+        B: AppendCost<C>,
+        Rest: AppendCost<<B as AppendCost<C>>::Out>,
+    {
+        const EQ: TypeEq<
+            <<CostCons<Ax, Deg, Rest> as AppendCost<B>>::Out as AppendCost<C>>::Out,
+            <CostCons<Ax, Deg, Rest> as AppendCost<<B as AppendCost<C>>::Out>>::Out,
+        > = Rest::EQ.project::<CostConsFn<Ax, Deg>>();
+    }
+
+    /// `AppendCost<A, CostNil> == A` for every map (right identity, total; left identity is
+    /// definitional). Induction on `A`, projecting the IH through `CostConsFn`.
+    pub trait AppendCostRightId
+    where
+        Self: AppendCost<CostNil>,
+    {
+        const EQ: TypeEq<<Self as AppendCost<CostNil>>::Out, Self>;
+    }
+    impl AppendCostRightId for CostNil {
+        const EQ: TypeEq<<CostNil as AppendCost<CostNil>>::Out, CostNil> = TypeEq::NEW;
+    }
+    impl<Ax, Deg, Rest> AppendCostRightId for CostCons<Ax, Deg, Rest>
+    where
+        Rest: AppendCostRightId + AppendCost<CostNil>,
+    {
+        const EQ: TypeEq<
+            <CostCons<Ax, Deg, Rest> as AppendCost<CostNil>>::Out,
+            CostCons<Ax, Deg, Rest>,
+        > = Rest::EQ.project::<CostConsFn<Ax, Deg>>();
+    }
+
+    // The generic `impl` bodies above ARE the proofs — Rust type-checks them for all nats at
+    // definition, so the laws hold over the whole open set. Instantiating at a representative depth
+    // forces monomorphization of the recursive chain (a concrete smoke-test of the induction) and
+    // marks the proof traits used.
+    const _: () = {
+        let _ = <D3 as MaxIdem>::EQ;
+        let _ = <D3 as MaxLeftId>::EQ;
+        let _ = <D3 as MaxRightId>::EQ;
+        let _ = <D2 as MaxComm<D3>>::EQ;
+        let _ = <D1 as MaxAssoc<D2, D3>>::EQ;
+        let _ = <D3 as NatEqRefl>::EQ;
+        let _ = <Ma as AppendCostAssoc<Mb, Mc>>::EQ;
+        let _ = <Ma as AppendCostRightId>::EQ;
+    };
 
     // --- cartesian expansion helpers: invoke a per-cell callback macro over a type list ---
     macro_rules! for_each {
@@ -1405,68 +1712,19 @@ mod cost_laws {
         };
         (@b $cb:ident; [$a:ty] []) => {};
     }
-    macro_rules! for_triples {
-        ($cb:ident; [$($t:ty),+ $(,)?]) => { for_triples!(@a $cb; [$($t),+] [$($t),+]); };
-        (@a $cb:ident; [$a:ty $(, $ar:ty)*] [$($l:ty),+]) => {
-            for_triples!(@b $cb; [$a] [$($l),+] [$($l),+]);
-            for_triples!(@a $cb; [$($ar),*] [$($l),+]);
-        };
-        (@a $cb:ident; [] [$($l:ty),+]) => {};
-        (@b $cb:ident; [$a:ty] [$b:ty $(, $br:ty)*] [$($l:ty),+]) => {
-            for_triples!(@c $cb; [$a] [$b] [$($l),+]);
-            for_triples!(@b $cb; [$a] [$($br),*] [$($l),+]);
-        };
-        (@b $cb:ident; [$a:ty] [] [$($l:ty),+]) => {};
-        (@c $cb:ident; [$a:ty] [$b:ty] [$c:ty $(, $cr:ty)*]) => {
-            $cb!($a, $b, $c);
-            for_triples!(@c $cb; [$a] [$b] [$($cr),*]);
-        };
-        (@c $cb:ident; [$a:ty] [$b:ty] []) => {};
-    }
 
-    // MAX is a commutative, associative, idempotent monoid with `Z` as identity — a bounded
-    // join-semilattice on the degrees, the structure `Lookup` relies on to fold per-axis maxes.
-    macro_rules! max_comm {
-        ($a:ty, $b:ty) => {
-            const _: TypeEq<<$a as Max<$b>>::Out, <$b as Max<$a>>::Out> = TypeEq::NEW;
-        };
-    }
-    macro_rules! max_idem {
-        ($a:ty) => {
-            const _: TypeEq<<$a as Max<$a>>::Out, $a> = TypeEq::NEW;
-        };
-    }
-    macro_rules! max_ident {
-        ($a:ty) => {
-            const _: TypeEq<<$a as Max<Z>>::Out, $a> = TypeEq::NEW;
-            const _: TypeEq<<Z as Max<$a>>::Out, $a> = TypeEq::NEW;
-        };
-    }
-    macro_rules! max_assoc {
-        ($a:ty, $b:ty, $c:ty) => {
-            const _: TypeEq<
-                <<$a as Max<$b>>::Out as Max<$c>>::Out,
-                <$a as Max<<$b as Max<$c>>::Out>>::Out,
-            > = TypeEq::NEW;
-        };
-    }
-    for_pairs!(max_comm; [D0, D1, D2, D3]);
-    for_each!(max_idem; [D0, D1, D2, D3]);
-    for_each!(max_ident; [D0, D1, D2, D3]);
-    for_triples!(max_assoc; [D0, D1, D2, D3]);
+    // The MAX semilattice laws (idempotence, identity, commutativity, associativity) and NATEQ
+    // reflexivity are proven TOTAL by the inductive witnesses above — no sample needed. The
+    // remaining helper laws below are still spot-checked over the representative sample: NATEQ
+    // SYMMETRY and the LE order feed `Lookup`/`WithinBudget` but are not (yet) the load-bearing
+    // structure, so they rest on the now-total `Max` foundation rather than re-deriving it.
 
-    // NATEQ is reflexive and symmetric (a decidable equality on degrees).
-    macro_rules! nateq_refl {
-        ($a:ty) => {
-            const _: TypeEq<<$a as NatEq<$a>>::Out, True> = TypeEq::NEW;
-        };
-    }
+    // NATEQ symmetry: `NatEq<A, B> == NatEq<B, A>` (decidable-equality symmetry, sampled).
     macro_rules! nateq_symm {
         ($a:ty, $b:ty) => {
             const _: TypeEq<<$a as NatEq<$b>>::Out, <$b as NatEq<$a>>::Out> = TypeEq::NEW;
         };
     }
-    for_each!(nateq_refl; [D0, D1, D2, D3]);
     for_pairs!(nateq_symm; [D0, D1, D2, D3]);
 
     // LE is reflexive and consistent with `Max`: every operand is `<=` the max (the lub
@@ -1528,21 +1786,18 @@ mod cost_laws {
     type Mb = CostCons<Ax1, D1, CostCons<Ax2, D2, CostNil>>;
     type Mc = CostCons<Ax2, D3, CostCons<Ax0, D1, CostNil>>;
 
-    // APPENDCOST: associative, with `CostNil` as the two-sided identity (the cost monoid that
-    // `Compose` threads for both `TimeCost` and `SpaceCost`).
-    const _: TypeEq<<CostNil as AppendCost<Mb>>::Out, Mb> = TypeEq::NEW;
-    const _: TypeEq<<Ma as AppendCost<CostNil>>::Out, Ma> = TypeEq::NEW;
-    // The spelled-out associated-type chain IS the associativity law; the complexity is the point.
-    #[allow(clippy::type_complexity)]
-    const _: TypeEq<
-        <<Ma as AppendCost<Mb>>::Out as AppendCost<Mc>>::Out,
-        <Ma as AppendCost<<Mb as AppendCost<Mc>>::Out>>::Out,
-    > = TypeEq::NEW;
+    // APPENDCOST associativity and `CostNil` identity (the cost monoid `Compose` threads for both
+    // `TimeCost` and `SpaceCost`) are proven TOTAL above by `AppendCostAssoc`/`AppendCostRightId`
+    // — for every map, not this sample.
 
     // THE LOAD-BEARING LAW: `Lookup<Q>` distributes over `AppendCost` as `Max` —
     //   lookup(append(A, B), Q) == max(lookup(A, Q), lookup(B, Q))
-    // for every query axis. This is exactly why sequential composition is plain append with no
-    // map merge: the per-axis max is recovered at lookup time. Proven per axis over `Ma`/`Mb`.
+    // for every query axis. This is exactly why sequential composition is plain append with no map
+    // merge: the per-axis max is recovered at lookup time. Still SAMPLED (over `Ma`/`Mb` and each
+    // axis): its total proof needs decidable-equality reflection — case-splitting `Lookup`'s
+    // `Select` on `NatEq`, invoking the now-total `MaxAssoc` in the matching branch — which the
+    // total `Max`/`AppendCost` foundations above now make a tractable next step. It rests on those
+    // total foundations rather than re-deriving them.
     macro_rules! lookup_append_is_max {
         ($q:ty) => {
             const _: TypeEq<
