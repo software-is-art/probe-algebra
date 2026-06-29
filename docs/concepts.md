@@ -46,13 +46,19 @@ arguments are literally one type, so the section compiling *is* the proof:
   canonical iso (`drop_unit_l`/`reassoc_residual` + inverses), checked by proptest. An honest
   finding: strict equality doesn't reach a free product.
 - **capability** — *how much power an edge claims*: the lattice `pure ⊂ lossy ⊂ stateful ⊂
-  effectful` (`Effect` / `AtMost` / `Join`), demandable (`run_pure` accepts only `AtMost<Pure>`)
-  and audited against behaviour (the `capability` module). The lattice is sealed at four levels,
-  so its proofs are **exhaustive by cases**: `Join` is a commutative, idempotent semilattice
-  with `Pure` as identity (associativity over all 64 triples); a `const` assertion pins the
-  type-level table to the runtime `Capability::join`; and `AtMost` is proven to agree with
-  `Join` (reflexive, every operand `AtMost` its join) so the ceiling check and the composition
-  can't disagree.
+  effectful` (`Effect` / `AtMost` / `Join`), demandable (`run_pure` accepts only `AtMost<Pure>`).
+  The lattice is sealed at four levels, so its proofs are **exhaustive by cases**: `Join` is a
+  commutative, idempotent semilattice with `Pure` as identity (associativity over all 64 triples);
+  a `const` assertion pins the type-level table to the runtime `Capability::join`; and `AtMost`
+  agrees with `Join` (reflexive, every operand `AtMost` its join) so the ceiling check and the
+  composition can't disagree. A declared capability could still *lie*, in two directions, and the
+  two are split: **under-claiming** (declare `Pure`, secretly read state) is now **inferred from
+  structure** — `InputEffect` reads a STATE FLOOR off the input type (`Bound` carries an `Env` ⇒
+  `Stateful`), and `run_pure` rejects an edge whose input grants more than the ceiling whatever its
+  annotation says, so the dangerous hidden dependency is a compile error; **over-claiming** (declare
+  more than you use) is a *negative* the type system can't express, so it stays the `capability`
+  module's behavioural audit (perturb a source, watch the output) — as does `Effectful`/I/O, which
+  types can't see at all. Inference and audit are complementary, with a sharp boundary between them.
 - **cost** — *time and space complexity*, an **open keyed map** from named size axes to a
   polynomial degree (`CostCons` / `Lookup` / `WithinBudget`); time and space diverge at
   iteration (mapping materializes n results, folding streams). A path over budget is a compile

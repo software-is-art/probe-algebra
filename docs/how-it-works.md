@@ -95,12 +95,15 @@ the build step can, so edge-completeness is total.
 recursion — with **zero tests**. Its correctness is a consequence of the boundary, *measured* by
 the mutation sweep: every viable mutant dies, the survivors only documented equivalents.
 
-Freedom doesn't let the interior lie about its capability. The `capability` module *audits a
-declaration against behaviour* — perturb a declared source and watch whether the output moves —
-catching both **over-claiming** (declares `Stateful`, ignores state → slop) and **under-claiming**
-(declares `Pure`, secretly reads state → a hidden dependency the type system trusted). This is
-the one honesty check the type level can't yet do, because a declared capability is trusted, not
-inferred from the body.
+Freedom doesn't let the interior lie about its capability, and the two ways it could are split.
+**Under-claiming** (declare `Pure`, secretly read state) — the dangerous case — is caught
+**structurally**: the capability's state floor is inferred from the input type (`Bound` carries an
+`Env` ⇒ `InputEffect = Stateful`), so `run_pure` rejects an edge whose input grants more than the
+ceiling, whatever its annotation says (`tests/compile_fail/under_claimed_capability`). **Over-claiming**
+(declare `Stateful`, ignore state → slop) is a *negative* the type system can't express — "this
+body does *not* read state" — so it stays the `capability` module's behavioural audit: perturb a
+declared source, watch whether the output moves. `Effectful`/I/O stays the audit's too, invisible
+to types. Inference handles what flows through a type; the audit handles what doesn't.
 
 ## 6. Self-hosting, and what it unlocks
 

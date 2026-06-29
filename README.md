@@ -157,8 +157,10 @@ derived probes and the mutation sweep validate the spec.
 - GDP name-branding runs inside a `with_seed` continuation (fine for a program, an imposition
   on a library's callers);
 - the type level checks *declared* cost composes within budget; `fits` audits a leaf's declared
-  degree empirically, but the type level cannot see a leaf's true cost — and, likewise, a
-  declared *capability* is audited against behaviour at runtime, not inferred from it (yet).
+  degree empirically, but the type level cannot see a leaf's true cost. Capability is sharper: an
+  edge that **under**-declares (claims `Pure` over a state-carrying input) is a compile error,
+  inferred from the input type; only **over**-claiming and `Effectful`/I/O — negatives the type
+  system can't express — remain the behavioural audit's job.
 
 ## License
 

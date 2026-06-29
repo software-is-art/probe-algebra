@@ -333,6 +333,21 @@ impl AtMost<Stateful> for Stateful {}
 impl AtMost<Effectful> for Stateful {}
 impl AtMost<Effectful> for Effectful {}
 
+/// The capability an INPUT type grants by its very shape — the capability's STATE FLOOR,
+/// INFERRED from the input type rather than declared. An edge consuming a state-carrying value
+/// object (`Bound`, which holds an `Env`) is at least `Stateful` whatever its body does, so a
+/// demand (`run_pure` / `run_within<Ceiling>`) checks the input's own effect against the ceiling
+/// too — not just the edge's *declared* `Capability`. That closes the dangerous case structurally:
+/// a `Pure`-declared edge that secretly reads state cannot be demanded pure, because its INPUT
+/// betrays the power the annotation hid. (An annotation can still over-claim — caught behaviourally
+/// by the `capability` audit — and `Effectful`/I/O stays invisible to types, also the audit's job;
+/// but the under-claim, the hidden dependency the type system would otherwise trust, is now a
+/// compile error keyed on structure.) Each value object declares its input effect, default `Pure`.
+pub trait InputEffect {
+    /// The least capability that consuming `Self` grants. `Pure` for an ordinary value object.
+    type Eff: Effect;
+}
+
 /// The type-level join (the composition rule): the higher of two levels. `Compose` and
 /// `Then` use it, so a path's ceiling is computed in the type system — the type-level
 /// twin of the const `join`.
@@ -361,6 +376,11 @@ join_impls!(
 pub fn run_within<Ceiling, M: Morphism>(m: &M, input: &M::In) -> (M::Out, M::Residual)
 where
     M::Capability: AtMost<Ceiling>,
+    // THE STATE FLOOR: the input's own inferred effect must also fit the ceiling, so an edge that
+    // UNDER-declares (claims `Pure` over a stateful input) is rejected here on structure, not on
+    // its (lie-able) annotation.
+    M::In: InputEffect,
+    <M::In as InputEffect>::Eff: AtMost<Ceiling>,
 {
     m.forward(input)
 }
@@ -370,6 +390,8 @@ where
 pub fn run_pure<M: Morphism>(m: &M, input: &M::In) -> (M::Out, M::Residual)
 where
     M::Capability: AtMost<Pure>,
+    M::In: InputEffect,
+    <M::In as InputEffect>::Eff: AtMost<Pure>,
 {
     run_within::<Pure, M>(m, input)
 }

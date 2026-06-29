@@ -23,7 +23,8 @@
 use core::marker::PhantomData;
 
 use crate::boundary::{
-    Branch, Construction, CostCons, CostNil, Guarded, Lossy, Morphism, Pure, Stateful, Unit, S, Z,
+    Branch, Construction, CostCons, CostNil, Guarded, InputEffect, Lossy, Morphism, Pure, Stateful,
+    Unit, S, Z,
 };
 use crate::gdp::Named;
 use crate::Shaped; // the `#[derive(Shaped)]` macro (the trait is `crate::boundary::Shaped`)
@@ -288,6 +289,17 @@ impl Pos {
 // `Int` and `Ident` register themselves via `refined!`; the rest are registered here.
 crate::value_object!(Op, Lit, Ty, Expr, Value, Env, Bound, Source, Pos);
 
+// Capability STATE FLOOR, INFERRED from the input type (see `boundary::InputEffect`): `Bound`
+// carries an `Env`, so consuming it is at least `Stateful` whatever the body does; an ordinary
+// expression grants nothing extra (`Pure`). `run_pure`/`run_within` read these to reject an edge
+// that UNDER-declares its capability, on structure rather than its annotation.
+impl InputEffect for Expr {
+    type Eff = Pure;
+}
+impl InputEffect for Bound {
+    type Eff = Stateful;
+}
+
 // The probe surface (`Shaped`) is DERIVED for the composites (`Op`, `Lit`, `Value`, `Expr`)
 // but the two leaves carry smart-constructor INVARIANTS the derive cannot see (an `Int` is
 // non-negative; an `Ident` is non-empty, alphabetic, non-keyword), so their inhabitants and
@@ -480,15 +492,18 @@ impl Morphism for ConstFold {
 // populated Pure → Lossy → Stateful on the one substrate. Its probe (`harness`) is the
 // oracle-free two-route law: substitute-then-eval equals let-bind-then-eval.
 //
-// A declared capability is only a CLAIM; the type system trusts it, and the `capability`
-// module's behavioural audit checks the claim against behaviour. Its two dishonest subjects
-// (`ResolveIgnoresEnv` over-claims `Stateful` but ignores the env; `ResolvePretendsPure`
-// under-claims `Pure` but secretly reads it) live below under `#[cfg(test)]`: they are
-// COUNTEREXAMPLES that exercise the audit, NOT spec edges — they carry no probe, so they are
-// kept out of the production edge set `build.rs` enumerates. Unlike the `ConstFold`
-// counterexamples, mutation cannot retire them (it mutates bodies, not declarations); they are
-// retired only once the capability is INFERRED from structure, making a mis-declaration a
-// compile error with no counterexample left to write.
+// A declared capability is only a CLAIM. v4 splits the two ways it can lie:
+//
+//   - UNDER-claiming (declare `Pure`, secretly read state) — the dangerous case — is now caught
+//     STRUCTURALLY: `Bound` carries state (`impl InputEffect for Bound = Stateful`), so the
+//     capability's STATE FLOOR is read from the input type and `run_pure` refuses any edge whose
+//     input grants more than the ceiling, whatever its annotation says. The under-claiming
+//     counterexample is RETIRED; the rejection is pinned by `tests/compile_fail`.
+//   - OVER-claiming (declare `Stateful`, ignore the env) is a NEGATIVE the type system can't
+//     prove ("this body does not read state"), so it stays the behavioural audit's job —
+//     `ResolveIgnoresEnv` below remains its `#[cfg(test)]` subject. (Inference reads state THREADED
+//     THROUGH a type; state hidden elsewhere — a global, I/O — also stays the audit's, and
+//     `Effectful` stays invisible to types entirely. Inference and audit are complementary.)
 
 /// The honest variable resolver: a `Stateful` `Morphism` that reads its carried `Env`.
 pub struct Resolve;
@@ -507,20 +522,15 @@ impl Morphism for Resolve {
     }
 }
 
-// Capability-audit COUNTEREXAMPLES — dishonest `Resolve` twins, TEST-ONLY (flat, so the
-// boundary stays flat). They are the subjects the `capability` audit must catch (over- and
-// under-claiming); they carry no probe and are NOT part of the production edge set, so
-// `build.rs`'s edge enumeration does not demand one. Retired by capability inference.
-
-/// OVER-claims: declares `Stateful` but returns the expression untouched (ignores state).
+/// Capability-audit COUNTEREXAMPLE — an OVER-claiming `Resolve` twin, TEST-ONLY (flat, so the
+/// boundary stays flat). It declares `Stateful` but ignores the env; the audit must catch that an
+/// edge claims more than it uses. It carries no probe and is not a production edge, so `build.rs`'s
+/// enumeration does not demand one. (The under-claiming twin is gone — inference retired it.)
 #[cfg(test)]
 pub struct ResolveIgnoresEnv;
-/// UNDER-claims: declares `Pure` but actually reads the environment — a hidden dependency.
-#[cfg(test)]
-pub struct ResolvePretendsPure;
 
 #[cfg(test)]
-crate::value_operator!(ResolveIgnoresEnv, ResolvePretendsPure);
+crate::value_operator!(ResolveIgnoresEnv);
 
 #[cfg(test)]
 impl Morphism for ResolveIgnoresEnv {
@@ -531,22 +541,6 @@ impl Morphism for ResolveIgnoresEnv {
 
     fn forward(&self, input: &Bound) -> (Expr, Unit) {
         (input.expr().clone(), Unit) // …but it never reads the env — over-claim.
-    }
-    fn backward(&self, _out: &Expr, _residual: &Unit) -> Option<Bound> {
-        None
-    }
-}
-
-#[cfg(test)]
-impl Morphism for ResolvePretendsPure {
-    type Capability = Pure; // DECLARED pure…
-    type In = Bound;
-    type Out = Expr;
-    type Residual = Unit;
-
-    fn forward(&self, input: &Bound) -> (Expr, Unit) {
-        // …but it reads the carried state — a hidden dependency the declaration hides.
-        (super::internal::subst(input.expr(), input.env()), Unit)
     }
     fn backward(&self, _out: &Expr, _residual: &Unit) -> Option<Bound> {
         None
