@@ -127,14 +127,19 @@ What is **irreducible** — by nature, not for lack of effort:
   without circularity — the host, kept under the mutation lens but not re-specified in itself.
 - **rejection tests**: "input X is *rejected*" can't be derived from the thing under test (you
   cannot generate a counterexample to a property from the property). These stay hand-written.
-- the **meaning** itself — but it has shrunk. The algebraic laws are no longer authored: `discover`
-  instantiates the universal shapes over the operators and keeps the ones that RUN true, so the law
-  set falls out of the operators' behaviour (and renders as a readable, non-mathy report). What an
-  author still supplies is the **validity rule** (`Int ≥ 0`) and the act of **ratifying** the
+- the **meaning** itself — but it has shrunk. The algebraic laws are no longer authored, and not even
+  matched against a catalog of named shapes: `discover` ENUMERATES terms over the operators, groups
+  them by behaviour, and reads off the equalities (QuickSpec-style), folding the redundant ones to one
+  clean representative per shape and counting the rest as consequences. It discovers a structural law
+  the same way, over a synthetic **universal observer `U`** (the faithful rendering, virtually one
+  more operator): *no two distinct programs look the same to `U`*. So the whole law set — algebraic
+  and structural — falls out of the operators' behaviour and renders as a readable, non-mathy report.
+  What an author still supplies is the **validity rule** (`Int ≥ 0`) and the act of **ratifying** the
   discovered set — recognizing whether it is the algebra they meant (a law you expect but don't see
   is a bug). Discovery's reference frame is the baseline, so it catches *deviations* (mutation) and
-  *surprises* (ratification); it cannot conjure a law the operators don't exhibit. That is the
-  precise edge where "the tests write themselves" ends and "what did you mean" begins.
+  *surprises* (ratification); it cannot conjure a law the operators don't exhibit, and enumeration is
+  depth-bounded (a resource limit, not a curated list). That is the precise edge where "the tests
+  write themselves" ends and "what did you mean" begins.
 
 ## The inward rule
 

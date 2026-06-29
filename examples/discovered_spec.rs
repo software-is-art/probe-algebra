@@ -8,17 +8,22 @@
 //!
 //! Run `cargo run --example discovered_spec`.
 
-use boundary_algebra::discover::discover_laws;
+use boundary_algebra::discover::discovered_spec;
 
 fn main() {
-    let laws = discover_laws();
+    let (laws, consequences) = discovered_spec();
     println!("The interpreter's arithmetic obeys these laws (discovered by running it):\n");
     for law in &laws {
-        println!("  • {}", law.prose);
-        println!("      {}", law.equation);
+        println!("  • {}", law.prose());
+        println!("      {}", law.equation());
     }
     println!(
-        "\n{} laws, none hand-written — found by running the operators over a grid of inputs.",
+        "\n{} named laws, none hand-written — found by enumerating terms over the operators and \
+         keeping the equalities that ran true.",
         laws.len()
+    );
+    println!(
+        "({consequences} further equalities were discovered too — every one a consequence of the \
+         laws above, so they are counted, not listed.)"
     );
 }
