@@ -308,7 +308,8 @@ impl<T: Theory> Engine<T> {
                 let o = &self.ops[*op];
                 match o.fixity {
                     Fixity::Nullary => o.symbol.to_string(),
-                    Fixity::Infix if args.len() == 2 => {
+                    // infix operators are binary by construction.
+                    Fixity::Infix => {
                         format!(
                             "({} {} {})",
                             self.render(&args[0]),
@@ -316,7 +317,7 @@ impl<T: Theory> Engine<T> {
                             self.render(&args[1])
                         )
                     }
-                    _ => {
+                    Fixity::Prefix => {
                         let inner: Vec<String> = args.iter().map(|a| self.render(a)).collect();
                         format!("{}({})", o.symbol, inner.join(", "))
                     }
@@ -583,12 +584,11 @@ impl<T: Theory> Engine<T> {
         }
     }
 
-    /// Re-probe every named law over a FRESH grid (offset assignments), returning the first failure.
-    /// This is the mutation-judged probe: if an operator's interior is mutated so a law no longer
-    /// holds, this catches it. The fresh grid guards against over-fitting to the discovery grid.
-    pub fn replay(&self) -> Result<(), String> {
-        let laws = self.templates();
-        for l in &laws {
+    /// Check that the GIVEN laws hold when evaluated over the grid against the current operators,
+    /// returning the first failure. Unlike re-deriving (which is tautological), feeding FROZEN laws
+    /// here is the mutation-judged probe: a mutant that breaks a frozen law is caught.
+    pub fn check(&self, laws: &[DiscoveredLaw]) -> Result<(), String> {
+        for l in laws {
             for asn in &self.grid {
                 let lhs = self.eval(&l.lhs, asn).map(|v| T::observe(&v));
                 let rhs = self.eval(&l.rhs, asn).map(|v| T::observe(&v));
@@ -604,5 +604,286 @@ impl<T: Theory> Engine<T> {
 impl<T: Theory> Default for Engine<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+impl<T: Theory> Engine<T> {
+    /// The raw equalities enumeration emits — for probing the discovery machinery itself.
+    pub(crate) fn emitted_equalities(&self) -> Vec<(Term, Term)> {
+        self.enumerate()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A self-contained boolean algebra, to pin the engine independent of any domain.
+    #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
+    struct Bit;
+    struct Bits;
+    fn b(v: &[bool], f: impl Fn(bool, bool) -> bool) -> Option<bool> {
+        Some(f(v[0], v[1]))
+    }
+    fn and(v: &[Value2]) -> Option<Value2> {
+        b(&[v[0].0, v[1].0], |a, c| a && c).map(Value2)
+    }
+    fn or(v: &[Value2]) -> Option<Value2> {
+        b(&[v[0].0, v[1].0], |a, c| a || c).map(Value2)
+    }
+    fn not(v: &[Value2]) -> Option<Value2> {
+        Some(Value2(!v[0].0))
+    }
+    fn ff(_: &[Value2]) -> Option<Value2> {
+        Some(Value2(false))
+    }
+    fn tt(_: &[Value2]) -> Option<Value2> {
+        Some(Value2(true))
+    }
+    #[derive(Clone)]
+    struct Value2(bool);
+
+    impl Theory for Bits {
+        type Sort = Bit;
+        type Value = Value2;
+        type Obs = bool;
+        fn name() -> &'static str {
+            "bits"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            use Fixity::{Infix, Nullary, Prefix};
+            vec![
+                Operator {
+                    name: "False",
+                    symbol: "F",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: Bit,
+                    eval: ff,
+                },
+                Operator {
+                    name: "True",
+                    symbol: "T",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: Bit,
+                    eval: tt,
+                },
+                Operator {
+                    name: "And",
+                    symbol: "&",
+                    fixity: Infix,
+                    inputs: vec![Bit, Bit],
+                    output: Bit,
+                    eval: and,
+                },
+                Operator {
+                    name: "Or",
+                    symbol: "|",
+                    fixity: Infix,
+                    inputs: vec![Bit, Bit],
+                    output: Bit,
+                    eval: or,
+                },
+                Operator {
+                    name: "Not",
+                    symbol: "~",
+                    fixity: Prefix,
+                    inputs: vec![Bit],
+                    output: Bit,
+                    eval: not,
+                },
+            ]
+        }
+        fn inhabitants(_: Self::Sort) -> Vec<Self::Value> {
+            vec![Value2(false), Value2(true)]
+        }
+        fn sort_of(_: &Self::Value) -> Self::Sort {
+            Bit
+        }
+        fn observe(v: &Self::Value) -> Self::Obs {
+            v.0
+        }
+    }
+
+    /// The engine, exercised end to end on a boolean algebra it knows nothing about: it discovers
+    /// the FULL boolean law set (both distributivities, involution) by running the operators. Pins
+    /// enumeration, the template battery, rendering, and coverage against mutation.
+    #[test]
+    fn the_engine_discovers_boolean_algebra() {
+        let e = Engine::<Bits>::new();
+        let d = e.discover();
+        let got: Vec<(String, String)> = d
+            .laws
+            .iter()
+            .map(|l| (l.prose.clone(), l.equation.clone()))
+            .collect();
+        let expected: Vec<(&str, &str)> = vec![
+            (
+                "And gives the same result in either order.",
+                "(x & y) = (y & x)",
+            ),
+            (
+                "With And, the grouping of three values doesn't matter.",
+                "((x & y) & z) = (x & (y & z))",
+            ),
+            (
+                "And of a value with itself gives that value.",
+                "(x & x) = x",
+            ),
+            ("And by F always gives F.", "(F & x) = F"),
+            ("And with T leaves a value unchanged.", "(T & x) = x"),
+            (
+                "And distributes over Or.",
+                "(x & (y | z)) = ((x & y) | (x & z))",
+            ),
+            (
+                "Or gives the same result in either order.",
+                "(x | y) = (y | x)",
+            ),
+            (
+                "With Or, the grouping of three values doesn't matter.",
+                "((x | y) | z) = (x | (y | z))",
+            ),
+            ("Or of a value with itself gives that value.", "(x | x) = x"),
+            ("Or with F leaves a value unchanged.", "(F | x) = x"),
+            ("Or by T always gives T.", "(T | x) = T"),
+            (
+                "Or distributes over And.",
+                "(x | (y & z)) = ((x | y) & (x | z))",
+            ),
+            ("Not twice returns the original value.", "~(~(x)) = x"),
+        ];
+        let expected: Vec<(String, String)> = expected
+            .into_iter()
+            .map(|(p, q)| (p.to_string(), q.to_string()))
+            .collect();
+        assert_eq!(got, expected, "the discovered boolean algebra changed");
+        assert_eq!(d.consequences, 1, "consequence count changed");
+        assert!(
+            d.uncovered_ops.is_empty(),
+            "uncovered: {:?}",
+            d.uncovered_ops
+        );
+    }
+
+    /// `check` has real kill power: it passes the genuine laws and REJECTS a false one (`x & y` is
+    /// not `x | y`). Pins `check` against an always-`Ok` mutant and a flipped comparison.
+    #[test]
+    fn check_accepts_real_laws_and_rejects_a_false_one() {
+        let e = Engine::<Bits>::new();
+        let d = e.discover();
+        assert_eq!(e.check(&d.laws), Ok(()));
+        // ops: [F=0, T=1, And=2, Or=3, Not=4]; vars: x=0, y=1, z=2.
+        let bogus = DiscoveredLaw {
+            prose: "bogus".into(),
+            equation: "(x & y) = (x | y)".into(),
+            lhs: Term::App(2, vec![Term::Var(0), Term::Var(1)]),
+            rhs: Term::App(3, vec![Term::Var(0), Term::Var(1)]),
+        };
+        assert!(e.check(&[bogus]).is_err(), "check must reject a false law");
+    }
+
+    /// Enumeration never emits a reflexive equality (`t = t`): every emitted equality relates two
+    /// DISTINCT terms with the same behaviour. Pins the `*c != t` guard against being dropped.
+    #[test]
+    fn enumeration_emits_no_reflexive_equality() {
+        let e = Engine::<Bits>::new();
+        assert!(
+            e.enumerate().iter().all(|(a, b)| a != b),
+            "a reflexive t = t equality was emitted"
+        );
+    }
+
+    // A second theory with PARTIAL operators (all-undefined constants) and a ROUND-TRIP pair, to
+    // pin the `meaningful` filter and round-trip detection that total theories can't reach.
+    #[derive(Clone)]
+    struct M3(u8);
+    struct Codec;
+    fn enc(v: &[M3]) -> Option<M3> {
+        Some(M3((v[0].0 + 1) % 3))
+    }
+    fn dec(v: &[M3]) -> Option<M3> {
+        Some(M3((v[0].0 + 2) % 3))
+    }
+    fn bottom(_: &[M3]) -> Option<M3> {
+        None
+    }
+
+    impl Theory for Codec {
+        type Sort = Bit;
+        type Value = M3;
+        type Obs = u8;
+        fn name() -> &'static str {
+            "codec"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            use Fixity::{Nullary, Prefix};
+            vec![
+                // two all-undefined constants: filtered by `meaningful`, and they would COLLIDE
+                // (both have the empty behaviour) if the filter were removed.
+                Operator {
+                    name: "Bottom1",
+                    symbol: "b1",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: Bit,
+                    eval: bottom,
+                },
+                Operator {
+                    name: "Bottom2",
+                    symbol: "b2",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: Bit,
+                    eval: bottom,
+                },
+                Operator {
+                    name: "encode",
+                    symbol: "enc",
+                    fixity: Prefix,
+                    inputs: vec![Bit],
+                    output: Bit,
+                    eval: enc,
+                },
+                Operator {
+                    name: "decode",
+                    symbol: "dec",
+                    fixity: Prefix,
+                    inputs: vec![Bit],
+                    output: Bit,
+                    eval: dec,
+                },
+            ]
+        }
+        fn inhabitants(_: Self::Sort) -> Vec<Self::Value> {
+            vec![M3(0), M3(1), M3(2)]
+        }
+        fn sort_of(_: &Self::Value) -> Self::Sort {
+            Bit
+        }
+        fn observe(v: &Self::Value) -> Self::Obs {
+            v.0
+        }
+    }
+
+    /// The engine finds the ROUND-TRIP laws (`dec` undoes `enc`, and vice versa), filters the
+    /// all-undefined constants via `meaningful`, and reports them as uncovered. Pins round-trip
+    /// detection and the `meaningful` filter (without it the two bottoms collide).
+    #[test]
+    fn the_engine_discovers_round_trips_and_filters_undefined() {
+        let e = Engine::<Codec>::new();
+        let d = e.discover();
+        let proses: Vec<&str> = d.laws.iter().map(|l| l.prose.as_str()).collect();
+        assert!(proses.contains(&"decode undoes encode — the round trip is the identity."));
+        assert!(proses.contains(&"encode undoes decode — the round trip is the identity."));
+        // the all-undefined constants are in no law (and `meaningful` kept them from colliding —
+        // without the filter the two bottoms collide and this count rises to 9).
+        assert_eq!(d.uncovered_ops, vec!["b1", "b2"]);
+        assert_eq!(
+            d.consequences, 8,
+            "an undefined-constant collision leaked in"
+        );
     }
 }

@@ -43,6 +43,7 @@ impl Law {
 /// A theory's discovered spec: the named laws, the count of further (consequence) equalities, and
 /// the operators that appear in no named law (where the spec is silent).
 pub struct Spec {
+    pub theory: &'static str,
     pub laws: Vec<Law>,
     pub consequences: usize,
     pub uncovered_ops: Vec<&'static str>,
@@ -73,6 +74,7 @@ pub fn interpreter_spec() -> Spec {
     }
 
     Spec {
+        theory: <Arithmetic as engine::Theory>::name(),
         laws,
         consequences: discovered.consequences,
         uncovered_ops: discovered.uncovered_ops,
@@ -89,7 +91,9 @@ pub fn discover_laws() -> Vec<Law> {
 /// oracle-free check that the discovered algebra still holds (the interpreter's per-arm correctness
 /// is pinned independently by the harness's `eval_semantics_are_probed`). Returns the first failure.
 pub fn replay_interpreter_laws() -> Result<(), String> {
-    Engine::<Arithmetic>::new().replay()
+    let engine = Engine::<Arithmetic>::new();
+    let laws = engine.discover().laws;
+    engine.check(&laws)
 }
 
 // ----- the universal observer U: structure + semantics sensitivity --------
@@ -145,10 +149,12 @@ mod tests {
     #[test]
     fn the_interpreter_spec_is_exact() {
         let spec = interpreter_spec();
+        assert_eq!(spec.theory, "interpreter arithmetic");
+        assert_eq!(discover_laws().len(), 10, "law count changed");
         let got: Vec<(String, String)> = spec
             .laws
             .iter()
-            .map(|l| (l.prose.clone(), l.equation.clone()))
+            .map(|l| (l.prose().to_string(), l.equation().to_string()))
             .collect();
         let expected: Vec<(&str, &str)> = vec![
             (
@@ -194,6 +200,19 @@ mod tests {
             spec.uncovered_ops.is_empty(),
             "uncovered: {:?}",
             spec.uncovered_ops
+        );
+        // the count of further (consequence) equalities — pins enumeration depth and dedup.
+        assert_eq!(spec.consequences, 316, "consequence count changed");
+    }
+
+    /// Enumeration over the (richer) arithmetic theory emits no reflexive `t = t` equality — every
+    /// emitted equality relates two DISTINCT terms. Pins the `*c != t` guard in `enumerate`.
+    #[test]
+    fn arithmetic_enumeration_emits_no_reflexive_equality() {
+        let eqs = Engine::<Arithmetic>::new().emitted_equalities();
+        assert!(
+            eqs.iter().all(|(a, b)| a != b),
+            "a reflexive t = t equality was emitted"
         );
     }
 

@@ -12,7 +12,10 @@ use boundary_algebra::discover::interpreter_spec;
 
 fn main() {
     let spec = interpreter_spec();
-    println!("The interpreter's arithmetic obeys these laws (discovered by running it):\n");
+    println!(
+        "The {} obeys these laws (discovered by running it):\n",
+        spec.theory
+    );
     for law in &spec.laws {
         println!("  • {}", law.prose());
         println!("      {}", law.equation());
