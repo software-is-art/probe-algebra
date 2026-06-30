@@ -84,6 +84,12 @@ fn walk(dir: &Path, src_root: &Path, manifest: &str, out: &mut Vec<String>) {
         if path.parent() == Some(src_root) {
             continue;
         }
+        // the `discover` module is the discovery / report meta-layer: like the crate root, it emits
+        // human-facing RENDERINGS (`String`) and COUNTS (`usize`) — a report, not domain value
+        // objects — so it is exempt from the tier-2 inward rule. The domains it reads still obey it.
+        if path.components().any(|c| c.as_os_str() == "discover") {
+            continue;
+        }
         println!("cargo:rerun-if-changed={}", path.display());
 
         let loc = path

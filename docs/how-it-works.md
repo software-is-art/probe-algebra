@@ -64,20 +64,24 @@ by probes, and the probes are checked by mutation:
   parse round-trip, the capability/residual laws, `ConstFold`'s fold-preserves-value law,
   `Resolve`'s two-route law, and `eval_semantics_are_probed`, which pins every evaluator arm
   oracle-free against an independent computation — so evaluation needs *no hand-written examples*.
-- **value laws are *discovered* by unbounded synthesis, not declared** — `discover` ENUMERATES terms
-  over the operators, variables, and constants (QuickSpec-style), groups them by behaviour on a grid
-  of inputs, and reads each equality between distinct terms as a candidate law — there is no catalog
-  of shapes to match. It then folds the redundant swamp (up to renaming, commutativity, and
-  associativity) to one clean representative per recognized shape (identity, commutativity,
-  associativity, annihilation, distributivity, irreflexivity), counting the rest as consequences. One
-  **structural** law is found the same way: `eval` collapses structure, so the signature includes a
-  synthetic **universal observer `U`** (the faithful rendering, virtually one more operator), and
-  discovery surfaces *no two distinct programs look the same to `U`* — so the whole probe taxonomy,
-  algebraic and structural, falls out of one mechanism. The author writes no law; the spec renders as
-  a non-mathy report (`cargo run --example discovered_spec`) a non-mathematical stakeholder can
-  ratify. Each discovered law is re-probed as an oracle-free equation, so mutation judges its kill
-  power. (The generic `Relation` runner with its **non-vacuity guard** remains for metamorphic
-  relations that only sometimes apply; `relation_laws` fails if a probe fired zero times.)
+- **value laws are *discovered* by a generic engine, not declared** — a domain implements one trait,
+  `discover::engine::Theory` (its sorts, operators, a grid of inhabitants, and an OBSERVATION on
+  values), and the engine ENUMERATES terms over the operators, groups them by behaviour on the grid,
+  instantiates the universal algebraic shapes over the operators (identity, commutativity,
+  associativity, annihilation, idempotence, distributivity, involution, round-trip), and keeps the
+  ones that run true — counting the rest as consequences and reporting operators in no law (**where
+  the spec is silent**). It is not arithmetic-specific: the same engine discovers the interpreter's
+  arithmetic, a non-commutative **router** monoid (routers are compared *observationally* — by how
+  they route a path grid — which is exactly what the engine groups by, so it correctly omits the
+  commutativity that does not hold), and a multi-sorted **date calculus** with a partial operator and
+  a round-trip. The interpreter adds one **structural** law over a synthetic **universal observer
+  `U`** (the faithful rendering): `eval` collapses structure, so *no two distinct programs look the
+  same to `U`* closes the blind spot the equations leave. The author writes no law; the spec renders
+  as a non-mathy report (`cargo run --example discovered_spec`). It is then **frozen** into a
+  committed file per theory (`spec/*.spec`); CI re-derives the live spec and fails on drift, so the
+  committed file in a PR diff IS the ratification and an unintended behaviour change is a build error.
+  (The generic `Relation` runner with its **non-vacuity guard** remains for metamorphic relations
+  that only sometimes apply; `relation_laws` fails if a probe fired zero times.)
 - **`cargo mutants` judges all of it** — the interior carries no tests; the sweep reports how
   many of its mutants the boundary kills.
 

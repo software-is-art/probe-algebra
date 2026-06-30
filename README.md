@@ -11,9 +11,10 @@ survive.
 **The answer is yes.** The demonstration is an expression-language interpreter — lexer,
 parser, type checker, evaluator — whose interior has **zero tests of its own**, and whose
 entire *positive* behaviour is certified with **zero hand-written examples** — and its algebraic
-laws are **discovered by running the operators**, not declared, rendering as a plain-language spec. Mutate the interior and **every viable mutant dies**; the
-only survivors are a handful of documented equivalents (genuine free choices), carved out in
-`.cargo/mutants.toml`.
+laws are **discovered by running the operators**, not declared, by a generic engine that does the
+same for a non-commutative router and a multi-sorted date calculus, rendering as a plain-language
+spec. Mutate the interior and **every viable mutant dies**; the only survivors are a handful of
+documented equivalents (genuine free choices), carved out in `.cargo/mutants.toml`.
 
 ```
 cargo run --bin demo   # the boundary narrated end-to-end
@@ -85,38 +86,42 @@ mutation sweep, so the bought correctness is *measured*, not asserted.
 
 ---
 
-## The laws discover themselves — and read in plain language
+## The laws discover themselves — for *any* boundary, not just arithmetic
 
-You don't even state the algebra — and there's no catalog of shapes to match against either.
-`discover` **enumerates terms** over the operators, variables, and constants (QuickSpec-style),
-groups them by how they behave on a grid of inputs, and reads each equality between distinct terms
-as a candidate law. It then folds the swamp of redundant equalities — up to renaming, commutativity,
-and associativity — to **one clean representative per shape**, counting the rest as consequences. So
-the spec falls out of the operators' behaviour, not a human's list. `cargo run --example
-discovered_spec` prints it as a contract a non-mathematical stakeholder can audit:
+You don't state the algebra, and there's no catalog of shapes to match against. A domain implements
+one trait — `Theory` (its sorts, operators, a grid of inhabitants, and an OBSERVATION on values) —
+and the generic **engine** enumerates terms over the operators, groups them by how they behave on
+the grid, instantiates the universal algebraic shapes over the operators, and keeps the ones that
+run true. The spec falls out of the operators' behaviour, not a human's list. The algebra was never
+about numbers; numbers were just *legible*. `cargo run --example discovered_spec` discovers three
+very different algebras from the **same engine**:
 
 ```
-Adding zero leaves a value unchanged.            (0 + x) = x
-Multiplying by one leaves a value unchanged.     (1 * x) = x
-Multiplying by zero always gives zero.           (0 * x) = 0
-Addition gives the same result in either order.  (x + y) = (y + x)
-Multiplication gives the same result in either order.   (x * y) = (y * x)
-When combining three values with Addition, the grouping doesn't matter.        (x + (y + z)) = …
-Multiplying a sum is the same as multiplying each part and adding.   (x * (y + z)) = (x*y) + (x*z)
-A value is never less than itself.               (x < x) = false
+interpreter arithmetic    Addition gives the same result in either order.   (x + y) = (y + x)
+                          Multiplication distributes over Addition.         (x * (y+z)) = (x*y)+(x*z)
+                          A value is never less than itself.                (x < x) = false
+router (a monoid)         Or with empty leaves a value unchanged.           (empty or a) = a
+                          With Or, the grouping doesn't matter.             ((a or b) or c) = …
+                          — and NOT commutativity: overlapping routers route differently each way,
+                            so the engine correctly refuses to report it.
+date calculus (2 sorts)   Plus with zero leaves a value unchanged.          (zero + p) = p
+                          at undoes since — the round trip is the identity.  at(since(s)) = s
+                          add (a heterogeneous action) is reported UNCOVERED — where the spec is silent.
 ```
 
-The same mechanism discovers one structural law too. `eval` collapses structure (`2+3` and `5` are
-equal to it), so the equational laws are blind to a transform that computes the right value but
-mangles the tree. So the signature includes a synthetic **universal observer `U`** — the program's
-faithful rendering, virtually treated as one more operator — and discovery surfaces its law: *no two
-distinct programs look the same to `U`*. One discovery engine yields the whole probe taxonomy,
-algebraic and structural.
+Routers have no structural `Eq` — they are compared by how they route a path grid, i.e.
+**observationally**, which is exactly what the engine groups by. The interpreter adds one
+**structural** law over a synthetic **universal observer `U`** (its faithful rendering): `eval`
+collapses structure (`2+3` and `5` are equal to it), so a transform that computes the right value but
+mangles the tree is invisible to the equations — *no two distinct programs look the same to `U`*
+closes that. And the **coverage report** names operators in no law: where the spec is silent and
+human attention belongs.
 
-Each discovered law is re-probed as an oracle-free equation and judged by mutation, so the author
-can't weaken a probe by accident — they write none of them. The only human acts left are the
-**validity rule** (`Int ≥ 0`) and **ratifying** the report: a law you expect but don't see (a folder
-that doubled would have no "adding zero leaves a value unchanged") is a bug surfaced.
+The discovered spec is **frozen** into a committed file per theory (`spec/*.spec`) — a behaviour
+lock. CI re-derives the live spec and fails if it drifts from the committed text, so the committed
+file read in a PR diff IS the **ratification**, and an unintended behaviour change is a build error.
+The only human acts left are the **validity rule** (`Int ≥ 0`) and ratifying that diff: a law you
+expect but don't see is a bug surfaced.
 
 ---
 
@@ -158,7 +163,8 @@ matrix through gdp's `InBounds` proof, so an out-of-range read is a **type error
 
 ## Using it
 
-The grammar is domain-agnostic — the interpreter is one worked example, not the limit:
+The grammar is domain-agnostic — the interpreter is the lead worked example, the router and date
+calculus show the discovery engine generalises, and none of it is the limit:
 
 ```toml
 [dependencies]

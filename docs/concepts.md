@@ -127,18 +127,23 @@ What is **irreducible** — by nature, not for lack of effort:
   without circularity — the host, kept under the mutation lens but not re-specified in itself.
 - **rejection tests**: "input X is *rejected*" can't be derived from the thing under test (you
   cannot generate a counterexample to a property from the property). These stay hand-written.
-- the **meaning** itself — but it has shrunk. The algebraic laws are no longer authored, and not even
-  matched against a catalog of named shapes: `discover` ENUMERATES terms over the operators, groups
-  them by behaviour, and reads off the equalities (QuickSpec-style), folding the redundant ones to one
-  clean representative per shape and counting the rest as consequences. It discovers a structural law
-  the same way, over a synthetic **universal observer `U`** (the faithful rendering, virtually one
-  more operator): *no two distinct programs look the same to `U`*. So the whole law set — algebraic
-  and structural — falls out of the operators' behaviour and renders as a readable, non-mathy report.
-  What an author still supplies is the **validity rule** (`Int ≥ 0`) and the act of **ratifying** the
-  discovered set — recognizing whether it is the algebra they meant (a law you expect but don't see
-  is a bug). Discovery's reference frame is the baseline, so it catches *deviations* (mutation) and
-  *surprises* (ratification); it cannot conjure a law the operators don't exhibit, and enumeration is
-  depth-bounded (a resource limit, not a curated list). That is the precise edge where "the tests
+- the **meaning** itself — but it has shrunk. The algebraic laws are not authored, not matched against
+  a catalog, and not even arithmetic-specific: a domain implements one trait — `engine::Theory` (its
+  sorts, operators, inhabitants, and an OBSERVATION on values) — and the generic engine ENUMERATES
+  terms, groups them by behaviour, instantiates the universal algebraic shapes over the operators, and
+  keeps the ones that run true, counting the rest as consequences and reporting operators in no law.
+  The same engine discovers the interpreter's arithmetic, a non-commutative **router** monoid (routers
+  compared *observationally* — by how they route a path grid — so commutativity is correctly omitted),
+  and a multi-sorted **date calculus**; the interpreter adds a structural law over a synthetic
+  **universal observer `U`** (the faithful rendering): *no two distinct programs look the same to
+  `U`*. The whole law set falls out of the operators' behaviour and renders as a readable, non-mathy
+  report, then is **frozen** into a committed file per theory (`spec/*.spec`) — the staleness gate
+  fails on drift, so the committed file in a PR diff IS the ratification. What an author still supplies
+  is the **validity rule** (`Int ≥ 0`) and ratifying that diff — recognizing whether it is the algebra
+  they meant (a law you expect but don't see is a bug). Discovery's reference frame is the baseline,
+  so it catches *deviations* (mutation) and *surprises* (ratification); it cannot conjure a law the
+  operators don't exhibit, and enumeration is depth- and grid-bounded (a resource limit, not a curated
+  list). That is the precise edge where "the tests
   write themselves" ends and "what did you mean" begins.
 
 ## The inward rule
