@@ -13,6 +13,13 @@
 //! constant operators. So closing the grid under the BOUNDARY operators would never leave the empty
 //! set: there is nothing to start from. Only the shadow algebra (the type's three inhabitants) can
 //! seed it — and from it the engine discovers the full lattice spec, hands-free.
+//!
+//! It is also written in the MINIMAL form of `theory!` — no `Obs`, no `observe`, no `vars`, no
+//! `inhabit`. For a first-order value object the observation IS the value, the variable letters
+//! default, and the grid is shadow-derived, so the whole domain is the FLOOR: the value type, its
+//! sort, and its operators. Everything a `theory!` once spelled out is either defaulted or derived;
+//! what is left is only the irreducible meaning. (A behavioural observer or a curated grid — like the
+//! router's, or arithmetic's — is a deliberate deviation from this floor, and stays written out.)
 
 use crate::Shaped;
 
@@ -41,9 +48,8 @@ fn join(v: &[Tri]) -> Option<Tri> {
 pub struct Lattice;
 
 crate::theory! {
-    Lattice : "tri lattice", Value = Tri, Obs = Tri, Sort = LatticeSort,
+    Lattice : "tri lattice", Value = Tri, Sort = LatticeSort,
     sort_of = |_: &Tri| LatticeSort::T,
-    observe = |v: &Tri| *v,
     ops {
         Infix "meet" "&" (LatticeSort::T, LatticeSort::T) -> LatticeSort::T = meet;
         Infix "join" "|" (LatticeSort::T, LatticeSort::T) -> LatticeSort::T = join;
