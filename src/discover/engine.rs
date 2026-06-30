@@ -20,7 +20,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 /// How an operator renders in a symbolic equation.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Fixity {
     /// `a + b`
     Infix,
@@ -125,6 +125,12 @@ pub struct Engine<T: Theory> {
 
 /// A term's behavioural signature: the observation at each grid assignment (`None` where undefined).
 type Sig<T> = Vec<Option<<T as Theory>::Obs>>;
+
+/// An operator's signature, by index: `(symbol, input sorts, output sort)`.
+pub type OpSignature<S> = (&'static str, Vec<S>, S);
+
+/// An operator's full declaration: `(name, symbol, fixity, input sorts, output sort)`.
+pub type OpDeclaration<S> = (&'static str, &'static str, Fixity, Vec<S>, S);
 
 /// Is `op` a homogeneous binary operator on sort `s` (`s × s -> s`)? Used by every shape that needs
 /// a binary on a given sort, so a mutation to this predicate breaks laws across all theories.
@@ -693,6 +699,24 @@ impl<T: Theory> Engine<T> {
             }
         }
         Ok(())
+    }
+
+    /// The signature, by operator index: `(symbol, input sorts, output sort)`. For the cohesion
+    /// analysis, which reads which operators interact (share a law) and what sorts they touch.
+    pub fn signatures(&self) -> Vec<OpSignature<T::Sort>> {
+        self.ops
+            .iter()
+            .map(|o| (o.symbol, o.inputs.clone(), o.output))
+            .collect()
+    }
+
+    /// The full declaration of each operator — `(name, symbol, fixity, inputs, output)` — for the
+    /// scaffolder, which regenerates a `theory!` block for each split-out sub-module.
+    pub fn declarations(&self) -> Vec<OpDeclaration<T::Sort>> {
+        self.ops
+            .iter()
+            .map(|o| (o.name, o.symbol, o.fixity, o.inputs.clone(), o.output))
+            .collect()
     }
 }
 

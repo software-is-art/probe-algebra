@@ -149,6 +149,38 @@ homomorphism.
 
 ---
 
+## Cohesion: when should a module be split?
+
+The smell of a badly-factored module isn't a *large* algebra — boolean algebra is large and superb.
+It's a **decomposable** one: secretly several algebras crammed together with no laws connecting them.
+So `discover::cohesion` builds the **operator-interaction graph** — operators are nodes, two are
+linked whenever a discovered law mentions both — and its weakly-connected components are the **latent
+modules**. One dense component → cohesive, keep it; several components → the cut is where it wants to
+split, and the seam is classified transport vs transform (so it tells you whether the split needs a
+coherence check or a homomorphism). It's a *suggestion*, never a constraint — a modularity signal you
+ratify, like an editor quick-fix.
+
+It is self-applicable (`cargo run --example cohesion`):
+
+```
+module `interpreter arithmetic`: decomposes into 2 — { 0, 1, +, * } and { false, < }
+                                 seam on Int — transport (no law links < to + or *)
+module `router`:                 cohesive — one algebra, keep as one module
+module `date calculus`:          decomposes into 2 — { zero, +, add, diff } and { since, at }
+                                 seam on Date, Duration — transform (since/at convert: a layer line)
+```
+
+And the suggestion has an *action*: `discover::scaffold` (`cargo run --example scaffold`) emits the
+split — one `theory!` skeleton per component (operators, fixities, and sorts carried faithfully; the
+`eval` functions left as move-here markers, since the interior is what moves), plus the seam
+obligation. The split is **lossless** by construction — components are defined by law-connectivity,
+so every discovered law lives entirely inside one sub-module — and the only obligation is the seam: a
+transport seam shares a type (safe by construction), a transform seam emits a homomorphism check so a
+bad cut becomes a failing probe, not a silent bug. You (or an agent, naming as it goes) ratify and
+apply it — a quick-fix from signal to safe refactor.
+
+---
+
 ## Mutation runs where it pays — and self-hosts
 
 Mutation testing is expensive, so it runs against the **specification**, not the interior:

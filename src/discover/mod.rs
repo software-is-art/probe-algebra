@@ -18,10 +18,12 @@
 
 pub mod arithmetic;
 pub mod coherence;
+pub mod cohesion;
 pub mod date;
 pub mod engine;
 pub mod freeze;
 pub mod router;
+pub mod scaffold;
 
 /// Generate a whole `engine::Theory` impl from a concise declaration — so a discovery domain is
 /// "just module definition": the value-object types, the operator functions, and this block. The
