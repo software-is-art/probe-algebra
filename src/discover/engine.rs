@@ -126,6 +126,9 @@ pub struct Engine<T: Theory> {
 /// A term's behavioural signature: the observation at each grid assignment (`None` where undefined).
 type Sig<T> = Vec<Option<<T as Theory>::Obs>>;
 
+/// An operator's signature, by index: `(symbol, input sorts, output sort)`.
+pub type OpSignature<S> = (&'static str, Vec<S>, S);
+
 /// Is `op` a homogeneous binary operator on sort `s` (`s × s -> s`)? Used by every shape that needs
 /// a binary on a given sort, so a mutation to this predicate breaks laws across all theories.
 fn is_binary_on<T: Theory>(op: &Operator<T>, s: T::Sort) -> bool {
@@ -693,6 +696,15 @@ impl<T: Theory> Engine<T> {
             }
         }
         Ok(())
+    }
+
+    /// The signature, by operator index: `(symbol, input sorts, output sort)`. For the cohesion
+    /// analysis, which reads which operators interact (share a law) and what sorts they touch.
+    pub fn signatures(&self) -> Vec<OpSignature<T::Sort>> {
+        self.ops
+            .iter()
+            .map(|o| (o.symbol, o.inputs.clone(), o.output))
+            .collect()
     }
 }
 
