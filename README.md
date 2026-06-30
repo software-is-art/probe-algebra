@@ -86,6 +86,12 @@ And it **enforces**, at compile time, claims that can be statically false:
   `//! Tier:` marker `build.rs` reads to dispatch the right discipline. A file that names no tier is
   a build error, so a new module cannot land silently un-categorized; placement is ratified in the
   diff. This replaces the old path heuristics (the blanket `discover/` exemption is gone).
+- **effects in an ALGEBRA file are honest, or they don't build.** That layer may touch the world (a
+  report tool reads sources, writes a scaffold) — but not *silently*: a function whose body reaches
+  `std::fs`/`io`/`process`/`net`/`env` must declare a `Capability:` in its doc, else build error. So
+  the fine seam/capability/leaf split *inside* an ALGEBRA file is enforced the same way the file-level
+  tier is — the dev tool's `apply` (writes) and `theory_line` (reads) are named edges, not hidden
+  dependencies. (Adding the rule immediately flagged two world-reads we'd left undeclared.)
 
 The interior backing these edges (`interp::internal`) is private, untested, and kept in the
 mutation sweep, so the bought correctness is *measured*, not asserted.

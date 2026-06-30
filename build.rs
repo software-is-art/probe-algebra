@@ -123,11 +123,12 @@ fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
         //   INTERIOR — the workshop / leaves: the tier-2 inward rule (no raw primitive escapes).
         //   ALGEBRA  — a discovered-law / report layer (`theory!` domains + the discover meta): it
         //              renders human-facing reports (counts, prose, observations), so it is exempt
-        //              from the inward rule; its finer seam/capability/leaf split is enforced WITHIN
-        //              it by discovered laws and declared capabilities, not by structure.
+        //              from the inward rule. But its effects must be HONEST: a function that touches
+        //              the world (`std::fs`/`io`/`process`/`net`/`env`/`thread`) must DECLARE a
+        //              capability — the fine seam/capability/leaf split, made a build obligation.
         match tier {
-            "KERNEL" | "ALGEBRA" => continue,
-            "BOUNDARY" | "INTERIOR" => {}
+            "KERNEL" => continue,
+            "BOUNDARY" | "INTERIOR" | "ALGEBRA" => {}
             _ => continue,
         }
 
@@ -138,10 +139,11 @@ fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
                 continue;
             }
         };
-        if tier == "BOUNDARY" {
-            check_boundary(&loc, &file, out); // tier 1
-        } else {
-            check_internal(&loc, &file, out); // tier 2
+        match tier {
+            "BOUNDARY" => check_boundary(&loc, &file, out), // tier 1
+            "INTERIOR" => check_internal(&loc, &file, out), // tier 2
+            "ALGEBRA" => check_algebra(&loc, &file, out),   // the capability-honesty rule
+            _ => {}
         }
     }
 }
@@ -395,6 +397,87 @@ fn describe(item: &Item) -> &'static str {
         Item::TraitAlias(_) => "trait alias",
         Item::Verbatim(_) => "unparsed tokens",
         _ => "item",
+    }
+}
+
+// ===== ALGEBRA: effects must be declared capabilities ====================
+//
+// An ALGEBRA-tier file may touch the world (a report tool writes files, reads sources) — but not
+// SILENTLY. A function whose body reaches `std::fs`/`io`/`process`/`net`/`env`/`thread` must DECLARE
+// a capability in its doc (`Capability: Effectful`), so the world-touch is an honest, named edge and
+// not a hidden dependency. This is the fine seam/capability/leaf partition (which v12 established by
+// hand on `architect`) turned into a build obligation, the analogue of the file-level `Tier:` rule.
+
+fn check_algebra(loc: &str, file: &syn::File, out: &mut Vec<String>) {
+    check_algebra_items(loc, &file.items, out);
+}
+
+fn check_algebra_items(loc: &str, items: &[Item], out: &mut Vec<String>) {
+    for item in items {
+        match item {
+            // a `#[cfg(test)]` module is test scaffolding, not a production edge — skip it.
+            Item::Mod(m) if !is_cfg_test(&m.attrs) => {
+                if let Some((_, inner)) = &m.content {
+                    check_algebra_items(loc, inner, out);
+                }
+            }
+            Item::Fn(f) if !is_cfg_test(&f.attrs) => {
+                let mut eff = EffectFinder { found: None };
+                eff.visit_item_fn(f);
+                if let Some(effect) = eff.found {
+                    if !declares_capability(&f.attrs) {
+                        out.push(format!(
+                            "{loc}: `{}` touches the world (`{effect}`) but declares no capability — \
+                             an ALGEBRA-tier effect must be an honest edge. Add a `Capability: \
+                             Effectful` line to its doc, or move the effect behind a declared edge.",
+                            f.sig.ident
+                        ));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Whether any doc attribute carries a `Capability:` declaration.
+fn declares_capability(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|a| {
+        if let Meta::NameValue(nv) = &a.meta {
+            if nv.path.is_ident("doc") {
+                if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(s),
+                    ..
+                }) = &nv.value
+                {
+                    return s.value().contains("Capability:");
+                }
+            }
+        }
+        false
+    })
+}
+
+/// Detects a world-touch: a path through `std::{fs,io,process,net,thread,env}`.
+struct EffectFinder {
+    found: Option<String>,
+}
+
+impl<'ast> Visit<'ast> for EffectFinder {
+    fn visit_path(&mut self, node: &'ast syn::Path) {
+        let segs: Vec<String> = node.segments.iter().map(|s| s.ident.to_string()).collect();
+        for w in segs.windows(2) {
+            if w[0] == "std"
+                && matches!(
+                    w[1].as_str(),
+                    "io" | "fs" | "process" | "net" | "thread" | "env"
+                )
+                && self.found.is_none()
+            {
+                self.found = Some(format!("std::{}", w[1]));
+            }
+        }
+        visit::visit_path(self, node);
     }
 }
 
