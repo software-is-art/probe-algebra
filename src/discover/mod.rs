@@ -17,10 +17,79 @@
 //! resource limit, not a curated list).
 
 pub mod arithmetic;
+pub mod coherence;
 pub mod date;
 pub mod engine;
 pub mod freeze;
 pub mod router;
+
+/// Generate a whole `engine::Theory` impl from a concise declaration — so a discovery domain is
+/// "just module definition": the value-object types, the operator functions, and this block. The
+/// operator table, `sort_of`, `observe`, `sort_vars`, and `inhabitants` plumbing are all generated;
+/// only the actual content (the operator functions and the value objects) is authored.
+///
+/// ```ignore
+/// theory! {
+///     Router : "router", Value = Routes, Obs = Vec<Option<u8>>, Sort = Sort,
+///     sort_of = |_: &Routes| Sort::Router,
+///     observe = |v: &Routes| v.0.to_vec(),
+///     vars { Sort::Router => &["a", "b", "c"], }
+///     inhabit { Sort::Router => routers(), }
+///     ops {
+///         Nullary "Empty" "empty" () -> Sort::Router = empty;
+///         Infix   "Or"    "or"    (Sort::Router, Sort::Router) -> Sort::Router = or;
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! theory {
+    (
+        $thy:ty : $namestr:literal,
+        Value = $Value:ty,
+        Obs = $Obs:ty,
+        Sort = $Sort:ty,
+        sort_of = $sortof:expr,
+        observe = $observe:expr,
+        vars { $( $vpat:pat => $vlist:expr, )+ }
+        inhabit { $( $ipat:pat => $ilist:expr, )+ }
+        ops {
+            $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
+        }
+    ) => {
+        impl $crate::discover::engine::Theory for $thy {
+            type Sort = $Sort;
+            type Value = $Value;
+            type Obs = $Obs;
+            fn name() -> &'static str {
+                $namestr
+            }
+            fn operators() -> ::std::vec::Vec<$crate::discover::engine::Operator<Self>> {
+                ::std::vec![ $(
+                    $crate::discover::engine::Operator {
+                        name: $opname,
+                        symbol: $opsym,
+                        fixity: $crate::discover::engine::Fixity::$fix,
+                        inputs: ::std::vec![ $($insort),* ],
+                        output: $outsort,
+                        eval: $eval,
+                    }
+                ),+ ]
+            }
+            fn inhabitants(sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
+                match sort { $( $ipat => $ilist, )+ }
+            }
+            fn sort_of(value: &Self::Value) -> Self::Sort {
+                ($sortof)(value)
+            }
+            fn observe(value: &Self::Value) -> Self::Obs {
+                ($observe)(value)
+            }
+            fn sort_vars(sort: Self::Sort) -> &'static [&'static str] {
+                match sort { $( $vpat => $vlist, )+ }
+            }
+        }
+    };
+}
 
 use crate::boundary::sensitive_to_all;
 use crate::discover::arithmetic::Arithmetic;
