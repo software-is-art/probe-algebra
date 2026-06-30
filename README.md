@@ -80,6 +80,12 @@ And it **enforces**, at compile time, claims that can be statically false:
   **total, by structural induction**, not a sample. (See [concepts](docs/concepts.md#the-gradings).)
 - **every production edge carries a probe.** `build.rs` enumerates every concrete edge impl and
   rejects any without an `impl Probed` — so an edge no probe can kill cannot be merged.
+- **the partition is total and explicit.** Every source file declares its tier — `KERNEL` (the
+  trusted floor: grammar, engine, macros, tooling), `BOUNDARY` (a domain's strict surface),
+  `INTERIOR` (the workshop / leaves), or `ALGEBRA` (a discovered-law / report layer) — with a
+  `//! Tier:` marker `build.rs` reads to dispatch the right discipline. A file that names no tier is
+  a build error, so a new module cannot land silently un-categorized; placement is ratified in the
+  diff. This replaces the old path heuristics (the blanket `discover/` exemption is gone).
 
 The interior backing these edges (`interp::internal`) is private, untested, and kept in the
 mutation sweep, so the bought correctness is *measured*, not asserted.

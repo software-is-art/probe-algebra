@@ -1,3 +1,5 @@
+//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
+//!
 //! capability — the behavioural side of the capability lattice: reconcile what an edge
 //! DECLARES with what it DOES.
 //!

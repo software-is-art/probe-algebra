@@ -1,3 +1,5 @@
+//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
+//!
 //! engine — generic, signature-parameterized law discovery.
 //!
 //! The arithmetic discovery in v5/v6 was hardcoded to `Int`/`Bool` with `Add`/`Mul`/`Lt`. This is

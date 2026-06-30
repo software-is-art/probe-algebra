@@ -1,24 +1,32 @@
-//! build.rs — enforces the boundary discipline at COMPILE time, in two tiers.
+//! build.rs — enforces the boundary discipline at COMPILE time, over an EXPLICIT, TOTAL partition.
 //!
 //! A boundary is a CATEGORY: value-object OBJECTS and value-operator MORPHISMS
 //! (`Morphism` / `Construction` / `Branch` / `Guarded`), with typestates as object INDICES.
 //!
-//! TIER 1 — domain boundary files (`src/<module>/boundary.rs`): the strict
-//! grammar. May contain ONLY value objects, typestates, and value operators —
-//! no free functions, no global state, no submodules, no traits, no public
-//! fields, no I/O / `unsafe`.
+//! Every source file declares its place in the partition with a `//! Tier: <NAME>` marker in its
+//! header — there is no silent exemption. A new module that names no tier is a BUILD ERROR, so the
+//! partition stays total and the choice is ratified in the diff. The four tiers:
 //!
-//! TIER 2 — module-internal files (any other `.rs` inside a module directory,
-//! e.g. `internal.rs`): the "workshop". Mutation and raw collections are fine
-//! here, but the INWARD rule still holds: a function may not RETURN a raw
-//! primitive — `String`/`&str` or any numeric (`i64`, `usize`, `f64`, ...) —
-//! because every primitive that means something in the domain must be a value
-//! object with its own operators. `bool` is exempt (a predicate is control, not
-//! domain data). Accessors that unwrap to a primitive live at the boundary
-//! (tier 1), the sanctioned exit hatch — they are not subject to this rule.
+//! KERNEL   — the trusted floor: the grammar (`src/boundary.rs`), the discovery engine and the
+//!            `theory!` macro, and crate-level tooling (`gdp`, `harness`, `capability`), plus the
+//!            crate root. It DEFINES and RUNS the format, so it is exempt from the structural rules
+//!            — but it is NAMED, not silently skipped.
 //!
-//! EXEMPT — files directly under `src/` (`main.rs`, the grammar `boundary.rs`,
-//! test files): the crate root / vocabulary definition, not a module interior.
+//! BOUNDARY — a domain's strict value-object surface (`src/<module>/boundary.rs`): TIER 1. May
+//!            contain ONLY value objects, typestates, and value operators — no free functions,
+//!            global state, submodules, traits, public fields, I/O, or `unsafe`.
+//!
+//! INTERIOR — the workshop / leaves (`internal.rs`, module glue): TIER 2. Mutation and raw
+//!            collections are fine, but the INWARD rule holds: a function may not RETURN a raw
+//!            primitive — `String`/`&str` or any numeric — because every domain primitive must be a
+//!            value object with its own operators. `bool` is exempt (a predicate is control, not
+//!            domain data); boundary accessors that unwrap to a primitive are the sanctioned hatch.
+//!
+//! ALGEBRA  — a discovered-law / report layer (the `theory!` domains and the `discover` meta): it
+//!            renders human-facing reports (counts, prose, observations), so it is exempt from the
+//!            inward rule. Its finer seam / capability-edge / leaf split is enforced WITHIN it by
+//!            discovered laws and declared capabilities (see `discover::architect`), not by this
+//!            structural pass.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -66,7 +74,7 @@ fn main() {
     }
 }
 
-fn walk(dir: &Path, src_root: &Path, manifest: &str, out: &mut Vec<String>) {
+fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -74,20 +82,10 @@ fn walk(dir: &Path, src_root: &Path, manifest: &str, out: &mut Vec<String>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            walk(&path, src_root, manifest, out);
+            walk(&path, _src_root, manifest, out);
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("rs") {
-            continue;
-        }
-        // files directly under src/ are exempt (crate root / grammar / tests)
-        if path.parent() == Some(src_root) {
-            continue;
-        }
-        // the `discover` module is the discovery / report meta-layer: like the crate root, it emits
-        // human-facing RENDERINGS (`String`) and COUNTS (`usize`) — a report, not domain value
-        // objects — so it is exempt from the tier-2 inward rule. The domains it reads still obey it.
-        if path.components().any(|c| c.as_os_str() == "discover") {
             continue;
         }
         println!("cargo:rerun-if-changed={}", path.display());
@@ -97,20 +95,77 @@ fn walk(dir: &Path, src_root: &Path, manifest: &str, out: &mut Vec<String>) {
             .unwrap_or(&path)
             .display()
             .to_string();
-        let file = match parse(&path) {
-            Ok(f) => f,
-            Err(msg) => {
-                out.push(format!("{loc}: {msg}"));
+        let source = match std::fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(e) => {
+                out.push(format!("{loc}: cannot read ({e})"));
                 continue;
             }
         };
 
-        if path.file_name().and_then(|n| n.to_str()) == Some("boundary.rs") {
+        // THE PARTITION, made total and explicit: every source file must DECLARE its tier. This
+        // replaces the old path heuristics (filename `boundary.rs` → tier 1; a blanket `discover/`
+        // skip) — so a new module cannot land silently un-categorized; placing it in the partition
+        // is a build obligation, ratified in the diff.
+        let Some(tier) = declared_tier(&source) else {
+            out.push(format!(
+                "{loc}: no `Tier:` declaration — every source file must name its place in the \
+                 partition. Add a `//! Tier: <{}> — …` line to the module header.",
+                TIERS.join(" | ")
+            ));
+            continue;
+        };
+
+        // dispatch the STRUCTURAL discipline on the declared tier:
+        //   KERNEL   — the trusted floor (the grammar, the engine, the macros, crate tooling):
+        //              defines/runs the format, so it is exempt — but NAMED, not silently skipped.
+        //   BOUNDARY — a domain's strict value-object surface: the tier-1 grammar.
+        //   INTERIOR — the workshop / leaves: the tier-2 inward rule (no raw primitive escapes).
+        //   ALGEBRA  — a discovered-law / report layer (`theory!` domains + the discover meta): it
+        //              renders human-facing reports (counts, prose, observations), so it is exempt
+        //              from the inward rule; its finer seam/capability/leaf split is enforced WITHIN
+        //              it by discovered laws and declared capabilities, not by structure.
+        match tier {
+            "KERNEL" | "ALGEBRA" => continue,
+            "BOUNDARY" | "INTERIOR" => {}
+            _ => continue,
+        }
+
+        let file = match syn::parse_file(&source) {
+            Ok(f) => f,
+            Err(e) => {
+                out.push(format!("{loc}: parse error ({e})"));
+                continue;
+            }
+        };
+        if tier == "BOUNDARY" {
             check_boundary(&loc, &file, out); // tier 1
         } else {
             check_internal(&loc, &file, out); // tier 2
         }
     }
+}
+
+/// The partition tiers — every source file declares exactly one (see `walk` for what each enforces).
+const TIERS: &[&str] = &["KERNEL", "BOUNDARY", "INTERIOR", "ALGEBRA"];
+
+/// The tier a file declares, via a `Tier: <NAME>` marker in its header (the module doc). `None` if
+/// it declares none — which `walk` turns into a violation, so the partition stays total.
+fn declared_tier(source: &str) -> Option<&'static str> {
+    for line in source.lines().take(40) {
+        let Some((_, rest)) = line.split_once("Tier:") else {
+            continue;
+        };
+        let word: String = rest
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_alphabetic())
+            .collect();
+        if let Some(t) = TIERS.iter().find(|t| word.eq_ignore_ascii_case(t)) {
+            return Some(t);
+        }
+    }
+    None
 }
 
 fn parse(path: &Path) -> Result<syn::File, String> {

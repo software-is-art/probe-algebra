@@ -1,3 +1,5 @@
+//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
+//!
 //! cohesion — a selection pressure toward well-factored modules, read off the discovered algebra.
 //!
 //! A badly-architected module is not one with a LARGE algebra (boolean algebra is large and superb)

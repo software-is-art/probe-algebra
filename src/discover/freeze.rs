@@ -1,3 +1,5 @@
+//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
+//!
 //! freeze — the discovered spec is a committed, diffable artifact (a behaviour lock).
 //!
 //! Discovery is a pure function of the boundary, so the expensive enumeration is run ONCE and its
