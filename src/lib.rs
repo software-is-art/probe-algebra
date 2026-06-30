@@ -55,6 +55,12 @@ pub mod select;
 /// `crate::boundary::Shaped` trait, re-exported here so edges write `#[derive(Shaped)]`.
 pub use boundary_algebra_macros::Shaped;
 
+/// `#[algebra(Marker, "name")]` — generate a WHOLE discovery `Theory` from a module of ordinary
+/// operator functions (no `theory!` block). The macro reads each function's signature and emits the
+/// operator table, sort, `sort_of`, identity `observe`, and the shadow grid; the agent writes only
+/// the value object and the operator functions. See `discover::derived`.
+pub use boundary_algebra_macros::algebra;
+
 #[cfg(test)]
 mod harness;
 #[cfg(test)]

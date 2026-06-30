@@ -381,28 +381,32 @@ boundary-algebra = { git = "https://github.com/software-is-art/probe-algebra" }
 ```
 
 Model your boundary as value objects and edges, write the interior in any style, and let the
-derived probes and the mutation sweep validate the spec. For a discovery domain specifically, a
-`theory!` block has been pared to its **floor**: for a first-order `#[derive(Shaped)]` value object,
-the observation is the value itself, the variable letters default, and the grid is **derived from
-the type's structure** (a shadow algebra of synthetic generators, never hand-listed) — so all that
-is left to write is the value type, its sort, and the operators:
+derived probes and the mutation sweep validate the spec. For a discovery domain specifically, there
+is no longer a declaration to write at all: `#[algebra]` reads a module of ordinary operator
+**functions** and synthesises the whole `Theory` — each signature gives its arity (→ fixity), its
+single value type (→ the sort), its name (→ the symbol); the grid is shadow-derived from the type and
+the observation is the value itself. So the agent authors only what it *means*, the value object and
+the operators:
 
 ```rust,ignore
-crate::theory! {
-    Lattice : "tri lattice", Value = Tri, Sort = LatticeSort,
-    sort_of = |_: &Tri| LatticeSort::T,
-    ops {
-        Infix "meet" "&" (LatticeSort::T, LatticeSort::T) -> LatticeSort::T = meet;
-        Infix "join" "|" (LatticeSort::T, LatticeSort::T) -> LatticeSort::T = join;
-    }
-}   // discovers the whole distributive-lattice spec, hands-free
+#[algebra(Lattice, "tri lattice")]
+pub mod lattice {
+    #[derive(Shaped, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    pub enum Tri { Lo, Mid, Hi }
+
+    pub fn meet(a: Tri, b: Tri) -> Tri { a.min(b) }   // (Tri, Tri) -> Tri ⇒ binary operator
+    pub fn join(a: Tri, b: Tri) -> Tri { a.max(b) }
+}
+// Engine::<lattice::Lattice>::new().discover() — the whole distributive-lattice spec, hands-free
 ```
 
-Everything a `theory!` once spelled out — inhabitants, variables, `observe`, `Obs` — is now
-defaulted or derived. What remains is only the irreducible **meaning**: the operators (the module
-itself), and the *deliberate* deviations from the floor — a behavioural observer (the router, judged
-by how it routes) or a hand-curated grid (arithmetic's, chosen so the discovered spec reads cleanly)
-— which are kept written out precisely because they are choices, not boilerplate.
+Everything a `theory!` once spelled out — the operator table, `sort_of`, `observe`, `Obs`, the
+variables, the grid — is now read off the functions or derived. What remains is only the irreducible
+**meaning**: the value object and the operators (the module itself). A *deliberate* deviation — a
+behavioural observer (the router, judged by how it routes) or a hand-curated grid (arithmetic's,
+chosen so the discovered spec reads cleanly) — is still written out with the explicit `theory!` form,
+precisely because it is a choice, not boilerplate. (`#[algebra]` is single-sort today; multi-sorted
+domains keep `theory!`.)
 
 ## Costs, paid openly
 

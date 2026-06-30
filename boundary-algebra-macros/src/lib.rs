@@ -17,7 +17,179 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Fields, Ident};
+use syn::parse::{Parse, ParseStream};
+use syn::{
+    parse_macro_input, Data, DataEnum, DeriveInput, Fields, FnArg, Ident, Item, ItemFn, ItemMod,
+    LitStr, ReturnType, Token, Type,
+};
+
+/// `#[algebra(Marker, "display name")]` — generate a WHOLE discovery `Theory` from a module of
+/// ordinary operator functions. No `theory!` block is written: the macro reads each function's
+/// signature (arity → fixity, the single value type → the sort, the name → the symbol), and emits the
+/// operator table, the sort, `sort_of`, `observe` (identity), and the shadow-derived grid. So the
+/// agent authors only the value object and the operator functions — the algebra is what they mean,
+/// not a declaration they also transcribe.
+///
+/// Single-sort: every operator must be over ONE `#[derive(Shaped)]` value type (a function with mixed
+/// types is treated as a helper and ignored). `Engine::<Marker>::new().discover()` then runs it.
+#[proc_macro_attribute]
+pub fn algebra(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let AlgebraArgs { marker, name } = parse_macro_input!(attr as AlgebraArgs);
+    let mut module = parse_macro_input!(item as ItemMod);
+    let content = match &mut module.content {
+        Some((_, items)) => items,
+        None => {
+            return syn::Error::new_spanned(&module, "#[algebra] needs an inline module body")
+                .to_compile_error()
+                .into();
+        }
+    };
+
+    // an operator is a fn whose return type and EVERY argument type are one and the same value type;
+    // anything else in the module (the value enum, helpers, `use`s) is left untouched.
+    let mut value_ty: Option<Type> = None;
+    let mut ops: Vec<(Ident, usize)> = Vec::new();
+    for it in content.iter() {
+        let Item::Fn(f) = it else { continue };
+        let Some((ret, arity)) = operator_shape(f) else {
+            continue;
+        };
+        match &value_ty {
+            Some(prev) if type_str(prev) != type_str(&ret) => {
+                return syn::Error::new_spanned(
+                    &f.sig,
+                    "#[algebra] supports a single sort: every operator must be over one value type",
+                )
+                .to_compile_error()
+                .into();
+            }
+            None => value_ty = Some(ret),
+            _ => {}
+        }
+        ops.push((f.sig.ident.clone(), arity));
+    }
+    let Some(value_ty) = value_ty else {
+        return syn::Error::new_spanned(
+            &module,
+            "#[algebra] found no operator functions (a fn whose args and return are one value type)",
+        )
+        .to_compile_error()
+        .into();
+    };
+
+    let sort = format_ident!("{}Sort", marker);
+    let mut wrappers = Vec::new();
+    let mut entries = Vec::new();
+    for (fname, arity) in &ops {
+        let wname = format_ident!("__op_{}", fname);
+        let clones: Vec<TokenStream2> = (0..*arity)
+            .map(|i| {
+                let idx = proc_macro2::Literal::usize_unsuffixed(i);
+                quote! { __v[#idx].clone() }
+            })
+            .collect();
+        wrappers.push(quote! {
+            fn #wname(__v: &[#value_ty]) -> ::std::option::Option<#value_ty> {
+                ::std::option::Option::Some(#fname(#(#clones),*))
+            }
+        });
+        let fixity = match arity {
+            0 => quote! { Nullary },
+            1 => quote! { Prefix },
+            _ => quote! { Infix },
+        };
+        let inputs: Vec<TokenStream2> = (0..*arity).map(|_| quote! { #sort::Only }).collect();
+        let sym = fname.to_string();
+        entries.push(quote! {
+            crate::discover::engine::Operator {
+                name: #sym,
+                symbol: #sym,
+                fixity: crate::discover::engine::Fixity::#fixity,
+                inputs: ::std::vec![ #(#inputs),* ],
+                output: #sort::Only,
+                eval: #wname,
+            }
+        });
+    }
+
+    let generated = quote! {
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+        pub enum #sort {
+            Only,
+        }
+
+        pub struct #marker;
+
+        impl crate::discover::engine::Theory for #marker {
+            type Sort = #sort;
+            type Value = #value_ty;
+            type Obs = #value_ty;
+            fn name() -> &'static str {
+                #name
+            }
+            fn operators() -> ::std::vec::Vec<crate::discover::engine::Operator<Self>> {
+                ::std::vec![ #(#entries),* ]
+            }
+            fn inhabitants(_sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
+                crate::discover::engine::shadow_grid::<#value_ty>(24)
+            }
+            fn sort_of(_v: &Self::Value) -> Self::Sort {
+                #sort::Only
+            }
+            fn observe(v: &Self::Value) -> Self::Obs {
+                ::std::clone::Clone::clone(v)
+            }
+        }
+
+        #(#wrappers)*
+    };
+
+    let parsed: syn::File = syn::parse2(generated).expect("generated algebra items parse");
+    content.extend(parsed.items);
+    quote! { #module }.into()
+}
+
+/// `#[algebra(Marker, "display name")]`.
+struct AlgebraArgs {
+    marker: Ident,
+    name: LitStr,
+}
+impl Parse for AlgebraArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let marker = input.parse()?;
+        input.parse::<Token![,]>()?;
+        let name = input.parse()?;
+        Ok(AlgebraArgs { marker, name })
+    }
+}
+
+/// If `f` is an operator — return type and every argument a single path type — its `(value type,
+/// arity)`. A receiver, a non-path return, or a mixed-type argument means "not an operator".
+fn operator_shape(f: &ItemFn) -> Option<(Type, usize)> {
+    let ret = match &f.sig.output {
+        ReturnType::Type(_, ty) => (**ty).clone(),
+        ReturnType::Default => return None,
+    };
+    if !matches!(ret, Type::Path(_)) {
+        return None;
+    }
+    let want = type_str(&ret);
+    let mut arity = 0;
+    for arg in &f.sig.inputs {
+        let FnArg::Typed(pt) = arg else {
+            return None;
+        };
+        if type_str(&pt.ty) != want {
+            return None;
+        }
+        arity += 1;
+    }
+    Some((ret, arity))
+}
+
+fn type_str(t: &Type) -> String {
+    quote! { #t }.to_string()
+}
 
 #[proc_macro_derive(Shaped)]
 pub fn derive_shaped(input: TokenStream) -> TokenStream {
