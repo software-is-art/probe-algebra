@@ -181,6 +181,28 @@ apply it — a quick-fix from signal to safe refactor.
 
 ---
 
+## The architect: the suggestion as a dev tool — and the tool is itself an algebra
+
+The cohesion signal and its scaffold only become an *editor experience* when they speak the
+editor's protocol, so `discover::architect` packages them as **LSP**: it analyses each registered
+theory and, for the decomposable ones, emits a **diagnostic** (a `Hint`, anchored at the `theory!`
+declaration) plus a `refactor.extract` **code action** whose `WorkspaceEdit` *creates* the scaffolded
+sub-module files. `cargo run --example architect` prints the LSP payload; `-- --apply <dir>` writes
+the files. It's a quick-fix like any other — the agent names things as it goes, applies it if it
+wants, ignores it if it doesn't.
+
+The dogfood goes one level deeper than "the tool analyses our modules". **The tool's own domain is a
+discovered algebra.** An architect run produces a `Report` — the set of flagged modules — and that
+`Report` is a join-semilattice: merging two runs is **commutative, idempotent, associative, with the
+empty report as identity**. So the architect models its own output as a `theory!`, and the engine
+*discovers* those four laws by running them — the same pipeline that probes arithmetic now probes the
+report type that decides whether arithmetic should be split. A test asserts the architect's `Report`
+theory is itself **cohesive** (one algebra, correctly *not* a candidate for its own refactor) and
+that a live run flags the modules we expect. The abstraction validates the tool that wields the
+abstraction.
+
+---
+
 ## Mutation runs where it pays — and self-hosts
 
 Mutation testing is expensive, so it runs against the **specification**, not the interior:
