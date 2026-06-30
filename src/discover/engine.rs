@@ -7,8 +7,9 @@
 //!   1. ENUMERATES terms over the operators and per-sort variables, canonically (one term per
 //!      behavioural class), so the working set is bounded by behaviour, not raw term count;
 //!   2. instantiates the UNIVERSAL ALGEBRAIC SHAPES (identity, commutativity, associativity,
-//!      annihilation, idempotence, distributivity, involution, round-trip, irreflexivity) over the
-//!      actual operators and keeps the ones that run true over a grid — named laws;
+//!      annihilation, idempotence, distributivity, absorption, involution, round-trip, irreflexivity,
+//!      and the heterogeneous shapes — monoid ACTION, HOMOMORPHISM) over the actual operators and
+//!      keeps the ones that run true over a grid — named laws;
 //!   3. counts every other discovered equality as a CONSEQUENCE, and reports which operators appear
 //!      in no law (where the spec is silent).
 //!
@@ -124,6 +125,12 @@ pub struct Engine<T: Theory> {
 
 /// A term's behavioural signature: the observation at each grid assignment (`None` where undefined).
 type Sig<T> = Vec<Option<<T as Theory>::Obs>>;
+
+/// Is `op` a homogeneous binary operator on sort `s` (`s × s -> s`)? Used by every shape that needs
+/// a binary on a given sort, so a mutation to this predicate breaks laws across all theories.
+fn is_binary_on<T: Theory>(op: &Operator<T>, s: T::Sort) -> bool {
+    op.inputs.len() == 2 && op.inputs[0] == s && op.inputs[1] == s && op.output == s
+}
 
 impl<T: Theory> Engine<T> {
     /// Build the engine for a theory: collect the sorts that appear in the signature, mint `num_vars`
@@ -378,7 +385,7 @@ impl<T: Theory> Engine<T> {
         let ops = &self.ops;
         for (fid, f) in ops.iter().enumerate() {
             // homogeneous binary `f : s × s -> s`
-            if f.inputs.len() == 2 && f.inputs[0] == f.inputs[1] && f.output == f.inputs[0] {
+            if is_binary_on(f, f.output) {
                 let s = f.output;
                 let (Some(x), Some(y), Some(z)) = (self.var(s, 0), self.var(s, 1), self.var(s, 2))
                 else {
@@ -451,14 +458,10 @@ impl<T: Theory> Engine<T> {
                     );
                 }
 
-                // distributivity: f distributes over a homogeneous binary g of the same sort
+                // a second homogeneous binary `g` of the same sort: distributivity and absorption.
                 for (gid, g) in ops.iter().enumerate() {
-                    if gid != fid
-                        && g.inputs.len() == 2
-                        && g.inputs[0] == s
-                        && g.inputs[1] == s
-                        && g.output == s
-                    {
+                    if gid != fid && is_binary_on(g, s) {
+                        // distributivity: f(x, g(y,z)) = g(f(x,y), f(x,z))
                         push(
                             self,
                             format!("{} distributes over {}.", f.name, g.name),
@@ -474,6 +477,61 @@ impl<T: Theory> Engine<T> {
                                 ],
                             ),
                         );
+                        // absorption: f(x, g(x,y)) = x  (e.g. `x ∧ (x ∨ y) = x`)
+                        push(
+                            self,
+                            format!("{} absorbs {}.", f.name, g.name),
+                            Self::app(
+                                fid,
+                                vec![x.clone(), Self::app(gid, vec![x.clone(), y.clone()])],
+                            ),
+                            x.clone(),
+                        );
+                    }
+                }
+            }
+
+            // heterogeneous binary `f : s × t -> s` (an ACTION of `t` on `s`, `t ≠ s`)
+            if f.inputs.len() == 2 && f.inputs[0] == f.output && f.inputs[1] != f.output {
+                let s = f.output;
+                let t = f.inputs[1];
+                if let (Some(x), Some(p), Some(q)) =
+                    (self.var(s, 0), self.var(t, 0), self.var(t, 1))
+                {
+                    // action identity: f(x, c) = x for a constant `c : t` (`add(d, zero) = d`)
+                    for (_, c) in self
+                        .constants()
+                        .into_iter()
+                        .filter(|(cid, _)| ops[*cid].output == t)
+                    {
+                        let cs = self.render(&c);
+                        push(
+                            self,
+                            format!("{} with {} leaves a value unchanged.", f.name, cs),
+                            Self::app(fid, vec![x.clone(), c.clone()]),
+                            x.clone(),
+                        );
+                    }
+                    // action compatibility: f(f(x,p),q) = f(x, g(p,q)) for a binary `g : t × t -> t`
+                    // (`add(add(d,p),q) = add(d, plus(p,q))`)
+                    for (gid, g) in ops.iter().enumerate() {
+                        if is_binary_on(g, t) {
+                            push(
+                                self,
+                                format!(
+                                    "Repeated {} combines its parameters with {}.",
+                                    f.name, g.name
+                                ),
+                                Self::app(
+                                    fid,
+                                    vec![Self::app(fid, vec![x.clone(), p.clone()]), q.clone()],
+                                ),
+                                Self::app(
+                                    fid,
+                                    vec![x.clone(), Self::app(gid, vec![p.clone(), q.clone()])],
+                                ),
+                            );
+                        }
                     }
                 }
             }
@@ -535,6 +593,35 @@ impl<T: Theory> Engine<T> {
                                 Self::app(gid, vec![Self::app(fid, vec![x.clone()])]),
                                 x.clone(),
                             );
+                        }
+                    }
+                }
+
+                // homomorphism: `h(p(x,y)) = q(h(x), h(y))` — `h = f` turns a binary `p` on its input
+                // sort into a binary `q` on its output sort (e.g. De Morgan: `¬(x∧y) = ¬x ∨ ¬y`).
+                if let (Some(xs), Some(ys)) = (self.var(s, 0), self.var(s, 1)) {
+                    for (pid, p) in ops.iter().enumerate() {
+                        if !is_binary_on(p, s) {
+                            continue;
+                        }
+                        for (qid, q) in ops.iter().enumerate() {
+                            if is_binary_on(q, t) {
+                                push(
+                                    self,
+                                    format!("{} turns {} into {}.", f.name, p.name, q.name),
+                                    Self::app(
+                                        fid,
+                                        vec![Self::app(pid, vec![xs.clone(), ys.clone()])],
+                                    ),
+                                    Self::app(
+                                        qid,
+                                        vec![
+                                            Self::app(fid, vec![xs.clone()]),
+                                            Self::app(fid, vec![ys.clone()]),
+                                        ],
+                                    ),
+                                );
+                            }
                         }
                     }
                 }
@@ -727,6 +814,8 @@ mod tests {
             .iter()
             .map(|l| (l.prose.clone(), l.equation.clone()))
             .collect();
+        // the COMPLETE boolean algebra — including both absorption laws and both De Morgan laws —
+        // discovered by running the operators, nothing hand-listed.
         let expected: Vec<(&str, &str)> = vec![
             (
                 "And gives the same result in either order.",
@@ -746,6 +835,7 @@ mod tests {
                 "And distributes over Or.",
                 "(x & (y | z)) = ((x & y) | (x & z))",
             ),
+            ("And absorbs Or.", "(x & (x | y)) = x"),
             (
                 "Or gives the same result in either order.",
                 "(x | y) = (y | x)",
@@ -761,7 +851,10 @@ mod tests {
                 "Or distributes over And.",
                 "(x | (y & z)) = ((x | y) & (x | z))",
             ),
+            ("Or absorbs And.", "(x | (x & y)) = x"),
             ("Not twice returns the original value.", "~(~(x)) = x"),
+            ("Not turns And into Or.", "~((x & y)) = (~(x) | ~(y))"),
+            ("Not turns Or into And.", "~((x | y)) = (~(x) & ~(y))"),
         ];
         let expected: Vec<(String, String)> = expected
             .into_iter()

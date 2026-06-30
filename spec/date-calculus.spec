@@ -6,6 +6,10 @@
       ((p + q) + r) = (p + (q + r))
 - Plus with zero leaves a value unchanged.
       (zero + p) = p
+- Add with zero leaves a value unchanged.
+      add(s, zero) = s
+- Repeated Add combines its parameters with Plus.
+      add(add(s, p), q) = add(s, (p + q))
 - Diff of a value with itself gives zero.
       diff(s, s) = zero
 - at undoes since — the round trip is the identity.
@@ -13,5 +17,5 @@
 - since undoes at — the round trip is the identity.
       since(at(p)) = p
 
-# 249 further consequence equalities (implied by the laws above)
-# operators in no law (where the spec is silent): add
+# 248 further consequence equalities (implied by the laws above)
+# operators in no law (where the spec is silent): none — every operator participates in a law

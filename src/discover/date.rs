@@ -5,9 +5,8 @@
 //! combines durations (a commutative monoid with `zero`); `add` shifts a date by a duration; `diff`
 //! is PARTIAL (a later date minus an earlier one — `None` when it would go negative); `since`/`at`
 //! convert between a date and its days-from-epoch, a round-trip. The engine discovers the duration
-//! monoid and the round trip by running the operators; `add` and `diff` (heterogeneous actions the
-//! universal shape templates don't name) are reported as UNCOVERED — exactly where the spec is
-//! silent and human attention belongs.
+//! monoid, the round trip, AND the duration ACTION on dates (`add(d, zero) = d`, and repeated `add`
+//! combining its parameters with `plus`) — so every operator participates in a law.
 
 use super::engine::{Fixity, Operator, Theory};
 
@@ -153,9 +152,9 @@ mod tests {
     use crate::discover::engine::Engine;
 
     /// The engine discovers, across two sorts and through a PARTIAL operator, the duration monoid
-    /// (commutativity, associativity, identity), the self-difference law, and BOTH round trips —
-    /// and reports `add` (a heterogeneous action the universal shapes don't name) as uncovered: the
-    /// honest "here is where the spec is silent" signal.
+    /// (commutativity, associativity, identity), the duration ACTION on dates (`add(d, zero) = d`,
+    /// and repeated `add` combining its parameters with `plus`), the self-difference law, and BOTH
+    /// round trips — so every operator participates in a law.
     #[test]
     fn the_calendar_algebra_is_discovered() {
         assert_eq!(Calendar::name(), "date calculus");
@@ -176,6 +175,15 @@ mod tests {
                 "((p + q) + r) = (p + (q + r))",
             ),
             ("Plus with zero leaves a value unchanged.", "(zero + p) = p"),
+            // the duration ACTION on dates — now discovered by the action templates.
+            (
+                "Add with zero leaves a value unchanged.",
+                "add(s, zero) = s",
+            ),
+            (
+                "Repeated Add combines its parameters with Plus.",
+                "add(add(s, p), q) = add(s, (p + q))",
+            ),
             (
                 "Diff of a value with itself gives zero.",
                 "diff(s, s) = zero",
@@ -194,9 +202,13 @@ mod tests {
             .map(|(p, q)| (p.to_string(), q.to_string()))
             .collect();
         assert_eq!(got, expected, "the discovered calendar algebra changed");
-        assert_eq!(d.consequences, 249);
-        // `add` (Date × Duration → Date) is a heterogeneous action no universal shape names.
-        assert_eq!(d.uncovered_ops, vec!["add"], "coverage report changed");
+        assert_eq!(d.consequences, 248);
+        // every operator now participates in a law (the action templates cover `add`).
+        assert!(
+            d.uncovered_ops.is_empty(),
+            "uncovered: {:?}",
+            d.uncovered_ops
+        );
         assert_eq!(e.check(&d.laws), Ok(()));
     }
 }

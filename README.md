@@ -105,17 +105,20 @@ router (a monoid)         Or with empty leaves a value unchanged.           (emp
                           — and NOT commutativity: overlapping routers route differently each way,
                             so the engine correctly refuses to report it.
 date calculus (2 sorts)   Plus with zero leaves a value unchanged.          (zero + p) = p
+                          Add with zero leaves a value unchanged.           add(s, zero) = s
                           at undoes since — the round trip is the identity.  at(since(s)) = s
-                          add (a heterogeneous action) is reported UNCOVERED — where the spec is silent.
 ```
 
-Routers have no structural `Eq` — they are compared by how they route a path grid, i.e.
-**observationally**, which is exactly what the engine groups by. The interpreter adds one
-**structural** law over a synthetic **universal observer `U`** (its faithful rendering): `eval`
-collapses structure (`2+3` and `5` are equal to it), so a transform that computes the right value but
-mangles the tree is invisible to the equations — *no two distinct programs look the same to `U`*
-closes that. And the **coverage report** names operators in no law: where the spec is silent and
-human attention belongs.
+The universal shapes the engine tries cover the heterogeneous cases too — monoid **actions**
+(date's `add`), **homomorphisms** (boolean De Morgan, `¬(x∧y) = ¬x ∨ ¬y`), absorption,
+distributivity — so it finds the laws that are actually there, across sorts. Routers have no
+structural `Eq` — they are compared by how they route a path grid, i.e. **observationally**, which
+is exactly what the engine groups by. The interpreter adds one **structural** law over a synthetic
+**universal observer `U`** (its faithful rendering): `eval` collapses structure (`2+3` and `5` are
+equal to it), so a transform that computes the right value but mangles the tree is invisible to the
+equations — *no two distinct programs look the same to `U`* closes that. And when a shape doesn't
+reach an operator, the **coverage report** names it: where the spec is silent and human attention
+belongs.
 
 The discovered spec is **frozen** into a committed file per theory (`spec/*.spec`) — a behaviour
 lock. CI re-derives the live spec and fails if it drifts from the committed text, so the committed
