@@ -8,8 +8,6 @@
 //! monoid, the round trip, AND the duration ACTION on dates (`add(d, zero) = d`, and repeated `add`
 //! combining its parameters with `plus`) — so every operator participates in a law.
 
-use super::engine::{Fixity, Operator, Theory};
-
 /// A value in the calculus: a date or a duration (days).
 #[derive(Clone)]
 pub enum Time {
@@ -53,103 +51,40 @@ fn at(v: &[Time]) -> Option<Time> {
     Some(Time::Date(date(&v[0])))
 }
 
-impl Theory for Calendar {
-    type Sort = Sort;
-    type Value = Time;
-    type Obs = (u8, u32);
-
-    fn name() -> &'static str {
-        "date calculus"
+// The whole multi-sorted `Theory` impl is generated from this block — only the value object
+// (`Time`) and the operator functions above are authored.
+crate::theory! {
+    Calendar : "date calculus", Value = Time, Obs = (u8, u32), Sort = Sort,
+    sort_of = |v: &Time| match v {
+        Time::Date(_) => Sort::Date,
+        Time::Dur(_) => Sort::Duration,
+    },
+    observe = |v: &Time| match v {
+        Time::Date(d) => (0u8, *d),
+        Time::Dur(d) => (1u8, *d),
+    },
+    vars {
+        Sort::Date => &["s", "t", "u"],
+        Sort::Duration => &["p", "q", "r"],
     }
-
-    fn operators() -> Vec<Operator<Self>> {
-        use Fixity::{Infix, Nullary, Prefix};
-        use Sort::{Date, Duration};
-        vec![
-            Operator {
-                name: "Zero",
-                symbol: "zero",
-                fixity: Nullary,
-                inputs: vec![],
-                output: Duration,
-                eval: zero,
-            },
-            Operator {
-                name: "Plus",
-                symbol: "+",
-                fixity: Infix,
-                inputs: vec![Duration, Duration],
-                output: Duration,
-                eval: plus,
-            },
-            Operator {
-                name: "Add",
-                symbol: "add",
-                fixity: Prefix,
-                inputs: vec![Date, Duration],
-                output: Date,
-                eval: add,
-            },
-            Operator {
-                name: "Diff",
-                symbol: "diff",
-                fixity: Prefix,
-                inputs: vec![Date, Date],
-                output: Duration,
-                eval: diff,
-            },
-            Operator {
-                name: "since",
-                symbol: "since",
-                fixity: Prefix,
-                inputs: vec![Date],
-                output: Duration,
-                eval: since,
-            },
-            Operator {
-                name: "at",
-                symbol: "at",
-                fixity: Prefix,
-                inputs: vec![Duration],
-                output: Date,
-                eval: at,
-            },
-        ]
+    inhabit {
+        Sort::Date => [0u32, 1, 2, 3, 5, 8].into_iter().map(Time::Date).collect(),
+        Sort::Duration => [0u32, 1, 2, 4].into_iter().map(Time::Dur).collect(),
     }
-
-    fn inhabitants(sort: Self::Sort) -> Vec<Self::Value> {
-        match sort {
-            Sort::Date => [0u32, 1, 2, 3, 5, 8].into_iter().map(Time::Date).collect(),
-            Sort::Duration => [0u32, 1, 2, 4].into_iter().map(Time::Dur).collect(),
-        }
-    }
-
-    fn sort_of(value: &Self::Value) -> Self::Sort {
-        match value {
-            Time::Date(_) => Sort::Date,
-            Time::Dur(_) => Sort::Duration,
-        }
-    }
-
-    fn observe(value: &Self::Value) -> Self::Obs {
-        match value {
-            Time::Date(d) => (0, *d),
-            Time::Dur(d) => (1, *d),
-        }
-    }
-
-    fn sort_vars(sort: Self::Sort) -> &'static [&'static str] {
-        match sort {
-            Sort::Date => &["s", "t", "u"],
-            Sort::Duration => &["p", "q", "r"],
-        }
+    ops {
+        Nullary "Zero"  "zero"  () -> Sort::Duration = zero;
+        Infix   "Plus"  "+"     (Sort::Duration, Sort::Duration) -> Sort::Duration = plus;
+        Prefix  "Add"   "add"   (Sort::Date, Sort::Duration) -> Sort::Date = add;
+        Prefix  "Diff"  "diff"  (Sort::Date, Sort::Date) -> Sort::Duration = diff;
+        Prefix  "since" "since" (Sort::Date) -> Sort::Duration = since;
+        Prefix  "at"    "at"    (Sort::Duration) -> Sort::Date = at;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::discover::engine::Engine;
+    use crate::discover::engine::{Engine, Theory};
 
     /// The engine discovers, across two sorts and through a PARTIAL operator, the duration monoid
     /// (commutativity, associativity, identity), the duration ACTION on dates (`add(d, zero) = d`,

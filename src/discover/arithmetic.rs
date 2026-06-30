@@ -3,7 +3,6 @@
 //! Every operator routes through the REAL interpreter (`Check` then `Eval`), so the discovered laws,
 //! re-probed, exercise the interpreter's interior — a mutant that breaks `eval` breaks a law.
 
-use super::engine::{Fixity, Operator, Theory};
 use crate::gdp::with_seed;
 use crate::interp::boundary::{Check, Eval, Expr, Int, Op, Value};
 
@@ -59,96 +58,32 @@ fn fls(_: &[Value]) -> Option<Value> {
     Some(Value::Bool(false))
 }
 
-impl Theory for Arithmetic {
-    type Sort = Sort;
-    type Value = Value;
-    type Obs = (u8, i64);
-
-    fn name() -> &'static str {
-        "interpreter arithmetic"
+// The whole `Theory` impl is generated — even for the interpreter-backed theory, only the operator
+// functions (which route through the real `Check` ⊳ `Eval`) and the `Sort` enum are authored.
+crate::theory! {
+    Arithmetic : "interpreter arithmetic", Value = Value, Obs = (u8, i64), Sort = Sort,
+    sort_of = |v: &Value| match v {
+        Value::Int(_) => Sort::Int,
+        Value::Bool(_) => Sort::Bool,
+    },
+    observe = |v: &Value| match v {
+        Value::Int(i) => (0u8, i.get()),
+        Value::Bool(b) => (1u8, *b as i64),
+    },
+    vars {
+        Sort::Int => &["x", "y", "z"],
+        Sort::Bool => &["p", "q", "r"],
     }
-
-    fn operators() -> Vec<Operator<Self>> {
-        use Fixity::{Infix, Nullary};
-        vec![
-            Operator {
-                name: "Zero",
-                symbol: "0",
-                fixity: Nullary,
-                inputs: vec![],
-                output: Sort::Int,
-                eval: zero,
-            },
-            Operator {
-                name: "One",
-                symbol: "1",
-                fixity: Nullary,
-                inputs: vec![],
-                output: Sort::Int,
-                eval: one,
-            },
-            Operator {
-                name: "False",
-                symbol: "false",
-                fixity: Nullary,
-                inputs: vec![],
-                output: Sort::Bool,
-                eval: fls,
-            },
-            Operator {
-                name: "Addition",
-                symbol: "+",
-                fixity: Infix,
-                inputs: vec![Sort::Int, Sort::Int],
-                output: Sort::Int,
-                eval: add,
-            },
-            Operator {
-                name: "Multiplication",
-                symbol: "*",
-                fixity: Infix,
-                inputs: vec![Sort::Int, Sort::Int],
-                output: Sort::Int,
-                eval: mul,
-            },
-            Operator {
-                name: "less than",
-                symbol: "<",
-                fixity: Infix,
-                inputs: vec![Sort::Int, Sort::Int],
-                output: Sort::Bool,
-                eval: lt,
-            },
-        ]
+    inhabit {
+        Sort::Int => (0..8).map(|n| Value::Int(Int::new(n).expect("n >= 0"))).collect(),
+        Sort::Bool => vec![Value::Bool(false), Value::Bool(true)],
     }
-
-    fn inhabitants(sort: Self::Sort) -> Vec<Self::Value> {
-        match sort {
-            Sort::Int => (0..8)
-                .map(|n| Value::Int(Int::new(n).expect("n >= 0")))
-                .collect(),
-            Sort::Bool => vec![Value::Bool(false), Value::Bool(true)],
-        }
-    }
-
-    fn sort_of(value: &Self::Value) -> Self::Sort {
-        match value {
-            Value::Int(_) => Sort::Int,
-            Value::Bool(_) => Sort::Bool,
-        }
-    }
-
-    fn observe(value: &Self::Value) -> Self::Obs {
-        match value {
-            Value::Int(i) => (0, i.get()),
-            Value::Bool(b) => (1, *b as i64),
-        }
-    }
-
-    fn sort_vars(sort: Self::Sort) -> &'static [&'static str] {
-        match sort {
-            Sort::Int => &["x", "y", "z"],
-            Sort::Bool => &["p", "q", "r"],
-        }
+    ops {
+        Nullary "Zero"           "0"     () -> Sort::Int = zero;
+        Nullary "One"            "1"     () -> Sort::Int = one;
+        Nullary "False"          "false" () -> Sort::Bool = fls;
+        Infix   "Addition"       "+"     (Sort::Int, Sort::Int) -> Sort::Int = add;
+        Infix   "Multiplication" "*"     (Sort::Int, Sort::Int) -> Sort::Int = mul;
+        Infix   "less than"      "<"     (Sort::Int, Sort::Int) -> Sort::Bool = lt;
     }
 }

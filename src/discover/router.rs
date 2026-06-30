@@ -9,8 +9,6 @@
 //! idempotence — but NOT commutativity, which the engine correctly refuses to report because
 //! overlapping routers route differently in each order.
 
-use super::engine::{Fixity, Operator, Theory};
-
 /// The number of distinct paths the router is observed over.
 const PATHS: usize = 4;
 
@@ -42,67 +40,37 @@ fn or(vs: &[Routes]) -> Option<Routes> {
     Some(Routes(out))
 }
 
-impl Theory for Router {
-    type Sort = Sort;
-    type Value = Routes;
-    type Obs = Vec<Option<u8>>;
+/// A spread that includes OVERLAPPING routers (several route path 0), so the grid can tell
+/// `a or b` from `b or a` — and the engine correctly omits commutativity.
+fn routers() -> Vec<Routes> {
+    vec![
+        Routes([None, None, None, None]),
+        Routes([Some(1), None, None, None]),
+        Routes([None, Some(2), None, None]),
+        Routes([Some(3), Some(4), None, None]),
+        Routes([Some(5), None, Some(6), None]),
+        Routes([None, None, None, Some(7)]),
+    ]
+}
 
-    fn name() -> &'static str {
-        "router"
-    }
-
-    fn operators() -> Vec<Operator<Self>> {
-        use Fixity::{Infix, Nullary};
-        vec![
-            Operator {
-                name: "Empty",
-                symbol: "empty",
-                fixity: Nullary,
-                inputs: vec![],
-                output: Sort::Router,
-                eval: empty,
-            },
-            Operator {
-                name: "Or",
-                symbol: "or",
-                fixity: Infix,
-                inputs: vec![Sort::Router, Sort::Router],
-                output: Sort::Router,
-                eval: or,
-            },
-        ]
-    }
-
-    fn inhabitants(_: Self::Sort) -> Vec<Self::Value> {
-        // a spread that includes OVERLAPPING routers (several route path 0), so the grid can tell
-        // `a or b` from `b or a` — and the engine correctly omits commutativity.
-        vec![
-            Routes([None, None, None, None]),
-            Routes([Some(1), None, None, None]),
-            Routes([None, Some(2), None, None]),
-            Routes([Some(3), Some(4), None, None]),
-            Routes([Some(5), None, Some(6), None]),
-            Routes([None, None, None, Some(7)]),
-        ]
-    }
-
-    fn sort_of(_: &Self::Value) -> Self::Sort {
-        Sort::Router
-    }
-
-    fn observe(value: &Self::Value) -> Self::Obs {
-        value.0.to_vec()
-    }
-
-    fn sort_vars(_: Self::Sort) -> &'static [&'static str] {
-        &["a", "b", "c"]
+// The whole `Theory` impl is generated from this block — the operator functions (`empty`, `or`) and
+// the value object (`Routes`) above are the only authored content.
+crate::theory! {
+    Router : "router", Value = Routes, Obs = Vec<Option<u8>>, Sort = Sort,
+    sort_of = |_: &Routes| Sort::Router,
+    observe = |v: &Routes| v.0.to_vec(),
+    vars { Sort::Router => &["a", "b", "c"], }
+    inhabit { Sort::Router => routers(), }
+    ops {
+        Nullary "Empty" "empty" () -> Sort::Router = empty;
+        Infix   "Or"    "or"    (Sort::Router, Sort::Router) -> Sort::Router = or;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::discover::engine::Engine;
+    use crate::discover::engine::{Engine, Theory};
 
     /// The engine discovers the router's monoid by running it: identity, associativity, idempotence —
     /// and crucially NOT commutativity (overlapping routers route differently in each order, so the
