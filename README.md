@@ -170,6 +170,15 @@ module `date calculus`:          decomposes into 2 — { zero, +, add, diff } an
                                  seam on Date, Duration — transform (since/at convert: a layer line)
 ```
 
+And the suggestion has an *action*: `discover::scaffold` (`cargo run --example scaffold`) emits the
+split — one `theory!` skeleton per component (operators, fixities, and sorts carried faithfully; the
+`eval` functions left as move-here markers, since the interior is what moves), plus the seam
+obligation. The split is **lossless** by construction — components are defined by law-connectivity,
+so every discovered law lives entirely inside one sub-module — and the only obligation is the seam: a
+transport seam shares a type (safe by construction), a transform seam emits a homomorphism check so a
+bad cut becomes a failing probe, not a silent bug. You (or an agent, naming as it goes) ratify and
+apply it — a quick-fix from signal to safe refactor.
+
 ---
 
 ## Mutation runs where it pays — and self-hosts

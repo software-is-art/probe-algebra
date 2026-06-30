@@ -22,7 +22,7 @@ use std::collections::BTreeSet;
 use super::engine::{Engine, Term, Theory};
 
 /// What kind of seam a split would create.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SeamKind {
     /// The components share a sort with operators on both sides — the algebra stays (coherence).
     Transport,
