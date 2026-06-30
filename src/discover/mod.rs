@@ -17,6 +17,7 @@
 //! resource limit, not a curated list).
 
 pub mod arithmetic;
+pub mod coherence;
 pub mod date;
 pub mod engine;
 pub mod freeze;
