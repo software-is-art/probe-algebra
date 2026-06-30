@@ -15,23 +15,24 @@
 //! `Ident`) impl `Shaped` by hand; everything composite is derived.
 
 use proc_macro::TokenStream;
+use proc_macro2::Literal;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{
     parse_macro_input, Data, DataEnum, DeriveInput, Fields, FnArg, Ident, Item, ItemFn, ItemMod,
-    LitStr, ReturnType, Token, Type,
+    LitStr, ReturnType, Token, Type, Visibility,
 };
 
 /// `#[algebra(Marker, "display name")]` — generate a WHOLE discovery `Theory` from a module of
-/// ordinary operator functions. No `theory!` block is written: the macro reads each function's
-/// signature (arity → fixity, the single value type → the sort, the name → the symbol), and emits the
-/// operator table, the sort, `sort_of`, `observe` (identity), and the shadow-derived grid. So the
-/// agent authors only the value object and the operator functions — the algebra is what they mean,
-/// not a declaration they also transcribe.
+/// ordinary operator functions. No `theory!` block is written: the macro reads each PUBLIC function's
+/// signature — arity → fixity, the value types → the sorts, the name → the symbol — and emits the
+/// operator table, the sort(s), `sort_of`, identity `observe`, and the shadow-derived grid. So the
+/// agent authors only the value objects and the operator functions; the algebra is what they mean.
 ///
-/// Single-sort: every operator must be over ONE `#[derive(Shaped)]` value type (a function with mixed
-/// types is treated as a helper and ignored). `Engine::<Marker>::new().discover()` then runs it.
+/// MULTI-SORTED: operators may range over several `#[derive(Shaped)]` value types (e.g. `Date` and
+/// `Duration`). The macro synthesises a `Value` sum over the sorts and the `sort_of` that tags it. The
+/// module's PUBLIC functions are its operators; private functions are helpers, left untouched.
 #[proc_macro_attribute]
 pub fn algebra(attr: TokenStream, item: TokenStream) -> TokenStream {
     let AlgebraArgs { marker, name } = parse_macro_input!(attr as AlgebraArgs);
@@ -45,108 +46,51 @@ pub fn algebra(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    // an operator is a fn whose return type and EVERY argument type are one and the same value type;
-    // anything else in the module (the value enum, helpers, `use`s) is left untouched.
-    let mut value_ty: Option<Type> = None;
-    let mut ops: Vec<(Ident, usize)> = Vec::new();
+    // the module's PUBLIC functions are the operators; everything else (the value enums, private
+    // helpers, `use`s) is left untouched.
+    let mut ops: Vec<OpInfo> = Vec::new();
     for it in content.iter() {
         let Item::Fn(f) = it else { continue };
-        let Some((ret, arity)) = operator_shape(f) else {
+        if !matches!(f.vis, Visibility::Public(_)) {
             continue;
-        };
-        match &value_ty {
-            Some(prev) if type_str(prev) != type_str(&ret) => {
+        }
+        match operator_info(f) {
+            Some(op) => ops.push(op),
+            None => {
                 return syn::Error::new_spanned(
                     &f.sig,
-                    "#[algebra] supports a single sort: every operator must be over one value type",
+                    "#[algebra]: a public function must be an operator — every argument and the \
+                     return must be a named value type (make helpers private)",
                 )
                 .to_compile_error()
                 .into();
             }
-            None => value_ty = Some(ret),
-            _ => {}
         }
-        ops.push((f.sig.ident.clone(), arity));
     }
-    let Some(value_ty) = value_ty else {
-        return syn::Error::new_spanned(
-            &module,
-            "#[algebra] found no operator functions (a fn whose args and return are one value type)",
-        )
-        .to_compile_error()
-        .into();
-    };
-
-    let sort = format_ident!("{}Sort", marker);
-    let mut wrappers = Vec::new();
-    let mut entries = Vec::new();
-    for (fname, arity) in &ops {
-        let wname = format_ident!("__op_{}", fname);
-        let clones: Vec<TokenStream2> = (0..*arity)
-            .map(|i| {
-                let idx = proc_macro2::Literal::usize_unsuffixed(i);
-                quote! { __v[#idx].clone() }
-            })
-            .collect();
-        wrappers.push(quote! {
-            fn #wname(__v: &[#value_ty]) -> ::std::option::Option<#value_ty> {
-                ::std::option::Option::Some(#fname(#(#clones),*))
-            }
-        });
-        let fixity = match arity {
-            0 => quote! { Nullary },
-            1 => quote! { Prefix },
-            _ => quote! { Infix },
-        };
-        let inputs: Vec<TokenStream2> = (0..*arity).map(|_| quote! { #sort::Only }).collect();
-        let sym = fname.to_string();
-        entries.push(quote! {
-            crate::discover::engine::Operator {
-                name: #sym,
-                symbol: #sym,
-                fixity: crate::discover::engine::Fixity::#fixity,
-                inputs: ::std::vec![ #(#inputs),* ],
-                output: #sort::Only,
-                eval: #wname,
-            }
-        });
+    if ops.is_empty() {
+        return syn::Error::new_spanned(&module, "#[algebra] found no public operator functions")
+            .to_compile_error()
+            .into();
     }
 
-    let generated = quote! {
-        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-        pub enum #sort {
-            Only,
-        }
-
-        pub struct #marker;
-
-        impl crate::discover::engine::Theory for #marker {
-            type Sort = #sort;
-            type Value = #value_ty;
-            type Obs = #value_ty;
-            fn name() -> &'static str {
-                #name
-            }
-            fn operators() -> ::std::vec::Vec<crate::discover::engine::Operator<Self>> {
-                ::std::vec![ #(#entries),* ]
-            }
-            fn inhabitants(_sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
-                crate::discover::engine::shadow_grid::<#value_ty>(24)
-            }
-            fn sort_of(_v: &Self::Value) -> Self::Sort {
-                #sort::Only
-            }
-            fn observe(v: &Self::Value) -> Self::Obs {
-                ::std::clone::Clone::clone(v)
-            }
-        }
-
-        #(#wrappers)*
+    // the sorts are the distinct value types appearing in the signatures, in first-seen order.
+    let sorts = distinct_sorts(&ops);
+    let generated = if sorts.len() == 1 {
+        single_sort_impl(&marker, &name, &ops, &sorts[0])
+    } else {
+        multi_sort_impl(&marker, &name, &ops, &sorts)
     };
 
     let parsed: syn::File = syn::parse2(generated).expect("generated algebra items parse");
     content.extend(parsed.items);
     quote! { #module }.into()
+}
+
+/// One operator read off a function: its name, the (named) argument types, and the return type.
+struct OpInfo {
+    name: Ident,
+    args: Vec<Type>,
+    ret: Type,
 }
 
 /// `#[algebra(Marker, "display name")]`.
@@ -163,9 +107,9 @@ impl Parse for AlgebraArgs {
     }
 }
 
-/// If `f` is an operator — return type and every argument a single path type — its `(value type,
-/// arity)`. A receiver, a non-path return, or a mixed-type argument means "not an operator".
-fn operator_shape(f: &ItemFn) -> Option<(Type, usize)> {
+/// Read an operator off a function: every argument and the return must be a NAMED (path) type — a
+/// receiver or a non-path type means it is not an operator over value objects.
+fn operator_info(f: &ItemFn) -> Option<OpInfo> {
     let ret = match &f.sig.output {
         ReturnType::Type(_, ty) => (**ty).clone(),
         ReturnType::Default => return None,
@@ -173,22 +117,215 @@ fn operator_shape(f: &ItemFn) -> Option<(Type, usize)> {
     if !matches!(ret, Type::Path(_)) {
         return None;
     }
-    let want = type_str(&ret);
-    let mut arity = 0;
+    let mut args = Vec::new();
     for arg in &f.sig.inputs {
         let FnArg::Typed(pt) = arg else {
             return None;
         };
-        if type_str(&pt.ty) != want {
+        let ty = (*pt.ty).clone();
+        if !matches!(ty, Type::Path(_)) {
             return None;
         }
-        arity += 1;
+        args.push(ty);
     }
-    Some((ret, arity))
+    Some(OpInfo {
+        name: f.sig.ident.clone(),
+        args,
+        ret,
+    })
+}
+
+/// The distinct value types across every operator's signature, in first-seen order.
+fn distinct_sorts(ops: &[OpInfo]) -> Vec<Type> {
+    let mut seen: Vec<Type> = Vec::new();
+    for op in ops {
+        for ty in op.args.iter().chain(std::iter::once(&op.ret)) {
+            if !seen.iter().any(|t| type_str(t) == type_str(ty)) {
+                seen.push(ty.clone());
+            }
+        }
+    }
+    seen
 }
 
 fn type_str(t: &Type) -> String {
     quote! { #t }.to_string()
+}
+
+/// The variant identifier a value type contributes to the synthesised `Value`/`Sort` enums — its
+/// last path segment (`crate::date::Duration` → `Duration`).
+fn variant_of(ty: &Type) -> Ident {
+    match ty {
+        Type::Path(tp) => tp.path.segments.last().unwrap().ident.clone(),
+        _ => format_ident!("Sort"),
+    }
+}
+
+fn fixity_tokens(arity: usize) -> TokenStream2 {
+    match arity {
+        0 => quote! { Nullary },
+        1 => quote! { Prefix },
+        _ => quote! { Infix },
+    }
+}
+
+/// SINGLE-SORT: the value type IS the engine `Value`; one sort, identity observation, shadow grid.
+fn single_sort_impl(
+    marker: &Ident,
+    name: &LitStr,
+    ops: &[OpInfo],
+    value_ty: &Type,
+) -> TokenStream2 {
+    let sort = format_ident!("{}Sort", marker);
+    let mut wrappers = Vec::new();
+    let mut entries = Vec::new();
+    for op in ops {
+        let wname = format_ident!("__op_{}", op.name);
+        let fname = &op.name;
+        let arity = op.args.len();
+        let clones: Vec<TokenStream2> = (0..arity)
+            .map(|i| {
+                let idx = Literal::usize_unsuffixed(i);
+                quote! { __v[#idx].clone() }
+            })
+            .collect();
+        wrappers.push(quote! {
+            fn #wname(__v: &[#value_ty]) -> ::std::option::Option<#value_ty> {
+                ::std::option::Option::Some(#fname(#(#clones),*))
+            }
+        });
+        let fixity = fixity_tokens(arity);
+        let inputs: Vec<TokenStream2> = (0..arity).map(|_| quote! { #sort::Only }).collect();
+        let sym = op.name.to_string();
+        entries.push(quote! {
+            crate::discover::engine::Operator {
+                name: #sym,
+                symbol: #sym,
+                fixity: crate::discover::engine::Fixity::#fixity,
+                inputs: ::std::vec![ #(#inputs),* ],
+                output: #sort::Only,
+                eval: #wname,
+            }
+        });
+    }
+    quote! {
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+        pub enum #sort {
+            Only,
+        }
+        pub struct #marker;
+        impl crate::discover::engine::Theory for #marker {
+            type Sort = #sort;
+            type Value = #value_ty;
+            type Obs = #value_ty;
+            fn name() -> &'static str { #name }
+            fn operators() -> ::std::vec::Vec<crate::discover::engine::Operator<Self>> {
+                ::std::vec![ #(#entries),* ]
+            }
+            fn inhabitants(_sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
+                crate::discover::engine::shadow_grid::<#value_ty>(24)
+            }
+            fn sort_of(_v: &Self::Value) -> Self::Sort { #sort::Only }
+            fn observe(v: &Self::Value) -> Self::Obs { ::std::clone::Clone::clone(v) }
+        }
+        #(#wrappers)*
+    }
+}
+
+/// MULTI-SORT: synthesise a `Value` SUM over the sorts (`Value::Date(Date) | Value::Duration(..)`)
+/// and a matching `Sort` enum; each operator wrapper pattern-matches its argument sorts. The grid per
+/// sort is the shadow grid of that type, wrapped into the sum.
+fn multi_sort_impl(marker: &Ident, name: &LitStr, ops: &[OpInfo], sorts: &[Type]) -> TokenStream2 {
+    let value_enum = format_ident!("{}Value", marker);
+    let sort_enum = format_ident!("{}Sort", marker);
+    let variants: Vec<Ident> = sorts.iter().map(variant_of).collect();
+
+    let value_variants = sorts
+        .iter()
+        .zip(&variants)
+        .map(|(ty, v)| quote! { #v(#ty) });
+    let sort_of_arms = variants
+        .iter()
+        .map(|v| quote! { #value_enum::#v(_) => #sort_enum::#v });
+    let inhab_arms = sorts.iter().zip(&variants).map(|(ty, v)| {
+        quote! {
+            #sort_enum::#v => crate::discover::engine::shadow_grid::<#ty>(12)
+                .into_iter()
+                .map(#value_enum::#v)
+                .collect()
+        }
+    });
+
+    let mut wrappers = Vec::new();
+    let mut entries = Vec::new();
+    for op in ops {
+        let wname = format_ident!("__op_{}", op.name);
+        let fname = &op.name;
+        let arity = op.args.len();
+        let ret_v = variant_of(&op.ret);
+        let binds: Vec<Ident> = (0..arity).map(|i| format_ident!("__a{}", i)).collect();
+        let pats = op.args.iter().zip(&binds).map(|(ty, b)| {
+            let v = variant_of(ty);
+            quote! { #value_enum::#v(#b) }
+        });
+        let calls = binds.iter().map(|b| quote! { #b.clone() });
+        let body = if arity == 0 {
+            quote! { ::std::option::Option::Some(#value_enum::#ret_v(#fname())) }
+        } else {
+            quote! {
+                match __v {
+                    [ #(#pats),* ] => ::std::option::Option::Some(
+                        #value_enum::#ret_v(#fname( #(#calls),* ))
+                    ),
+                    _ => ::std::option::Option::None,
+                }
+            }
+        };
+        wrappers.push(quote! {
+            fn #wname(__v: &[#value_enum]) -> ::std::option::Option<#value_enum> { #body }
+        });
+        let fixity = fixity_tokens(arity);
+        let inputs = op.args.iter().map(|ty| {
+            let v = variant_of(ty);
+            quote! { #sort_enum::#v }
+        });
+        let sym = op.name.to_string();
+        entries.push(quote! {
+            crate::discover::engine::Operator {
+                name: #sym,
+                symbol: #sym,
+                fixity: crate::discover::engine::Fixity::#fixity,
+                inputs: ::std::vec![ #(#inputs),* ],
+                output: #sort_enum::#ret_v,
+                eval: #wname,
+            }
+        });
+    }
+
+    quote! {
+        #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+        pub enum #value_enum { #(#value_variants),* }
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+        pub enum #sort_enum { #(#variants),* }
+        pub struct #marker;
+        impl crate::discover::engine::Theory for #marker {
+            type Sort = #sort_enum;
+            type Value = #value_enum;
+            type Obs = #value_enum;
+            fn name() -> &'static str { #name }
+            fn operators() -> ::std::vec::Vec<crate::discover::engine::Operator<Self>> {
+                ::std::vec![ #(#entries),* ]
+            }
+            fn inhabitants(__sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
+                match __sort { #(#inhab_arms),* }
+            }
+            fn sort_of(__v: &Self::Value) -> Self::Sort {
+                match __v { #(#sort_of_arms),* }
+            }
+            fn observe(__v: &Self::Value) -> Self::Obs { ::std::clone::Clone::clone(__v) }
+        }
+        #(#wrappers)*
+    }
 }
 
 #[proc_macro_derive(Shaped)]

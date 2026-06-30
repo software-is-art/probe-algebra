@@ -35,10 +35,79 @@ pub mod lattice {
     }
 }
 
+/// MULTI-SORTED: operators ranging over TWO value types. The macro synthesises a `Value` sum over
+/// `Lo` and `Hi` and the `sort_of` that tags it — so a domain spanning several sorts (like the date
+/// calculus's `Date`/`Duration`) is still just its value objects and functions. `lift` carries the
+/// small lattice into the large one; the engine discovers it is a homomorphism, across the sorts.
+#[algebra(Graded, "graded lattices")]
+pub mod graded {
+    use crate::Shaped;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
+    pub enum Lo {
+        Bot,
+        Top,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
+    pub enum Hi {
+        X,
+        Y,
+        Z,
+    }
+
+    pub fn meet_lo(a: Lo, b: Lo) -> Lo {
+        a.min(b)
+    }
+    pub fn meet_hi(a: Hi, b: Hi) -> Hi {
+        a.min(b)
+    }
+    pub fn lift(x: Lo) -> Hi {
+        match x {
+            Lo::Bot => Hi::X,
+            Lo::Top => Hi::Y,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::graded::Graded;
     use super::lattice::{Lattice, LatticeSort, Tri};
     use crate::discover::engine::{shadow_grid, Engine, Theory};
+
+    /// MULTI-SORT autogeneration: from two `#[derive(Shaped)]` value enums (`Lo`, `Hi`) and three
+    /// functions, `#[algebra]` synthesised a TWO-SORTED `Theory` — the `Value` sum and the `sort_of`
+    /// that tags it — and the engine discovers both monoids AND the cross-sort homomorphism `lift`.
+    /// No `Value` enum, no `sort_of`, no `theory!` was written; the multi-sorted algebra is just the
+    /// value objects and the functions.
+    #[test]
+    fn a_multi_sorted_theory_is_generated_and_discovered() {
+        let proses: Vec<String> = Engine::<Graded>::new()
+            .discover()
+            .laws
+            .iter()
+            .map(|l| l.prose.clone())
+            .collect();
+        assert_eq!(
+            proses,
+            vec![
+                "meet_lo gives the same result in either order.".to_string(),
+                "With meet_lo, the grouping of three values doesn't matter.".to_string(),
+                "meet_lo of a value with itself gives that value.".to_string(),
+                "meet_hi gives the same result in either order.".to_string(),
+                "With meet_hi, the grouping of three values doesn't matter.".to_string(),
+                "meet_hi of a value with itself gives that value.".to_string(),
+                "lift turns meet_lo into meet_hi.".to_string(), // the cross-sort homomorphism
+            ],
+            "the generated two-sorted spec"
+        );
+        // the synthesised theory genuinely spans TWO sorts (the operators touch both).
+        let sorts: std::collections::BTreeSet<_> = <Graded as Theory>::operators()
+            .iter()
+            .flat_map(|o| o.inputs.iter().chain(std::iter::once(&o.output)).copied())
+            .collect();
+        assert_eq!(sorts.len(), 2, "two sorts synthesised from the value types");
+    }
 
     /// The macro generated a real `Theory`: a marker (`Lattice`), a sort (`LatticeSort`), and the
     /// operator table — from two ordinary functions. The grid still comes from the value type's
