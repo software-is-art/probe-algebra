@@ -36,43 +36,47 @@ pub mod lattice {
 }
 
 /// MULTI-SORTED: operators ranging over TWO value types. The macro synthesises a `Value` sum over
-/// `Lo` and `Hi` and the `sort_of` that tags it — so a domain spanning several sorts (like the date
-/// calculus's `Date`/`Duration`) is still just its value objects and functions. `lift` carries the
-/// small lattice into the large one; the engine discovers it is a homomorphism, across the sorts.
-#[algebra(Graded, "graded lattices")]
-pub mod graded {
+/// `Small` and `Large` and the `sort_of` that tags it — so a domain spanning several sorts (like the
+/// date calculus's `Date`/`Duration`) is still just its value objects and functions. `lift` carries
+/// the small lattice into the large one; the engine discovers it is a homomorphism, across the sorts.
+///
+/// (Names are kept clear of the crate's type-level vocabulary — `Z`, `S`, `Graded` are Peano/grading
+/// types in `boundary`, and reusing them makes rustc fully-qualify paths in the compile-fail
+/// `.stderr` fixtures.)
+#[algebra(Tiers, "graded lattices")]
+pub mod tiers {
     use crate::Shaped;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
-    pub enum Lo {
+    pub enum Small {
         Bot,
         Top,
     }
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
-    pub enum Hi {
-        X,
-        Y,
-        Z,
+    pub enum Large {
+        One,
+        Two,
+        Three,
     }
 
-    pub fn meet_lo(a: Lo, b: Lo) -> Lo {
+    pub fn meet_small(a: Small, b: Small) -> Small {
         a.min(b)
     }
-    pub fn meet_hi(a: Hi, b: Hi) -> Hi {
+    pub fn meet_large(a: Large, b: Large) -> Large {
         a.min(b)
     }
-    pub fn lift(x: Lo) -> Hi {
+    pub fn lift(x: Small) -> Large {
         match x {
-            Lo::Bot => Hi::X,
-            Lo::Top => Hi::Y,
+            Small::Bot => Large::One,
+            Small::Top => Large::Two,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::graded::Graded;
     use super::lattice::{Lattice, LatticeSort, Tri};
+    use super::tiers::Tiers;
     use crate::discover::engine::{shadow_grid, Engine, Theory};
 
     /// MULTI-SORT autogeneration: from two `#[derive(Shaped)]` value enums (`Lo`, `Hi`) and three
@@ -82,7 +86,7 @@ mod tests {
     /// value objects and the functions.
     #[test]
     fn a_multi_sorted_theory_is_generated_and_discovered() {
-        let proses: Vec<String> = Engine::<Graded>::new()
+        let proses: Vec<String> = Engine::<Tiers>::new()
             .discover()
             .laws
             .iter()
@@ -91,18 +95,18 @@ mod tests {
         assert_eq!(
             proses,
             vec![
-                "meet_lo gives the same result in either order.".to_string(),
-                "With meet_lo, the grouping of three values doesn't matter.".to_string(),
-                "meet_lo of a value with itself gives that value.".to_string(),
-                "meet_hi gives the same result in either order.".to_string(),
-                "With meet_hi, the grouping of three values doesn't matter.".to_string(),
-                "meet_hi of a value with itself gives that value.".to_string(),
-                "lift turns meet_lo into meet_hi.".to_string(), // the cross-sort homomorphism
+                "meet_small gives the same result in either order.".to_string(),
+                "With meet_small, the grouping of three values doesn't matter.".to_string(),
+                "meet_small of a value with itself gives that value.".to_string(),
+                "meet_large gives the same result in either order.".to_string(),
+                "With meet_large, the grouping of three values doesn't matter.".to_string(),
+                "meet_large of a value with itself gives that value.".to_string(),
+                "lift turns meet_small into meet_large.".to_string(), // the cross-sort homomorphism
             ],
             "the generated two-sorted spec"
         );
         // the synthesised theory genuinely spans TWO sorts (the operators touch both).
-        let sorts: std::collections::BTreeSet<_> = <Graded as Theory>::operators()
+        let sorts: std::collections::BTreeSet<_> = <Tiers as Theory>::operators()
             .iter()
             .flat_map(|o| o.inputs.iter().chain(std::iter::once(&o.output)).copied())
             .collect();
