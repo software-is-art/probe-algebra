@@ -128,6 +128,27 @@ expect but don't see is a bug surfaced.
 
 ---
 
+## Coherence: do two modules *agree*, not just *connect*?
+
+The type system answers "do these modules **connect**?" — type, witness, and grading compatibility,
+total at compile time. It does not answer "do they **agree**?". Two modules can be perfectly
+connectable and silently *incoherent* — meaning different things about a value type they share. So
+`discover::coherence` checks it behaviourally: two same-signature modules are **coherent** iff every
+law one discovers also holds under the other's operators. `max`-merge and `gcd`-merge are coherent
+(different operators, identical laws — coherence is law-agreement, not operator-equality); `max`-merge
+and a first-match merge are **incoherent** (both expose `merge : Key × Key → Key`, so they wire and
+type-check, but they disagree on commutativity — the bug class types can't see). This is the
+behavioural analog of `gdp`'s proof-carrying seam: gdp carries a value's *proof* across a seam, this
+checks its *laws* survive it.
+
+It frames a whole program as a **graph of algebras**: each module is a node (its discovered algebra),
+each seam an edge that is either a **transport** (the algebra stays — checked by coherence) or a
+**transform** (the algebra changes — checked by the homomorphism law, `h(a op b) = h(a) op' h(b)`,
+e.g. `eval`). Dataflow is sound when every transport seam is coherent and every transform seam is a
+homomorphism.
+
+---
+
 ## Mutation runs where it pays — and self-hosts
 
 Mutation testing is expensive, so it runs against the **specification**, not the interior:
