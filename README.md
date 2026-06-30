@@ -323,6 +323,32 @@ capabilities where the world is touched, named leaves where derivation stops.
 
 ---
 
+## Qualification: boundary-hood is a *computed* property, not a file
+
+So far a module *declares* itself — a `boundary.rs` file, a `//! Tier:` marker, an `#[algebra]`
+attribute. The last step removes the declaration from the question itself: **does this module meet
+the algebra spec?** is something the build *computes*. `build.rs` scans every module and reports
+which ones are **operator-shaped** — every function argument and return a bare named value type, no
+raw primitives, no I/O (the shape `#[algebra]` reads) — independent of where the module lives or what
+it is named. A module qualifies as a boundary by *structure*; `boundary.rs` is just one place that
+happens to.
+
+The census is frozen into [`spec/qualify.spec`](spec/qualify.spec) and drift-gated, so the answer is
+ratified in the diff. And running it on the crate's *own* code finds what you'd hope — a module
+nobody wrote as an algebra qualifying anyway:
+
+```
+src/capability.rs:        QUALIFIES — operators [cap_of] over sorts {Capability, Source}
+src/discover/derived.rs:  QUALIFIES — operators [meet, join, lift, …] over sorts {Tri, Small, Large}
+```
+
+`capability`'s `cap_of : Source → Capability` is an operator over value objects, so the audit module
+*is* a boundary by the same definition the discovery domains are — it was simply never declared one.
+That is the answer to "must a boundary be a `boundary.rs`?": no — boundary-hood is a property a module
+either has or doesn't, and the build now reads it off the code.
+
+---
+
 ## Mutation runs where it pays — and self-hosts
 
 Mutation testing is expensive, so it runs against the **specification**, not the interior:
