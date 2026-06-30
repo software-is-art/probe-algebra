@@ -187,6 +187,32 @@ apply it — a quick-fix from signal to safe refactor.
 
 ---
 
+## Layering: when is a module *sprawling* rather than split?
+
+Cohesion catches one pathology — a module that is secretly *several* (disconnected algebras → split).
+But a large algebra is not itself the smell (boolean algebra is large and superb). The other
+pathology is a module that is **one connected algebra yet holds together only through a load-bearing
+operator** — really two tighter sub-algebras hinged at a point. That wants to **layer**, not split.
+
+`discover::layering` reads it off the same operator-interaction graph, **structurally, with no
+threshold**: an operator is a **hinge** when it is a graph *articulation point* — removing it would
+disconnect its component, so the rest of the algebra only holds together *through* it. No hinge →
+**atomic**, one tight layer, keep it. A hinge → the natural seam to introduce a layer. Run
+`cargo run --example layering`:
+
+```
+interpreter arithmetic   component { 0, 1, +, * } — layered at hinge: *   (1 reaches the ring only
+                         component { false, < }   — atomic                 through multiplication)
+router                   every component is atomic — no layering pressure
+date calculus            component { zero, +, add, diff } — layered at hinge: zero
+```
+
+So the two analyses are complementary selection pressures: **split when disconnected, layer when
+sprawling.** Router is tight (no hinge); arithmetic's ring genuinely pivots on `*`. It is the same
+kind of suggestion — a structural signal a human (or an agent) ratifies, never a constraint.
+
+---
+
 ## The architect: the suggestion as a dev tool — and the tool is itself an algebra
 
 The cohesion signal and its scaffold only become an *editor experience* when they speak the

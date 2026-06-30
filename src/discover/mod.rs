@@ -25,6 +25,7 @@ pub mod cohesion;
 pub mod date;
 pub mod engine;
 pub mod freeze;
+pub mod layering;
 pub mod router;
 pub mod scaffold;
 
