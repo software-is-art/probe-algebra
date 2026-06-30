@@ -159,8 +159,33 @@ fn esc(s: &str) -> String {
             '\\' => out.push_str("\\\\"),
             '\n' => out.push_str("\\n"),
             '\t' => out.push_str("\\t"),
-            '\r' => {}
+            // ESCAPED, not dropped: `esc` must be INVERTIBLE or the engine refuses the codec
+            // round-trip below (a dropping escaper loses `\r` and `unesc(esc(s)) != s`).
+            '\r' => out.push_str("\\r"),
             _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// The inverse of `esc` — decode the wire-escaping back to the original. With `esc` it forms a
+/// CODEC: `unesc(esc(s)) = s`, the round-trip the `EscapeCodec` theory discovers below.
+fn unesc(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('"') => out.push('"'),
+                Some('\\') => out.push('\\'),
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some('r') => out.push('\r'),
+                Some(other) => out.push(other),
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(c);
         }
     }
     out
@@ -214,13 +239,38 @@ pub fn render_lsp(findings: &[Finding]) -> String {
     )
 }
 
+/// `apply` is the architect's one EFFECTFUL edge — everything else here (the analysis, the codec)
+/// is `Pure`. Declared, not hidden: the top of the capability lattice (`effectful ⊃ stateful ⊃
+/// lossy ⊃ pure`). The `std::fs::write` beneath it is the leaf where the world is finally touched.
+pub const APPLY_CAPABILITY: crate::boundary::Capability = crate::boundary::Capability::Effectful;
+
+/// True iff `rel` stays UNDER a root when joined — the confinement bound `apply` declares. An
+/// absolute path or a `..` component would escape it, so neither is confined.
+fn confined(rel: &Path) -> bool {
+    !rel.is_absolute()
+        && !rel
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+}
+
 /// Apply a code action: write every created file under `root`. Returns the paths written. This is
 /// the "auto-apply" — the scaffolded skeletons land on disk; the developer (or an agent) then moves
 /// the operator functions in and names the modules.
+///
+/// The effect is BOUNDED to `root`: an edit whose path escapes it (absolute, or via `..`) is
+/// rejected rather than written, so the declared `Effectful`-confined-to-`root` capability is real,
+/// not a vacuous claim.
 pub fn apply(action: &CodeAction, root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
     let mut written = Vec::new();
     for e in &action.edits {
-        let path = root.join(&e.path);
+        let rel = Path::new(&e.path);
+        if !confined(rel) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("edit path `{}` escapes the root", e.path),
+            ));
+        }
+        let path = root.join(rel);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -290,6 +340,65 @@ crate::theory! {
     }
 }
 
+// ----- the LSP serialization as an in-format TRANSFORM SEAM -----------------
+//
+// The wire-escaping that carries the scaffolded source (full of quotes and newlines) safely inside
+// the JSON payload is modelled as a string theory over `concat`, `esc`, and `unesc`. Running it, the
+// engine DISCOVERS the serializer's algebra:
+//   - HOMOMORPHISM — `esc(a ++ b) = esc(a) ++ esc(b)` — so the payload assembles and escapes
+//     piecewise, identically (exactly how `render_lsp` builds it from fragments).
+//   - ROUND-TRIP — `unesc(esc(s)) = s` — so the wire form is a FAITHFUL CODEC (and this is what
+//     forced `\r` to be escaped rather than dropped: the round-trip would not hold otherwise).
+//
+// What the algebra does NOT determine is the ENCODING — which character maps to which escape. That
+// is a representation CONVENTION (conformance to the JSON wire standard), not a law: many invertible
+// homomorphisms exist (the identity is one), so the specific arms `'\t' => "\\t"` … are a LEAF the
+// laws cannot derive. The in-format model thus locates the irreducible bit precisely: the codec
+// STRUCTURE is discovered; the encoding is an oracle pinned by `esc_conforms_to_the_json_encoding`.
+
+/// The escape codec's single sort.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum ESort {
+    Str,
+}
+
+fn cat(v: &[String]) -> Option<String> {
+    Some(format!("{}{}", v[0], v[1]))
+}
+fn esc_op(v: &[String]) -> Option<String> {
+    Some(esc(&v[0]))
+}
+fn unesc_op(v: &[String]) -> Option<String> {
+    Some(unesc(&v[0]))
+}
+/// One inhabitant per escape arm, plus plain text AND already-escaped SEQUENCES (`\n` as the two
+/// chars backslash-n, a trailing backslash). The sequences matter: without them the grid is too weak
+/// and discovery over-fits — `unesc` looks like an involution and a homomorphism (it is neither);
+/// the sequences refute both, leaving only the TRUE laws (esc homomorphism, the codec round-trip,
+/// concat associativity). A non-invertible mutation still fails the round-trip on its escape arm.
+fn escape_inhabitants() -> Vec<String> {
+    ["", "\"", "\\", "\n", "\t", "\r", "ab", "\\n", "x\\y"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// The LSP serializer's escaping AS a theory — so the tool's wire format is a discovered algebra
+/// (an invertible homomorphism), not a hand-rolled transform.
+pub struct EscapeCodec;
+crate::theory! {
+    EscapeCodec : "lsp escape codec", Value = String, Obs = String, Sort = ESort,
+    sort_of = |_: &String| ESort::Str,
+    observe = |s: &String| s.clone(),
+    vars { ESort::Str => &["a", "b", "c"], }
+    inhabit { ESort::Str => escape_inhabitants(), }
+    ops {
+        Infix  "concat" "++"    (ESort::Str, ESort::Str) -> ESort::Str = cat;
+        Prefix "esc"    "esc"   (ESort::Str) -> ESort::Str = esc_op;
+        Prefix "unesc"  "unesc" (ESort::Str) -> ESort::Str = unesc_op;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,12 +445,58 @@ mod tests {
         );
     }
 
-    /// `esc` escapes the JSON specials (so the scaffolded source — full of quotes and newlines —
-    /// rides safely inside the LSP payload). Pins every escape arm.
+    /// DOGFOOD: the LSP wire-escaping is a DISCOVERED algebra, and its WHOLE spec is exactly this —
+    /// the serializer's structure found by running `esc`/`unesc`/`concat`: `concat` is associative,
+    /// `unesc` undoes `esc` (a faithful codec), and `esc` is a homomorphism over concatenation
+    /// (exactly how `render_lsp` assembles the payload). Pinning the EXACT law set + consequence
+    /// count kills the under-constrained mutants a loose `any()` check misses: a constant `concat`
+    /// would spuriously become commutative (a 4th law), and a collapsed inhabitant grid would change
+    /// the consequence count. (Note: the engine finds NO false `unesc` law — the escape-sequence
+    /// inhabitants refute the involution/homomorphism a weaker grid would over-fit.)
     #[test]
-    fn esc_escapes_json_specials() {
-        assert_eq!(esc("a\"b\\c\nd\te"), "a\\\"b\\\\c\\nd\\te");
-        assert_eq!(esc("x\ry"), "xy", "carriage returns are dropped");
+    fn the_escape_codec_spec_is_exact() {
+        let d = Engine::<EscapeCodec>::new().discover();
+        let got: Vec<(String, String)> = d
+            .laws
+            .iter()
+            .map(|l| (l.prose.clone(), l.equation.clone()))
+            .collect();
+        let expected: Vec<(&str, &str)> = vec![
+            (
+                "With concat, the grouping of three values doesn't matter.",
+                "((a ++ b) ++ c) = (a ++ (b ++ c))",
+            ),
+            (
+                "unesc undoes esc — the round trip is the identity.",
+                "unesc(esc(a)) = a",
+            ),
+            (
+                "esc turns concat into concat.",
+                "esc((a ++ b)) = (esc(a) ++ esc(b))",
+            ),
+        ];
+        let expected: Vec<(String, String)> = expected
+            .into_iter()
+            .map(|(p, e)| (p.to_string(), e.to_string()))
+            .collect();
+        assert_eq!(got, expected, "the escape codec's discovered spec changed");
+        assert!(
+            d.uncovered_ops.is_empty(),
+            "uncovered: {:?}",
+            d.uncovered_ops
+        );
+        assert_eq!(d.consequences, 43, "consequence count changed");
+    }
+
+    /// The codec STRUCTURE is discovered (above); the ENCODING is not a law — many invertible
+    /// homomorphisms exist, so which character maps to which escape is a representation CONVENTION,
+    /// conformance to the JSON wire standard. This is the irreducible leaf the algebra cannot
+    /// derive, pinned here as an oracle (and pinning every `esc` arm against deletion).
+    #[test]
+    fn esc_conforms_to_the_json_encoding() {
+        assert_eq!(esc("a\"b\\c\nd\te\rf"), "a\\\"b\\\\c\\nd\\te\\rf");
+        // and it round-trips through `unesc` — invertibility, including the once-dropped `\r`.
+        assert_eq!(unesc(&esc("a\"b\\c\nd\te\rf")), "a\"b\\c\nd\te\rf");
     }
 
     /// `render_lsp` emits the LSP payloads an editor consumes — a Hint (severity 4) diagnostic and a
@@ -392,9 +547,11 @@ mod tests {
         assert!(report().flagged().iter().any(|n| n == "date calculus"));
     }
 
-    /// `apply` writes the scaffolded files to disk — the auto-apply. Uses the scratch dir.
+    /// `apply` writes the scaffolded files to disk — the auto-apply — and its effect is CONFINED to
+    /// `root`: every written path lands under it (the declared `Effectful`-bounded-to-`root`
+    /// capability, made real). Uses the scratch dir.
     #[test]
-    fn apply_writes_the_split_files() {
+    fn apply_writes_the_split_files_confined_to_root() {
         let date = analyze()
             .into_iter()
             .find(|f| f.diagnostic.message.contains("date calculus"))
@@ -402,8 +559,37 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("architect-test-{}", std::process::id()));
         let written = apply(&date.action, &dir).expect("write");
         assert_eq!(written.len(), date.action.edits.len());
+        assert_eq!(APPLY_CAPABILITY, crate::boundary::Capability::Effectful);
+        // CONFINEMENT: every write stayed under the root — the effect is bounded as declared.
+        assert!(
+            written.iter().all(|p| p.starts_with(&dir)),
+            "a write escaped the root: {written:?}"
+        );
         let body = std::fs::read_to_string(&written[0]).expect("read back");
         assert!(body.contains("crate::theory! {"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// An edit whose path ESCAPES the root (absolute, or via `..`) is rejected, not written — so the
+    /// confinement bound is enforced, not decorative. Pins the `confined` guard.
+    #[test]
+    fn apply_rejects_paths_that_escape_the_root() {
+        let dir = std::env::temp_dir().join(format!("architect-escape-{}", std::process::id()));
+        for bad in ["../escape.rs", "/etc/passwd"] {
+            let action = CodeAction {
+                title: "x".to_string(),
+                edits: vec![FileEdit {
+                    path: bad.to_string(),
+                    contents: "x".to_string(),
+                }],
+            };
+            assert!(
+                apply(&action, &dir).is_err(),
+                "escaping path `{bad}` should be rejected"
+            );
+        }
+        // a plain relative path is accepted (the guard is not just rejecting everything).
+        assert!(confined(Path::new("src/discover/date/module0.rs")));
         std::fs::remove_dir_all(&dir).ok();
     }
 }
