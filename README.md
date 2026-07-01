@@ -336,6 +336,17 @@ free and keep CI fast. CI ([`ci.yml`](.github/workflows/ci.yml)) reflects this: 
 test on every push, the mutation gate on each PR's *changed lines*, and a full-crate sweep
 (`0 missed`) on the default branch and weekly.
 
+A handful of mutants survive that *no* probe can kill — **equivalent mutants**, behaviourally
+identical to the original (deciding equivalence is undecidable, so they're ratified by hand). The
+method refuses to let them rot as buried config: `discover::residue` makes the residue a **classified
+finding**. A behaviourally-inert expression is either a **redundant guard** — simplify it away and the
+mutant is *eliminated*, not excluded (as `shadow_grid`'s doubled cap-check and `select`'s guards
+already were) — or a **free choice** the spec doesn't constrain (accept it, or tighten the spec). A
+**drift gate** keeps that classified list in lockstep with the carve-outs the gate actually applies,
+so an exclusion can't accumulate undocumented. Equivalent mutants become simplification work, surfaced
+like any other suggestion (`cargo run --example residue`) — the irreducible human bit is just the
+*why* (which kind), not the bookkeeping.
+
 The strongest evidence is that the method is **turned on its own runtime**:
 
 - **`interp`** and **`select`** (the kill-matrix selector that picks the probes) are *structural*
