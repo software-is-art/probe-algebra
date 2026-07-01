@@ -1,3 +1,5 @@
+//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
+//!
 //! architect — the cohesion suggestion as an EDITOR DEV TOOL: LSP-shaped diagnostics and an
 //! auto-applicable code action that scaffolds the split.
 //!
@@ -440,7 +442,7 @@ mod tests {
         assert_eq!(date.diagnostic.file, "src/discover/date.rs");
         // the exact line of `crate::theory! {` in date.rs — pins the `i + 1` line math.
         assert_eq!(
-            date.diagnostic.line, 56,
+            date.diagnostic.line, 58,
             "should locate the theory! declaration"
         );
     }

@@ -1,3 +1,5 @@
+//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
+//!
 //! internal — PRIVATE implementation of the interpreter: lexer, parser, type
 //! checker, and evaluator. Other modules cannot name anything here.
 //!

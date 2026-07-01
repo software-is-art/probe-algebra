@@ -1,3 +1,5 @@
+//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
+//!
 //! interp — a tiny expression-language interpreter: the crate's "cold" use case.
 //!
 //! Its ONLY public surface is `interp::boundary`: the value objects (`Expr`, `Value`,

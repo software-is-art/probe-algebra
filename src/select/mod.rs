@@ -1,3 +1,5 @@
+//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
+//!
 //! select — the kill-matrix selector, brought under the boundary discipline it serves.
 //!
 //! `select` is part of the method's own kernel: given the kill matrix it picks the minimal,

@@ -1,3 +1,5 @@
+//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
+//!
 //! demo — exercises the boundary algebra THROUGH the interpreter, the sole demonstration
 //! substrate. The bin names only `boundary_algebra::boundary` (the grammar) and
 //! `boundary_algebra::interp::boundary` (the interpreter's interface); the lexer, parser,

@@ -1,3 +1,5 @@
+//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
+//!
 //! The interpreter's arithmetic, expressed as a `Theory` so its algebra discovers itself.
 //!
 //! Every operator routes through the REAL interpreter (`Check` then `Eval`), so the discovered laws,

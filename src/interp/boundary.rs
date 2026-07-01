@@ -1,3 +1,5 @@
+//! Tier: BOUNDARY — a domain's strict value-object surface (tier 1 grammar).
+//!
 //! interp::boundary — a tiny expression language as a boundary CATEGORY.
 //!
 //! This module is the crate's "cold" use case: a domain the grammar was NOT designed

@@ -1,3 +1,5 @@
+//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
+//!
 //! A tiny HTTP-style router, as a `Theory` — to show the engine discovers a NON-arithmetic, and
 //! crucially NON-COMMUTATIVE, algebra by running the operators.
 //!

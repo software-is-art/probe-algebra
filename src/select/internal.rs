@@ -1,3 +1,5 @@
+//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
+//!
 //! select::internal — the greedy set-cover selector. PRIVATE; reached only through
 //! `select::boundary`. Like the interpreter's interior it carries **zero example tests**:
 //! the oracle-free property probes below — cover validity, the coverable/uncoverable

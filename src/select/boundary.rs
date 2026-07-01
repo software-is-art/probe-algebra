@@ -1,3 +1,5 @@
+//! Tier: BOUNDARY — a domain's strict value-object surface (tier 1 grammar).
+//!
 //! select::boundary — choose a minimal, DISCRIMINATING relation set from a kill matrix,
 //! specified as a boundary module.
 //!
