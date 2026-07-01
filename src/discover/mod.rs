@@ -28,6 +28,7 @@ pub mod derived;
 pub mod engine;
 pub mod freeze;
 pub mod layering;
+pub mod modularize;
 pub mod residue;
 pub mod router;
 pub mod scaffold;
