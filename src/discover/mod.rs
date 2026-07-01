@@ -16,6 +16,7 @@
 //! (mutation) plus expectation-checking (ratification); enumeration is depth- and grid-bounded (a
 //! resource limit, not a curated list).
 
+pub mod architect;
 pub mod arithmetic;
 pub mod coherence;
 pub mod cohesion;
