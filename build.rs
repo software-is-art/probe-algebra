@@ -32,7 +32,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use syn::visit::{self, Visit};
-use syn::{Fields, Item, Meta, ReturnType, Signature, Type, Visibility};
+use syn::{Fields, FnArg, Item, ItemFn, Meta, ReturnType, Signature, Type, Visibility};
 
 fn main() {
     let root = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
@@ -61,6 +61,14 @@ fn main() {
         }
     }
 
+    // QUALIFICATION CENSUS: boundary-hood as a COMPUTED property, not a file convention. For every
+    // module, compute whether its functions form a discoverable algebra — operator-shaped (each
+    // argument and the return a bare NAMED value type, no raw primitives, no I/O). A module qualifies
+    // by STRUCTURE, wherever it lives and whatever it is named; `boundary.rs` is just one place that
+    // happens to. The census is frozen into `spec/qualify.spec` and drift-gated, so the answer is
+    // ratified in the diff (regenerate with `BLESS_QUALIFY=1 cargo build`).
+    qualify_census(&src, &root, &mut violations);
+
     if !violations.is_empty() {
         violations.sort();
         violations.dedup();
@@ -72,6 +80,166 @@ fn main() {
             violations.len()
         );
     }
+}
+
+// ===== qualification census: which modules ARE algebras, by structure ====
+
+/// Compute the algebra-qualification of every module, render it, and drift-check it against the
+/// committed `spec/qualify.spec`.
+fn qualify_census(src: &Path, manifest: &str, out: &mut Vec<String>) {
+    let mut lines: Vec<String> = Vec::new();
+    let mut scanned = 0usize;
+    collect_qualifications(src, manifest, &mut scanned, &mut lines);
+    lines.sort();
+
+    let mut report = String::from(
+        "# qualify census — modules that meet the algebra spec by STRUCTURE: their functions are\n\
+         # operator-shaped (every argument and the return a bare named value type, no primitives, no\n\
+         # I/O). Boundary-hood is a COMPUTED property here, not the `boundary.rs` file convention — a\n\
+         # module qualifies wherever it lives. Regenerate with `BLESS_QUALIFY=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files scanned, {} qualify.\n\n",
+        scanned,
+        lines.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+
+    let spec_path = Path::new(manifest).join("spec/qualify.spec");
+    println!("cargo:rerun-if-changed={}", spec_path.display());
+    if std::env::var("BLESS_QUALIFY").is_ok() {
+        std::fs::write(&spec_path, &report).expect("write spec/qualify.spec");
+        return;
+    }
+    let committed = std::fs::read_to_string(&spec_path).unwrap_or_default();
+    if committed != report {
+        out.push(
+            "spec/qualify.spec is stale — the algebra-qualification census drifted. Regenerate \
+             with `BLESS_QUALIFY=1 cargo build` and ratify the diff."
+                .to_string(),
+        );
+    }
+}
+
+/// Walk `dir`, parsing each `.rs` file, and push a `QUALIFIES` line for every file whose functions
+/// form an algebra.
+fn collect_qualifications(dir: &Path, manifest: &str, scanned: &mut usize, out: &mut Vec<String>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_qualifications(&path, manifest, scanned, out);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        // `tests.rs` is the crate's `#[cfg(test)] mod tests` body — test scaffolding, not a domain.
+        if path.file_name().and_then(|n| n.to_str()) == Some("tests.rs") {
+            continue;
+        }
+        let Ok(file) = parse(&path) else { continue };
+        *scanned += 1;
+        let mut ops: Vec<Op> = Vec::new();
+        qualify_items(&file.items, &mut ops);
+        if ops.is_empty() {
+            continue;
+        }
+        let loc = path.strip_prefix(manifest).unwrap_or(&path).display();
+        let mut names: Vec<&str> = ops.iter().map(|o| o.name.as_str()).collect();
+        names.sort_unstable();
+        let mut sorts: Vec<&str> = ops
+            .iter()
+            .flat_map(|o| o.args.iter().chain(std::iter::once(&o.ret)))
+            .map(|s| s.as_str())
+            .collect();
+        sorts.sort_unstable();
+        sorts.dedup();
+        out.push(format!(
+            "{loc}: QUALIFIES — operators [{}] over sorts {{{}}}",
+            names.join(", "),
+            sorts.join(", ")
+        ));
+    }
+}
+
+/// An operator read off a function: name, argument sorts, return sort.
+struct Op {
+    name: String,
+    args: Vec<String>,
+    ret: String,
+}
+
+/// Collect operator functions from items, descending into non-test inline modules.
+fn qualify_items(items: &[Item], out: &mut Vec<Op>) {
+    for it in items {
+        match it {
+            Item::Fn(f) if !is_cfg_test(&f.attrs) => {
+                if let Some(op) = operator_candidate(f) {
+                    out.push(op);
+                }
+            }
+            Item::Mod(m) if !is_cfg_test(&m.attrs) => {
+                if let Some((_, inner)) = &m.content {
+                    qualify_items(inner, out);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Is `f` an operator over value objects? Every argument and the return must be a BARE NAMED value
+/// type (a path with no generics, not a raw primitive or `bool`), and the body must do no I/O — the
+/// shape `#[algebra]` reads. A `&[Value]`-style evaluator, a primitive return, or an effect is not.
+fn operator_candidate(f: &ItemFn) -> Option<Op> {
+    let ret = match &f.sig.output {
+        ReturnType::Type(_, ty) => named_value_type(ty)?,
+        ReturnType::Default => return None,
+    };
+    let mut args = Vec::new();
+    for arg in &f.sig.inputs {
+        let FnArg::Typed(pt) = arg else {
+            return None;
+        };
+        args.push(named_value_type(&pt.ty)?);
+    }
+    if args.is_empty() {
+        // an arity-0 constant only counts toward an algebra alongside real operators; on its own a
+        // bare `fn() -> T` is not enough signal, so require at least one argument here.
+        return None;
+    }
+    let mut eff = EffectFinder { found: None };
+    eff.visit_item_fn(f);
+    if eff.found.is_some() {
+        return None;
+    }
+    Some(Op {
+        name: f.sig.ident.to_string(),
+        args,
+        ret,
+    })
+}
+
+/// A bare named value type — a path with no generic arguments that is not a raw primitive or `bool`.
+/// `Tri`/`Date` qualify; `i64`, `bool`, `Option<T>`, `&[T]`, `&str` do not.
+fn named_value_type(ty: &Type) -> Option<String> {
+    let Type::Path(tp) = ty else { return None };
+    let seg = tp.path.segments.last()?;
+    if !matches!(seg.arguments, syn::PathArguments::None) {
+        return None;
+    }
+    let n = seg.ident.to_string();
+    if RAW_PRIMITIVES.contains(&n.as_str()) || n == "bool" {
+        return None;
+    }
+    Some(n)
 }
 
 fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
