@@ -728,6 +728,36 @@ impl<T: Theory> Default for Engine<T> {
     }
 }
 
+/// Build a grid for a value type from its STRUCTURE — the "shadow algebra".
+///
+/// The boundary operators define the LAWS, but they may not generate enough values to judge them on:
+/// a thin grid over-fits (too few values to refute a false law), and a boundary with no
+/// value-producing operator — a bare monoid, a router whose `or` never leaves its seeds — cannot
+/// bootstrap a grid at all. So the grid is grown not from the boundary operators but from the value
+/// type's OWN `Shaped` surface — a shadow algebra of synthetic generators the user never writes and
+/// that never enter the discovered spec: start at the canonical `inhabitant`, close under its
+/// structural PERTURBATIONS (variant swaps, field neighbours), bounded by `cap`. Deterministic — the
+/// derived perturbation order is fixed. This is `#[derive(Shaped)]` (already minting the probe
+/// surface for edges) reused to fatten the discovery grid.
+pub fn shadow_grid<V: crate::boundary::Shaped>(cap: usize) -> Vec<V> {
+    let mut grid: Vec<V> = ::std::vec![V::inhabitant()];
+    let mut i = 0;
+    // the `cap` bound lives in the inner break (the only place new values are added); the outer loop
+    // just walks the frontier. `i` indexes into `grid`, so `i <= grid.len()` would read past the end.
+    while i < grid.len() {
+        for n in grid[i].all_perturbations() {
+            if grid.len() >= cap {
+                break;
+            }
+            if !grid.contains(&n) {
+                grid.push(n);
+            }
+        }
+        i += 1;
+    }
+    grid
+}
+
 #[cfg(test)]
 impl<T: Theory> Engine<T> {
     /// The raw equalities enumeration emits — for probing the discovery machinery itself.
@@ -1012,5 +1042,19 @@ mod tests {
             d.consequences, 8,
             "an undefined-constant collision leaked in"
         );
+    }
+
+    /// `shadow_grid` grows a value type's grid from its STRUCTURE, not from any operator. For `bool`
+    /// (which is `Shaped`: `inhabitant` = false, its one perturbation = negation) it produces exactly
+    /// {false, true} from the type alone — the synthetic generation that fattens a boundary whose own
+    /// operators could not. The `cap` is a hard bound.
+    #[test]
+    fn shadow_grid_grows_from_the_type_structure() {
+        assert_eq!(
+            shadow_grid::<bool>(8),
+            vec![false, true],
+            "bool's shadow grid is its two inhabitants, from the type alone"
+        );
+        assert_eq!(shadow_grid::<bool>(1).len(), 1, "cap bounds the grid");
     }
 }

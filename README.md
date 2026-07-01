@@ -138,6 +138,31 @@ file read in a PR diff IS the **ratification**, and an unintended behaviour chan
 The only human acts left are the **validity rule** (`Int ≥ 0`) and ratifying that diff: a law you
 expect but don't see is a bug surfaced.
 
+### The grid writes itself, too — from the type, not the operators
+
+A `Theory` needs a **grid** of values to judge laws on, and that grid is the one part that resists
+derivation: too few values and a false law survives (over-fitting), and a boundary whose operators
+don't *generate* values — a bare monoid, a router whose `or` never leaves its seeds, a lattice with
+no constant — can't bootstrap a grid at all. The fix is a **shadow algebra**: synthetic generators
+the author never writes and that never enter the spec. Reusing the same `#[derive(Shaped)]` that
+mints the probe surface for edges, the grid is grown from the value type's *structure* — start at the
+canonical inhabitant, close under its variant/field perturbations — so it is fattened by the type,
+not by the operators or by hand. A domain then collapses to *just its operators*:
+
+```rust,ignore
+theory! {
+    Lattice : "tri lattice", Value = Tri, Obs = Tri, Sort = LatticeSort,
+    sort_of = |_| LatticeSort::T, observe = |v| *v,
+    ops {  Infix "meet" "&" (..) = meet;  Infix "join" "|" (..) = join;  }
+}   // no inhabitants, no variables, no constants — the grid comes from Tri's structure
+```
+
+`Tri` is a three-element lattice with **no constant operator**, so closing under its boundary would
+leave the grid empty; the shadow algebra supplies its three inhabitants, and over them the engine
+discovers the whole **distributive-lattice spec** — both operations commutative, associative,
+idempotent, with both distributivities and both absorptions — hands-free. The author wrote the value
+object and two functions; the grid, the variables, and the ten laws wrote themselves.
+
 ---
 
 ## Coherence: do two modules *agree*, not just *connect*?

@@ -24,6 +24,7 @@ pub mod coherence;
 pub mod cohesion;
 pub mod composition;
 pub mod date;
+pub mod derived;
 pub mod engine;
 pub mod freeze;
 pub mod layering;
@@ -93,6 +94,59 @@ macro_rules! theory {
             }
             fn sort_vars(sort: Self::Sort) -> &'static [&'static str] {
                 match sort { $( $vpat => $vlist, )+ }
+            }
+        }
+    };
+
+    // DERIVED-GRID form: no `vars`, no hand-written `inhabit` — the grid is GENERATED from the value
+    // type's own structure (its `Shaped` surface — a shadow algebra of synthetic generators the agent
+    // never writes and that never enter the spec), and the variable letters fall back to the trait
+    // default. So a domain is JUST its value objects and operator functions: the grid the laws are
+    // judged on writes itself, fattened by the type structure so a boundary whose operators cannot
+    // generate values (a bare monoid, a router) is still judged over a representative set. Requires
+    // `Value: Shaped` (any `#[derive(Shaped)]` value object).
+    (
+        $thy:ty : $namestr:literal,
+        Value = $Value:ty,
+        Obs = $Obs:ty,
+        Sort = $Sort:ty,
+        sort_of = $sortof:expr,
+        observe = $observe:expr,
+        ops {
+            $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
+        }
+    ) => {
+        impl $crate::discover::engine::Theory for $thy {
+            type Sort = $Sort;
+            type Value = $Value;
+            type Obs = $Obs;
+            fn name() -> &'static str {
+                $namestr
+            }
+            fn operators() -> ::std::vec::Vec<$crate::discover::engine::Operator<Self>> {
+                ::std::vec![ $(
+                    $crate::discover::engine::Operator {
+                        name: $opname,
+                        symbol: $opsym,
+                        fixity: $crate::discover::engine::Fixity::$fix,
+                        inputs: ::std::vec![ $($insort),* ],
+                        output: $outsort,
+                        eval: $eval,
+                    }
+                ),+ ]
+            }
+            fn inhabitants(sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
+                let sort_of = $sortof;
+                $crate::discover::engine::shadow_grid::<$Value>(24)
+                    .into_iter()
+                    .filter(|v| sort_of(v) == sort)
+                    .collect()
+            }
+            fn sort_of(value: &Self::Value) -> Self::Sort {
+                ($sortof)(value)
+            }
+            fn observe(value: &Self::Value) -> Self::Obs {
+                ($observe)(value)
             }
         }
     };
