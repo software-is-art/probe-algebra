@@ -269,6 +269,37 @@ stage produces no law: the composite is checked, never presumed.
 
 ---
 
+## Modularize: reading structure out of an unstructured bag
+
+Cohesion, layering, and composition all *critique a module that already has a shape*. The final turn
+points the whole stack at the **pathological input**: one flat file with everything crammed together —
+functions from several unrelated algebras dumped in a heap, no structure at all — the bag a real agent
+hands you. There is no shape to critique yet; the job is to **propose** one.
+
+`discover::modularize` makes **the algebra itself the selection criterion**. It partitions the
+functions by law-connectivity (the same components cohesion reads), **scores** each cluster by how many
+discovered laws live inside it, and marks each one's tightness (layering). What falls out is a
+**ranking**: the richest shapes first, and at the bottom the **misfits** — functions that cohere with
+nothing, which the proposal *refuses to dress up as a module*. `cargo run --example modularize` feeds
+it a bag of four functions over three unrelated types — a `max` semilattice, an `and`/`or` lattice, and
+a structureless three-cycle:
+
+```
+bag `flat soup` → proposed decomposition:
+  shape 0: { both, either } — 10 law(s), atomic     (the distributive lattice — richest)
+  shape 1: { peak } — 3 law(s), atomic              (the max semilattice)
+  misfits (bound by no law — left unstructured): rotate
+```
+
+The lattice outranks the semilattice because more laws bind it; `rotate` (a three-cycle that satisfies
+no universal shape) is flagged as noise rather than packaged. **Nothing about this decomposition was
+written down** — `#[algebra]` synthesised the theory from just the functions, and the structure was
+read off the discovered laws. It is the culmination of the stack: cohesion says *this wants to split*,
+layering says *this wants to layer*, and modularize says *here is the structure hiding in your
+unstructured bag, ranked by how real it is.*
+
+---
+
 ## The architect: the suggestion as a dev tool — and the tool is itself an algebra
 
 The cohesion signal and its scaffold only become an *editor experience* when they speak the
