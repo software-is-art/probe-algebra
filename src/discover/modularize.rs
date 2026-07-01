@@ -223,7 +223,11 @@ mod tests {
     fn it_selects_the_hidden_shapes_and_flags_the_misfit() {
         let p = modularize::<Soup>();
         let shapes = p.shapes();
-        assert_eq!(shapes.len(), 2, "two real shapes: the lattice and the semilattice");
+        assert_eq!(
+            shapes.len(),
+            2,
+            "two real shapes: the lattice and the semilattice"
+        );
 
         // richest first: the Flag lattice (both/either — ten lattice laws) outranks the Count
         // semilattice (peak — three laws).
@@ -236,8 +240,15 @@ mod tests {
         assert_eq!(lattice.laws, 10, "the distributive lattice's ten laws");
 
         let semilattice = shapes[1];
-        assert_eq!(semilattice.operators, vec!["peak"], "the semilattice is peak alone");
-        assert_eq!(semilattice.laws, 3, "commutativity, associativity, idempotence");
+        assert_eq!(
+            semilattice.operators,
+            vec!["peak"],
+            "the semilattice is peak alone"
+        );
+        assert_eq!(
+            semilattice.laws, 3,
+            "commutativity, associativity, idempotence"
+        );
 
         // and `rotate` — bound by no law — is the misfit, not packaged as a module.
         assert_eq!(p.misfits(), vec!["rotate"], "rotate coheres with nothing");
@@ -250,8 +261,16 @@ mod tests {
     fn shapes_are_ranked_by_richness_above_the_misfits() {
         let p = modularize::<Soup>();
         // shapes carry laws, misfit modules carry none.
-        assert!(p.modules.iter().filter(|m| m.is_shape()).all(|m| m.laws > 0));
-        assert!(p.modules.iter().filter(|m| !m.is_shape()).all(|m| m.laws == 0));
+        assert!(p
+            .modules
+            .iter()
+            .filter(|m| m.is_shape())
+            .all(|m| m.laws > 0));
+        assert!(p
+            .modules
+            .iter()
+            .filter(|m| !m.is_shape())
+            .all(|m| m.laws == 0));
         // descending by law count across the whole proposal (so misfits necessarily land last).
         for w in p.modules.windows(2) {
             assert!(w[0].laws >= w[1].laws, "proposal is not richest-first");
