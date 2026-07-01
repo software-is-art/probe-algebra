@@ -401,12 +401,14 @@ pub mod lattice {
 ```
 
 Everything a `theory!` once spelled out — the operator table, `sort_of`, `observe`, `Obs`, the
-variables, the grid — is now read off the functions or derived. What remains is only the irreducible
-**meaning**: the value object and the operators (the module itself). A *deliberate* deviation — a
-behavioural observer (the router, judged by how it routes) or a hand-curated grid (arithmetic's,
-chosen so the discovered spec reads cleanly) — is still written out with the explicit `theory!` form,
-precisely because it is a choice, not boilerplate. (`#[algebra]` is single-sort today; multi-sorted
-domains keep `theory!`.)
+variables, the grid — is now read off the functions or derived. It is **multi-sorted**: operators may
+range over several value types (a `Date`/`Duration` calculus), and the macro synthesises the `Value`
+sum and the `sort_of` that tags it from the signatures — the engine then discovers the laws *across*
+the sorts (a conversion's homomorphism included). What remains is only the irreducible **meaning**:
+the value objects and the operators (the module itself). A *deliberate* deviation — a behavioural
+observer (the router, judged by how it routes) or a hand-curated grid (arithmetic's, chosen so the
+discovered spec reads cleanly) — is still written out with the explicit `theory!` form, precisely
+because it is a choice, not boilerplate.
 
 ## Costs, paid openly
 
