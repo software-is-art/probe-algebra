@@ -151,6 +151,34 @@ macro_rules! theory {
             }
         }
     };
+
+    // MINIMAL form: the floor of a discovered domain. No `Obs`, no `observe`, no `vars`, no `inhabit`
+    // — for a first-order value object the observation IS the value (`Obs = Value`, observed by
+    // identity), the variable letters default, and the grid is shadow-derived from the type. So all
+    // that is left to write is the irreducible MEANING: the value type, its sort, and the operators.
+    // (Requires `Value: Shaped + Clone + Eq + Ord + Hash` — any first-order `#[derive(Shaped)]` value
+    // object. A behavioural observation or a curated grid is a deliberate deviation, written out.)
+    (
+        $thy:ty : $namestr:literal,
+        Value = $Value:ty,
+        Sort = $Sort:ty,
+        sort_of = $sortof:expr,
+        ops {
+            $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
+        }
+    ) => {
+        $crate::theory! {
+            $thy : $namestr,
+            Value = $Value,
+            Obs = $Value,
+            Sort = $Sort,
+            sort_of = $sortof,
+            observe = |v: &$Value| ::std::clone::Clone::clone(v),
+            ops {
+                $( $fix $opname $opsym ( $($insort),* ) -> $outsort = $eval; )+
+            }
+        }
+    };
 }
 
 use crate::boundary::sensitive_to_all;
