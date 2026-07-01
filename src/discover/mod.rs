@@ -22,6 +22,7 @@ pub mod architect;
 pub mod arithmetic;
 pub mod coherence;
 pub mod cohesion;
+pub mod composition;
 pub mod date;
 pub mod engine;
 pub mod freeze;

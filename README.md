@@ -219,6 +219,31 @@ kind of suggestion — a structural signal a human (or an agent) ratifies, never
 
 ---
 
+## Composition: what survives a pipeline of modules
+
+Cohesion and layering look *inside* a module. The last question is the whole-program one: a program is
+a graph of algebras joined by seams, and a **transform seam** is a conversion `h : A → B` that is a
+homomorphism — it carries the source algebra into the target. A real program **chains** them,
+`A → B → C`, and a single module's discovery cannot see whether structure *survives the chain*.
+
+`discover::composition` answers it by running it. If `h1 : A → B` and `h2 : B → C` are each
+homomorphisms, the **composite** `h2∘h1 : A → C` is one too — verified over the source grid, not
+assumed. So along a transform pipeline the **operation changes at every stage** (`⊕_A → ⊕_B → ⊕_C`)
+but the **law is invariant**: the dataflow preserves the algebra end to end. `cargo run --example
+composition` discovers it on a three-stage reading pipeline:
+
+```
+reading pipeline   report ∘ scale: cR → cP is a homomorphism — cP(h(x), h(y)) = h(cR(x, y))
+                   (combine changes at every stage; the composite still preserves it end to end)
+interpreter / router / date   no transform pipeline — no cross-module composite law
+```
+
+So this is the answer to *"do algebras stay the same or change over modules?"* — they **change** (the
+operators differ at each stage) yet the **structure is conserved** along the flow. A non-homomorphic
+stage produces no law: the composite is checked, never presumed.
+
+---
+
 ## The architect: the suggestion as a dev tool — and the tool is itself an algebra
 
 The cohesion signal and its scaffold only become an *editor experience* when they speak the
