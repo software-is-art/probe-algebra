@@ -201,6 +201,38 @@ theory is itself **cohesive** (one algebra, correctly *not* a candidate for its 
 that a live run flags the modules we expect. The abstraction validates the tool that wields the
 abstraction.
 
+### The imperative shell, in-format too — and where the format *stops*
+
+A dev tool is mostly the unglamorous parts: serialise to a wire format, write files. Those are the
+real test of the claim, because we didn't get to design them as clean algebras — and every workload
+is mostly made of them. So the rest of the architect is pushed into the format too, and each layer
+lands in a different place:
+
+- **The serialiser is a discovered algebra.** The JSON wire-escaping (`esc`/`unesc`) is modelled as
+  a string `theory!` over concatenation, and the engine *discovers* its structure: a **homomorphism**
+  (`esc(a ++ b) = esc(a) ++ esc(b)` — so the payload escapes piecewise, exactly how it is assembled)
+  and a **codec round-trip** (`unesc(esc(s)) = s`). The hand-written escape test is gone; a mutated
+  serialiser breaks the round-trip and the law vanishes.
+- **The finding it forced.** Demanding the round-trip is what *taught* us something the curated
+  domains never could: the escaper had been **dropping** `\r`, which makes it non-invertible — and
+  the engine flatly refused the codec law until `\r` was escaped instead. The format caught a latent
+  lossiness we'd hand-waved.
+- **Where the algebra stops.** The codec *structure* is discovered, but the *encoding* — which
+  character maps to which escape — is **not a law**: many invertible homomorphisms exist (the
+  identity is one), so the specific arms are a representation **convention** (conformance to the JSON
+  standard), an irreducible **leaf** pinned by an oracle. Modelling the serialiser in-format doesn't
+  dissolve the human input; it *locates* it precisely.
+- **The effect is a declared, bounded capability.** `apply` writes files — the one **`Effectful`**
+  edge (`effectful ⊃ stateful ⊃ lossy ⊃ pure`), declared rather than hidden; everything else here is
+  `Pure`. Its effect is **confined** to the target root (an edit path that escapes via `..` or an
+  absolute path is rejected, not written), so the declared bound is real. The `std::fs::write`
+  beneath it is the leaf where the world is finally touched.
+
+So the same module spans the whole partition — **discovered algebra** (the report, the codec), a
+**capability-typed effect edge** (`apply`), and the **leaves** the laws bottom out in (the encoding
+convention, the syscall) — which is the honest shape of any program: laws where they exist, declared
+capabilities where the world is touched, named leaves where derivation stops.
+
 ---
 
 ## Mutation runs where it pays — and self-hosts
