@@ -93,6 +93,8 @@ fn registry() -> Vec<Entry> {
 
 /// The 1-based line of the `theory!` invocation in `file` (so the diagnostic points at the
 /// declaration), or 1 if it can't be found.
+///
+/// Capability: Effectful — reads the source file from disk (a world-read).
 fn theory_line(file: &str) -> usize {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
     std::fs::read_to_string(path)
@@ -262,6 +264,8 @@ fn confined(rel: &Path) -> bool {
 /// The effect is BOUNDED to `root`: an edit whose path escapes it (absolute, or via `..`) is
 /// rejected rather than written, so the declared `Effectful`-confined-to-`root` capability is real,
 /// not a vacuous claim.
+///
+/// Capability: Effectful — writes files to disk (confined to `root`; see `APPLY_CAPABILITY`).
 pub fn apply(action: &CodeAction, root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
     let mut written = Vec::new();
     for e in &action.edits {

@@ -53,6 +53,8 @@ pub fn render(spec: &Spec) -> String {
 /// Check every theory's LIVE spec against its committed lock. On success returns the theory names
 /// verified fresh; on drift returns the names that no longer match (the fix is to regenerate and
 /// ratify the diff).
+///
+/// Capability: Effectful — reads the committed spec locks from disk (a world-read).
 pub fn check_fresh() -> Result<Vec<&'static str>, Vec<String>> {
     let mut fresh = Vec::new();
     let mut stale = Vec::new();
