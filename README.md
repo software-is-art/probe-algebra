@@ -440,6 +440,9 @@ many values; the borrow now carries the identity the brand alone could not.)
 - **[docs/how-it-works.md](docs/how-it-works.md)** — the end-to-end mechanism: what you write,
   what compile time and autotest time each give you, and why an under-specified probe is
   unrepresentable.
+- **[docs/ci-discipline.md](docs/ci-discipline.md)** — the extractable CI pattern (deterministic
+  spec → frozen file → drift gate → diff-scoped mutation), what each move buys and costs, and the
+  standalone [`spec-lock`](spec-lock) crate that carries the freeze/gate mechanics to any project.
 
 ## Using it
 

@@ -4,19 +4,18 @@
 //! theory. Run this when a boundary's algebra legitimately changes; review the diff it produces as
 //! the RATIFICATION of the new spec. CI's staleness gate (`freeze::the_committed_specs_are_fresh`)
 //! fails if the committed locks are out of date, so an unintended behaviour change is caught.
+//! The write itself is `spec_lock::bless` — the generic regeneration path; `freeze::lock` supplies
+//! this repo's artifacts (path + rendered text).
 //!
 //! Run `cargo run --example freeze_spec`.
-
-use std::fs;
 
 use boundary_algebra::discover::{all_specs, freeze};
 
 fn main() {
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/spec");
-    fs::create_dir_all(dir).expect("create spec/");
-    for spec in all_specs() {
-        let path = freeze::lock_path(spec.theory);
-        fs::write(&path, freeze::render(&spec)).expect("write spec lock");
-        println!("froze {} ({} laws)", path.display(), spec.laws.len());
+    let specs = all_specs();
+    let locks: Vec<spec_lock::Lock> = specs.iter().map(freeze::lock).collect();
+    spec_lock::bless(&locks).expect("write spec locks");
+    for (lock, spec) in locks.iter().zip(&specs) {
+        println!("froze {} ({} laws)", lock.path.display(), spec.laws.len());
     }
 }

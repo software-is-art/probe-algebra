@@ -36,6 +36,7 @@ dependencies = [
  "boundary-algebra-macros",
  "proptest",
  "serde_json",
+ "spec-lock",
  "syn",
  "trybuild",
  "typewit",
@@ -351,6 +352,10 @@ checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
 dependencies = [
  "serde_core",
 ]
+
+[[package]]
+name = "spec-lock"
+version = "0.1.0"
 
 [[package]]
 name = "syn"

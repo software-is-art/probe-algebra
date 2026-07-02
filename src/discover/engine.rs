@@ -810,6 +810,17 @@ impl<T: Theory> Engine<T> {
     pub(crate) fn emitted_equalities(&self) -> Vec<(Term, Term)> {
         self.enumerate()
     }
+
+    /// The grid assignments (one `Vec<Value>` per assignment, columns aligned with `var_sorts`) —
+    /// so tests can put the sampler itself on trial instead of taking its spread on faith.
+    pub(crate) fn grid_assignments(&self) -> &[Vec<T::Value>] {
+        &self.grid
+    }
+
+    /// The sort of each variable, in grid column order — the key for reading `grid_assignments`.
+    pub(crate) fn var_sorts(&self) -> Vec<T::Sort> {
+        self.vars.iter().map(|v| v.sort).collect()
+    }
 }
 
 #[cfg(test)]
@@ -1102,5 +1113,353 @@ mod tests {
             "bool's shadow grid is its two inhabitants, from the type alone"
         );
         assert_eq!(shadow_grid::<bool>(1).len(), 1, "cap bounds the grid");
+    }
+
+    // -- adversarial self-tests: the grid on trial ------------------------------------------------
+    //
+    // Every theory above bears only laws that are universally TRUE, so no test so far could tell a
+    // grid that judges laws from one that rubber-stamps them. The theories below carry KNOWN-FALSE
+    // laws: the engine passes only by refusing them, which is the one thing a degenerate grid
+    // cannot do.
+
+    // A theory whose operators are chosen for the laws they DON'T have: left projection
+    // (associative and idempotent, but not commutative) and truncated subtraction (monus — neither
+    // commutative, nor associative, nor idempotent). Over Q4 = {0,1,2,3} with three variables the
+    // space is 4³ = 64, at the exhaustive cap, so refusal here means the full cross-product
+    // refuted each false shape.
+    #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
+    struct Q4;
+    struct Skew;
+    #[derive(Clone)]
+    struct V4(u8);
+    fn proj(v: &[V4]) -> Option<V4> {
+        Some(V4(v[0].0))
+    }
+    fn monus(v: &[V4]) -> Option<V4> {
+        Some(V4(v[0].0.saturating_sub(v[1].0)))
+    }
+
+    impl Theory for Skew {
+        type Sort = Q4;
+        type Value = V4;
+        type Obs = u8;
+        fn name() -> &'static str {
+            "skew"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            use Fixity::{Infix, Prefix};
+            vec![
+                Operator {
+                    name: "Left projection",
+                    symbol: "proj",
+                    fixity: Prefix,
+                    inputs: vec![Q4, Q4],
+                    output: Q4,
+                    eval: proj,
+                },
+                Operator {
+                    name: "Monus",
+                    symbol: "-.",
+                    fixity: Infix,
+                    inputs: vec![Q4, Q4],
+                    output: Q4,
+                    eval: monus,
+                },
+            ]
+        }
+        fn inhabitants(_: Self::Sort) -> Vec<Self::Value> {
+            (0..4).map(V4).collect()
+        }
+        fn sort_of(_: &Self::Value) -> Self::Sort {
+            Q4
+        }
+        fn observe(v: &Self::Value) -> Self::Obs {
+            v.0
+        }
+    }
+
+    /// FALSE laws are REFUSED — and the refusal is honest because the same run still finds the
+    /// TRUE ones. Left projection is associative and idempotent but not commutative; monus is
+    /// none of the three. A grid degenerate enough to alias variables (or a `same` mutated toward
+    /// `true`) certifies at least one of the false shapes and fails here; a grid mutated toward
+    /// emptiness certifies ALL shapes and also fails here — the positive and negative assertions
+    /// pin the sampler from both sides.
+    #[test]
+    fn the_grid_refutes_false_laws_while_naming_true_ones() {
+        let e = Engine::<Skew>::new();
+        let d = e.discover();
+        let proses: Vec<&str> = d.laws.iter().map(|l| l.prose.as_str()).collect();
+
+        // the true laws: found (a refusal test that finds nothing proves nothing).
+        assert!(
+            proses.contains(&"With Left projection, the grouping of three values doesn't matter."),
+            "projection's associativity is real and must be discovered; got {proses:?}"
+        );
+        assert!(
+            proses.contains(&"Left projection of a value with itself gives that value."),
+            "projection's idempotence is real and must be discovered; got {proses:?}"
+        );
+
+        // the false laws: refused.
+        for false_law in [
+            "Left projection gives the same result in either order.",
+            "Monus gives the same result in either order.",
+            "With Monus, the grouping of three values doesn't matter.",
+            "Monus of a value with itself gives that value.",
+        ] {
+            assert!(
+                !proses.contains(&false_law),
+                "a FALSE law was certified: {false_law:?} — the grid failed to refute it"
+            );
+        }
+    }
+
+    // The regression sort for the sampler fix: Lo/Mid/Hi with a binary op commutative on every
+    // pair INVOLVING Mid but not on (Lo, Hi) — the exact blind spot of a sample that pins the
+    // middle variable to Mid.
+    #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
+    struct T3s;
+    struct Tilted;
+    #[derive(Clone)]
+    struct T3v(u8); // 0 = Lo, 1 = Mid, 2 = Hi
+    fn tilt(v: &[T3v]) -> Option<T3v> {
+        let (a, b) = (v[0].0, v[1].0);
+        // max — i.e. symmetric — everywhere except {Lo, Hi}, where the FIRST argument wins:
+        // tilt(Lo,Hi) = Lo but tilt(Hi,Lo) = Hi. Commutative on every pair involving Mid (and on
+        // the diagonal), non-commutative only at the (Lo,Hi) corner.
+        Some(T3v(if a.min(b) == 0 && a.max(b) == 2 {
+            a
+        } else {
+            a.max(b)
+        }))
+    }
+
+    impl Theory for Tilted {
+        type Sort = T3s;
+        type Value = T3v;
+        type Obs = u8;
+        fn name() -> &'static str {
+            "tilted"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![Operator {
+                name: "Tilt",
+                symbol: "><",
+                fixity: Fixity::Infix,
+                inputs: vec![T3s, T3s],
+                output: T3s,
+                eval: tilt,
+            }]
+        }
+        fn inhabitants(_: Self::Sort) -> Vec<Self::Value> {
+            (0..3).map(T3v).collect()
+        }
+        fn sort_of(_: &Self::Value) -> Self::Sort {
+            T3s
+        }
+        fn observe(v: &Self::Value) -> Self::Obs {
+            v.0
+        }
+    }
+
+    /// THE REGRESSION PIN for the grid sampler. The pre-fix sampler assigned variable `i` (ord
+    /// `ord_i`, minted in ord order per sort) the inhabitant at `(k·(1 + 2i) + ord_i) mod n` for
+    /// assignment `k` — which, on a 3-element sort, pins the middle variable to `(3k + 1) mod 3 =
+    /// 1` FOREVER: `y` is the constant Mid, and commutativity of `x >< y` is only ever judged on
+    /// pairs involving Mid. `Tilt` is built to be commutative on exactly those pairs and false on
+    /// (Lo, Hi), so:
+    ///
+    ///   (a) reconstructing the OLD sample inline, the false commutativity HOLDS on every one of
+    ///       its assignments — the old sampler would have certified it as a law;
+    ///   (b) the current engine refuses it (while still finding Tilt's real idempotence), and
+    ///       `check` on the frozen false law returns `Err`.
+    ///
+    /// Reverting `Engine::new`'s sampler to the aliasing spread makes (b) fail while (a) still
+    /// passes: this test is the fix's load-bearing wall.
+    #[test]
+    fn the_sampler_fix_is_load_bearing_against_the_old_degenerate_sample() {
+        let inh = Tilted::inhabitants(T3s);
+        let f = |a: &T3v, b: &T3v| tilt(&[a.clone(), b.clone()]).unwrap().0;
+
+        // the law is genuinely false: one witness pair breaks it.
+        assert_ne!(
+            f(&inh[0], &inh[2]),
+            f(&inh[2], &inh[0]),
+            "Tilt must actually be non-commutative for this test to mean anything"
+        );
+
+        // (a) the OLD sample, reconstructed inline: index = (k·(1 + 2i) + ord_i) mod 3 for
+        // variable i over k in 0..grid_size, one sort so ord_i = i. On every assignment it
+        // produces, the false commutativity HOLDS — the old grid would have certified it.
+        for k in 0..Tilted::grid_size() {
+            let idx = |i: usize| (k * (1 + 2 * i) + i) % 3;
+            assert_eq!(
+                idx(1),
+                1,
+                "the old sample pinned y to Mid — that IS the bug"
+            );
+            let (x, y) = (&inh[idx(0)], &inh[idx(1)]);
+            assert_eq!(
+                f(x, y),
+                f(y, x),
+                "the old sample was degenerate precisely because it never refuted this law; \
+                 if it refutes it now, the reconstruction no longer matches the old formula"
+            );
+        }
+
+        // (b) the CURRENT engine refuses the false law on a grid that reaches the (Lo, Hi) corner
+        // (3³ = 27 assignments, under the exhaustive cap — the full cross-product)...
+        let e = Engine::<Tilted>::new();
+        let d = e.discover();
+        let proses: Vec<&str> = d.laws.iter().map(|l| l.prose.as_str()).collect();
+        assert!(
+            !proses.contains(&"Tilt gives the same result in either order."),
+            "the grid certified the false commutativity the old sampler certified — sampler regressed"
+        );
+        // ...while still finding the real law, so the refusal isn't an artifact of finding nothing.
+        assert!(
+            proses.contains(&"Tilt of a value with itself gives that value."),
+            "Tilt's idempotence is real and must be discovered; got {proses:?}"
+        );
+
+        // and `check` on the frozen false law is the same probe from the other door: ops = [Tilt],
+        // vars x = 0, y = 1.
+        let frozen = DiscoveredLaw {
+            prose: "Tilt gives the same result in either order.".into(),
+            equation: "(x >< y) = (y >< x)".into(),
+            lhs: Term::App(0, vec![Term::Var(0), Term::Var(1)]),
+            rhs: Term::App(0, vec![Term::Var(1), Term::Var(0)]),
+        };
+        assert!(
+            e.check(&[frozen]).is_err(),
+            "check certified a false commutativity — the grid never reaches (Lo, Hi)"
+        );
+    }
+
+    // A two-sort theory (one 2-element sort, one 3-element sort, three variables each) to probe
+    // variable independence in the sampled regime: 2³·3³ = 216 > the exhaustive cap, so this grid
+    // comes from the mixed-radix stride sampler.
+    #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
+    enum MSort {
+        B2,
+        T3,
+    }
+    struct Mixed;
+    #[derive(Clone)]
+    enum MVal {
+        B(bool),
+        T(u8),
+    }
+    fn mxor(v: &[MVal]) -> Option<MVal> {
+        match (&v[0], &v[1]) {
+            (MVal::B(a), MVal::B(b)) => Some(MVal::B(a ^ b)),
+            _ => None,
+        }
+    }
+    fn mmax(v: &[MVal]) -> Option<MVal> {
+        match (&v[0], &v[1]) {
+            (MVal::T(a), MVal::T(b)) => Some(MVal::T(*a.max(b))),
+            _ => None,
+        }
+    }
+
+    impl Theory for Mixed {
+        type Sort = MSort;
+        type Value = MVal;
+        type Obs = u8;
+        fn name() -> &'static str {
+            "mixed"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![
+                Operator {
+                    name: "Xor",
+                    symbol: "^",
+                    fixity: Fixity::Infix,
+                    inputs: vec![MSort::B2, MSort::B2],
+                    output: MSort::B2,
+                    eval: mxor,
+                },
+                Operator {
+                    name: "Max",
+                    symbol: "max",
+                    fixity: Fixity::Prefix,
+                    inputs: vec![MSort::T3, MSort::T3],
+                    output: MSort::T3,
+                    eval: mmax,
+                },
+            ]
+        }
+        fn inhabitants(s: Self::Sort) -> Vec<Self::Value> {
+            match s {
+                MSort::B2 => vec![MVal::B(false), MVal::B(true)],
+                MSort::T3 => (0..3).map(MVal::T).collect(),
+            }
+        }
+        fn sort_of(v: &Self::Value) -> Self::Sort {
+            match v {
+                MVal::B(_) => MSort::B2,
+                MVal::T(_) => MSort::T3,
+            }
+        }
+        fn observe(v: &Self::Value) -> Self::Obs {
+            match v {
+                MVal::B(b) => *b as u8,
+                MVal::T(n) => *n,
+            }
+        }
+    }
+
+    /// VARIABLE INDEPENDENCE, read straight off the grid: for every pair of distinct variables
+    /// there is an assignment where they take DIFFERENT inhabitants of their sorts and one where
+    /// they take the SAME (by position in the sort's inhabitant list — derived from the grid and
+    /// `inhabitants`, no hand-picked expectations). The old stride made each variable an affine
+    /// function of `k`, so same-cardinality variables were locked together: on a 2-element sort
+    /// x ≡ z on every assignment (the "differ" half never happens), and on a 3-element sort the
+    /// middle variable was pinned constant (failing "differ" against everything it happened to
+    /// start equal to, and "agree" against the rest). Any sampler whose variables are functions
+    /// of each other fails this test.
+    #[test]
+    fn every_variable_pair_both_agrees_and_differs_on_the_grid() {
+        let e = Engine::<Mixed>::new();
+        let sorts = e.var_sorts();
+        assert_eq!(sorts.len(), 6, "three variables per sort, two sorts");
+
+        // each assignment as inhabitant COORDINATES: variable -> index into its sort's inhabitants.
+        let coords: Vec<Vec<usize>> = e
+            .grid_assignments()
+            .iter()
+            .map(|asn| {
+                asn.iter()
+                    .zip(&sorts)
+                    .map(|(v, &s)| {
+                        Mixed::inhabitants(s)
+                            .iter()
+                            .position(|i| Mixed::observe(i) == Mixed::observe(v))
+                            .expect("grid value must be one of its sort's inhabitants")
+                    })
+                    .collect()
+            })
+            .collect();
+        assert!(!coords.is_empty(), "the grid must not be empty");
+
+        for i in 0..sorts.len() {
+            for j in (i + 1)..sorts.len() {
+                assert!(
+                    coords.iter().any(|c| c[i] != c[j]),
+                    "variables {i} ({:?}) and {j} ({:?}) NEVER differ — they are aliased, \
+                     and any law relating them is judged on a diagonal slice only",
+                    sorts[i],
+                    sorts[j]
+                );
+                assert!(
+                    coords.iter().any(|c| c[i] == c[j]),
+                    "variables {i} ({:?}) and {j} ({:?}) never agree — the diagonal (where \
+                     idempotence-like laws live) is unsampled",
+                    sorts[i],
+                    sorts[j]
+                );
+            }
+        }
     }
 }

@@ -57,6 +57,39 @@ impl LayeringReport {
     pub fn wants_layering(&self) -> bool {
         self.components.iter().any(|c| !c.is_atomic())
     }
+
+    /// Analyse a theory's discovered algebra for sprawl. The analysis is an associated
+    /// function of its REPORT — the public surface is the value object, not a loose
+    /// function (the no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn of<T: Theory>() -> Self {
+        layering::<T>()
+    }
+
+    /// Render the layering report as a readable suggestion.
+    pub fn render(&self) -> String {
+        let mut out = format!("module `{}`: ", self.theory);
+        if !self.wants_layering() {
+            out.push_str("every component is atomic — no layering pressure.\n");
+            return out;
+        }
+        out.push_str("some components sprawl — consider layering:\n");
+        for (i, c) in self.components.iter().enumerate() {
+            if c.is_atomic() {
+                out.push_str(&format!(
+                    "  component {i}: {{ {} }} — atomic\n",
+                    c.operators.join(", ")
+                ));
+            } else {
+                out.push_str(&format!(
+                    "  component {i}: {{ {} }} — layered at hinge(s): {} (the algebra holds \
+                     together only through them — layer there)\n",
+                    c.operators.join(", "),
+                    c.hinges.join(", ")
+                ));
+            }
+        }
+        out
+    }
 }
 
 /// Collect the operator indices a term mentions.
@@ -178,8 +211,8 @@ fn dfs(
 }
 
 /// Analyse a theory's discovered algebra for sprawl — per connected component, which operators are
-/// hinges (load-bearing for connectivity).
-pub fn layering<T: Theory>() -> LayeringReport {
+/// hinges (load-bearing for connectivity). (Private — reached as `LayeringReport::of`.)
+fn layering<T: Theory>() -> LayeringReport {
     let sigs = Engine::<T>::new().signatures();
     let adj = interaction_graph::<T>(sigs.len());
     let hinges = articulation_points(&adj);
@@ -200,33 +233,6 @@ pub fn layering<T: Theory>() -> LayeringReport {
         theory: T::name(),
         components,
     }
-}
-
-/// Render the layering report as a readable suggestion.
-pub fn render<T: Theory>() -> String {
-    let r = layering::<T>();
-    let mut out = format!("module `{}`: ", r.theory);
-    if !r.wants_layering() {
-        out.push_str("every component is atomic — no layering pressure.\n");
-        return out;
-    }
-    out.push_str("some components sprawl — consider layering:\n");
-    for (i, c) in r.components.iter().enumerate() {
-        if c.is_atomic() {
-            out.push_str(&format!(
-                "  component {i}: {{ {} }} — atomic\n",
-                c.operators.join(", ")
-            ));
-        } else {
-            out.push_str(&format!(
-                "  component {i}: {{ {} }} — layered at hinge(s): {} (the algebra holds together \
-                 only through them — layer there)\n",
-                c.operators.join(", "),
-                c.hinges.join(", ")
-            ));
-        }
-    }
-    out
 }
 
 #[cfg(test)]
@@ -295,7 +301,7 @@ mod tests {
     /// point detector: exactly one hinge, and it is the shared operator, not either triangle's tips.
     #[test]
     fn the_chain_layers_at_the_shared_operator() {
-        let r = layering::<Chain>();
+        let r = LayeringReport::of::<Chain>();
         assert!(r.wants_layering(), "the chain sprawls through maxB");
         assert_eq!(r.components.len(), 1, "one connected component");
         let comp = &r.components[0];
@@ -312,10 +318,12 @@ mod tests {
     /// layer to peel. No false layering pressure on a genuinely tight module.
     #[test]
     fn the_router_is_atomic() {
-        let r = layering::<Router>();
+        let r = LayeringReport::of::<Router>();
         assert!(!r.wants_layering(), "router is tight: {:?}", r.theory);
         assert!(r.components.iter().all(|c| c.is_atomic()));
-        assert!(render::<Router>().contains("no layering pressure"));
+        assert!(LayeringReport::of::<Router>()
+            .render()
+            .contains("no layering pressure"));
     }
 
     // `min` with a TOP element (identity, `min(2,x)=x`) and a BOTTOM element (annihilator,
@@ -355,7 +363,7 @@ mod tests {
     /// interior hinge, which exercises the non-root case.
     #[test]
     fn a_central_operator_with_two_arms_is_a_root_hinge() {
-        let r = layering::<MinClamp>();
+        let r = LayeringReport::of::<MinClamp>();
         assert!(r.wants_layering());
         assert_eq!(r.components.len(), 1, "one component: {:?}", r.components);
         assert_eq!(r.components[0].operators.len(), 3, "min, top, bot");
@@ -371,13 +379,15 @@ mod tests {
     /// comparison component (`<`, `false`) is atomic. A real, threshold-free finding on a real theory.
     #[test]
     fn arithmetic_ring_hinges_on_multiplication() {
-        let r = layering::<Arithmetic>();
+        let r = LayeringReport::of::<Arithmetic>();
         let ring = component_with(&r, "+");
         assert!(ring.operators.contains(&"*") && ring.operators.contains(&"1"));
         assert_eq!(ring.hinges, vec!["*"], "the ring hinges on multiplication");
         let compare = component_with(&r, "<");
         assert!(compare.is_atomic(), "comparison is atomic: {compare:?}");
         // and it renders the hinge as a readable suggestion.
-        assert!(render::<Arithmetic>().contains("layered at hinge(s): *"));
+        assert!(LayeringReport::of::<Arithmetic>()
+            .render()
+            .contains("layered at hinge(s): *"));
     }
 }

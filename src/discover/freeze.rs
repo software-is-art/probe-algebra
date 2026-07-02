@@ -8,8 +8,15 @@
 //! means what was ratified; a mismatch is a build error whose fix is to regenerate
 //! (`cargo run --example freeze_spec`) and ratify the diff in review. So the committed spec file,
 //! read in a pull request's diff, IS the ratification — the one human act discovery cannot perform.
+//!
+//! The freeze/drift mechanics (compare live text to a committed file; write the regeneration) are
+//! the domain-agnostic `spec-lock` crate; this module is the thin adapter that knows what THIS
+//! repo's artifacts are — where a theory's lock lives (`lock_path`) and how a `Spec` renders
+//! (`render`). See `docs/ci-discipline.md` for the whole discipline.
 
 use std::path::PathBuf;
+
+use spec_lock::Lock;
 
 use super::{all_specs, Spec};
 
@@ -50,26 +57,32 @@ pub fn render(spec: &Spec) -> String {
     out
 }
 
+/// A theory's spec as a `spec_lock::Lock` — its name, committed lock file, and live rendered
+/// text. This is the whole adapter: everything domain-specific about the freeze is in here
+/// (`lock_path` + `render`); the compare (`spec_lock::check`) and the regeneration write
+/// (`spec_lock::bless`, used by `examples/freeze_spec.rs`) are generic.
+pub fn lock(spec: &Spec) -> Lock {
+    Lock {
+        name: spec.theory.to_string(),
+        path: lock_path(spec.theory),
+        live: render(spec),
+    }
+}
+
 /// Check every theory's LIVE spec against its committed lock. On success returns the theory names
 /// verified fresh; on drift returns the names that no longer match (the fix is to regenerate and
 /// ratify the diff).
 ///
-/// Capability: Effectful — reads the committed spec locks from disk (a world-read).
+/// Capability: Effectful — reads the committed spec locks from disk (a world-read, performed by
+/// `spec_lock::check`).
 pub fn check_fresh() -> Result<Vec<&'static str>, Vec<String>> {
-    let mut fresh = Vec::new();
-    let mut stale = Vec::new();
-    for spec in all_specs() {
-        let committed = std::fs::read_to_string(lock_path(spec.theory)).unwrap_or_default();
-        if committed == render(&spec) {
-            fresh.push(spec.theory);
-        } else {
-            stale.push(spec.theory.to_string());
-        }
-    }
-    if stale.is_empty() {
-        Ok(fresh)
-    } else {
-        Err(stale)
+    let specs = all_specs();
+    let locks: Vec<Lock> = specs.iter().map(lock).collect();
+    match spec_lock::check(&locks) {
+        // spec-lock reports every lock fresh, in order — so the fresh names are exactly the
+        // theories', still `&'static` from `Spec` rather than borrowed from the local locks.
+        Ok(_) => Ok(specs.iter().map(|s| s.theory).collect()),
+        Err(stale) => Err(stale.into_iter().map(String::from).collect()),
     }
 }
 

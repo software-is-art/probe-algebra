@@ -189,7 +189,7 @@ impl Sampled for crate::interp::boundary::Expr {
             any::<bool>().prop_map(Expr::boolean),
             <Ident as Sampled>::sampled().prop_map(Expr::var),
         ];
-        leaf.prop_recursive(4, 48, 3, |inner| {
+        let domain = leaf.prop_recursive(4, 48, 3, |inner| {
             let op = prop_oneof![Just(Op::Add), Just(Op::Mul), Just(Op::Lt)];
             prop_oneof![
                 (op, inner.clone(), inner.clone()).prop_map(|(o, a, b)| Expr::bin(o, a, b)),
@@ -198,9 +198,104 @@ impl Sampled for crate::interp::boundary::Expr {
                 (<Ident as Sampled>::sampled(), inner.clone(), inner.clone())
                     .prop_map(|(n, v, b)| Expr::bind(n, v, b)),
             ]
-        })
-        .boxed()
+        });
+        // BOTH spaces: the structure-derived shadow grid (every constructor, by
+        // construction — see the section below) and the hand-shaped recursive space
+        // (deep, big-valued trees the shallow grid cannot reach).
+        prop_oneof![1 => shaped_strategy::<Expr>(SHAPE_CAP), 4 => domain].boxed()
     }
+}
+
+// ===== the DERIVED base distribution: structure supplies the generator =====
+//
+// The recursive strategies above (and the probe-local ones in `registry`) are HAND-CURATED:
+// they shape depth, bounds, and binding the way each probe's law needs. Hand-curated is also
+// how a generator hides a gap — `Resolve`'s expression generator once omitted the binder
+// forms, and the omission hid a variable-capture bug in `subst`, because no test asked
+// whether the generated space still spanned the type. The derived base below removes that
+// failure mode BY CONSTRUCTION, as a chain where the author names no variant anywhere:
+//
+//   `#[derive(Shaped)]`  — a value object's degrees of freedom, read off its variants/fields;
+//   `shadow_grid`        — the inhabitant closed under `all_perturbations()` (variant swaps
+//                          included), so the grid reaches every constructor within the cap;
+//   `shaped_strategy`    — that grid as a proptest base, folded into each probe's generator
+//                          via `prop_oneof!` alongside the domain-shaped recursive space;
+//   the completeness tests in `registry` — `std::mem::discriminant` as the judge that the
+//                          chain (and the hand-shaped layer it backs) reaches every
+//                          constructor the derive knows.
+//
+// So a future `Expr::Match` widens the derive, hence the grid, hence every probe's base —
+// and a generator that fails to keep up fails a completeness test instead of silently
+// narrowing every probe that draws from it.
+
+/// Growth bound for the derived value space. Big enough that the grid closes over every
+/// constructor and its near-inhabitant combinations (e.g. a `let` whose body is a variable —
+/// the capture-shaped seed); small enough that `prop::sample::select` stays a sharp base
+/// distribution rather than a diffuse one.
+pub const SHAPE_CAP: usize = 64;
+
+/// The DERIVED base strategy: draw from the type's own shadow grid. No variant is named —
+/// the distribution is read off `#[derive(Shaped)]` — so it cannot go stale when the type
+/// grows. Probes fold this in next to their domain-shaped strategies, giving every probe
+/// both the structure-derived space and the deep domain-shaped space.
+pub fn shaped_strategy<V>(cap: usize) -> impl Strategy<Value = V>
+where
+    V: crate::boundary::Shaped + core::fmt::Debug + 'static,
+{
+    proptest::sample::select(crate::discover::engine::shadow_grid::<V>(cap))
+}
+
+/// The constructors the derived space DEMANDS but `grid` never exhibits: discriminants
+/// reachable via `all_perturbations` from grid members that appear nowhere in the grid.
+/// Empty iff the grid is discriminant-closed — the requirement side comes from the type's
+/// own `Shaped` surface, so no variant is hand-listed here either.
+pub fn grid_gaps<V: crate::boundary::Shaped>(grid: &[V]) -> Vec<core::mem::Discriminant<V>> {
+    let exhibited: Vec<_> = grid.iter().map(core::mem::discriminant).collect();
+    let mut gaps = Vec::new();
+    for v in grid {
+        for n in v.all_perturbations() {
+            let d = core::mem::discriminant(&n);
+            if !exhibited.contains(&d) && !gaps.contains(&d) {
+                gaps.push(d);
+            }
+        }
+    }
+    gaps
+}
+
+/// The constructors in `required` that `strategy` never produced (at the root) across
+/// `draws` DETERMINISTIC samples — how a generator is audited against the derived surface.
+/// Empty iff the strategy's space spans every required discriminant.
+pub fn undrawn_discriminants<V, S>(
+    strategy: S,
+    required: &[V],
+    draws: usize,
+) -> Vec<core::mem::Discriminant<V>>
+where
+    V: crate::boundary::Shaped + core::fmt::Debug,
+    S: Strategy<Value = V>,
+{
+    use proptest::strategy::ValueTree;
+    let mut runner = TestRunner::deterministic();
+    let mut drawn = Vec::new();
+    for _ in 0..draws {
+        let v = strategy
+            .new_tree(&mut runner)
+            .expect("strategy must generate")
+            .current();
+        let d = core::mem::discriminant(&v);
+        if !drawn.contains(&d) {
+            drawn.push(d);
+        }
+    }
+    let mut missing = Vec::new();
+    for v in required {
+        let d = core::mem::discriminant(v);
+        if !drawn.contains(&d) && !missing.contains(&d) {
+            missing.push(d);
+        }
+    }
+    missing
 }
 
 impl Wrapped for crate::interp::boundary::Int {
@@ -258,6 +353,19 @@ mod registry {
                 .classify(&named)
                 .expect("a closed int expr is well-typed");
             *Eval.run(&named, &proof).value()
+        })
+    }
+
+    // evaluate an ARBITRARY expression through the boundary, TOTALLY: `Some` iff `Check`
+    // admits it. The derived base draws from the whole `Expr` space — grid values may be
+    // open (an unbound `z`) or ill-typed (an `if` on an int) — so the probes that fold it
+    // in phrase their laws over `Option<Value>`: definedness itself becomes part of what
+    // the two routes must agree on.
+    fn try_eval(e: &Expr) -> Option<Value> {
+        with_seed(|seed| {
+            let named = seed.new_named(e.clone());
+            let proof = Check.classify(&named).ok()?;
+            Some(*Eval.run(&named, &proof).value())
         })
     }
 
@@ -353,55 +461,77 @@ mod registry {
         ConstFold::probe();
     }
 
+    // The DOMAIN-SHAPED layer of `Resolve`'s generator: expressions over {x, y} and int
+    // leaves — closed once x, y are bound, and int-typed so `eval` is total down both
+    // routes. The recursive layer deliberately includes `let` — with binder names drawn
+    // from {x, y, z}, so generated programs SHADOW the env-bound names — and `if` over a
+    // computed `<` condition. A substitution that rewrites BOUND occurrences (capture) can
+    // only diverge from the let-binding route on such programs; a generator of bare
+    // Add/Mul trees would never exercise it, which is exactly how the capture bug in
+    // `subst` once hid from this probe. `resolve_domain_generator_spans_the_derived_surface`
+    // below holds this hand-shaped layer to the derived yardstick, so the omission that
+    // hid that bug now fails a test on an ordinary run.
+    fn var_expr() -> impl Strategy<Value = Expr> {
+        let x = Ident::new("x").expect("valid ident");
+        let y = Ident::new("y").expect("valid ident");
+        let leaf = prop_oneof![
+            (0i64..=20).prop_map(|n| Expr::int(n).unwrap()),
+            Just(Expr::var(x)),
+            Just(Expr::var(y)),
+        ];
+        let binder = prop_oneof![Just("x"), Just("y"), Just("z")]
+            .prop_map(|s| Ident::new(s).expect("valid ident"));
+        leaf.prop_recursive(3, 12, 2, move |inner| {
+            prop_oneof![
+                (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
+                (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
+                // a computed boolean condition keeps the whole tree int-typed while
+                // routing `subst` through the `If` arm on both condition and branches.
+                (inner.clone(), inner.clone(), inner.clone(), inner.clone())
+                    .prop_map(|(a, b, t, f)| Expr::cond(Expr::bin(Op::Lt, a, b), t, f)),
+                (binder.clone(), inner.clone(), inner.clone())
+                    .prop_map(|(n, v, b)| Expr::bind(n, v, b)),
+            ]
+        })
+    }
+
+    // `Resolve`'s FULL generator: both the structure-derived base (every constructor, by
+    // construction, but shallow and near the inhabitant) and the domain-shaped space
+    // (deep, env-flavoured, capture-hunting). Neither alone suffices: the grid cannot
+    // build deep shadowing towers, and the hand-shaped layer is exactly what once carried
+    // a gap.
+    fn resolve_expr() -> impl Strategy<Value = Expr> {
+        prop_oneof![
+            1 => shaped_strategy::<Expr>(SHAPE_CAP),
+            3 => var_expr(),
+        ]
+    }
+
     /// `Resolve` — the `Stateful`, irreversible edge. Oracle-free TWO-ROUTE law: substituting
     /// the carried `Env` then evaluating equals let-binding the same env then evaluating — two
     /// independent paths to one value, so a wrong `subst` (or one that ignores the env, like the
     /// retired over-claiming counterexample) makes the routes diverge. The generated programs
     /// include `let`s that SHADOW the env-bound names (so capture — substituting into a bound
     /// occurrence — diverges) and the generated envs sometimes bind a name twice (so
-    /// `Env::get`'s last-binding-wins scan is what keeps the routes agreeing).
+    /// `Env::get`'s last-binding-wins scan is what keeps the routes agreeing). The generator
+    /// draws from BOTH spaces (`resolve_expr`): derived-base draws may be open (a free `z`)
+    /// or ill-typed, so the law is phrased over `Option<Value>` — DEFINEDNESS must agree down
+    /// both routes too — and the harness counts the defined cases so the probe cannot go
+    /// vacuous (all-`None` agreement proves nothing about `subst`).
     impl Probed for Resolve {
         fn probe() {
             let x = Ident::new("x").expect("valid ident");
             let y = Ident::new("y").expect("valid ident");
-            // expressions over {x, y} and int leaves: closed once x, y are bound, and int-typed
-            // so `eval` is total down both routes. The recursive layer deliberately includes
-            // `let` — with binder names drawn from {x, y, z}, so generated programs SHADOW the
-            // env-bound names — and `if` over a computed `<` condition. A substitution that
-            // rewrites BOUND occurrences (capture) can only diverge from the let-binding route
-            // on such programs; a generator of bare Add/Mul trees would never exercise it,
-            // which is exactly how the capture bug in `subst` once hid from this probe.
-            let var_expr = {
-                let (xx, yy) = (x.clone(), y.clone());
-                let leaf = prop_oneof![
-                    (0i64..=20).prop_map(|n| Expr::int(n).unwrap()),
-                    Just(Expr::var(xx)),
-                    Just(Expr::var(yy)),
-                ];
-                let binder = prop_oneof![Just("x"), Just("y"), Just("z")]
-                    .prop_map(|s| Ident::new(s).expect("valid ident"));
-                leaf.prop_recursive(3, 12, 2, move |inner| {
-                    prop_oneof![
-                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
-                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
-                        // a computed boolean condition keeps the whole tree int-typed while
-                        // routing `subst` through the `If` arm on both condition and branches.
-                        (inner.clone(), inner.clone(), inner.clone(), inner.clone())
-                            .prop_map(|(a, b, t, f)| Expr::cond(Expr::bin(Op::Lt, a, b), t, f)),
-                        (binder.clone(), inner.clone(), inner.clone())
-                            .prop_map(|(n, v, b)| Expr::bind(n, v, b)),
-                    ]
-                })
-            };
             // `stale` sometimes prepends an EARLIER binding for `x`, so the generated env
             // carries a duplicate name and last-binding-wins is what the two routes agree
             // on. This makes `Env::get`'s reverse scan LOAD-BEARING under the probe: an
             // `Env` that returned the first binding for a name would resolve `x` to the
             // stale value while the let-binding route uses `vx`, and the routes diverge.
             let stale = proptest::option::of(0i64..=20i64);
+            let defined = core::cell::Cell::new(0u32);
             TestRunner::default()
                 .run(
-                    &(0i64..=20i64, 0i64..=20i64, stale, var_expr),
+                    &(0i64..=20i64, 0i64..=20i64, stale, resolve_expr()),
                     |(vx, vy, stale_x, e)| {
                         let base = match stale_x {
                             Some(s) => Env::new().bind(x.clone(), Int::new(s).unwrap()),
@@ -412,7 +542,7 @@ mod registry {
                             .bind(y.clone(), Int::new(vy).unwrap());
                         // route 1: resolve (substitute the env), then evaluate.
                         let (resolved, _unit) = Resolve.forward(&Bound::new(env, e.clone()));
-                        let via_resolve = eval_closed(&resolved);
+                        let via_resolve = try_eval(&resolved);
                         // route 2: let-bind the same env, then evaluate. Only the LAST
                         // binding per name appears here — the definition of what a
                         // duplicate-carrying env must mean.
@@ -421,12 +551,24 @@ mod registry {
                             Expr::int(vx).unwrap(),
                             Expr::bind(y.clone(), Expr::int(vy).unwrap(), e.clone()),
                         );
-                        let via_let = eval_closed(&lets);
-                        prop_assert_eq!(via_resolve, via_let, "resolve diverged from let-binding");
+                        let via_let = try_eval(&lets);
+                        if via_let.is_some() {
+                            defined.set(defined.get() + 1);
+                        }
+                        prop_assert_eq!(
+                            via_resolve,
+                            via_let,
+                            "resolve diverged from let-binding at {:?}",
+                            e
+                        );
                         Ok(())
                     },
                 )
                 .unwrap();
+            assert!(
+                defined.get() > 0,
+                "the two-route law never fired on a defined program: a vacuous probe"
+            );
         }
     }
     #[test]

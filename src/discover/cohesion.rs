@@ -56,6 +56,43 @@ impl CohesionReport {
     pub fn is_cohesive(&self) -> bool {
         self.components.len() <= 1
     }
+
+    /// Analyse a theory's discovered algebra for decomposability. The analysis is an
+    /// associated function of its REPORT — the public surface is the value object, not a
+    /// loose function (the no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn of<T: Theory>() -> Self {
+        cohesion::<T>()
+    }
+
+    /// Render the report as a readable suggestion.
+    pub fn render(&self) -> String {
+        let mut out = format!("module `{}`: ", self.theory);
+        if self.is_cohesive() {
+            out.push_str("cohesive — one algebra, keep as one module.\n");
+            return out;
+        }
+        out.push_str(&format!(
+            "decomposes into {} latent modules — consider splitting:\n",
+            self.components.len()
+        ));
+        for (i, c) in self.components.iter().enumerate() {
+            out.push_str(&format!("  module {}: {{ {} }}\n", i, c.join(", ")));
+        }
+        for s in &self.seams {
+            let kind = match s.kind {
+                SeamKind::Transport => "transport (algebra stays — check coherence)",
+                SeamKind::Transform => "transform (algebra changes — check the homomorphism)",
+            };
+            out.push_str(&format!(
+                "  seam {}↔{} on {} — {}\n",
+                s.left,
+                s.right,
+                s.shared.join(", "),
+                kind
+            ));
+        }
+        out
+    }
 }
 
 /// Collect the operator indices a term mentions.
@@ -77,8 +114,8 @@ fn find(parent: &mut [usize], mut x: usize) -> usize {
     x
 }
 
-/// Analyse a theory's discovered algebra for decomposability.
-pub fn cohesion<T: Theory>() -> CohesionReport {
+/// The analysis body (private — reached as `CohesionReport::of`).
+fn cohesion<T: Theory>() -> CohesionReport {
     let engine = Engine::<T>::new();
     let sigs = engine.signatures();
     let n = sigs.len();
@@ -158,37 +195,6 @@ pub fn cohesion<T: Theory>() -> CohesionReport {
     }
 }
 
-/// Render the cohesion report as a readable suggestion.
-pub fn render<T: Theory>() -> String {
-    let r = cohesion::<T>();
-    let mut out = format!("module `{}`: ", r.theory);
-    if r.is_cohesive() {
-        out.push_str("cohesive — one algebra, keep as one module.\n");
-        return out;
-    }
-    out.push_str(&format!(
-        "decomposes into {} latent modules — consider splitting:\n",
-        r.components.len()
-    ));
-    for (i, c) in r.components.iter().enumerate() {
-        out.push_str(&format!("  module {}: {{ {} }}\n", i, c.join(", ")));
-    }
-    for s in &r.seams {
-        let kind = match s.kind {
-            SeamKind::Transport => "transport (algebra stays — check coherence)",
-            SeamKind::Transform => "transform (algebra changes — check the homomorphism)",
-        };
-        out.push_str(&format!(
-            "  seam {}↔{} on {} — {}\n",
-            s.left,
-            s.right,
-            s.shared.join(", "),
-            kind
-        ));
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,7 +262,7 @@ mod tests {
     /// components at once (with three parts, a part's complement is not a single other part).
     #[test]
     fn three_independent_monoids_give_three_components() {
-        let r = cohesion::<Triple>();
+        let r = CohesionReport::of::<Triple>();
         assert_eq!(r.components.len(), 3, "components: {:?}", r.components);
         let total: usize = r.components.iter().map(|c| c.len()).sum();
         assert_eq!(
@@ -274,7 +280,7 @@ mod tests {
     /// module is a single algebra — no split suggested.
     #[test]
     fn the_router_is_cohesive() {
-        let r = cohesion::<Router>();
+        let r = CohesionReport::of::<Router>();
         assert!(r.is_cohesive(), "router is one algebra: {:?}", r.components);
         assert!(r.seams.is_empty());
     }
@@ -283,7 +289,7 @@ mod tests {
     /// or `*`. They share the `Int` sort with operators on both sides, so the seam is TRANSPORT.
     #[test]
     fn arithmetic_splits_into_arithmetic_and_comparison() {
-        let r = cohesion::<Arithmetic>();
+        let r = CohesionReport::of::<Arithmetic>();
         assert_eq!(r.components.len(), 2, "components: {:?}", r.components);
         // `+`, `*`, `0`, `1` cluster; `<` and `false` form the other cluster.
         let arith = component_of(&r, "+");
@@ -301,7 +307,7 @@ mod tests {
     /// so the seam is TRANSFORM — the layer line the architecture wants.
     #[test]
     fn date_splits_into_arithmetic_and_conversion() {
-        let r = cohesion::<Calendar>();
+        let r = CohesionReport::of::<Calendar>();
         assert_eq!(r.components.len(), 2, "components: {:?}", r.components);
         let conversion = component_of(&r, "since");
         assert_eq!(
@@ -319,9 +325,9 @@ mod tests {
     /// The report renders as a readable suggestion — naming the latent modules and the seam kind.
     #[test]
     fn the_report_renders_readably() {
-        let text = render::<Calendar>();
+        let text = CohesionReport::of::<Calendar>().render();
         assert!(text.contains("decomposes into 2 latent modules"));
         assert!(text.contains("transform"));
-        assert!(render::<Router>().contains("cohesive"));
+        assert!(CohesionReport::of::<Router>().render().contains("cohesive"));
     }
 }
