@@ -21,7 +21,27 @@ use boundary_spec::algebra;
 /// The operator functions ARE the module; the theory (`CreditMeter`, named "credit meter") is
 /// what `#[algebra]` reads off their signatures. `(Credits, Credits) -> Credits` ⇒ three binary
 /// operators over one sort.
-#[algebra(CreditMeter, "credit meter")]
+///
+/// The `expects(...)` argument is the TOP-DOWN half: the meter's DECLARED algebra, stated
+/// before (and now verified against) what discovery finds — all nine laws of
+/// `spec/credit-meter.spec`, in the declaration vocabulary. `tests/expectations.rs` holds
+/// `Distance::of::<CreditMeter>()` green with no surprises; declaring is free — it changes
+/// nothing about discovery or the frozen lock, it only lets the distance be measured.
+#[algebra(
+    CreditMeter,
+    "credit meter",
+    expects(
+        commutative(grant),
+        associative(grant),
+        identity(grant, zero),
+        identity(spend, zero),
+        annihilation(spend, zero),
+        associative(renew),
+        idempotent(renew),
+        bias_later(renew),
+        identity(renew, zero),
+    )
+)]
 pub mod meter_ops {
     use crate::meter::Credits;
 

@@ -35,9 +35,21 @@ use syn::{
 /// MULTI-SORTED: operators may range over several `#[derive(Shaped)]` value types (e.g. `Date` and
 /// `Duration`). The macro synthesises a `Value` sum over the sorts and the `sort_of` that tags it. The
 /// module's PUBLIC functions are its operators; private functions are helpers, left untouched.
+///
+/// DECLARED EXPECTATIONS (optional third argument): `#[algebra(CreditMeter, "credit meter",
+/// expects(commutative(grant), identity(grant, zero), bias_later(renew)))]` additionally
+/// generates the `discover::expect::Expected` impl — the theory's declared laws, each a ratified
+/// catalog shape applied to operator symbols (an identifier per operator function; a string
+/// literal is also accepted). `Distance::of::<CreditMeter>()` then reports the gap between the
+/// declaration and what discovery finds; a shape name outside the catalog fails loudly, by name,
+/// the first time the expectations are read. No `expects`, no impl — nothing else changes.
 #[proc_macro_attribute]
 pub fn algebra(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let AlgebraArgs { marker, name } = parse_macro_input!(attr as AlgebraArgs);
+    let AlgebraArgs {
+        marker,
+        name,
+        expects,
+    } = parse_macro_input!(attr as AlgebraArgs);
     let mut module = parse_macro_input!(item as ItemMod);
     let content = match &mut module.content {
         Some((_, items)) => items,
@@ -99,11 +111,14 @@ pub fn algebra(attr: TokenStream, item: TokenStream) -> TokenStream {
     if let Some(err) = sort_name_collision(&sorts) {
         return err.to_compile_error().into();
     }
-    let generated = if sorts.len() == 1 {
+    let mut generated = if sorts.len() == 1 {
         single_sort_impl(&marker, &name, &ops, &sorts[0])
     } else {
         multi_sort_impl(&marker, &name, &ops, &sorts)
     };
+    if let Some(decls) = &expects {
+        generated.extend(expected_impl(&marker, decls));
+    }
 
     let parsed: syn::File = match syn::parse2(generated) {
         Ok(file) => file,
@@ -153,17 +168,98 @@ struct OpInfo {
     ret: Type,
 }
 
-/// `#[algebra(Marker, "display name")]`.
+/// `#[algebra(Marker, "display name")]`, optionally
+/// `#[algebra(Marker, "display name", expects(shape(op, ...), ...))]`.
 struct AlgebraArgs {
     marker: Ident,
     name: LitStr,
+    expects: Option<Vec<ExpectDecl>>,
 }
 impl Parse for AlgebraArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let marker = input.parse()?;
         input.parse::<Token![,]>()?;
         let name = input.parse()?;
-        Ok(AlgebraArgs { marker, name })
+        let mut expects = None;
+        if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            if !input.is_empty() {
+                let keyword: Ident = input.parse()?;
+                if keyword != "expects" {
+                    return Err(syn::Error::new_spanned(
+                        keyword,
+                        "#[algebra]: after the display name, the only further argument is \
+                         `expects(shape(op, ...), ...)`",
+                    ));
+                }
+                let inner;
+                syn::parenthesized!(inner in input);
+                let decls = inner.parse_terminated(ExpectDecl::parse, Token![,])?;
+                expects = Some(decls.into_iter().collect());
+            }
+        }
+        Ok(AlgebraArgs {
+            marker,
+            name,
+            expects,
+        })
+    }
+}
+
+/// One declared law inside `expects(...)`: a catalog shape key applied to operator symbols —
+/// `identity(grant, zero)`. Shape-name validity is the LIBRARY's call (its `Expectation::of`
+/// panics by name on an unratified shape), so this crate never duplicates the catalog.
+struct ExpectDecl {
+    shape: Ident,
+    ops: Vec<String>,
+}
+impl Parse for ExpectDecl {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let shape: Ident = input.parse()?;
+        let inner;
+        syn::parenthesized!(inner in input);
+        let ops = inner
+            .parse_terminated(ExpectOp::parse, Token![,])?
+            .into_iter()
+            .map(|op| op.0)
+            .collect();
+        Ok(ExpectDecl { shape, ops })
+    }
+}
+
+/// An operator symbol in a declared law: the operator function's identifier (`grant`), or a
+/// string literal for a symbol no identifier can spell.
+struct ExpectOp(String);
+impl Parse for ExpectOp {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.peek(LitStr) {
+            Ok(ExpectOp(input.parse::<LitStr>()?.value()))
+        } else {
+            Ok(ExpectOp(input.parse::<Ident>()?.to_string()))
+        }
+    }
+}
+
+/// The `expects(...)` expansion: the marker's `Expected` impl, one `Expectation` per declared
+/// law. Symbols are the operator function names — exactly what the synthesised operator table
+/// uses as `symbol`, so declared and discovered speak the same names.
+fn expected_impl(marker: &Ident, decls: &[ExpectDecl]) -> TokenStream2 {
+    let entries = decls.iter().map(|decl| {
+        let shape = decl.shape.to_string();
+        let ops = decl.ops.iter();
+        quote! {
+            ::boundary_spec::discover::expect::Expectation::of(
+                #shape,
+                ::std::vec![ #( #ops ),* ],
+            )
+        }
+    });
+    quote! {
+        impl ::boundary_spec::discover::expect::Expected for #marker {
+            fn expectations() -> ::std::vec::Vec<::boundary_spec::discover::expect::Expectation> {
+                ::std::vec![ #( #entries ),* ]
+            }
+        }
     }
 }
 

@@ -24,6 +24,7 @@ const KERNEL_ALLOWLIST: &[&str] = &[
     "src/boundary.rs",
     "src/capability.rs",
     "src/discover/engine.rs",
+    "src/discover/expect.rs",
     "src/discover/mod.rs",
     "src/gdp.rs",
     "src/harness.rs",

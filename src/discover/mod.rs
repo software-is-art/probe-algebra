@@ -26,6 +26,7 @@ pub mod composition;
 pub mod date;
 pub mod derived;
 pub mod engine;
+pub mod expect;
 pub mod freeze;
 pub mod layering;
 pub mod modularize;
@@ -51,6 +52,24 @@ pub mod scaffold;
 ///     }
 /// }
 /// ```
+///
+/// Every form takes an OPTIONAL trailing `expects { ... }` clause — the theory's DECLARED
+/// laws, the top-down half of the loop (see `discover::expect`). Each line is a ratified
+/// catalog shape applied to operator symbols (a bare identifier for an identifier-shaped
+/// symbol, a string literal for a symbolic one like `"+"`):
+///
+/// ```ignore
+///     expects {
+///         commutative(or);
+///         associative(or);
+///         identity(or, empty);
+///     }
+/// ```
+///
+/// The clause generates the `expect::Expected` impl, so `expect::Distance::of::<Router>()`
+/// reports the distance between what was declared and what discovery finds. A shape name
+/// outside the catalog fails loudly, by name, the first time the expectations are read.
+/// No clause, no impl — nothing else changes.
 #[macro_export]
 macro_rules! theory {
     (
@@ -65,6 +84,9 @@ macro_rules! theory {
         ops {
             $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
         }
+        $( expects {
+            $( $eshape:ident ( $($eop:tt),* ); )+
+        } )?
     ) => {
         impl $crate::discover::engine::Theory for $thy {
             type Sort = $Sort;
@@ -98,6 +120,7 @@ macro_rules! theory {
                 match sort { $( $vpat => $vlist, )+ }
             }
         }
+        $( $crate::__theory_expects! { $thy; $( $eshape ( $($eop),* ); )+ } )?
     };
 
     // DERIVED-GRID form: no `vars`, no hand-written `inhabit` — the grid is GENERATED from the value
@@ -117,6 +140,9 @@ macro_rules! theory {
         ops {
             $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
         }
+        $( expects {
+            $( $eshape:ident ( $($eop:tt),* ); )+
+        } )?
     ) => {
         impl $crate::discover::engine::Theory for $thy {
             type Sort = $Sort;
@@ -151,6 +177,7 @@ macro_rules! theory {
                 ($observe)(value)
             }
         }
+        $( $crate::__theory_expects! { $thy; $( $eshape ( $($eop),* ); )+ } )?
     };
 
     // MINIMAL form: the floor of a discovered domain. No `Obs`, no `observe`, no `vars`, no `inhabit`
@@ -167,6 +194,7 @@ macro_rules! theory {
         ops {
             $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
         }
+        $( expects { $($etail:tt)+ } )?
     ) => {
         $crate::theory! {
             $thy : $namestr,
@@ -178,7 +206,42 @@ macro_rules! theory {
             ops {
                 $( $fix $opname $opsym ( $($insort),* ) -> $outsort = $eval; )+
             }
+            $( expects { $($etail)+ } )?
         }
+    };
+}
+
+/// The `expects { ... }` clause's expansion — one `expect::Expected` impl, each line an
+/// `Expectation` (shape key, operator symbols). Split out of `theory!` so all three forms share
+/// one expansion. Hidden: only ever invoked by `theory!` itself.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __theory_expects {
+    ( $thy:ty; $( $shape:ident ( $($op:tt),* ); )+ ) => {
+        impl $crate::discover::expect::Expected for $thy {
+            fn expectations() -> ::std::vec::Vec<$crate::discover::expect::Expectation> {
+                ::std::vec![ $(
+                    $crate::discover::expect::Expectation::of(
+                        ::std::stringify!($shape),
+                        ::std::vec![ $( $crate::__expect_op!($op) ),* ],
+                    )
+                ),+ ]
+            }
+        }
+    };
+}
+
+/// One operator symbol inside an `expects` line: a bare identifier stringifies (`grant` →
+/// `"grant"`); a string literal passes through, for symbols no identifier can spell (`"+"`,
+/// `"-."`). Hidden: only ever invoked by `__theory_expects!`'s expansion.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __expect_op {
+    ( $op:literal ) => {
+        $op
+    };
+    ( $op:ident ) => {
+        ::std::stringify!($op)
     };
 }
 

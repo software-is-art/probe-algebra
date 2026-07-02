@@ -97,10 +97,40 @@ pub enum Term {
 /// A discovered law: its plain-language and symbolic renderings, plus the two terms it equates
 /// (so the spec can be re-probed over a fresh grid, where mutation judges its kill power).
 pub struct DiscoveredLaw {
+    /// The ratified catalog shape this law instantiates — EXACTLY a `ShapeCatalog::inventory()`
+    /// name, set at the `templates()` push site that minted the law. The tag is what the
+    /// declared-expectations layer (`discover::expect`) compares against: prose is for humans,
+    /// the tag is the machine-checkable identity of the shape.
+    pub shape: &'static str,
     pub prose: String,
     pub equation: String,
     pub lhs: Term,
     pub rhs: Term,
+}
+
+impl DiscoveredLaw {
+    /// The distinct operator symbols participating in this law, in first-appearance order
+    /// (lhs pre-order, then rhs). `symbols` is the theory's symbol table in operator-index
+    /// order — `Engine::signatures()` supplies it. Together with `shape` this is the law's
+    /// full identity for the declared-expectations gate: `identity` over `[grant, zero]` is
+    /// a different fact from `identity` over `[renew, zero]`.
+    pub fn ops(&self, symbols: &[&'static str]) -> Vec<&'static str> {
+        fn walk(t: &Term, symbols: &[&'static str], out: &mut Vec<&'static str>) {
+            if let Term::App(op, args) = t {
+                let sym = symbols[*op];
+                if !out.contains(&sym) {
+                    out.push(sym);
+                }
+                for a in args {
+                    walk(a, symbols, out);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(&self.lhs, symbols, &mut out);
+        walk(&self.rhs, symbols, &mut out);
+        out
+    }
 }
 
 /// The full result of discovery over a theory.
@@ -653,15 +683,17 @@ impl<T: Theory> Engine<T> {
     /// !! MOVE TOGETHER !! This battery and `ShapeCatalog::inventory()` above are the same
     /// catalog stated twice — as code that fires and as data that is locked in
     /// `spec/shapes.spec`. A shape added, removed, or reworded here must be mirrored there
-    /// (the census tests enforce both directions), and the regenerated lock diff ratified.
+    /// (the census tests enforce both directions — including that every `shape` tag pushed
+    /// here names a catalog entry), and the regenerated lock diff ratified.
     fn templates(&self) -> Vec<DiscoveredLaw> {
         let mut out: Vec<DiscoveredLaw> = Vec::new();
         let mut seen_prose: Vec<String> = Vec::new();
-        let mut push = |this: &Self, prose: String, lhs: Term, rhs: Term| {
+        let mut push = |this: &Self, shape: &'static str, prose: String, lhs: Term, rhs: Term| {
             if this.same(&lhs, &rhs) && !seen_prose.contains(&prose) {
                 seen_prose.push(prose.clone());
                 let equation = format!("{} = {}", this.render(&lhs), this.render(&rhs));
                 out.push(DiscoveredLaw {
+                    shape,
                     prose,
                     equation,
                     lhs,
@@ -683,6 +715,7 @@ impl<T: Theory> Engine<T> {
                 // commutativity: f(x,y) = f(y,x)
                 push(
                     self,
+                    "commutativity",
                     format!("{} gives the same result in either order.", f.name),
                     Self::app(fid, vec![x.clone(), y.clone()]),
                     Self::app(fid, vec![y.clone(), x.clone()]),
@@ -690,6 +723,7 @@ impl<T: Theory> Engine<T> {
                 // associativity: f(f(x,y),z) = f(x,f(y,z))
                 push(
                     self,
+                    "associativity",
                     format!(
                         "With {}, the grouping of three values doesn't matter.",
                         f.name
@@ -706,6 +740,7 @@ impl<T: Theory> Engine<T> {
                 // idempotence: f(x,x) = x
                 push(
                     self,
+                    "idempotence",
                     format!("{} of a value with itself gives that value.", f.name),
                     Self::app(fid, vec![x.clone(), x.clone()]),
                     x.clone(),
@@ -732,6 +767,7 @@ impl<T: Theory> Engine<T> {
                     );
                     push(
                         self,
+                        "bias (right-regular)",
                         format!(
                             "With {}, the later operand wins where the two disagree — \
                              re-applying an earlier one cannot overwrite it.",
@@ -742,6 +778,7 @@ impl<T: Theory> Engine<T> {
                     );
                     push(
                         self,
+                        "bias (left-regular)",
                         format!(
                             "With {}, the earlier operand wins where the two disagree — \
                              a later one cannot overwrite it.",
@@ -762,12 +799,14 @@ impl<T: Theory> Engine<T> {
                     // identity: f(c,x) = x  (or f(x,c) = x)
                     push(
                         self,
+                        "identity",
                         format!("{} with {} leaves a value unchanged.", f.name, cs),
                         Self::app(fid, vec![c.clone(), x.clone()]),
                         x.clone(),
                     );
                     push(
                         self,
+                        "identity",
                         format!("{} with {} leaves a value unchanged.", f.name, cs),
                         Self::app(fid, vec![x.clone(), c.clone()]),
                         x.clone(),
@@ -775,12 +814,14 @@ impl<T: Theory> Engine<T> {
                     // annihilation: f(c,x) = c  (or f(x,c) = c)
                     push(
                         self,
+                        "annihilation",
                         format!("{} by {} always gives {}.", f.name, cs, cs),
                         Self::app(fid, vec![c.clone(), x.clone()]),
                         c.clone(),
                     );
                     push(
                         self,
+                        "annihilation",
                         format!("{} by {} always gives {}.", f.name, cs, cs),
                         Self::app(fid, vec![x.clone(), c.clone()]),
                         c.clone(),
@@ -793,6 +834,7 @@ impl<T: Theory> Engine<T> {
                         // distributivity: f(x, g(y,z)) = g(f(x,y), f(x,z))
                         push(
                             self,
+                            "distributivity",
                             format!("{} distributes over {}.", f.name, g.name),
                             Self::app(
                                 fid,
@@ -809,6 +851,7 @@ impl<T: Theory> Engine<T> {
                         // absorption: f(x, g(x,y)) = x  (e.g. `x ∧ (x ∨ y) = x`)
                         push(
                             self,
+                            "absorption",
                             format!("{} absorbs {}.", f.name, g.name),
                             Self::app(
                                 fid,
@@ -836,6 +879,7 @@ impl<T: Theory> Engine<T> {
                         let cs = self.render(&c);
                         push(
                             self,
+                            "action identity",
                             format!("{} with {} leaves a value unchanged.", f.name, cs),
                             Self::app(fid, vec![x.clone(), c.clone()]),
                             x.clone(),
@@ -847,6 +891,7 @@ impl<T: Theory> Engine<T> {
                         if is_binary_on(g, t) {
                             push(
                                 self,
+                                "monoid action",
                                 format!(
                                     "Repeated {} combines its parameters with {}.",
                                     f.name, g.name
@@ -878,13 +923,20 @@ impl<T: Theory> Engine<T> {
                         // a relation collapsing to `false` is irreflexivity; any other constant is a
                         // self-application law (`diff(x, x) = zero`).
                         let cs = self.render(&c);
-                        let prose = if cs == "false" {
-                            format!("A value is never {} itself.", f.name)
+                        let (shape, prose) = if cs == "false" {
+                            (
+                                "irreflexivity",
+                                format!("A value is never {} itself.", f.name),
+                            )
                         } else {
-                            format!("{} of a value with itself gives {}.", f.name, cs)
+                            (
+                                "self-application",
+                                format!("{} of a value with itself gives {}.", f.name, cs),
+                            )
                         };
                         push(
                             self,
+                            shape,
                             prose,
                             Self::app(fid, vec![x.clone(), x.clone()]),
                             c.clone(),
@@ -899,6 +951,7 @@ impl<T: Theory> Engine<T> {
                 if let Some(x) = self.var(s, 0) {
                     push(
                         self,
+                        "involution",
                         format!("{} twice returns the original value.", f.name),
                         Self::app(fid, vec![Self::app(fid, vec![x.clone()])]),
                         x.clone(),
@@ -915,6 +968,7 @@ impl<T: Theory> Engine<T> {
                         if gid != fid && g.inputs.len() == 1 && g.inputs[0] == t && g.output == s {
                             push(
                                 self,
+                                "round-trip",
                                 format!(
                                     "{} undoes {} — the round trip is the identity.",
                                     g.name, f.name
@@ -937,6 +991,7 @@ impl<T: Theory> Engine<T> {
                             if is_binary_on(q, t) {
                                 push(
                                     self,
+                                    "homomorphism",
                                     format!("{} turns {} into {}.", f.name, p.name, q.name),
                                     Self::app(
                                         fid,
@@ -1266,6 +1321,7 @@ mod tests {
         assert_eq!(e.check(&d.laws), Ok(()));
         // ops: [F=0, T=1, And=2, Or=3, Not=4]; vars: x=0, y=1, z=2.
         let bogus = DiscoveredLaw {
+            shape: "commutativity",
             prose: "bogus".into(),
             equation: "(x & y) = (x | y)".into(),
             lhs: Term::App(2, vec![Term::Var(0), Term::Var(1)]),
@@ -1600,6 +1656,7 @@ mod tests {
         // and `check` on the frozen false law is the same probe from the other door: ops = [Tilt],
         // vars x = 0, y = 1.
         let frozen = DiscoveredLaw {
+            shape: "commutativity",
             prose: "Tilt gives the same result in either order.".into(),
             equation: "(x >< y) = (y >< x)".into(),
             lhs: Term::App(0, vec![Term::Var(0), Term::Var(1)]),
@@ -2040,12 +2097,15 @@ mod tests {
         }
     }
 
-    /// The discovered prose of a theory, engine-level (no per-domain addenda — the census is
+    /// The discovered laws of a theory, engine-level (no per-domain addenda — the census is
     /// about what the ENGINE's battery can say).
+    fn discovered_laws<T: Theory>() -> Vec<DiscoveredLaw> {
+        Engine::<T>::new().discover().laws
+    }
+
+    /// The discovered prose of a theory — the census matcher's view of `discovered_laws`.
     fn discovered_prose<T: Theory>() -> Vec<String> {
-        Engine::<T>::new()
-            .discover()
-            .laws
+        discovered_laws::<T>()
             .into_iter()
             .map(|l| l.prose)
             .collect()
@@ -2072,9 +2132,12 @@ mod tests {
     }
 
     /// CENSUS, direction two: every law discovered across EVERY registered theory in the crate
-    /// (plus the maximal ones) matches some catalog entry. A prose skeleton that escaped the
-    /// catalog is an UNRATIFIED template — it entered consumers' discovered specs without a
-    /// reviewed diff to spec/shapes.spec.
+    /// (plus the maximal ones) IS a ratified shape — checked at two strengths. The law's
+    /// `shape` TAG (set at its `templates()` push site) must name a catalog entry, and that
+    /// SAME entry's prose template must match the law's prose. The tag check is stronger than
+    /// prose matching alone: a push site tagged with a misspelled or unratified name fails
+    /// here even if its prose happens to fit some template, and a tag/prose mismatch (the tag
+    /// says one shape, the sentence reads as another) is caught as the lockstep violation it is.
     #[test]
     fn every_discovered_law_in_the_crate_is_a_ratified_shape() {
         use crate::discover::architect::{EscapeCodec, Reports};
@@ -2085,30 +2148,42 @@ mod tests {
         use crate::discover::router::Router;
         use crate::kvstore::theory::TtlStore;
 
-        let all: Vec<(&str, Vec<String>)> = vec![
-            ("interpreter arithmetic", discovered_prose::<Arithmetic>()),
-            ("router", discovered_prose::<Router>()),
-            ("date calculus", discovered_prose::<Calendar>()),
-            ("ttl store", discovered_prose::<TtlStore>()),
-            ("tri lattice", discovered_prose::<Lattice>()),
-            ("graded lattices", discovered_prose::<Tiers>()),
-            ("architect report", discovered_prose::<Reports>()),
-            ("lsp escape codec", discovered_prose::<EscapeCodec>()),
-            ("max-merge", discovered_prose::<MaxMerge>()),
-            ("gcd-merge", discovered_prose::<GcdMerge>()),
-            ("first-merge", discovered_prose::<FirstMerge>()),
-            ("maximal logic", discovered_prose::<MaxLogic>()),
-            ("maximal selection", discovered_prose::<MaxSelect>()),
+        let all: Vec<(&str, Vec<DiscoveredLaw>)> = vec![
+            ("interpreter arithmetic", discovered_laws::<Arithmetic>()),
+            ("router", discovered_laws::<Router>()),
+            ("date calculus", discovered_laws::<Calendar>()),
+            ("ttl store", discovered_laws::<TtlStore>()),
+            ("tri lattice", discovered_laws::<Lattice>()),
+            ("graded lattices", discovered_laws::<Tiers>()),
+            ("architect report", discovered_laws::<Reports>()),
+            ("lsp escape codec", discovered_laws::<EscapeCodec>()),
+            ("max-merge", discovered_laws::<MaxMerge>()),
+            ("gcd-merge", discovered_laws::<GcdMerge>()),
+            ("first-merge", discovered_laws::<FirstMerge>()),
+            ("maximal logic", discovered_laws::<MaxLogic>()),
+            ("maximal selection", discovered_laws::<MaxSelect>()),
         ];
         let inventory = ShapeCatalog::inventory();
-        for (theory, proses) in all {
-            for prose in proses {
+        for (theory, laws) in all {
+            for law in laws {
+                let entry = inventory.iter().find(|s| s.name == law.shape);
+                let Some(entry) = entry else {
+                    panic!(
+                        "law {:?} (theory {theory:?}) is tagged with shape {:?}, which names \
+                         NO catalog entry — an unratified tag escaped `templates()`: add the \
+                         shape to `ShapeCatalog::inventory()` (they must move together), \
+                         re-bless spec/shapes.spec, and ratify the diff",
+                        law.prose, law.shape
+                    );
+                };
                 assert!(
-                    inventory.iter().any(|s| s.matches(&prose)),
-                    "law {prose:?} (theory {theory:?}) matches NO catalog shape — an \
-                     unratified template escaped `templates()` into a discovered spec: add its \
-                     shape to `ShapeCatalog::inventory()` (they must move together), re-bless \
-                     spec/shapes.spec, and ratify the diff"
+                    entry.matches(&law.prose),
+                    "law {:?} (theory {theory:?}) is tagged {:?} but does not instantiate \
+                     that shape's prose template {:?} — the tag and the prose at its \
+                     `templates()` push site have come apart",
+                    law.prose,
+                    law.shape,
+                    entry.template
                 );
             }
         }
