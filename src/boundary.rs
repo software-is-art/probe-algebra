@@ -1042,6 +1042,12 @@ pub trait Shaped: Sized + Clone + PartialEq {
     }
 }
 
+/// The grid a `Shaped` type GROWS from its own structure (the inhabitant closed under
+/// perturbation, capped) — re-exported here because it is boundary vocabulary in practice: a
+/// consumer's `Probed` impls and probe tests legitimately want the derived grid, and
+/// `discover::engine::shadow_grid` reads engine-internal for what is really Shaped's closure.
+pub use crate::discover::engine::shadow_grid;
+
 /// A boolean varies one way: to its negation.
 impl Shaped for bool {
     fn inhabitant() -> Self {

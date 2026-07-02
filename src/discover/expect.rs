@@ -61,7 +61,9 @@ pub struct Expectation {
     pub shape: &'static str,
     /// The distinct operator symbols the shape ranges over, in the law's first-appearance
     /// order (the operator first, then its constant/partner: `[grant, zero]`, `[esc, ++]`).
-    pub ops: Vec<&'static str>,
+    /// Owned strings, not `&'static`: a declaration can be PARSED at runtime (genesis reads
+    /// `system!` declarations from tokens) as well as written in source.
+    pub ops: Vec<String>,
 }
 
 impl Expectation {
@@ -69,7 +71,7 @@ impl Expectation {
     /// exact catalog name (`"bias (right-regular)"`). An unknown name FAILS LOUDLY, listing the
     /// whole vocabulary — a declaration outside the ratified catalog is a spelling of a law the
     /// engine can never discover, so it must never silently count as "missing".
-    pub fn of(shape: &'static str, ops: Vec<&'static str>) -> Expectation {
+    pub fn of<S: Into<String>>(shape: &'static str, ops: Vec<S>) -> Expectation {
         let canonical = VOCABULARY
             .iter()
             .find(|(key, name)| *key == shape || *name == shape)
@@ -88,7 +90,7 @@ impl Expectation {
             });
         Expectation {
             shape: canonical,
-            ops: dedup(&ops),
+            ops: dedup(ops.into_iter().map(S::into).collect()),
         }
     }
 
@@ -102,8 +104,9 @@ impl Expectation {
             .unwrap_or(self.shape)
     }
 
-    /// `identity(grant, zero)` — the declaration form, which is also the report form.
-    fn render(&self) -> String {
+    /// `identity(grant, zero)` — the declaration form, which is also the report form (and
+    /// what genesis passes through AS WRITTEN into a generated `expects(...)` attribute).
+    pub fn render(&self) -> String {
         format!("{}({})", self.key(), self.ops.join(", "))
     }
 }
@@ -150,7 +153,7 @@ impl Distance {
             .iter()
             .map(|law: &DiscoveredLaw| Expectation {
                 shape: law.shape,
-                ops: law.ops(&symbols),
+                ops: law.ops(&symbols).into_iter().map(String::from).collect(),
             })
             .collect();
         let declared = T::expectations();
@@ -222,11 +225,11 @@ fn render_list(expectations: &[Expectation]) -> String {
 /// Distinct symbols in first-appearance order — the same normalisation `DiscoveredLaw::ops`
 /// applies, so a declaration like `homomorphism(esc, ++, ++)` (the shape's three parameter
 /// slots, two coinciding) compares equal to the discovered law's fingerprint `[esc, ++]`.
-fn dedup(ops: &[&'static str]) -> Vec<&'static str> {
-    let mut out = Vec::new();
+fn dedup(ops: Vec<String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
     for op in ops {
-        if !out.contains(op) {
-            out.push(*op);
+        if !out.contains(&op) {
+            out.push(op);
         }
     }
     out

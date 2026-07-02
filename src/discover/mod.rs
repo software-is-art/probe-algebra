@@ -34,6 +34,7 @@ pub mod modularize;
 pub mod residue;
 pub mod router;
 pub mod scaffold;
+pub mod system;
 
 /// Generate a whole `engine::Theory` impl from a concise declaration — so a discovery domain is
 /// "just module definition": the value-object types, the operator functions, and this block. The
@@ -330,14 +331,27 @@ pub fn kvstore_spec() -> Spec {
     Spec::of::<crate::kvstore::theory::TtlStore>()
 }
 
+/// This repo's own COMPILED `system!` declaration (see `discover::system`): the four
+/// demonstration theories as modules, no seams (the domains share no value objects). The
+/// graph IS the registry — [`all_specs`] reads it off `modules()`, so admitting a theory is
+/// a reviewed diff HERE, like admitting a kernel file — and the graph itself is frozen in
+/// `spec/boundary-spec.system.spec`, drift-gated like every module lock.
+pub struct BoundarySpec;
+
+crate::system! {
+    BoundarySpec : "boundary-spec",
+    modules {
+        arithmetic::Arithmetic = interpreter_spec();
+        router::Router;
+        date::Calendar;
+        crate::kvstore::theory::TtlStore;
+    }
+}
+
 /// Every theory's discovered spec — what the freeze records and the staleness gate checks.
+/// No longer a hand-maintained list: it is the [`BoundarySpec`] system's module registry.
 pub fn all_specs() -> Vec<Spec> {
-    vec![
-        interpreter_spec(),
-        router_spec(),
-        date_spec(),
-        kvstore_spec(),
-    ]
+    <BoundarySpec as system::System>::modules()
 }
 
 /// The interpreter's discovered laws (named value-algebra laws + the `U` law), for consumers that

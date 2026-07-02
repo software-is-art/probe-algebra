@@ -91,14 +91,17 @@ use syn::punctuated::Punctuated;
 use syn::{braced, parenthesized, Ident, LitStr, Token};
 
 use crate::discover::architect::{Architect, CodeAction, FileEdit};
+use crate::discover::engine::{ShapeCatalog, ShapeInfo};
+use crate::discover::expect::Expectation;
 
 // ===== the parse-side representation ========================================================
 //
-// Deliberately OURS and minimal: the runtime expectations vocabulary (`discover::expect` + the
-// `#[algebra]` macro's `expects(...)`) grew concurrently with this module, so genesis keeps its
-// own parse-side `Expect` rather than coupling to those types mid-flight. The declaration KEYS
-// (`commutative`, ..., `identity`, `annihilation`) and the emitted attribute syntax are kept
-// identical to that vocabulary; unifying the two representations is a deliberate follow-up.
+// Declared law expectations are NOT genesis's own vocabulary: a parsed `expects { ... }` line
+// becomes a `discover::expect::Expectation` — the same value the `theory!` macro's clause and
+// `#[algebra(..., expects(...))]` construct, and the same identity a discovered law carries.
+// Genesis only restricts WHICH shapes v1 admits (`V1_EXPECT_KEYS`: the catalog's homogeneous
+// binary rows) and renders the target-lock law lines through the catalog's own prose
+// templates (`ShapeInfo::instantiate`), so declared and discovered cannot drift apart.
 
 /// The whole parsed declaration — everything `system! { ... }` states.
 pub struct SystemDecl {
@@ -124,7 +127,7 @@ pub struct ValueDecl {
 pub struct ModuleDecl {
     pub name: String,
     pub ops: Vec<OpDecl>,
-    pub expects: Vec<Expect>,
+    pub expects: Vec<Expectation>,
 }
 
 /// One operator signature over declared value names. Zero inputs is a constant.
@@ -132,19 +135,6 @@ pub struct OpDecl {
     pub name: String,
     pub inputs: Vec<String>,
     pub output: String,
-}
-
-/// A declared law expectation — genesis's own minimal parse-side vocabulary: the homogeneous
-/// binary rows of the engine's `ShapeCatalog`, under the same keys `discover::expect` speaks
-/// (a follow-up unifies the two representations).
-pub enum Expect {
-    Commutative { op: String },
-    Associative { op: String },
-    Idempotent { op: String },
-    BiasLater { op: String },
-    BiasEarlier { op: String },
-    Identity { op: String, konst: String },
-    Annihilating { op: String, konst: String },
 }
 
 /// A declared seam between two modules on a shared value.
@@ -164,101 +154,64 @@ pub enum SeamKindDecl {
     Transform,
 }
 
-impl Expect {
-    /// The operator the expectation is about.
-    pub fn op(&self) -> &str {
-        match self {
-            Expect::Commutative { op }
-            | Expect::Associative { op }
-            | Expect::Idempotent { op }
-            | Expect::BiasLater { op }
-            | Expect::BiasEarlier { op }
-            | Expect::Identity { op, .. }
-            | Expect::Annihilating { op, .. } => op,
-        }
-    }
+/// The v1 expectation vocabulary: the shape catalog's homogeneous-binary rows by declaration
+/// key, each with the argument count it takes (the operator, plus a nullary constant for the
+/// last two). The keys are exactly the ones `discover::expect` speaks, so a parsed line is an
+/// `Expectation`, not a genesis-private twin.
+const V1_EXPECT_KEYS: &[(&str, usize)] = &[
+    ("commutative", 1),
+    ("associative", 1),
+    ("idempotent", 1),
+    ("bias_later", 1),
+    ("bias_earlier", 1),
+    ("identity", 2),
+    ("annihilation", 2),
+];
 
-    /// Every operator name the expectation mentions (the op, plus the constant if any) — what
-    /// the target lock's coverage line counts as "participates in a law".
-    pub fn mentions(&self) -> Vec<&str> {
-        match self {
-            Expect::Identity { op, konst } | Expect::Annihilating { op, konst } => {
-                vec![op, konst]
-            }
-            other => vec![other.op()],
-        }
-    }
+/// The catalog row a (validated) expectation instantiates.
+fn shape_info(e: &Expectation) -> ShapeInfo {
+    ShapeCatalog::inventory()
+        .into_iter()
+        .find(|shape| shape.name == e.shape)
+        .expect("an Expectation's shape is always a ratified catalog name")
+}
 
-    /// The expectation exactly as declared — `commutative(grant)` — for the pass-through into
-    /// the generated `#[algebra(..., expects(...))]` attribute.
-    pub fn as_written(&self) -> String {
-        match self {
-            Expect::Commutative { op } => format!("commutative({op})"),
-            Expect::Associative { op } => format!("associative({op})"),
-            Expect::Idempotent { op } => format!("idempotent({op})"),
-            Expect::BiasLater { op } => format!("bias_later({op})"),
-            Expect::BiasEarlier { op } => format!("bias_earlier({op})"),
-            Expect::Identity { op, konst } => format!("identity({op}, {konst})"),
-            Expect::Annihilating { op, konst } => format!("annihilation({op}, {konst})"),
-        }
-    }
+/// The shape-catalog rank — the order the engine tries (and therefore renders) the shapes, so
+/// the target lock's law order matches a discovery that confirms the declaration.
+fn shape_rank(e: &Expectation) -> usize {
+    ShapeCatalog::inventory()
+        .iter()
+        .position(|shape| shape.name == e.shape)
+        .expect("an Expectation's shape is always a ratified catalog name")
+}
 
-    /// The shape-catalog rank — the order the engine tries (and therefore renders) the shapes,
-    /// so the target lock's law order matches a discovery that confirms the declaration.
-    fn rank(&self) -> usize {
-        match self {
-            Expect::Commutative { .. } => 0,
-            Expect::Associative { .. } => 1,
-            Expect::Idempotent { .. } => 2,
-            Expect::BiasLater { .. } => 3,
-            Expect::BiasEarlier { .. } => 4,
-            Expect::Identity { .. } => 5,
-            Expect::Annihilating { .. } => 6,
-        }
-    }
+/// Does the expectation's shape take a constant (its second declared name)?
+fn takes_constant(e: &Expectation) -> bool {
+    matches!(e.shape, "identity" | "annihilation")
+}
 
-    /// The declared law as the lock will state it: `(prose, equation)`, instantiated from the
-    /// shape catalog's templates over the engine's default variable names (`x`, `y`, `z`) and
-    /// the operator rendered infix under its own name — exactly how a `#[algebra]` theory's
-    /// discovered spec renders.
-    fn law(&self) -> (String, String) {
-        match self {
-            Expect::Commutative { op } => (
-                format!("{op} gives the same result in either order."),
-                format!("(x {op} y) = (y {op} x)"),
-            ),
-            Expect::Associative { op } => (
-                format!("With {op}, the grouping of three values doesn't matter."),
-                format!("((x {op} y) {op} z) = (x {op} (y {op} z))"),
-            ),
-            Expect::Idempotent { op } => (
-                format!("{op} of a value with itself gives that value."),
-                format!("(x {op} x) = x"),
-            ),
-            Expect::BiasLater { op } => (
-                format!(
-                    "With {op}, the later operand wins where the two disagree — re-applying \
-                     an earlier one cannot overwrite it."
-                ),
-                format!("((x {op} y) {op} x) = (y {op} x)"),
-            ),
-            Expect::BiasEarlier { op } => (
-                format!(
-                    "With {op}, the earlier operand wins where the two disagree — a later \
-                     one cannot overwrite it."
-                ),
-                format!("((x {op} y) {op} x) = (x {op} y)"),
-            ),
-            Expect::Identity { op, konst } => (
-                format!("{op} with {konst} leaves a value unchanged."),
-                format!("({konst} {op} x) = x"),
-            ),
-            Expect::Annihilating { op, konst } => (
-                format!("{op} by {konst} always gives {konst}."),
-                format!("({konst} {op} x) = {konst}"),
-            ),
-        }
-    }
+/// The declared law as the lock will state it: `(prose, equation)`. The PROSE is the ratified
+/// shape catalog's own template (`ShapeInfo::instantiate`) — one source, never restated — over
+/// the declared names; the EQUATION is the canonical form the engine renders for the shape's
+/// discovered instance (default variable names `x`, `y`, `z`, the operator infix under its own
+/// name — the byte-exact render pin in the tests holds this side in sync).
+fn law(e: &Expectation) -> (String, String) {
+    let op = e.ops[0].as_str();
+    let prose = match e.ops.get(1) {
+        Some(konst) => shape_info(e).instantiate(&[("op", op), ("const", konst)]),
+        None => shape_info(e).instantiate(&[("op", op)]),
+    };
+    let equation = match e.shape {
+        "commutativity" => format!("(x {op} y) = (y {op} x)"),
+        "associativity" => format!("((x {op} y) {op} z) = (x {op} (y {op} z))"),
+        "idempotence" => format!("(x {op} x) = x"),
+        "bias (right-regular)" => format!("((x {op} y) {op} x) = (y {op} x)"),
+        "bias (left-regular)" => format!("((x {op} y) {op} x) = (x {op} y)"),
+        "identity" => format!("({} {op} x) = x", e.ops[1]),
+        "annihilation" => format!("({konst} {op} x) = {konst}", konst = e.ops[1]),
+        other => unreachable!("v1 admits no `{other}` expectation"),
+    };
+    (prose, equation)
 }
 
 /// Where the generated crate's dependencies point — the flag `cargo run --example genesis`
@@ -329,40 +282,40 @@ fn parse_op(input: ParseStream) -> syn::Result<OpDecl> {
     })
 }
 
-fn parse_expect(input: ParseStream) -> syn::Result<Expect> {
+fn parse_expect(input: ParseStream) -> syn::Result<Expectation> {
     let shape: Ident = input.parse()?;
     let args;
     parenthesized!(args in input);
     let idents: Punctuated<Ident, Token![,]> = args.parse_terminated(Ident::parse, Token![,])?;
     input.parse::<Token![;]>()?;
     let names: Vec<String> = idents.iter().map(Ident::to_string).collect();
-    let expect = match (shape.to_string().as_str(), names.as_slice()) {
-        ("commutative", [op]) => Expect::Commutative { op: op.clone() },
-        ("associative", [op]) => Expect::Associative { op: op.clone() },
-        ("idempotent", [op]) => Expect::Idempotent { op: op.clone() },
-        ("bias_later", [op]) => Expect::BiasLater { op: op.clone() },
-        ("bias_earlier", [op]) => Expect::BiasEarlier { op: op.clone() },
-        ("identity", [op, konst]) => Expect::Identity {
-            op: op.clone(),
-            konst: konst.clone(),
-        },
-        ("annihilation", [op, konst]) => Expect::Annihilating {
-            op: op.clone(),
-            konst: konst.clone(),
-        },
-        (other, args) => {
-            return Err(syn::Error::new(
-                shape.span(),
-                format!(
-                    "unknown expectation `{other}` with {} argument(s); the v1 vocabulary is \
-                     commutative(op), associative(op), idempotent(op), bias_later(op), \
-                     bias_earlier(op), identity(op, const), annihilation(op, const)",
-                    args.len()
-                ),
-            ))
-        }
+    let known = V1_EXPECT_KEYS
+        .iter()
+        .find(|(key, arity)| shape == key && *arity == names.len());
+    let Some((key, arity)) = known else {
+        return Err(syn::Error::new(
+            shape.span(),
+            format!(
+                "unknown expectation `{shape}` with {} argument(s); the v1 vocabulary is \
+                 commutative(op), associative(op), idempotent(op), bias_later(op), \
+                 bias_earlier(op), identity(op, const), annihilation(op, const)",
+                names.len()
+            ),
+        ));
     };
-    Ok(expect)
+    if *arity == 2 && names[0] == names[1] {
+        // `Expectation` normalises to DISTINCT names (a discovered law's fingerprint does the
+        // same), so a self-paired declaration would silently lose its constant — refuse it.
+        return Err(syn::Error::new(
+            shape.span(),
+            format!(
+                "expectation `{key}({0}, {0})` names the same operator twice — the constant \
+                 must be a distinct nullary operator",
+                names[0]
+            ),
+        ));
+    }
+    Ok(Expectation::of(key, names))
 }
 
 fn parse_module(input: ParseStream) -> syn::Result<ModuleDecl> {
@@ -567,11 +520,11 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
             }
         }
         for e in &m.expects {
-            let Some(op) = m.ops.iter().find(|o| o.name == e.op()) else {
+            let Some(op) = m.ops.iter().find(|o| o.name == e.ops[0]) else {
                 return err(format!(
                     "expectation `{}` names `{}`, which module `{}` does not declare",
-                    e.as_written(),
-                    e.op(),
+                    e.render(),
+                    e.ops[0],
                     m.name
                 ));
             };
@@ -581,14 +534,15 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
                 return err(format!(
                     "expectation `{}` needs a homogeneous binary operator (s × s → s); \
                      `{}` is `{}({}) -> {}`",
-                    e.as_written(),
+                    e.render(),
                     op.name,
                     op.name,
                     op.inputs.join(", "),
                     op.output
                 ));
             }
-            if let Expect::Identity { konst, .. } | Expect::Annihilating { konst, .. } = e {
+            if takes_constant(e) {
+                let konst = &e.ops[1];
                 let ok = m
                     .ops
                     .iter()
@@ -597,7 +551,7 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
                     return err(format!(
                         "expectation `{}` needs `{konst}` to be a declared constant \
                          (a nullary operator) of sort `{}` in module `{}`",
-                        e.as_written(),
+                        e.render(),
                         op.output,
                         m.name
                     ));
@@ -724,9 +678,9 @@ fn banner(app: &str) -> String {
 
 /// The expectations that name `op` as their operator, in shape-catalog order — for doc lines
 /// and the target lock.
-fn expects_for<'a>(m: &'a ModuleDecl, op: &str) -> Vec<&'a Expect> {
-    let mut found: Vec<&Expect> = m.expects.iter().filter(|e| e.op() == op).collect();
-    found.sort_by_key(|e| e.rank());
+fn expects_for<'a>(m: &'a ModuleDecl, op: &str) -> Vec<&'a Expectation> {
+    let mut found: Vec<&Expectation> = m.expects.iter().filter(|e| e.ops[0] == op).collect();
+    found.sort_by_key(|e| shape_rank(e));
     found
 }
 
@@ -835,8 +789,11 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
     out.push_str(
         "//! * [`ops`] (ALGEBRA) — each module's operators as an `#[algebra]` theory; the declared\n\
          //!   expectations ride the attribute, and discovery must re-earn them.\n\
-         //! * `spec/` — TARGET locks: the DECLARED laws in the exact lock format, committed RED\n\
-         //!   on purpose. The drift gate stays red until discovery matches the declaration.\n\
+         //! * [`system`] (ALGEBRA) — the COMPILED `system!` graph: the module registry (the graph\n\
+         //!   IS the registry the freeze loop reads) and the declared seams with their checkers.\n\
+         //! * `spec/` — TARGET locks: the DECLARED laws (and the declared seam graph) in the exact\n\
+         //!   lock format, committed RED on purpose. The drift gate stays red until discovery\n\
+         //!   matches the declaration.\n\
          //!\n\
          //! ## The runbook — from generated skeleton to ratified system\n\
          //!\n\
@@ -846,8 +803,10 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
     out.push_str(&format!(
         "//! 2. First build: `{bless}=1 cargo build` — mints `spec/qualify.spec`, which the\n\
          //!    enforcement shim (`build.rs`) drift-gates from then on.\n\
-         //! 3. `cargo test` — the freeze gate holds the LIVE discovered spec against the TARGET\n\
-         //!    locks; red means the meaning does not yet earn the declaration.\n\
+         //! 3. `cargo test` — the expectations gate names each module's DISTANCE from its\n\
+         //!    declaration, and the freeze gate holds the LIVE discovered spec (module laws and\n\
+         //!    the seam graph) against the TARGET locks; red means the meaning does not yet earn\n\
+         //!    the declaration.\n\
          //! 4. `cargo run --example freeze` — regenerate the locks from discovery and read the\n\
          //!    diff against the targets. That diff IS the review: ratify it, or fix the meaning.\n",
         bless = bless_env(&sys.name)
@@ -856,7 +815,7 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
     for m in &sys.modules {
         out.push_str(&format!("pub mod {};\n", m.name));
     }
-    out.push_str("pub mod ops;\n\n");
+    out.push_str("pub mod ops;\npub mod system;\n\n");
     for m in &sys.modules {
         out.push_str(&format!("mod {}_internal;\n", m.name));
     }
@@ -992,7 +951,7 @@ fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
                 let expect_doc = if expected.is_empty() {
                     String::new()
                 } else {
-                    let list: Vec<String> = expected.iter().map(|e| e.as_written()).collect();
+                    let list: Vec<String> = expected.iter().map(|e| e.render()).collect();
                     format!(
                         "    ///\n    /// Declared expectations (the target lock restates \
                          them): {}.\n",
@@ -1045,7 +1004,7 @@ fn emit_internal(sys: &SystemDecl, m: &ModuleDecl) -> String {
         let expect_doc = if expected.is_empty() {
             "/// No laws were declared for it — whatever discovery finds is the spec.\n".to_string()
         } else {
-            let list: Vec<String> = expected.iter().map(|e| e.as_written()).collect();
+            let list: Vec<String> = expected.iter().map(|e| e.render()).collect();
             format!(
                 "/// Declared expectations to honour (discovery must re-earn them): {}.\n",
                 list.join("; ")
@@ -1083,7 +1042,7 @@ fn emit_ops(sys: &SystemDecl) -> String {
         let attr = if m.expects.is_empty() {
             format!("#[algebra({theory}, \"{}\")]", m.name)
         } else {
-            let written: Vec<String> = m.expects.iter().map(Expect::as_written).collect();
+            let written: Vec<String> = m.expects.iter().map(Expectation::render).collect();
             format!(
                 "#[algebra({theory}, \"{}\", expects({}))]",
                 m.name,
@@ -1142,12 +1101,16 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
     );
     for op in &m.ops {
         for e in expects_for(m, &op.name) {
-            let (prose, equation) = e.law();
+            let (prose, equation) = law(e);
             out.push_str(&format!("- {prose}\n      {equation}\n"));
         }
     }
     out.push('\n');
-    let covered: BTreeSet<&str> = m.expects.iter().flat_map(|e| e.mentions()).collect();
+    let covered: BTreeSet<&str> = m
+        .expects
+        .iter()
+        .flat_map(|e| e.ops.iter().map(String::as_str))
+        .collect();
     let uncovered: Vec<&str> = m
         .ops
         .iter()
@@ -1165,42 +1128,192 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
     out
 }
 
-/// The `use <crate>::ops::<m>_ops::<Theory>;` + `Spec::of::<Theory>().lock_in(...)` pairs the
-/// freeze example and the drift gate share.
-fn theory_imports_and_locks(sys: &SystemDecl) -> (String, String) {
-    let krate = crate_ident(&sys.name);
-    let mut imports = String::new();
-    let mut locks = String::new();
-    for m in &sys.modules {
-        let theory = camel(&m.name);
-        imports.push_str(&format!("use {krate}::ops::{}_ops::{theory};\n", m.name));
-        locks.push_str(&format!(
-            "        Spec::of::<{theory}>().lock_in(&spec_dir),\n"
+/// The compiled `system!` twin of the declaration (see `discover::system`): the marker, the
+/// module registry, and every TRANSPORT seam — discharged by construction, because genesis
+/// defines each value object exactly once (the macro's compile-time witness pins it). A
+/// declared TRANSFORM seam is NOT compiled here: its conversion is meaning genesis cannot
+/// name, so it stays a loud hole in `tests/seams.rs` until a spanning theory exists.
+fn emit_system(sys: &SystemDecl) -> String {
+    let marker = camel(&sys.name);
+    let transports: Vec<&SeamDecl> = sys
+        .seams
+        .iter()
+        .filter(|s| s.kind == SeamKindDecl::Transport)
+        .collect();
+    let transforms = sys.seams.len() - transports.len();
+
+    let mut out = String::from(
+        "//! Tier: ALGEBRA — the compiled `system!` graph: the application-level spec as a \
+         checked artifact.\n",
+    );
+    out.push_str(&banner(&sys.name));
+    out.push_str(
+        "//!\n\
+         //! The graph IS the registry: `modules()` is the list the freeze loop records and the\n\
+         //! drift gate checks (a module cannot silently fall out of it), and the rendered graph\n\
+         //! — modules, seams, each seam's obligation and status — freezes into the committed\n\
+         //! `spec/*.system.spec` lock. Declared transport seams are discharged BY CONSTRUCTION:\n\
+         //! each shared value object is defined exactly once, and the `system!` macro emits the\n\
+         //! compile-time witness that keeps that true.\n",
+    );
+    if transforms > 0 {
+        out.push_str(&format!(
+            "//!\n\
+             //! NOTE: {transforms} declared TRANSFORM seam(s) are not compiled into this graph —\n\
+             //! a transform's conversion is meaning, not structure. Each remains a loud hole in\n\
+             //! `tests/seams.rs`; once a spanning theory exists, declare the seam here as\n\
+             //! `Left -- Right : transform on Value via conversion in SpanningTheory;`.\n"
         ));
     }
-    (imports, locks)
+    out.push('\n');
+
+    // imports: every module's theory marker, plus each transport seam's value (for the witness).
+    let mut imports = BTreeSet::new();
+    for m in &sys.modules {
+        imports.insert(format!(
+            "use crate::ops::{}_ops::{};\n",
+            m.name,
+            camel(&m.name)
+        ));
+    }
+    for s in &transports {
+        let owner = owner_of(sys, &s.on).expect("validated: seam value has an owner");
+        imports.insert(format!("use crate::{owner}::{};\n", s.on));
+    }
+    for line in &imports {
+        out.push_str(line);
+    }
+
+    out.push_str(&format!(
+        "\n/// The system marker — `SystemReport::of::<{marker}>()` is the graph the lock \
+         freezes.\npub struct {marker};\n\nboundary_spec::system! {{\n    {marker} : \
+         \"{name}\",\n    modules {{\n",
+        name = sys.name
+    ));
+    for m in &sys.modules {
+        out.push_str(&format!("        {};\n", camel(&m.name)));
+    }
+    out.push_str("    }\n");
+    if !transports.is_empty() {
+        out.push_str("    seams {\n");
+        for s in &transports {
+            out.push_str(&format!(
+                "        {} -- {} : transport on {} by construction;\n",
+                camel(&s.left),
+                camel(&s.right),
+                s.on
+            ));
+        }
+        out.push_str("    }\n");
+    }
+    out.push_str("}\n");
+    out
+}
+
+/// The TARGET system lock: the declared graph in the exact committed lock format
+/// (`discover::system::SystemReport::render` — keep the two in step; the render pin in the
+/// tests holds this side). Transport seams are born discharged (by construction), so this
+/// lock goes green the moment the crate compiles and discovery runs.
+fn emit_system_lock(sys: &SystemDecl) -> String {
+    let mut out = format!(
+        "# system spec: {} — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.\n\n",
+        sys.name
+    );
+    out.push_str("modules (the ratified registry — one committed module lock each):\n");
+    for m in &sys.modules {
+        out.push_str(&format!("- {}\n", m.name));
+    }
+    out.push('\n');
+    let transports: Vec<&SeamDecl> = sys
+        .seams
+        .iter()
+        .filter(|s| s.kind == SeamKindDecl::Transport)
+        .collect();
+    if transports.is_empty() {
+        out.push_str("seams: none — no module pair declares a shared-value obligation.\n");
+        return out;
+    }
+    out.push_str("seams (each edge: its obligation, then the verdict its checker returned):\n");
+    for s in &transports {
+        out.push_str(&format!(
+            "- {} -- {} : transport on {}\n",
+            s.left, s.right, s.on
+        ));
+        out.push_str("      obligation: the modules share this value and must agree on its laws\n");
+        out.push_str(
+            "      status: discharged by construction — the shared value is one type on both \
+             sides (the declaration carries the compile-time witness)\n",
+        );
+    }
+    out
+}
+
+/// The DECLARED-LAWS gate: one distance test per module that declares expectations —
+/// `Distance::of` names exactly what is missing, so the gate is red WITH A WORKLIST until
+/// the meaning earns the declaration. Emitted only when some module declares `expects`.
+fn emit_expectations(sys: &SystemDecl) -> String {
+    let krate = crate_ident(&sys.name);
+    let mut out = String::from(
+        "//! expectations — the DECLARED-LAWS gate: each module's DISTANCE from its declared\n\
+         //! algebra (`Distance::of`), red until discovery earns every declared law.\n",
+    );
+    out.push_str(&banner(&sys.name));
+    out.push_str(
+        "//!\n\
+         //! RED BY DESIGN until the meaning holes are filled: the failure message IS the\n\
+         //! worklist (\"MISSING: ...\"). Surprises (discovered, never declared) do not fail —\n\
+         //! ratify them into the declaration or refute the operator that produced them.\n\n\
+         use boundary_spec::discover::expect::Distance;\n\n",
+    );
+    for m in sys.modules.iter().filter(|m| !m.expects.is_empty()) {
+        out.push_str(&format!(
+            "use {krate}::ops::{}_ops::{};\n",
+            m.name,
+            camel(&m.name)
+        ));
+    }
+    for m in sys.modules.iter().filter(|m| !m.expects.is_empty()) {
+        out.push_str(&format!(
+            "\n/// `{m}` declares {n} law(s); the distance report names any that discovery has\n\
+             /// not (yet) found true of the meaning.\n\
+             #[test]\n\
+             fn {m}_meets_its_declared_expectations() {{\n    \
+             let distance = Distance::of::<{theory}>();\n    \
+             assert!(distance.is_met(), \"{{}}\", distance.render());\n}}\n",
+            m = m.name,
+            n = m.expects.len(),
+            theory = camel(&m.name),
+        ));
+    }
+    out
 }
 
 fn emit_freeze_example(sys: &SystemDecl) -> String {
-    let (imports, locks) = theory_imports_and_locks(sys);
     let template = r#"//! freeze — the BLESS path: regenerate `spec/*.spec` from the live, discovered algebra.
 //!
 //!     cargo run --example freeze
 //!
 //! This is the ONE sanctioned writer of the lock files. Genesis committed TARGET locks (the
-//! DECLARED laws); the drift gate stays red until discovery matches them. Once the meaning
-//! holes are filled, run this and read the diff against the targets — a clean diff means the
-//! code earned exactly what was declared; any other diff is the conversation to have in review.
-//! Never edit a lock by hand.
+//! DECLARED laws and the declared seam graph); the drift gate stays red until discovery
+//! matches them. Once the meaning holes are filled, run this and read the diff against the
+//! targets — a clean diff means the code earned exactly what was declared; any other diff is
+//! the conversation to have in review. Never edit a lock by hand.
+//!
+//! The lock list is READ OFF THE GRAPH (`@MARKER@::modules()` plus the system lock): the
+//! declaration is the registry, so a module cannot silently fall out of the freeze loop.
 
 use std::path::PathBuf;
 
-use boundary_spec::discover::Spec;
-@IMPORTS@
+use boundary_spec::discover::system::{System, SystemReport};
+use @KRATE@::system::@MARKER@;
+
 fn main() {
     let spec_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
-    let locks = vec![
-@LOCKS@    ];
+    let mut locks: Vec<spec_lock::Lock> = @MARKER@::modules()
+        .iter()
+        .map(|spec| spec.lock_in(&spec_dir))
+        .collect();
+    locks.push(SystemReport::of::<@MARKER@>().lock_in(&spec_dir));
     spec_lock::bless(&locks).expect("write the spec locks");
     for lock in &locks {
         println!("blessed `{}` -> {}", lock.name, lock.path.display());
@@ -1209,35 +1322,39 @@ fn main() {
 }
 "#;
     template
-        .replace("@IMPORTS@", &imports)
-        .replace("@LOCKS@", &locks)
+        .replace("@KRATE@", &crate_ident(&sys.name))
+        .replace("@MARKER@", &camel(&sys.name))
 }
 
 fn emit_freeze_gate(sys: &SystemDecl) -> String {
-    let (imports, locks) = theory_imports_and_locks(sys);
     let template = r#"//! freeze_gate — the DRIFT GATE, as a plain integration test.
 //!
 //! Re-derive the live discovered spec and hold it against the committed locks. Genesis
-//! committed TARGET locks — the DECLARED laws in the exact lock format — so this gate is RED
-//! BY DESIGN until the meaning holes are filled and discovery re-earns the declaration. The
-//! fix is never to hand-edit a lock: fill the meaning, run `cargo run --example freeze`, and
-//! ratify the diff against the targets in review.
+//! committed TARGET locks — the DECLARED laws and the declared seam graph, in the exact lock
+//! format — so this gate is RED BY DESIGN until the meaning holes are filled and discovery
+//! re-earns the declaration. The fix is never to hand-edit a lock: fill the meaning, run
+//! `cargo run --example freeze`, and ratify the diff against the targets in review.
 
 use std::path::PathBuf;
 
-use boundary_spec::discover::Spec;
-@IMPORTS@
+use boundary_spec::discover::system::{System, SystemReport};
+use @KRATE@::system::@MARKER@;
+
 fn spec_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec")
 }
 
-/// The committed locks are FRESH: the live discovered algebra matches what was ratified —
-/// which, until the first bless, is the DECLARED target.
+/// The committed locks are FRESH: the live discovered algebra (every module in the graph's
+/// registry, and the graph itself) matches what was ratified — which, until the first bless,
+/// is the DECLARED target.
 #[test]
 fn the_committed_specs_are_fresh() {
     let spec_dir = spec_dir();
-    let locks = vec![
-@LOCKS@    ];
+    let mut locks: Vec<spec_lock::Lock> = @MARKER@::modules()
+        .iter()
+        .map(|spec| spec.lock_in(&spec_dir))
+        .collect();
+    locks.push(SystemReport::of::<@MARKER@>().lock_in(&spec_dir));
     if let Err(stale) = spec_lock::check(&locks) {
         panic!(
             "discovered spec differs from the committed lock for: {}. If discovery now matches \
@@ -1249,8 +1366,8 @@ fn the_committed_specs_are_fresh() {
 }
 "#;
     template
-        .replace("@IMPORTS@", &imports)
-        .replace("@LOCKS@", &locks)
+        .replace("@KRATE@", &crate_ident(&sys.name))
+        .replace("@MARKER@", &camel(&sys.name))
 }
 
 fn emit_probes_stub(sys: &SystemDecl) -> String {
@@ -1388,12 +1505,20 @@ impl Genesis {
             path: "src/ops.rs".to_string(),
             contents: emit_ops(&system),
         });
+        edits.push(FileEdit {
+            path: "src/system.rs".to_string(),
+            contents: emit_system(&system),
+        });
         for m in &system.modules {
             edits.push(FileEdit {
                 path: format!("spec/{}.spec", m.name),
                 contents: emit_target_lock(m),
             });
         }
+        edits.push(FileEdit {
+            path: format!("spec/{}.system.spec", system.name),
+            contents: emit_system_lock(&system),
+        });
         edits.push(FileEdit {
             path: "examples/freeze.rs".to_string(),
             contents: emit_freeze_example(&system),
@@ -1402,6 +1527,12 @@ impl Genesis {
             path: "tests/freeze_gate.rs".to_string(),
             contents: emit_freeze_gate(&system),
         });
+        if system.modules.iter().any(|m| !m.expects.is_empty()) {
+            edits.push(FileEdit {
+                path: "tests/expectations.rs".to_string(),
+                contents: emit_expectations(&system),
+            });
+        }
         edits.push(FileEdit {
             path: "tests/probes.rs".to_string(),
             contents: emit_probes_stub(&system),
@@ -1466,10 +1597,13 @@ mod tests {
                 "src/billing.rs",
                 "src/billing_internal.rs",
                 "src/ops.rs",
+                "src/system.rs",
                 "spec/meter.spec",
                 "spec/billing.spec",
+                "spec/credit-app.system.spec",
                 "examples/freeze.rs",
                 "tests/freeze_gate.rs",
+                "tests/expectations.rs",
                 "tests/probes.rs",
                 "tests/seams.rs",
             ]
@@ -1569,10 +1703,96 @@ mod tests {
         assert!(seams.contains("fn seam_meter_billing_transport_on_credits()"));
         assert!(seams.contains("fn(credit_app::meter::Credits) -> credit_app::meter::Credits"));
 
-        // the lock loop names every theory the declaration derives.
+        // the lock loop is read off the GRAPH — the registry, plus the system lock.
         let gate = body("tests/freeze_gate.rs");
-        assert!(gate.contains("use credit_app::ops::meter_ops::Meter;"));
-        assert!(gate.contains("Spec::of::<Billing>().lock_in(&spec_dir)"));
+        assert!(gate.contains("use credit_app::system::CreditApp;"));
+        assert!(gate.contains("CreditApp::modules()"));
+        assert!(gate.contains("SystemReport::of::<CreditApp>().lock_in(&spec_dir)"));
+        let freeze = body("examples/freeze.rs");
+        assert!(freeze.contains("CreditApp::modules()"));
+        assert!(freeze.contains("SystemReport::of::<CreditApp>().lock_in(&spec_dir)"));
+
+        // the expectations gate covers exactly the modules that declare laws.
+        let expectations = body("tests/expectations.rs");
+        assert!(expectations.contains("fn meter_meets_its_declared_expectations()"));
+        assert!(expectations.contains("Distance::of::<Meter>()"));
+        assert!(
+            !expectations.contains("Billing"),
+            "billing declares no laws — no distance gate for it"
+        );
+    }
+
+    /// The COMPILED `system!` twin: the marker, the module registry, and the transport seam
+    /// as a by-construction declaration (genesis defines each value once); the roster admits
+    /// the module. A transform seam would stay OUT of the compiled graph (meaning, not
+    /// structure) — pinned by the second declaration.
+    #[test]
+    fn the_compiled_system_declaration_is_emitted() {
+        let plan = sample_plan();
+        let system = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/system.rs")
+            .expect("system module")
+            .contents;
+        assert!(system.contains("pub struct CreditApp;"));
+        assert!(system.contains("boundary_spec::system! {"));
+        assert!(system.contains("CreditApp : \"credit-app\","));
+        assert!(system.contains("        Meter;\n        Billing;\n"));
+        assert!(system.contains("Meter -- Billing : transport on Credits by construction;"));
+        assert!(system.contains("use crate::meter::Credits;"));
+
+        let lib = plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/lib.rs")
+            .expect("roster");
+        assert!(lib.contents.contains("pub mod system;\n"));
+
+        // a TRANSFORM seam is not compiled into the graph — it stays a tests/seams.rs hole,
+        // and the emitted module says so.
+        let decl =
+            "system! { name: \"pipey\", values { V = i64 where \"any\"; W = i64 where \"any\"; } \
+                    modules { a { ops { fst(V, V) -> V; } } b { ops { snd(V, W) -> W; } } } \
+                    seams { a -- b : transform on V; } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let system = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/system.rs")
+            .expect("system module")
+            .contents;
+        assert!(system.contains("1 declared TRANSFORM seam(s) are not compiled"));
+        assert!(!system.contains("seams {"), "no compiled seam block");
+        // ... while the seam test hole is still emitted.
+        assert!(plan.listing().contains(&"tests/seams.rs"));
+    }
+
+    /// The TARGET system lock is the declared graph in the EXACT committed lock format —
+    /// byte-for-byte what `SystemReport::render` produces once the crate compiles, so the
+    /// system gate goes green with an empty bless diff. (Keep in step with
+    /// `discover::system::SystemReport::render` — this pin is the sync point.)
+    #[test]
+    fn the_system_target_lock_renders_the_declared_graph_exactly() {
+        let plan = sample_plan();
+        let lock = plan
+            .edits
+            .iter()
+            .find(|e| e.path == "spec/credit-app.system.spec")
+            .expect("system lock");
+        let expected = "\
+# system spec: credit-app — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.
+
+modules (the ratified registry — one committed module lock each):
+- meter
+- billing
+
+seams (each edge: its obligation, then the verdict its checker returned):
+- meter -- billing : transport on Credits
+      obligation: the modules share this value and must agree on its laws
+      status: discharged by construction — the shared value is one type on both sides (the declaration carries the compile-time witness)
+";
+        assert_eq!(lock.contents, expected);
     }
 
     /// HONESTY: every hole is loud and greppable — each `todo!(` in the generated tree opens a

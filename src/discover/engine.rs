@@ -483,6 +483,18 @@ impl ShapeInfo {
         }
         cursor.ends_with(last)
     }
+
+    /// Instantiate the prose template over concrete names: fill each `{hole}` from `subs`
+    /// (`[("op", "grant"), ("const", "zero")]`). The catalog is thereby the SINGLE source of
+    /// a law's prose — genesis renders its target locks through this, so a declared law's
+    /// lock line and a confirming discovery's render cannot drift apart.
+    pub fn instantiate(&self, subs: &[(&str, &str)]) -> String {
+        let mut out = self.template.to_string();
+        for (hole, name) in subs {
+            out = out.replace(&format!("{{{hole}}}"), name);
+        }
+        out
+    }
 }
 
 /// The engine's shape catalog — the library's LAW-LANGUAGE surface, as a value object.
@@ -2217,6 +2229,35 @@ mod tests {
         // a hole spans multi-word operator names, so the census is robust to naming.
         let irrefl = shape("irreflexivity");
         assert!(irrefl.matches("A value is never less than itself."));
+    }
+
+    /// `instantiate` round-trips through `matches`: filling a template's holes yields prose
+    /// the same shape recognises as its own instance — exactly the guarantee genesis's target
+    /// locks lean on (a declared law's line IS what a confirming discovery renders).
+    #[test]
+    fn instantiate_yields_prose_the_shape_recognises() {
+        let inv = ShapeCatalog::inventory();
+        let shape = |n: &str| *inv.iter().find(|s| s.name == n).expect("shape by name");
+
+        let comm = shape("commutativity");
+        assert_eq!(
+            comm.instantiate(&[("op", "grant")]),
+            "grant gives the same result in either order."
+        );
+        assert!(comm.matches(&comm.instantiate(&[("op", "grant")])));
+
+        // a two-hole template fills BOTH holes (and `{const}` everywhere it appears).
+        let annihilation = shape("annihilation");
+        assert_eq!(
+            annihilation.instantiate(&[("op", "Multiplication"), ("const", "0")]),
+            "Multiplication by 0 always gives 0."
+        );
+
+        // an unnamed hole is left intact — instantiate substitutes, it never invents.
+        assert_eq!(
+            annihilation.instantiate(&[("op", "spend")]),
+            "spend by {const} always gives {const}."
+        );
     }
 
     /// THE LOCK: the catalog's deterministic rendering matches the committed, ratified

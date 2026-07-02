@@ -26,9 +26,8 @@
 use core::marker::PhantomData;
 
 use boundary_spec::boundary::{
-    reconstructs, Branch, Construction, Guarded, Probed, Pure, Shaped, Unit,
+    reconstructs, shadow_grid, Branch, Construction, Guarded, Probed, Pure, Shaped, Unit,
 };
-use boundary_spec::discover::engine::shadow_grid;
 use boundary_spec::gdp::{with_seed, Named};
 
 /// The meter's ceiling: a balance is valid iff it lies in `0..=CAP`. The one number the whole
