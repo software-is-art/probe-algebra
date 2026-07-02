@@ -4,8 +4,10 @@
       ((a or b) or c) = (a or (b or c))
 - Or of a value with itself gives that value.
       (a or a) = a
+- With Or, the earlier operand wins where the two disagree — a later one cannot overwrite it.
+      ((a or b) or a) = (a or b)
 - Or with empty leaves a value unchanged.
       (empty or a) = a
 
-# 14 further consequence equalities (implied by the laws above)
+# 13 further consequence equalities (implied by the laws above)
 # operators in no law (where the spec is silent): none — every operator participates in a law

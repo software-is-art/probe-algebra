@@ -19,12 +19,16 @@
 //! its residual round-trip and put-then-read coherence do the work. The store
 //! inhabitants are still BUILT with `put`, so its effects are inside the grid.
 //!
-//! One honest limit, found by planting a mutant: the shapes certify that `merge` is a
-//! monoid but cannot name the DIRECTION of its bias — a first-write-wins union
-//! satisfies the very same named laws, and the left-biased mutant survived this golden
-//! spec. The bias is pinned by a dedicated two-route probe in `probes`
-//! (`merge_is_right_biased_at_the_later_clock`); the division of labour is disclosed
-//! there and here.
+//! A limit this domain FOUND, and what it forced: the classic monoid shapes certify
+//! that `merge` is a monoid but cannot name the DIRECTION of its bias — a
+//! first-write-wins union satisfies the very same laws, and a planted left-biased
+//! mutant survived the then-golden spec. That finding became a new universal shape:
+//! the engine now tries the regular-band "sandwich" laws on every non-commutative
+//! binary, and the discovered spec STATES the bias — "the later operand wins where
+//! the two disagree" — so the first-write-wins mutant is killed by the spec itself.
+//! The dedicated two-route probe in `probes` (`merge_is_right_biased_at_the_later_clock`)
+//! stays as defense in depth: it pins the winning VALUES and the clock max, which is
+//! finer than the band law alone.
 
 use super::store::{Key, Snapshot, Store, Ttl, Val};
 
@@ -152,7 +156,9 @@ mod tests {
     ///     "apply the same batch twice" is safe);
     ///   - NOT commutativity — the engine correctly refuses it, because last-write-wins
     ///     means merge ORDER is semantics (the conflicting inhabitants make the orders
-    ///     observably different);
+    ///     observably different) — and in its place the BIAS law: the sandwich shape
+    ///     names WHICH side wins ("the later operand wins where the two disagree"), so
+    ///     a first-write-wins mutant now breaks the discovered spec itself;
     ///   - `tick` with `zero` as identity and repeated `tick` combining by `Plus`: time
     ///     is a MONOID ACTION of durations on stores — the same action template the date
     ///     calculus exercises, now moving real state (each `tick` runs the eager sweep,
@@ -181,6 +187,11 @@ mod tests {
                 "(s <+ s) = s",
             ),
             (
+                "With Merge, the later operand wins where the two disagree — re-applying \
+                 an earlier one cannot overwrite it.",
+                "((s <+ t) <+ s) = (t <+ s)",
+            ),
+            (
                 "Merge with empty leaves a value unchanged.",
                 "(empty <+ s) = s",
             ),
@@ -207,7 +218,7 @@ mod tests {
             .map(|(p, q)| (p.to_string(), q.to_string()))
             .collect();
         assert_eq!(got, expected, "the discovered ttl-store algebra changed");
-        assert_eq!(d.consequences, 150, "consequence count changed");
+        assert_eq!(d.consequences, 149, "consequence count changed");
         // put was curried out of the signature, so coverage is total by construction.
         assert!(
             d.uncovered_ops.is_empty(),

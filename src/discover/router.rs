@@ -98,6 +98,11 @@ mod tests {
                 "(a or a) = a",
             ),
             (
+                "With Or, the earlier operand wins where the two disagree — a later one \
+                 cannot overwrite it.",
+                "((a or b) or a) = (a or b)",
+            ),
+            (
                 "Or with empty leaves a value unchanged.",
                 "(empty or a) = a",
             ),
@@ -112,7 +117,7 @@ mod tests {
             !d.laws.iter().any(|l| l.prose.contains("either order")),
             "router `or` is not commutative — it must not be reported as such"
         );
-        assert_eq!(d.consequences, 14);
+        assert_eq!(d.consequences, 13);
         assert!(d.uncovered_ops.is_empty());
         // the laws hold on replay, and `check` would reject a false commutativity claim.
         assert_eq!(e.check(&d.laws), Ok(()));

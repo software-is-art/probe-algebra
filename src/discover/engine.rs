@@ -9,9 +9,10 @@
 //!   1. ENUMERATES terms over the operators and per-sort variables, canonically (one term per
 //!      behavioural class), so the working set is bounded by behaviour, not raw term count;
 //!   2. instantiates the UNIVERSAL ALGEBRAIC SHAPES (identity, commutativity, associativity,
-//!      annihilation, idempotence, distributivity, absorption, involution, round-trip, irreflexivity,
-//!      and the heterogeneous shapes — monoid ACTION, HOMOMORPHISM) over the actual operators and
-//!      keeps the ones that run true over a grid — named laws;
+//!      annihilation, idempotence, the regular-band BIAS laws for non-commutative operators,
+//!      distributivity, absorption, involution, round-trip, irreflexivity, and the heterogeneous
+//!      shapes — monoid ACTION, HOMOMORPHISM) over the actual operators and keeps the ones that
+//!      run true over a grid — named laws;
 //!   3. counts every other discovered equality as a CONSEQUENCE, and reports which operators appear
 //!      in no law (where the spec is silent).
 //!
@@ -476,6 +477,47 @@ impl<T: Theory> Engine<T> {
                     Self::app(fid, vec![x.clone(), x.clone()]),
                     x.clone(),
                 );
+
+                // BIAS — the regular-band "sandwich" laws, tried only when order matters (a
+                // commutative operator has no bias to state): with `(x⊕y)⊕x`, does the re-applied
+                // EARLIER operand overwrite the later one? `(x⊕y)⊕x = y⊕x` says no — the later
+                // operand wins wherever the two disagree (right-regular / last-write-wins);
+                // the mirror `(x⊕y)⊕x = x⊕y` says the earlier wins (left-regular /
+                // first-write-wins). This shape exists because a hostile domain taught us the
+                // monoid laws are BIAS-BLIND: first- and last-write-wins merges satisfy
+                // identical monoid laws, so WHICH side wins was invisible to the discovered
+                // spec until this template named it. Given non-commutativity the two variants
+                // are mutually exclusive on the grid.
+                let commutative = self.same(
+                    &Self::app(fid, vec![x.clone(), y.clone()]),
+                    &Self::app(fid, vec![y.clone(), x.clone()]),
+                );
+                if !commutative {
+                    let sandwich = Self::app(
+                        fid,
+                        vec![Self::app(fid, vec![x.clone(), y.clone()]), x.clone()],
+                    );
+                    push(
+                        self,
+                        format!(
+                            "With {}, the later operand wins where the two disagree — \
+                             re-applying an earlier one cannot overwrite it.",
+                            f.name
+                        ),
+                        sandwich.clone(),
+                        Self::app(fid, vec![y.clone(), x.clone()]),
+                    );
+                    push(
+                        self,
+                        format!(
+                            "With {}, the earlier operand wins where the two disagree — \
+                             a later one cannot overwrite it.",
+                            f.name
+                        ),
+                        sandwich,
+                        Self::app(fid, vec![x.clone(), y.clone()]),
+                    );
+                }
 
                 // constant-bearing shapes
                 for (_, c) in self

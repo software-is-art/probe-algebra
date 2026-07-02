@@ -70,7 +70,7 @@ by probes, and the probes are checked by mutation:
   `discover::engine::Theory` (its sorts, operators, a grid of inhabitants, and an OBSERVATION on
   values), and the engine ENUMERATES terms over the operators, groups them by behaviour on the grid,
   instantiates the universal algebraic shapes over the operators (identity, commutativity,
-  associativity, annihilation, idempotence, distributivity, absorption, involution, round-trip, and
+  associativity, annihilation, idempotence, the regular-band bias laws, distributivity, absorption, involution, round-trip, and
   the heterogeneous shapes — monoid action and homomorphism), and keeps the
   ones that run true — counting the rest as consequences and reporting operators in no law (**where
   the spec is silent**). It is not arithmetic-specific: the same engine discovers the interpreter's

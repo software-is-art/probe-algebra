@@ -4,6 +4,8 @@
       ((s <+ t) <+ u) = (s <+ (t <+ u))
 - Merge of a value with itself gives that value.
       (s <+ s) = s
+- With Merge, the later operand wins where the two disagree — re-applying an earlier one cannot overwrite it.
+      ((s <+ t) <+ s) = (t <+ s)
 - Merge with empty leaves a value unchanged.
       (empty <+ s) = s
 - Tick with zero leaves a value unchanged.
@@ -17,5 +19,5 @@
 - Plus with zero leaves a value unchanged.
       (zero + p) = p
 
-# 150 further consequence equalities (implied by the laws above)
+# 149 further consequence equalities (implied by the laws above)
 # operators in no law (where the spec is silent): none — every operator participates in a law

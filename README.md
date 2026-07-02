@@ -145,10 +145,18 @@ through an explicit `tick` edge (deterministic — `Stateful`, never `Effectful`
 observation is the store's *live entries at its own clock*, so expiry is visible to the engine.
 What discovery finds on state is exactly what a reviewer would want certified: accumulated state
 composes as a **monoid** (replaying a batch is safe — idempotent), time is a **monoid action** of
-durations on stores (sweep-then-sweep equals sweep-once), and merge **order is meaning** — the
-refused commutativity is last-write-wins, stated by silence. Its surface file is deliberately
-named `store.rs`, not `boundary.rs`: boundary-hood is the declared tier plus the enforced shape,
-never a filename.
+durations on stores (sweep-then-sweep equals sweep-once), and merge **order is meaning**. Its
+surface file is deliberately named `store.rs`, not `boundary.rs`: boundary-hood is the declared
+tier plus the enforced shape, never a filename.
+
+And this domain improved the engine. A planted first-write-wins mutant **survived** the monoid
+laws — they are *bias-blind* (both merge directions satisfy identical laws), so which write wins
+was invisible to the spec. That finding became a new universal shape: on every non-commutative
+binary the engine now tries the **regular-band sandwich laws** (`(x⊕y)⊕x = y⊕x` — the later
+operand wins; `= x⊕y` — the earlier does), and the bias is now a *stated law* in two specs at
+once: the store's merge ("the later operand wins where the two disagree") and the router's
+first-match `or` ("the earlier operand wins"). A hostile domain found the blind spot; the blind
+spot became a template; the template immediately explained an older domain better.
 
 The universal shapes the engine tries cover the heterogeneous cases too — monoid **actions**
 (date's `add`), **homomorphisms** (boolean De Morgan, `¬(x∧y) = ¬x ∨ ¬y`), absorption,
