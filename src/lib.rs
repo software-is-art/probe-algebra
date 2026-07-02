@@ -1,6 +1,6 @@
 //! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
-//! boundary-algebra — a boundary-discipline experiment plus a layered probe method.
+//! boundary-spec — a boundary-discipline experiment plus a layered probe method.
 //!
 //! Two constraints under study together:
 //!   1. every primitive that means something in the domain is a VALUE OBJECT and
@@ -52,9 +52,9 @@
 //! rules), self-hosted by replacing their example tests with oracle-free property probes.
 
 // Let this crate refer to itself by its package name, so the proc macros
-// (`#[derive(Shaped)]`, `#[algebra]`) can emit `::boundary_algebra::…` paths that resolve
+// (`#[derive(Shaped)]`, `#[algebra]`) can emit `::boundary_spec::…` paths that resolve
 // identically here and in a DOWNSTREAM crate — no consumer re-export shim needed.
-extern crate self as boundary_algebra;
+extern crate self as boundary_spec;
 
 pub mod boundary;
 pub mod capability;
@@ -68,13 +68,13 @@ pub mod select;
 /// `#[derive(Shaped)]` — generate a value object's probe surface (the fused universal
 /// probe's `inhabitant` + `perturbation_classes`) from its structure. The companion of the
 /// `crate::boundary::Shaped` trait, re-exported here so edges write `#[derive(Shaped)]`.
-pub use boundary_algebra_macros::Shaped;
+pub use boundary_spec_macros::Shaped;
 
 /// `#[algebra(Marker, "name")]` — generate a WHOLE discovery `Theory` from a module of ordinary
 /// operator functions (no `theory!` block). The macro reads each function's signature and emits the
 /// operator table, sort, `sort_of`, identity `observe`, and the shadow grid; the agent writes only
 /// the value object and the operator functions. See `discover::derived`.
-pub use boundary_algebra_macros::algebra;
+pub use boundary_spec_macros::algebra;
 
 #[cfg(test)]
 mod harness;

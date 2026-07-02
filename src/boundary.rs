@@ -1023,7 +1023,7 @@ where
 // derives the perturbation surface from a value object's own STRUCTURE, and the fused probe
 // below collapses the structural, value, and semantic layers into a SINGLE operator: a map
 // is faithful iff it responds to every derived degree of freedom. `#[derive(Shaped)]`
-// (in `boundary-algebra-macros`) generates it for composites; leaves with smart-constructor
+// (in `boundary-spec-macros`) generates it for composites; leaves with smart-constructor
 // invariants impl it by hand.
 
 /// A value object whose probe surface is its STRUCTURE. `inhabitant` is one canonical seed

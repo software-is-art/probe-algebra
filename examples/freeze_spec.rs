@@ -10,7 +10,7 @@
 //!
 //! Run `cargo run --example freeze_spec`.
 
-use boundary_algebra::discover::{all_specs, Spec};
+use boundary_spec::discover::{all_specs, Spec};
 
 fn main() {
     let specs = all_specs();

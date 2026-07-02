@@ -1,5 +1,5 @@
 [package]
-name = "boundary-algebra"
+name = "boundary-spec"
 version = "0.1.0"
 edition = "2021"
 description = "A module boundary specified precisely enough that its validating tests — and the proof their interior is correct — derive themselves."
@@ -17,7 +17,7 @@ exclude = [".github/", ".cargo/"]
 [workspace]
 members = [
     ".",
-    "boundary-algebra-macros",
+    "boundary-spec-macros",
     "boundary-enforce",
     "downstream-fixture",
     "spec-lock",
@@ -28,7 +28,7 @@ name = "demo"
 path = "src/main.rs"
 
 [dependencies]
-boundary-algebra-macros = { path = "boundary-algebra-macros", version = "0.1.0" }
+boundary-spec-macros = { path = "boundary-spec-macros", version = "0.1.0" }
 # The freeze/drift-gate mechanics (`discover::freeze` is a thin adapter over it) — extracted so
 # any project can lift the "frozen spec + drift gate" discipline without the discovery engine.
 spec-lock = { path = "spec-lock", version = "0.1.0" }

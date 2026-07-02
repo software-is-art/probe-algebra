@@ -11,7 +11,7 @@
 //!
 //! Run `cargo run --example freeze_shapes`.
 
-use boundary_algebra::discover::engine::ShapeCatalog;
+use boundary_spec::discover::engine::ShapeCatalog;
 
 fn main() {
     let lock = ShapeCatalog::lock();

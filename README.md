@@ -1,4 +1,4 @@
-# boundary-algebra
+# boundary-spec
 
 **Can a module boundary be specified precisely enough that the tests which validate it
 write themselves?**
@@ -481,7 +481,7 @@ calculus show the discovery engine generalises, and none of it is the limit:
 
 ```toml
 [dependencies]
-boundary-algebra = { git = "https://github.com/software-is-art/probe-algebra" }
+boundary-spec = { git = "https://github.com/software-is-art/probe-algebra" }
 ```
 
 Model your boundary as value objects and edges, write the interior in any style, and let the

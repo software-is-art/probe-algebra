@@ -6,7 +6,7 @@
 
 use core::marker::PhantomData;
 
-use boundary_algebra::gdp::with_seed;
+use boundary_spec::gdp::with_seed;
 use downstream_fixture::meter::{Affordable, Credits, Deduct, Order, Purchase};
 
 fn main() {

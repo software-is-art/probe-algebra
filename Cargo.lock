@@ -30,11 +30,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 
 [[package]]
-name = "boundary-algebra"
+name = "boundary-enforce"
 version = "0.1.0"
 dependencies = [
- "boundary-algebra-macros",
+ "syn",
+]
+
+[[package]]
+name = "boundary-spec"
+version = "0.1.0"
+dependencies = [
  "boundary-enforce",
+ "boundary-spec-macros",
  "proptest",
  "serde_json",
  "spec-lock",
@@ -43,18 +50,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "boundary-algebra-macros"
+name = "boundary-spec-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
-]
-
-[[package]]
-name = "boundary-enforce"
-version = "0.1.0"
-dependencies = [
  "syn",
 ]
 
@@ -68,8 +68,8 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 name = "downstream-fixture"
 version = "0.0.0"
 dependencies = [
- "boundary-algebra",
  "boundary-enforce",
+ "boundary-spec",
  "spec-lock",
  "trybuild",
 ]

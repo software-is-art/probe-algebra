@@ -6,8 +6,8 @@
 //! now per size-axis.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use boundary_algebra::boundary::{require_within, CostCons, CostNil, MapCollect, TimeCost, S, Z};
-use boundary_algebra::interp::boundary::{Eval, Nodes};
+use boundary_spec::boundary::{require_within, CostCons, CostNil, MapCollect, TimeCost, S, Z};
+use boundary_spec::interp::boundary::{Eval, Nodes};
 
 fn main() {
     // nodes^2 time demanded to be within nodes^1: unsatisfied.

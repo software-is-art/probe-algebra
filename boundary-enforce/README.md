@@ -5,7 +5,7 @@ strict boundary grammar, the interior inward rule, capability honesty,
 edge-probe completeness, and a drift-gated qualification census — consumable
 from any crate's `build.rs`.
 
-Extracted from [`boundary-algebra`](https://crates.io/crates/boundary-algebra),
+Extracted from [`boundary-spec`](https://crates.io/crates/boundary-spec),
 whose own `build.rs` is a thin shim over this crate. See the crate docs for the
 consumer wiring, and the main repository for the discipline it enforces:
 <https://github.com/software-is-art/probe-algebra>.

@@ -1,4 +1,4 @@
-//! boundary-algebra-macros — the derive side of the grammar.
+//! boundary-spec-macros — the derive side of the grammar.
 //!
 //! `#[derive(Shaped)]` reads a value object's STRUCTURE and emits its probe surface, so the
 //! "structure supplies the test surface" thesis is mechanized rather than hand-written:
@@ -258,10 +258,10 @@ fn single_sort_impl(
         let inputs: Vec<TokenStream2> = (0..arity).map(|_| quote! { #sort::Only }).collect();
         let sym = op.name.to_string();
         entries.push(quote! {
-            ::boundary_algebra::discover::engine::Operator {
+            ::boundary_spec::discover::engine::Operator {
                 name: #sym,
                 symbol: #sym,
-                fixity: ::boundary_algebra::discover::engine::Fixity::#fixity,
+                fixity: ::boundary_spec::discover::engine::Fixity::#fixity,
                 inputs: ::std::vec![ #(#inputs),* ],
                 output: #sort::Only,
                 eval: #wname,
@@ -274,16 +274,16 @@ fn single_sort_impl(
             Only,
         }
         pub struct #marker;
-        impl ::boundary_algebra::discover::engine::Theory for #marker {
+        impl ::boundary_spec::discover::engine::Theory for #marker {
             type Sort = #sort;
             type Value = #value_ty;
             type Obs = #value_ty;
             fn name() -> &'static str { #name }
-            fn operators() -> ::std::vec::Vec<::boundary_algebra::discover::engine::Operator<Self>> {
+            fn operators() -> ::std::vec::Vec<::boundary_spec::discover::engine::Operator<Self>> {
                 ::std::vec![ #(#entries),* ]
             }
             fn inhabitants(_sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
-                ::boundary_algebra::discover::engine::shadow_grid::<#value_ty>(24)
+                ::boundary_spec::discover::engine::shadow_grid::<#value_ty>(24)
             }
             fn sort_of(_v: &Self::Value) -> Self::Sort { #sort::Only }
             fn observe(v: &Self::Value) -> Self::Obs { ::std::clone::Clone::clone(v) }
@@ -309,7 +309,7 @@ fn multi_sort_impl(marker: &Ident, name: &LitStr, ops: &[OpInfo], sorts: &[Type]
         .map(|v| quote! { #value_enum::#v(_) => #sort_enum::#v });
     let inhab_arms = sorts.iter().zip(&variants).map(|(ty, v)| {
         quote! {
-            #sort_enum::#v => ::boundary_algebra::discover::engine::shadow_grid::<#ty>(12)
+            #sort_enum::#v => ::boundary_spec::discover::engine::shadow_grid::<#ty>(12)
                 .into_iter()
                 .map(#value_enum::#v)
                 .collect()
@@ -351,10 +351,10 @@ fn multi_sort_impl(marker: &Ident, name: &LitStr, ops: &[OpInfo], sorts: &[Type]
         });
         let sym = op.name.to_string();
         entries.push(quote! {
-            ::boundary_algebra::discover::engine::Operator {
+            ::boundary_spec::discover::engine::Operator {
                 name: #sym,
                 symbol: #sym,
-                fixity: ::boundary_algebra::discover::engine::Fixity::#fixity,
+                fixity: ::boundary_spec::discover::engine::Fixity::#fixity,
                 inputs: ::std::vec![ #(#inputs),* ],
                 output: #sort_enum::#ret_v,
                 eval: #wname,
@@ -368,12 +368,12 @@ fn multi_sort_impl(marker: &Ident, name: &LitStr, ops: &[OpInfo], sorts: &[Type]
         #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
         pub enum #sort_enum { #(#variants),* }
         pub struct #marker;
-        impl ::boundary_algebra::discover::engine::Theory for #marker {
+        impl ::boundary_spec::discover::engine::Theory for #marker {
             type Sort = #sort_enum;
             type Value = #value_enum;
             type Obs = #value_enum;
             fn name() -> &'static str { #name }
-            fn operators() -> ::std::vec::Vec<::boundary_algebra::discover::engine::Operator<Self>> {
+            fn operators() -> ::std::vec::Vec<::boundary_spec::discover::engine::Operator<Self>> {
                 ::std::vec![ #(#entries),* ]
             }
             fn inhabitants(__sort: Self::Sort) -> ::std::vec::Vec<Self::Value> {
@@ -412,13 +412,13 @@ pub fn derive_shaped(input: TokenStream) -> TokenStream {
         Data::Struct(data) => data.fields.len(),
         Data::Union(_) => 0,
     };
-    let mut dofs = quote! { ::boundary_algebra::boundary::DofNil };
+    let mut dofs = quote! { ::boundary_spec::boundary::DofNil };
     for i in (0..dof_count).rev() {
         let idx = proc_macro2::Literal::usize_unsuffixed(i);
-        dofs = quote! { ::boundary_algebra::boundary::DofCons<::boundary_algebra::boundary::Field<#name, #idx>, #dofs> };
+        dofs = quote! { ::boundary_spec::boundary::DofCons<::boundary_spec::boundary::Field<#name, #idx>, #dofs> };
     }
     quote! {
-        impl ::boundary_algebra::boundary::Shaped for #name {
+        impl ::boundary_spec::boundary::Shaped for #name {
             fn inhabitant() -> Self {
                 #inhabitant
             }
@@ -428,7 +428,7 @@ pub fn derive_shaped(input: TokenStream) -> TokenStream {
                 __classes
             }
         }
-        impl ::boundary_algebra::boundary::HasDofs for #name {
+        impl ::boundary_spec::boundary::HasDofs for #name {
             type Dofs = #dofs;
         }
     }
@@ -442,7 +442,7 @@ fn inhabitant_ctor(path: &TokenStream2, fields: &Fields) -> TokenStream2 {
         Fields::Unnamed(f) => {
             let vals = f.unnamed.iter().map(|field| {
                 let ty = &field.ty;
-                quote! { <#ty as ::boundary_algebra::boundary::Shaped>::inhabitant() }
+                quote! { <#ty as ::boundary_spec::boundary::Shaped>::inhabitant() }
             });
             quote! { #path( #(#vals),* ) }
         }
@@ -450,7 +450,7 @@ fn inhabitant_ctor(path: &TokenStream2, fields: &Fields) -> TokenStream2 {
             let vals = f.named.iter().map(|field| {
                 let id = field.ident.as_ref().unwrap();
                 let ty = &field.ty;
-                quote! { #id: <#ty as ::boundary_algebra::boundary::Shaped>::inhabitant() }
+                quote! { #id: <#ty as ::boundary_spec::boundary::Shaped>::inhabitant() }
             });
             quote! { #path { #(#vals),* } }
         }
@@ -518,7 +518,7 @@ fn field_class_pushes(path: &TokenStream2, fields: &Fields, ids: &[Ident]) -> To
         quote! {
             {
                 let mut __c: ::std::vec::Vec<Self> = ::std::vec::Vec::new();
-                for __n in ::boundary_algebra::boundary::Shaped::all_perturbations(#id) {
+                for __n in ::boundary_spec::boundary::Shaped::all_perturbations(#id) {
                     __c.push(#rebuilt);
                 }
                 __classes.push(__c);

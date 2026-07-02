@@ -1,8 +1,8 @@
 [package]
-name = "boundary-algebra-macros"
+name = "boundary-spec-macros"
 version = "0.1.0"
 edition = "2021"
-description = "Derive macros for boundary-algebra: generate a value object's probe surface from its structure."
+description = "Derive macros for boundary-spec: generate a value object's probe surface from its structure."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/software-is-art/probe-algebra"
 readme = "README.md"

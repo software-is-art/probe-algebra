@@ -15,7 +15,7 @@
 
 use std::path::PathBuf;
 
-use boundary_algebra::discover::Spec;
+use boundary_spec::discover::Spec;
 use downstream_fixture::ops::meter_ops::CreditMeter;
 
 fn main() {

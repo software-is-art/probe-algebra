@@ -12,7 +12,7 @@ note: constructor is not visible here due to private fields
    |
   ::: src/meter.rs
    |
-   | / boundary_algebra::proof_token!(
+   | / boundary_spec::proof_token!(
    | |     /// A proof that the order named `N` is AFFORDABLE (its purchase does not exceed its
    | |     /// balance — the deduction will not saturate). Branded with the order's name, so a
    | |     /// proof for order A cannot authorize deducting order B; minted ONLY by
@@ -20,4 +20,4 @@ note: constructor is not visible here due to private fields
    | |     Affordable
    | | );
    | |_- in this macro invocation
-   = note: this error originates in the macro `boundary_algebra::proof_token` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the macro `boundary_spec::proof_token` (in Nightly builds, run with -Z macro-backtrace for more info)

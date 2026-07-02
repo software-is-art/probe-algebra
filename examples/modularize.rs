@@ -14,7 +14,7 @@
 //!
 //! Run `cargo run --example modularize`.
 
-use boundary_algebra::discover::modularize::{soup::Soup, Proposal};
+use boundary_spec::discover::modularize::{soup::Soup, Proposal};
 
 fn main() {
     println!("Modularize — the structure hiding in an unstructured bag of functions:\n");

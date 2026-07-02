@@ -8,8 +8,8 @@
 
 use downstream_fixture::meter::{CheckFunds, Credits, Deduct, Order, ParseCredits, Purchase};
 
-use boundary_algebra::boundary::{Construction, Probed};
-use boundary_algebra::gdp::with_seed;
+use boundary_spec::boundary::{Construction, Probed};
+use boundary_spec::gdp::with_seed;
 
 /// The entry edge's derived laws hold: admitted raws reconstruct exactly, and admission
 /// agrees with the validity rule across a range spanning both saturation points.

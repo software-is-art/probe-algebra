@@ -25,11 +25,11 @@
 
 use core::marker::PhantomData;
 
-use boundary_algebra::boundary::{
+use boundary_spec::boundary::{
     reconstructs, Branch, Construction, Guarded, Probed, Pure, Shaped, Unit,
 };
-use boundary_algebra::discover::engine::shadow_grid;
-use boundary_algebra::gdp::{with_seed, Named};
+use boundary_spec::discover::engine::shadow_grid;
+use boundary_spec::gdp::{with_seed, Named};
 
 /// The meter's ceiling: a balance is valid iff it lies in `0..=CAP`. The one number the whole
 /// domain pivots on — `grant` saturates to it, the validity rule quotes it, the shadow grid
@@ -111,14 +111,14 @@ impl Shaped for Credits {
 
 // Citizen registration, with the library's own macros — public since the citizen/effect
 // seal split (`boundary::citizen` is open; only the effect lattice stays sealed).
-boundary_algebra::value_object!(Credits);
+boundary_spec::value_object!(Credits);
 
 /// The entry edge: parse a raw `i64` into a valid balance — "parse, don't validate" as a
 /// probeable `Construction`, the same shape as the library's own `Parse`. A pure
 /// refinement: nothing is normalized away, so the residual is `Unit` and the round trip
 /// is exact.
 pub struct ParseCredits;
-boundary_algebra::value_operator!(ParseCredits);
+boundary_spec::value_operator!(ParseCredits);
 
 impl Construction for ParseCredits {
     type Capability = Pure;
@@ -205,9 +205,9 @@ impl Order {
     }
 }
 
-boundary_algebra::value_object!(Purchase, Order);
+boundary_spec::value_object!(Purchase, Order);
 
-boundary_algebra::proof_token!(
+boundary_spec::proof_token!(
     /// A proof that the order named `N` is AFFORDABLE (its purchase does not exceed its
     /// balance — the deduction will not saturate). Branded with the order's name, so a
     /// proof for order A cannot authorize deducting order B; minted ONLY by
@@ -215,7 +215,7 @@ boundary_algebra::proof_token!(
     /// `tests/compile_fail/deduct_forged_witness.rs`). It is the witness `Deduct` demands.
     Affordable
 );
-boundary_algebra::proof_token!(
+boundary_spec::proof_token!(
     /// A proof that the order named `N` is INSUFFICIENT — the NEGATIVE witness, kept
     /// (not discarded as a `None`) so the refusal path is first-class. It discharges
     /// nothing: handing it to `Deduct` is a type error
@@ -231,7 +231,7 @@ pub struct CheckFunds;
 /// the SAME name. You cannot deduct an order whose funds have not been checked — the
 /// witness comes from `CheckFunds`, exactly as the library's `Eval` demands `Check`'s.
 pub struct Deduct;
-boundary_algebra::value_operator!(CheckFunds, Deduct);
+boundary_spec::value_operator!(CheckFunds, Deduct);
 
 impl Branch for CheckFunds {
     type Capability = Pure;

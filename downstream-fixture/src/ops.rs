@@ -9,14 +9,14 @@
 //! Two consumer facts this file pinned down as FINDINGS, both since fixed:
 //!
 //! * `#[algebra]` (and `#[derive(Shaped)]`) once expanded to `crate::…` paths and needed a
-//!   re-export shim at the consumer's root; the macros now emit `::boundary_algebra::…`
+//!   re-export shim at the consumer's root; the macros now emit `::boundary_spec::…`
 //!   (the library aliases itself), so this module works downstream with no shim.
 //! * A NULLARY constant operator was unauthorable on this path — the rats-nest rule
 //!   refused any public zero-argument function. The rule now recognises a nullary fn
 //!   returning a value type INSIDE an `#[algebra]` module as a CONSTANT operator, so
 //!   `zero` below is authorable and the identity laws it unlocks are discovered.
 
-use boundary_algebra::algebra;
+use boundary_spec::algebra;
 
 /// The operator functions ARE the module; the theory (`CreditMeter`, named "credit meter") is
 /// what `#[algebra]` reads off their signatures. `(Credits, Credits) -> Credits` ⇒ three binary

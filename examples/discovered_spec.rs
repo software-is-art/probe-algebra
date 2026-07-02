@@ -9,7 +9,7 @@
 //!
 //! Run `cargo run --example discovered_spec`.
 
-use boundary_algebra::discover::all_specs;
+use boundary_spec::discover::all_specs;
 
 fn main() {
     for spec in all_specs() {

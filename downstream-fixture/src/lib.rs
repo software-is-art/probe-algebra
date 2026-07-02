@@ -2,7 +2,7 @@
 //!
 //! # downstream-fixture — the consumer tutorial, as a crate that must keep compiling
 //!
-//! This crate is the EXISTENCE PROOF that a consumer of `boundary-algebra` can run the whole
+//! This crate is the EXISTENCE PROOF that a consumer of `boundary-spec` can run the whole
 //! discipline — tier partition, boundary grammar, discovered laws, frozen spec, drift gate —
 //! through PUBLIC API alone. It is deliberately tiny; copy its shape into your own repo piece by
 //! piece. Every piece below names why it exists; the discipline itself is documented in the
@@ -52,11 +52,11 @@
 //!
 //! The `#[algebra]` and `#[derive(Shaped)]` proc-macros once expanded to `crate::…` paths and
 //! forced every consumer to re-export the library's modules at its own root. The library now
-//! aliases itself (`extern crate self as boundary_algebra;`) and the macros emit
-//! `::boundary_algebra::…`, which resolves identically in the library and in any consumer that
+//! aliases itself (`extern crate self as boundary_spec;`) and the macros emit
+//! `::boundary_spec::…`, which resolves identically in the library and in any consumer that
 //! depends on it under its package name — so this crate uses `#[algebra]` directly, with no
 //! re-export. (If you rename the dependency in your Cargo.toml, restore the alias with
-//! `extern crate boundary_algebra as <your-name>;` — or just don't rename it.)
+//! `extern crate boundary_spec as <your-name>;` — or just don't rename it.)
 //!
 //! ## Edges work downstream too
 //!

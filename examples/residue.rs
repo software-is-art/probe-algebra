@@ -10,7 +10,7 @@
 //!
 //! Run `cargo run --example residue`.
 
-use boundary_algebra::discover::residue::Inert;
+use boundary_spec::discover::residue::Inert;
 
 fn main() {
     print!("{}", Inert::render_census());

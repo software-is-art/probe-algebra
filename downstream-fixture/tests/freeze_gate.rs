@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use boundary_algebra::discover::Spec;
+use boundary_spec::discover::Spec;
 use downstream_fixture::ops::meter_ops::CreditMeter;
 
 /// This crate's own spec directory — the lock must live where OUR CI can diff and ratify it,

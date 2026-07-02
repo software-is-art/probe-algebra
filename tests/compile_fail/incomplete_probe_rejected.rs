@@ -6,8 +6,8 @@
 //! the one thing still hand-writable.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use boundary_algebra::boundary::{require_complete, Covers, Field};
-use boundary_algebra::interp::boundary::Expr;
+use boundary_spec::boundary::{require_complete, Covers, Field};
+use boundary_spec::interp::boundary::Expr;
 
 // A probe that reaches only the first derived dimension.
 struct PartialProbe;

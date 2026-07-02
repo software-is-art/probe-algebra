@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use boundary_algebra::discover::architect::Architect;
+use boundary_spec::discover::architect::Architect;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

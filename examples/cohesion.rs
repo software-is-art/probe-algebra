@@ -7,10 +7,10 @@
 //!
 //! Run `cargo run --example cohesion`.
 
-use boundary_algebra::discover::arithmetic::Arithmetic;
-use boundary_algebra::discover::cohesion::CohesionReport;
-use boundary_algebra::discover::date::Calendar;
-use boundary_algebra::discover::router::Router;
+use boundary_spec::discover::arithmetic::Arithmetic;
+use boundary_spec::discover::cohesion::CohesionReport;
+use boundary_spec::discover::date::Calendar;
+use boundary_spec::discover::router::Router;
 
 fn main() {
     println!("Cohesion analysis — the discovered algebra read for decomposability:\n");

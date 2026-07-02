@@ -6,7 +6,7 @@
 //! precondition is tied to the VALUE it was proven of, not merely to having been checked.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use boundary_algebra::gdp::with_seed;
+use boundary_spec::gdp::with_seed;
 use downstream_fixture::meter::{CheckFunds, Credits, Deduct, Order, Purchase};
 
 fn main() {

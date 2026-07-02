@@ -3,8 +3,8 @@
 //!
 //! Run `cargo run --example scaffold`.
 
-use boundary_algebra::discover::date::Calendar;
-use boundary_algebra::discover::scaffold::Scaffold;
+use boundary_spec::discover::date::Calendar;
+use boundary_spec::discover::scaffold::Scaffold;
 
 fn main() {
     print!("{}", Scaffold::render::<Calendar>());

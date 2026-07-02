@@ -9,8 +9,8 @@
 //! and the check reads the INPUT type, not the annotation, so a downstream edge cannot lie here.)
 #![allow(dead_code)]
 
-use boundary_algebra::boundary::{AtMost, InputEffect, Pure};
-use boundary_algebra::interp::boundary::Bound;
+use boundary_spec::boundary::{AtMost, InputEffect, Pure};
+use boundary_spec::interp::boundary::Bound;
 
 /// The exact floor `run_pure` demands of an edge's input.
 fn demand_pure_input<T>()
