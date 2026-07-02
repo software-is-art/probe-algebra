@@ -1,0 +1,27 @@
+# The DOWNSTREAM CONSUMER FIXTURE: a separate crate that runs the whole boundary-algebra
+# discipline through PUBLIC API only. It exists to keep "the loop works downstream" a tested
+# invariant of the workspace — if a release breaks the consumer story, this crate stops building.
+# It is a fixture, never a product: version 0.0.0, publish = false.
+[package]
+name = "downstream-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Existence proof that a consumer can run the boundary-algebra discipline end to end through public API alone."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# The library under consumption. A real consumer writes
+# `boundary-algebra = { git = "https://github.com/software-is-art/probe-algebra" }`.
+boundary-algebra = { path = ".." }
+
+[dev-dependencies]
+# The freeze/drift-gate mechanics. Only the drift-gate test (`tests/freeze_gate.rs`) and the
+# regeneration example (`examples/freeze.rs`) touch it, so a dev-dependency suffices — the
+# library code never needs it.
+spec-lock = { path = "../spec-lock" }
+
+[build-dependencies]
+# The build-time discipline (tier partition, boundary grammar, inward rule, rats-nest,
+# edge-probe completeness, qualify census), attached from this crate's own build.rs.
+boundary-enforce = { path = "../boundary-enforce" }

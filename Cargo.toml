@@ -10,7 +10,13 @@ keywords = ["mutation-testing", "property-testing", "boundary", "category", "ver
 categories = ["development-tools::testing", "rust-patterns"]
 
 [workspace]
-members = [".", "boundary-algebra-macros", "boundary-enforce", "spec-lock"]
+members = [
+    ".",
+    "boundary-algebra-macros",
+    "boundary-enforce",
+    "downstream-fixture",
+    "spec-lock",
+]
 
 [[bin]]
 name = "demo"
