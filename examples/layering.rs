@@ -11,14 +11,14 @@
 
 use boundary_algebra::discover::arithmetic::Arithmetic;
 use boundary_algebra::discover::date::Calendar;
-use boundary_algebra::discover::layering::render;
+use boundary_algebra::discover::layering::LayeringReport;
 use boundary_algebra::discover::router::Router;
 
 fn main() {
     println!("Layering analysis — the discovered algebra read for sprawl:\n");
-    print!("{}", render::<Arithmetic>());
-    print!("{}", render::<Router>());
-    print!("{}", render::<Calendar>());
+    print!("{}", LayeringReport::of::<Arithmetic>().render());
+    print!("{}", LayeringReport::of::<Router>().render());
+    print!("{}", LayeringReport::of::<Calendar>().render());
     println!(
         "\nA HINGE is an operator whose removal would disconnect the algebra — the rest holds\n\
          together only through it, so it is where a layer wants to go. Atomic components have none."

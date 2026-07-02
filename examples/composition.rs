@@ -13,7 +13,7 @@
 //! Run `cargo run --example composition`.
 
 use boundary_algebra::discover::arithmetic::Arithmetic;
-use boundary_algebra::discover::composition::render;
+use boundary_algebra::discover::composition::PipelineLaw;
 use boundary_algebra::discover::date::Calendar;
 use boundary_algebra::discover::router::Router;
 
@@ -63,10 +63,10 @@ boundary_algebra::theory! {
 
 fn main() {
     println!("Composition analysis — what survives a transform pipeline:\n");
-    print!("{}", render::<Readings>());
-    print!("{}", render::<Arithmetic>());
-    print!("{}", render::<Router>());
-    print!("{}", render::<Calendar>());
+    print!("{}", PipelineLaw::render::<Readings>());
+    print!("{}", PipelineLaw::render::<Arithmetic>());
+    print!("{}", PipelineLaw::render::<Router>());
+    print!("{}", PipelineLaw::render::<Calendar>());
     println!(
         "\nThe operation changes at every stage (combineRaw → combineScaled → combineReported), but\n\
          the composite report∘scale is still a homomorphism: the dataflow preserves the algebra end\n\

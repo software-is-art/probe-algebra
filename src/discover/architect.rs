@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use super::scaffold::{scaffold, Scaffold};
+use super::scaffold::Scaffold;
 use crate::discover::arithmetic::Arithmetic;
 use crate::discover::date::Calendar;
 use crate::discover::engine::Theory;
@@ -67,7 +67,7 @@ struct Entry {
 /// The theories the architect analyses (the crate's real discovery domains).
 fn registry() -> Vec<Entry> {
     fn s<T: Theory>() -> Option<Scaffold> {
-        scaffold::<T>()
+        Scaffold::of::<T>()
     }
     vec![
         Entry {
@@ -107,52 +107,62 @@ fn theory_line(file: &str) -> usize {
         .unwrap_or(1)
 }
 
-/// Analyse the registry and produce a finding (diagnostic + scaffold code action) for every module
-/// whose discovered algebra DECOMPOSES — the cohesive ones produce nothing, exactly as an editor
-/// would surface a hint only where there is something to act on.
-pub fn analyze() -> Vec<Finding> {
-    let mut findings = Vec::new();
-    for e in registry() {
-        let Some(sc) = (e.scaffold)() else {
-            continue;
-        };
-        let edits = sc
-            .modules
-            .iter()
-            .enumerate()
-            .map(|(i, m)| FileEdit {
-                path: format!("{}/module{i}.rs", e.out_dir),
-                contents: m.source.clone(),
-            })
-            .collect();
-        let seams: Vec<&str> = sc
-            .seams
-            .iter()
-            .map(|s| match s.kind {
-                super::cohesion::SeamKind::Transport => "transport",
-                super::cohesion::SeamKind::Transform => "transform",
-            })
-            .collect();
-        findings.push(Finding {
-            name: e.name.to_string(),
-            diagnostic: Diagnostic {
-                file: e.file.to_string(),
-                line: theory_line(e.file),
-                severity: Severity::Hint,
-                message: format!(
-                    "`{}` is secretly {} modules — its algebra decomposes (seam: {}). Consider splitting.",
-                    e.name,
-                    sc.modules.len(),
-                    seams.join(", ")
-                ),
-            },
-            action: CodeAction {
-                title: format!("Split `{}` into {} modules", e.name, sc.modules.len()),
-                edits,
-            },
-        });
+/// The architect tool itself, as a TYPESTATE — the surface its analysis, serialisation, and
+/// auto-apply hang off, so the tool's public callables are associated functions of the tool's
+/// value object, not loose ones (the no-rats-nest rule: every public callable hangs off a
+/// typestate).
+pub struct Architect;
+
+impl Architect {
+    /// Analyse the registry and produce a finding (diagnostic + scaffold code action) for every module
+    /// whose discovered algebra DECOMPOSES — the cohesive ones produce nothing, exactly as an editor
+    /// would surface a hint only where there is something to act on. The analysis is an associated
+    /// function of the TOOL — the public surface is the typestate, not a loose function (the
+    /// no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn analyze() -> Vec<Finding> {
+        let mut findings = Vec::new();
+        for e in registry() {
+            let Some(sc) = (e.scaffold)() else {
+                continue;
+            };
+            let edits = sc
+                .modules
+                .iter()
+                .enumerate()
+                .map(|(i, m)| FileEdit {
+                    path: format!("{}/module{i}.rs", e.out_dir),
+                    contents: m.source.clone(),
+                })
+                .collect();
+            let seams: Vec<&str> = sc
+                .seams
+                .iter()
+                .map(|s| match s.kind {
+                    super::cohesion::SeamKind::Transport => "transport",
+                    super::cohesion::SeamKind::Transform => "transform",
+                })
+                .collect();
+            findings.push(Finding {
+                name: e.name.to_string(),
+                diagnostic: Diagnostic {
+                    file: e.file.to_string(),
+                    line: theory_line(e.file),
+                    severity: Severity::Hint,
+                    message: format!(
+                        "`{}` is secretly {} modules — its algebra decomposes (seam: {}). Consider splitting.",
+                        e.name,
+                        sc.modules.len(),
+                        seams.join(", ")
+                    ),
+                },
+                action: CodeAction {
+                    title: format!("Split `{}` into {} modules", e.name, sc.modules.len()),
+                    edits,
+                },
+            });
+        }
+        findings
     }
-    findings
 }
 
 /// Escape a string to its RFC 8259 wire form: `"` and `\` and the three whitespace controls take
@@ -216,52 +226,54 @@ fn unesc(s: &str) -> String {
     out
 }
 
-/// Serialise the findings to the LSP JSON an editor consumes: a `diagnostics` array and a
-/// `codeActions` array (each action a `refactor.extract` whose `documentChanges` create the files).
-pub fn render_lsp(findings: &[Finding]) -> String {
-    let diags: Vec<String> = findings
-        .iter()
-        .map(|f| {
-            let d = &f.diagnostic;
-            let line = d.line.saturating_sub(1);
-            format!(
-                "{{\"uri\":\"{}\",\"range\":{{\"start\":{{\"line\":{line},\"character\":0}},\
-                 \"end\":{{\"line\":{line},\"character\":0}}}},\"severity\":{},\
-                 \"source\":\"architect\",\"message\":\"{}\"}}",
-                esc(&d.file),
-                d.severity as u8,
-                esc(&d.message)
-            )
-        })
-        .collect();
-    let actions: Vec<String> = findings
-        .iter()
-        .map(|f| {
-            let changes: Vec<String> = f
-                .action
-                .edits
-                .iter()
-                .map(|e| {
-                    format!(
-                        "{{\"kind\":\"create\",\"uri\":\"{}\",\"text\":\"{}\"}}",
-                        esc(&e.path),
-                        esc(&e.contents)
-                    )
-                })
-                .collect();
-            format!(
-                "{{\"title\":\"{}\",\"kind\":\"refactor.extract\",\
-                 \"edit\":{{\"documentChanges\":[{}]}}}}",
-                esc(&f.action.title),
-                changes.join(",")
-            )
-        })
-        .collect();
-    format!(
-        "{{\"diagnostics\":[{}],\"codeActions\":[{}]}}",
-        diags.join(","),
-        actions.join(",")
-    )
+impl Architect {
+    /// Serialise the findings to the LSP JSON an editor consumes: a `diagnostics` array and a
+    /// `codeActions` array (each action a `refactor.extract` whose `documentChanges` create the files).
+    pub fn render_lsp(findings: &[Finding]) -> String {
+        let diags: Vec<String> = findings
+            .iter()
+            .map(|f| {
+                let d = &f.diagnostic;
+                let line = d.line.saturating_sub(1);
+                format!(
+                    "{{\"uri\":\"{}\",\"range\":{{\"start\":{{\"line\":{line},\"character\":0}},\
+                     \"end\":{{\"line\":{line},\"character\":0}}}},\"severity\":{},\
+                     \"source\":\"architect\",\"message\":\"{}\"}}",
+                    esc(&d.file),
+                    d.severity as u8,
+                    esc(&d.message)
+                )
+            })
+            .collect();
+        let actions: Vec<String> = findings
+            .iter()
+            .map(|f| {
+                let changes: Vec<String> = f
+                    .action
+                    .edits
+                    .iter()
+                    .map(|e| {
+                        format!(
+                            "{{\"kind\":\"create\",\"uri\":\"{}\",\"text\":\"{}\"}}",
+                            esc(&e.path),
+                            esc(&e.contents)
+                        )
+                    })
+                    .collect();
+                format!(
+                    "{{\"title\":\"{}\",\"kind\":\"refactor.extract\",\
+                     \"edit\":{{\"documentChanges\":[{}]}}}}",
+                    esc(&f.action.title),
+                    changes.join(",")
+                )
+            })
+            .collect();
+        format!(
+            "{{\"diagnostics\":[{}],\"codeActions\":[{}]}}",
+            diags.join(","),
+            actions.join(",")
+        )
+    }
 }
 
 /// `apply` is the architect's one EFFECTFUL edge — everything else here (the analysis, the codec)
@@ -278,33 +290,35 @@ fn confined(rel: &Path) -> bool {
             .any(|c| c == std::path::Component::ParentDir)
 }
 
-/// Apply a code action: write every created file under `root`. Returns the paths written. This is
-/// the "auto-apply" — the scaffolded skeletons land on disk; the developer (or an agent) then moves
-/// the operator functions in and names the modules.
-///
-/// The effect is BOUNDED to `root`: an edit whose path escapes it (absolute, or via `..`) is
-/// rejected rather than written, so the declared `Effectful`-confined-to-`root` capability is real,
-/// not a vacuous claim.
-///
-/// Capability: Effectful — writes files to disk (confined to `root`; see `APPLY_CAPABILITY`).
-pub fn apply(action: &CodeAction, root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
-    let mut written = Vec::new();
-    for e in &action.edits {
-        let rel = Path::new(&e.path);
-        if !confined(rel) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("edit path `{}` escapes the root", e.path),
-            ));
+impl Architect {
+    /// Apply a code action: write every created file under `root`. Returns the paths written. This is
+    /// the "auto-apply" — the scaffolded skeletons land on disk; the developer (or an agent) then moves
+    /// the operator functions in and names the modules.
+    ///
+    /// The effect is BOUNDED to `root`: an edit whose path escapes it (absolute, or via `..`) is
+    /// rejected rather than written, so the declared `Effectful`-confined-to-`root` capability is real,
+    /// not a vacuous claim.
+    ///
+    /// Capability: Effectful — writes files to disk (confined to `root`; see `APPLY_CAPABILITY`).
+    pub fn apply(action: &CodeAction, root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
+        let mut written = Vec::new();
+        for e in &action.edits {
+            let rel = Path::new(&e.path);
+            if !confined(rel) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("edit path `{}` escapes the root", e.path),
+                ));
+            }
+            let path = root.join(rel);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&path, &e.contents)?;
+            written.push(path);
         }
-        let path = root.join(rel);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(&path, &e.contents)?;
-        written.push(path);
+        Ok(written)
     }
-    Ok(written)
 }
 
 // ----- the architect's OWN algebra: a report is a join-semilattice ----------
@@ -322,15 +336,17 @@ use std::collections::BTreeSet;
 pub struct Report(BTreeSet<String>);
 
 impl Report {
+    /// The architect's output AS a value object — the set of flagged modules from one analysis
+    /// run. An associated function of the value object it yields (the no-rats-nest rule: every
+    /// public callable hangs off a typestate).
+    pub fn of() -> Report {
+        Report(Architect::analyze().into_iter().map(|f| f.name).collect())
+    }
+
     /// The flagged module names, sorted.
     pub fn flagged(&self) -> Vec<String> {
         self.0.iter().cloned().collect()
     }
-}
-
-/// The architect's output AS a value object — the set of flagged modules from one analysis run.
-pub fn report() -> Report {
-    Report(analyze().into_iter().map(|f| f.name).collect())
 }
 
 /// The report theory's single sort.
@@ -432,7 +448,7 @@ crate::theory! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::discover::cohesion::cohesion;
+    use crate::discover::cohesion::CohesionReport;
     use crate::discover::engine::Engine;
 
     /// The architect surfaces a finding for every DECOMPOSABLE module and none for the cohesive
@@ -440,7 +456,7 @@ mod tests {
     /// router is cohesive, so it is silent.
     #[test]
     fn it_surfaces_findings_only_for_decomposable_modules() {
-        let f = analyze();
+        let f = Architect::analyze();
         let named: Vec<&str> = f.iter().map(|x| x.diagnostic.message.as_str()).collect();
         assert!(named
             .iter()
@@ -463,7 +479,7 @@ mod tests {
     /// The diagnostic points at the `theory!` declaration line, not the top of the file.
     #[test]
     fn the_diagnostic_points_at_the_theory_declaration() {
-        let date = analyze()
+        let date = Architect::analyze()
             .into_iter()
             .find(|f| f.diagnostic.message.contains("date calculus"))
             .expect("date finding");
@@ -550,7 +566,7 @@ mod tests {
     /// `refactor.extract` code action whose documentChange CREATES the scaffolded module file.
     #[test]
     fn it_renders_lsp_json() {
-        let json = render_lsp(&analyze());
+        let json = Architect::render_lsp(&Architect::analyze());
         assert!(json.contains("\"diagnostics\":["));
         assert!(json.contains("\"severity\":4"));
         assert!(json.contains("\"source\":\"architect\""));
@@ -587,11 +603,11 @@ mod tests {
             "associativity"
         );
         assert!(
-            cohesion::<Reports>().is_cohesive(),
+            CohesionReport::of::<Reports>().is_cohesive(),
             "the architect itself is one algebra"
         );
-        // and `report()` yields the architect's output as that value object.
-        assert!(report().flagged().iter().any(|n| n == "date calculus"));
+        // and `Report::of()` yields the architect's output as that value object.
+        assert!(Report::of().flagged().iter().any(|n| n == "date calculus"));
     }
 
     /// `apply` writes the scaffolded files to disk — the auto-apply — and its effect is CONFINED to
@@ -599,12 +615,12 @@ mod tests {
     /// capability, made real). Uses the scratch dir.
     #[test]
     fn apply_writes_the_split_files_confined_to_root() {
-        let date = analyze()
+        let date = Architect::analyze()
             .into_iter()
             .find(|f| f.diagnostic.message.contains("date calculus"))
             .expect("date finding");
         let dir = std::env::temp_dir().join(format!("architect-test-{}", std::process::id()));
-        let written = apply(&date.action, &dir).expect("write");
+        let written = Architect::apply(&date.action, &dir).expect("write");
         assert_eq!(written.len(), date.action.edits.len());
         assert_eq!(APPLY_CAPABILITY, crate::boundary::Capability::Effectful);
         // CONFINEMENT: every write stayed under the root — the effect is bounded as declared.
@@ -631,7 +647,7 @@ mod tests {
                 }],
             };
             assert!(
-                apply(&action, &dir).is_err(),
+                Architect::apply(&action, &dir).is_err(),
                 "escaping path `{bad}` should be rejected"
             );
         }

@@ -110,14 +110,37 @@ where
     None
 }
 
-/// The coherence violations between two same-signature theories: the laws one module discovers that
-/// do NOT hold under the other's operators (checked both directions). `Ok(empty)` ⇒ the modules
-/// agree about the shared algebra; `Ok(non-empty)` ⇒ they are connectable but INCOHERENT.
-///
-/// `Err` ⇒ the question was ill-posed: the operator tables do not align index-for-index
-/// (`signature_mismatch`), so a law's operator indices would silently resolve to the WRONG
-/// operators in the other engine — misalignment is reported, never judged as (in)coherence.
-pub fn coherence_violations<A, B>() -> Result<Vec<String>, String>
+/// The coherence analysis of a pair of same-signature theories: the laws one module discovers that
+/// do NOT hold under the other's operators (checked both directions).
+pub struct CoherenceReport {
+    /// The rendered disagreements — empty when the modules agree about the shared algebra.
+    pub violations: Vec<String>,
+}
+
+impl CoherenceReport {
+    /// The coherence violations between two same-signature theories: the laws one module discovers
+    /// that do NOT hold under the other's operators (checked both directions). `Ok` with no
+    /// violations ⇒ the modules agree about the shared algebra; `Ok` with violations ⇒ they are
+    /// connectable but INCOHERENT.
+    ///
+    /// `Err` ⇒ the question was ill-posed: the operator tables do not align index-for-index
+    /// (`signature_mismatch`), so a law's operator indices would silently resolve to the WRONG
+    /// operators in the other engine — misalignment is reported, never judged as (in)coherence.
+    ///
+    /// The analysis is an associated function of its REPORT — the public surface is the value
+    /// object, not a loose function (the no-rats-nest rule: every public callable hangs off a
+    /// typestate).
+    pub fn between<A, B>() -> Result<Self, String>
+    where
+        A: Theory,
+        B: Theory<Sort = A::Sort, Value = A::Value, Obs = A::Obs>,
+    {
+        coherence_violations::<A, B>().map(|violations| CoherenceReport { violations })
+    }
+}
+
+/// The violation scan (private — reached as `CoherenceReport::between`).
+fn coherence_violations<A, B>() -> Result<Vec<String>, String>
 where
     A: Theory,
     B: Theory<Sort = A::Sort, Value = A::Value, Obs = A::Obs>,
@@ -163,8 +186,9 @@ mod tests {
     #[test]
     fn max_and_gcd_merge_are_coherent() {
         assert!(
-            coherence_violations::<MaxMerge, GcdMerge>()
+            CoherenceReport::between::<MaxMerge, GcdMerge>()
                 .expect("identical signatures")
+                .violations
                 .is_empty(),
             "max and gcd merge share the same laws — they must be coherent"
         );
@@ -175,7 +199,9 @@ mod tests {
     /// the bug class the type system cannot see.
     #[test]
     fn max_and_first_merge_are_incoherent() {
-        let v = coherence_violations::<MaxMerge, FirstMerge>().expect("identical signatures");
+        let v = CoherenceReport::between::<MaxMerge, FirstMerge>()
+            .expect("identical signatures")
+            .violations;
         assert!(
             v.iter()
                 .any(|s| s.contains("either order") && s.contains("max-merge")),
@@ -201,7 +227,9 @@ mod tests {
     /// disagreement is. Pins that coherence is not vacuously "everything differs".
     #[test]
     fn only_the_genuine_disagreement_is_reported() {
-        let v = coherence_violations::<MaxMerge, FirstMerge>().expect("identical signatures");
+        let v = CoherenceReport::between::<MaxMerge, FirstMerge>()
+            .expect("identical signatures")
+            .violations;
         // exactly the commutativity law disagrees (in one direction); everything else is shared.
         assert_eq!(v.len(), 1, "only commutativity should disagree, got: {v:?}");
     }
@@ -224,7 +252,7 @@ mod tests {
                 Nullary "Empty" "empty" () -> Sort::Key = empty;
             }
         }
-        let err = coherence_violations::<MaxMerge, SwappedMerge>()
+        let err = CoherenceReport::between::<MaxMerge, SwappedMerge>()
             .expect_err("misaligned operator tables must be an error, not a coherence verdict");
         assert!(
             err.contains("misaligned") && err.contains("Empty") && err.contains("Merge"),

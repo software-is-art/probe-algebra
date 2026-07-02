@@ -4,8 +4,8 @@
 //! Run `cargo run --example scaffold`.
 
 use boundary_algebra::discover::date::Calendar;
-use boundary_algebra::discover::scaffold::render;
+use boundary_algebra::discover::scaffold::Scaffold;
 
 fn main() {
-    print!("{}", render::<Calendar>());
+    print!("{}", Scaffold::render::<Calendar>());
 }

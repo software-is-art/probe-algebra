@@ -14,11 +14,11 @@
 //!
 //! Run `cargo run --example modularize`.
 
-use boundary_algebra::discover::modularize::{render, soup::Soup};
+use boundary_algebra::discover::modularize::{soup::Soup, Proposal};
 
 fn main() {
     println!("Modularize — the structure hiding in an unstructured bag of functions:\n");
-    print!("{}", render::<Soup>());
+    print!("{}", Proposal::of::<Soup>().render());
     println!(
         "\nThe algebra IS the selection criterion: a cluster the laws bind tightly is a real shape\n\
          (ranked by how many laws), and a function bound by no law is a MISFIT — the proposal will\n\
