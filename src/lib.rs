@@ -19,16 +19,23 @@
 //! is the static join of its edges. Probes come in flavours: `probe` (residual
 //! completeness), `commutes` (commutation), `coefficient_holds` (quantitative,
 //! reference-bearing), and `reconstructs` / `construction_probe` (the entry-edge
-//! analogs). Each module's `boundary.rs` is its only public surface; `build.rs`
-//! enforces the grammar and the inward "no raw primitive escapes" rule.
+//! analogs). A module's public surface is its BOUNDARY-tier file — the tier and the
+//! enforced shape, not a filename: `interp`'s is `boundary.rs`, `kvstore`'s is
+//! `store.rs`, and both carry the same discipline. `build.rs` enforces the grammar,
+//! the inward "no raw primitive escapes" rule, and the NO-RATS-NEST rule: a fully
+//! public function anywhere outside the ratified kernel must be attached to a
+//! typestate or be operator-shaped, or it does not build.
 //!
 //! Every part of the runtime is SELF-HOSTED — certified by oracle-free probes with no
 //! hand-written example tests, judged by mutation. The interpreter (`interp`) is the lead
 //! demonstration substrate: an expression language whose boundary is `Parse` (a
 //! `Construction`), `Check` (a `Branch`), and `Eval` (a `Guarded` edge). Its private internals
-//! carry zero tests, and its entire POSITIVE surface — evaluation, parsing, type-checker
-//! acceptance — carries no hand-written examples either: the autogen `harness` registry
-//! (declared laws + structure-derived probes) is its whole verification. `select` is a second
+//! carry zero tests, and its POSITIVE surface — evaluation, parsing, type-checker
+//! acceptance — is certified by the autogen `harness` registry (declared laws +
+//! structure-derived probes), with only a disclosed few hand-written examples that pin the
+//! grammar plumbing itself (see `tests.rs`'s inventory). `kvstore` is the first STATEFUL
+//! domain under the same discipline — a TTL store whose merge monoid and tick action the
+//! engine discovers, with expiry visible to the observation. `select` is a second
 //! structural self-host: the kill-matrix set-cover selector, specified in the discipline with
 //! no interior tests. Only the IRREDUCIBLE base is hand-written — the negative tests
 //! (rejection of ill-typed / malformed input, the blind-spot map) and the grammar itself —
@@ -49,6 +56,8 @@ pub mod capability;
 pub mod discover;
 pub mod gdp;
 pub mod interp;
+/// The first STATEFUL domain: a TTL key-value store whose clock only moves via an explicit `Tick` edge.
+pub mod kvstore;
 pub mod select;
 
 /// `#[derive(Shaped)]` — generate a value object's probe surface (the fused universal

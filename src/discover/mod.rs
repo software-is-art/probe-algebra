@@ -256,9 +256,19 @@ pub fn date_spec() -> Spec {
     theory_spec::<date::Calendar>()
 }
 
+/// The TTL store's discovered spec (the first STATEFUL domain: merge monoid, tick action).
+pub fn kvstore_spec() -> Spec {
+    theory_spec::<crate::kvstore::theory::TtlStore>()
+}
+
 /// Every theory's discovered spec — what the freeze records and the staleness gate checks.
 pub fn all_specs() -> Vec<Spec> {
-    vec![interpreter_spec(), router_spec(), date_spec()]
+    vec![
+        interpreter_spec(),
+        router_spec(),
+        date_spec(),
+        kvstore_spec(),
+    ]
 }
 
 /// The interpreter's discovered laws (named value-algebra laws + the `U` law), for consumers that

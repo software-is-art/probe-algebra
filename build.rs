@@ -347,7 +347,50 @@ fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
             "ALGEBRA" => check_algebra(&loc, &file, out),   // the capability-honesty rule
             _ => {}
         }
+        // the NO-RATS-NEST rule, on every non-kernel tier: a fully-public function must be
+        // ATTACHED — a method/associated fn on a typestate (impls are untouched here) — or be
+        // OPERATOR-SHAPED (bare named value types in and out, the same shape `#[algebra]` and
+        // the qualify census read: an operator IS attached, to its value objects). Anything
+        // else public is loose plumbing: localize it (`fn` / `pub(super)` / `pub(crate)` are
+        // free — "local defs"), or hang it off the type it serves. BOUNDARY already bans all
+        // top-level fns (stricter), so this adds teeth to INTERIOR and ALGEBRA.
+        if matches!(tier, "INTERIOR" | "ALGEBRA") {
+            check_loose_pub_fns(&loc, &file, out);
+        }
     }
+}
+
+/// Flag fully-public top-level functions that are neither operator-shaped nor localized —
+/// the rats-nest rule. Recurses into non-`cfg(test)` inline modules (an `#[algebra]` module's
+/// operators are inside one), skipping test scaffolding like every other pass.
+fn check_loose_pub_fns(loc: &str, file: &syn::File, out: &mut Vec<String>) {
+    let imports = std_effect_imports(&file.items);
+    fn go(loc: &str, items: &[Item], imports: &HashMap<String, String>, out: &mut Vec<String>) {
+        for item in items {
+            match item {
+                Item::Mod(m) if !is_cfg_test(&m.attrs) => {
+                    if let Some((_, inner)) = &m.content {
+                        go(loc, inner, imports, out);
+                    }
+                }
+                Item::Fn(f)
+                    if !is_cfg_test(&f.attrs) && matches!(f.vis, syn::Visibility::Public(_)) =>
+                {
+                    if operator_candidate(f, imports).is_none() {
+                        out.push(format!(
+                            "{loc}: `pub fn {}` is a LOOSE public function — neither attached to \
+                             a typestate nor operator-shaped. Make it a method/associated fn on \
+                             the value object it serves, give it the operator shape (bare named \
+                             value types in and out), or localize it (`pub(super)`/`pub(crate)`).",
+                            f.sig.ident
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    go(loc, &file.items, &imports, out);
 }
 
 /// The partition tiers — every source file declares exactly one (see `walk` for what each enforces).

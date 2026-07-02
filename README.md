@@ -99,6 +99,14 @@ And it **enforces**, at compile time, claims that can be statically false:
   edges, not hidden dependencies. (Adding the rule immediately flagged two world-reads we'd left
   undeclared.) The residual honesty gap is transitive effects — a helper that does the I/O for you —
   which `build.rs` documents rather than pretends to close.
+- **no loose public functions — the rats-nest rule.** Outside the ratified kernel, a fully public
+  function must be **attached to a typestate** (a method or associated fn on the value object it
+  serves — `CohesionReport::of`, `Spec::lock`, `Architect::analyze`) or be **operator-shaped**
+  (bare named value types in and out — the shape `#[algebra]` and the qualify census read; an
+  operator is already attached, to its value objects). Anything else public is a build error;
+  private / `pub(super)` / `pub(crate)` helpers stay free — local defs. So the public surface of
+  every module is exactly its typestates and its operators, and "where does this function belong?"
+  has an enforced answer.
 
 The interior backing these edges (`interp::internal`) is private, untested, and kept in the
 mutation sweep, so the bought correctness is *measured*, not asserted.
@@ -112,7 +120,7 @@ one trait — `Theory` (its sorts, operators, a grid of inhabitants, and an OBSE
 and the generic **engine** enumerates terms over the operators, groups them by how they behave on
 the grid, instantiates the universal algebraic shapes over the operators, and keeps the ones that
 run true. The spec falls out of the operators' behaviour, not a human's list. The algebra was never
-about numbers; numbers were just *legible*. `cargo run --example discovered_spec` discovers three
+about numbers; numbers were just *legible*. `cargo run --example discovered_spec` discovers four
 very different algebras from the **same engine**:
 
 ```
@@ -126,7 +134,21 @@ router (a monoid)         Or with empty leaves a value unchanged.           (emp
 date calculus (2 sorts)   Plus with zero leaves a value unchanged.          (zero + p) = p
                           Add with zero leaves a value unchanged.           add(s, zero) = s
                           at undoes since — the round trip is the identity.  at(since(s)) = s
+ttl store (STATEFUL)      With Merge, the grouping doesn't matter.          ((s <+ t) <+ u) = …
+                          Repeated Tick combines its parameters with Plus.  tick(tick(s,p),q) = tick(s,(p+q))
+                          — and NOT merge commutativity: last-write-wins makes order semantics,
+                            so the engine correctly refuses to report it.
 ```
+
+The TTL store is the first **stateful** domain: `Store` is the state itself, time moves only
+through an explicit `tick` edge (deterministic — `Stateful`, never `Effectful`), and the
+observation is the store's *live entries at its own clock*, so expiry is visible to the engine.
+What discovery finds on state is exactly what a reviewer would want certified: accumulated state
+composes as a **monoid** (replaying a batch is safe — idempotent), time is a **monoid action** of
+durations on stores (sweep-then-sweep equals sweep-once), and merge **order is meaning** — the
+refused commutativity is last-write-wins, stated by silence. Its surface file is deliberately
+named `store.rs`, not `boundary.rs`: boundary-hood is the declared tier plus the enforced shape,
+never a filename.
 
 The universal shapes the engine tries cover the heterogeneous cases too — monoid **actions**
 (date's `add`), **homomorphisms** (boolean De Morgan, `¬(x∧y) = ¬x ∨ ¬y`), absorption,

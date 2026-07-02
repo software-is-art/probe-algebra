@@ -112,6 +112,7 @@ where
 
 /// The coherence analysis of a pair of same-signature theories: the laws one module discovers that
 /// do NOT hold under the other's operators (checked both directions).
+#[derive(Debug)]
 pub struct CoherenceReport {
     /// The rendered disagreements — empty when the modules agree about the shared algebra.
     pub violations: Vec<String>,
