@@ -45,6 +45,7 @@ dependencies = [
  "proptest",
  "serde_json",
  "spec-lock",
+ "syn",
  "trybuild",
  "typewit",
 ]

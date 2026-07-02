@@ -28,6 +28,7 @@ pub mod derived;
 pub mod engine;
 pub mod expect;
 pub mod freeze;
+pub mod genesis;
 pub mod layering;
 pub mod modularize;
 pub mod residue;
