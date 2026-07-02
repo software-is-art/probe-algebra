@@ -21,6 +21,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::path::PathBuf;
 
 /// How an operator renders in a symbolic equation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -391,6 +392,233 @@ impl<T: Theory> Engine<T> {
 
 // -- the template battery: universal algebraic shapes instantiated over the operators -----------
 
+// ================================================================================================
+// THE SHAPE CATALOG — this block and `Engine::templates()` below MUST MOVE TOGETHER.
+//
+// `templates()` is the battery stated as CODE (shapes that fire); `ShapeCatalog::inventory()` is
+// the same battery stated as DATA (shapes that are ratified). Add, remove, or reword a shape in
+// one and the census tests fail until the other follows — and until the regenerated
+// `spec/shapes.spec` diff is reviewed.
+// ================================================================================================
+
+/// One universal algebraic shape, as a ratifiable datum: its name, its schematic equation, the
+/// applicability GATE that decides which operators it is tried on, and the prose TEMPLATE a
+/// discovered instance renders with (`{op}`/`{other}`/`{via}` are operator names, `{const}` a
+/// constant's symbol).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ShapeInfo {
+    /// The shape's name ("commutativity", "bias (right-regular)").
+    pub name: &'static str,
+    /// The schematic equation, over placeholder operators ("(x ⊕ y) = (y ⊕ x)").
+    pub schema: &'static str,
+    /// When the shape is tried, in prose ("homogeneous binary; skipped when commutative").
+    pub gate: &'static str,
+    /// The prose template a discovered instance renders with — the exact `format!` skeleton in
+    /// `templates()`, with `{...}` holes where operator/constant names are substituted.
+    pub template: &'static str,
+}
+
+impl ShapeInfo {
+    /// Does a discovered law's prose instantiate this shape's template? The template's literal
+    /// fragments (around the `{...}` holes) must appear in the prose IN ORDER — the first as a
+    /// prefix, the last as a suffix — with the holes free to match any operator or constant name.
+    /// This is the census's matcher: robust to what a domain calls its operators, strict about
+    /// the ratified prose skeleton.
+    pub fn matches(&self, prose: &str) -> bool {
+        // split the template into literal fragments around the `{...}` holes.
+        let mut fragments: Vec<&str> = Vec::new();
+        let mut rest = self.template;
+        while let (Some(open), Some(len)) = (
+            rest.find('{'),
+            rest.find('{').and_then(|o| rest[o..].find('}')),
+        ) {
+            fragments.push(&rest[..open]);
+            rest = &rest[open + len + 1..];
+        }
+        fragments.push(rest);
+
+        // no holes at all: a literal template must equal the prose outright.
+        let (first, holed) = fragments.split_first().expect("at least one fragment");
+        let Some((last, mids)) = holed.split_last() else {
+            return prose == *first;
+        };
+        let Some(mut cursor) = prose.strip_prefix(first) else {
+            return false;
+        };
+        for mid in mids {
+            match cursor.find(mid) {
+                Some(pos) => cursor = &cursor[pos + mid.len()..],
+                None => return false,
+            }
+        }
+        cursor.ends_with(last)
+    }
+}
+
+/// The engine's shape catalog — the library's LAW-LANGUAGE surface, as a value object.
+///
+/// Every law any theory's discovered spec can ever state is an instance of one shape here: the
+/// catalog is the vocabulary discovery speaks in. Until now that vocabulary existed only as code
+/// (`templates()`), so adding a shape silently changed what EVERY downstream consumer's discovered
+/// spec contains — the regular-band BIAS laws are the motivating example: the day they landed,
+/// two frozen specs (router, ttl store) changed underneath their consumers with no artifact
+/// naming the cause. The catalog closes that: `inventory()` states the battery as data,
+/// `lock()` freezes its deterministic rendering into `spec/shapes.spec`, and the drift gate makes
+/// template evolution a RATIFIED, VERSIONED event — a new or changed shape is a reviewed diff to
+/// the committed catalog (regenerate with `cargo run --example freeze_shapes`), not a silent
+/// side effect of an engine edit. Associated fns per the no-rats-nest rule: every public callable
+/// hangs off a typestate.
+pub struct ShapeCatalog;
+
+impl ShapeCatalog {
+    /// The full inventory, in the order `templates()` tries the shapes. KEEP IN STEP with
+    /// `templates()` — the census tests hold each side against the other, and the lock holds
+    /// both against `spec/shapes.spec`.
+    pub fn inventory() -> Vec<ShapeInfo> {
+        vec![
+            ShapeInfo {
+                name: "commutativity",
+                schema: "(x ⊕ y) = (y ⊕ x)",
+                gate: "homogeneous binary (s × s → s)",
+                template: "{op} gives the same result in either order.",
+            },
+            ShapeInfo {
+                name: "associativity",
+                schema: "((x ⊕ y) ⊕ z) = (x ⊕ (y ⊕ z))",
+                gate: "homogeneous binary (s × s → s)",
+                template: "With {op}, the grouping of three values doesn't matter.",
+            },
+            ShapeInfo {
+                name: "idempotence",
+                schema: "(x ⊕ x) = x",
+                gate: "homogeneous binary (s × s → s)",
+                template: "{op} of a value with itself gives that value.",
+            },
+            ShapeInfo {
+                name: "bias (right-regular)",
+                schema: "((x ⊕ y) ⊕ x) = (y ⊕ x)",
+                gate: "homogeneous binary; skipped when commutative (a commutative operator \
+                       has no bias to state); excludes the left-regular variant on the grid",
+                template: "With {op}, the later operand wins where the two disagree — \
+                           re-applying an earlier one cannot overwrite it.",
+            },
+            ShapeInfo {
+                name: "bias (left-regular)",
+                schema: "((x ⊕ y) ⊕ x) = (x ⊕ y)",
+                gate: "homogeneous binary; skipped when commutative (a commutative operator \
+                       has no bias to state); excludes the right-regular variant on the grid",
+                template: "With {op}, the earlier operand wins where the two disagree — \
+                           a later one cannot overwrite it.",
+            },
+            ShapeInfo {
+                name: "identity",
+                schema: "(e ⊕ x) = x  (or (x ⊕ e) = x)",
+                gate: "homogeneous binary plus a constant of its sort; tried on both sides, \
+                       deduplicated by prose",
+                template: "{op} with {const} leaves a value unchanged.",
+            },
+            ShapeInfo {
+                name: "annihilation",
+                schema: "(a ⊕ x) = a  (or (x ⊕ a) = a)",
+                gate: "homogeneous binary plus a constant of its sort; tried on both sides, \
+                       deduplicated by prose",
+                template: "{op} by {const} always gives {const}.",
+            },
+            ShapeInfo {
+                name: "distributivity",
+                schema: "(x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))",
+                gate: "an ordered pair of distinct homogeneous binaries on one sort",
+                template: "{op} distributes over {other}.",
+            },
+            ShapeInfo {
+                name: "absorption",
+                schema: "(x ⊕ (x ⊗ y)) = x",
+                gate: "an ordered pair of distinct homogeneous binaries on one sort",
+                template: "{op} absorbs {other}.",
+            },
+            ShapeInfo {
+                name: "action identity",
+                schema: "act(x, e) = x",
+                gate: "heterogeneous binary s × t → s (an action of t on s) plus a constant \
+                       of the parameter sort t",
+                template: "{op} with {const} leaves a value unchanged.",
+            },
+            ShapeInfo {
+                name: "monoid action",
+                schema: "act(act(x, p), q) = act(x, (p ⊗ q))",
+                gate: "heterogeneous binary s × t → s plus a homogeneous binary on the \
+                       parameter sort t",
+                template: "Repeated {op} combines its parameters with {other}.",
+            },
+            ShapeInfo {
+                name: "irreflexivity",
+                schema: "rel(x, x) = false",
+                gate: "relation s × s → r (r ≠ s) whose output sort carries a constant \
+                       rendering as `false`",
+                template: "A value is never {op} itself.",
+            },
+            ShapeInfo {
+                name: "self-application",
+                schema: "rel(x, x) = c",
+                gate: "relation s × s → r (r ≠ s) plus any other constant of the output sort",
+                template: "{op} of a value with itself gives {const}.",
+            },
+            ShapeInfo {
+                name: "involution",
+                schema: "u(u(x)) = x",
+                gate: "unary s → s",
+                template: "{op} twice returns the original value.",
+            },
+            ShapeInfo {
+                name: "round-trip",
+                schema: "g(f(x)) = x",
+                gate: "a pair of distinct unaries f : s → t and g : t → s",
+                template: "{op} undoes {other} — the round trip is the identity.",
+            },
+            ShapeInfo {
+                name: "homomorphism",
+                schema: "h((x ⊕ y)) = (h(x) ⊗ h(y))",
+                gate: "unary h : s → t plus a homogeneous binary on s and one on t",
+                template: "{op} turns {other} into {via}.",
+            },
+        ]
+    }
+
+    /// The catalog's canonical text — deterministic, human-readable, diffable: one shape per
+    /// stanza (name, schema, gate, prose template). This is what `spec/shapes.spec` locks.
+    pub fn render() -> String {
+        let mut out = String::from(
+            "# shape catalog: the universal algebraic shapes the discovery engine instantiates \
+             — generated by `cargo run --example freeze_shapes`; ratify changes.\n\
+             #\n\
+             # This is the engine's LAW-LANGUAGE: every law in every theory's discovered spec is\n\
+             # an instance of one stanza below. Adding or changing a stanza changes what EVERY\n\
+             # consumer's discovered spec can say, so it lands as a reviewed diff to this file —\n\
+             # never as a silent engine edit.\n",
+        );
+        for shape in Self::inventory() {
+            out.push_str(&format!(
+                "\n- {}\n      schema:   {}\n      gate:     {}\n      template: {}\n",
+                shape.name, shape.schema, shape.gate, shape.template
+            ));
+        }
+        out
+    }
+
+    /// The catalog as a `spec_lock::Lock` on `spec/shapes.spec` — same discipline as the theory
+    /// specs: `spec_lock::check` is the drift gate, `spec_lock::bless` (via
+    /// `examples/freeze_shapes.rs`) the regeneration path, the committed diff the ratification.
+    pub fn lock() -> spec_lock::Lock {
+        spec_lock::Lock {
+            name: "shape catalog".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("spec")
+                .join("shapes.spec"),
+            live: Self::render(),
+        }
+    }
+}
+
 impl<T: Theory> Engine<T> {
     /// The id of the variable for `(sort, ord)`, if it exists.
     fn var(&self, sort: T::Sort, ord: usize) -> Option<Term> {
@@ -421,6 +649,11 @@ impl<T: Theory> Engine<T> {
     /// Instantiate the universal algebraic shapes over the operators; keep those that run true.
     /// One law per recognised shape-instance, deduplicated by its prose (so left/right variants of
     /// one symmetric law collapse).
+    ///
+    /// !! MOVE TOGETHER !! This battery and `ShapeCatalog::inventory()` above are the same
+    /// catalog stated twice — as code that fires and as data that is locked in
+    /// `spec/shapes.spec`. A shape added, removed, or reworded here must be mirrored there
+    /// (the census tests enforce both directions), and the regenerated lock diff ratified.
     fn templates(&self) -> Vec<DiscoveredLaw> {
         let mut out: Vec<DiscoveredLaw> = Vec::new();
         let mut seen_prose: Vec<String> = Vec::new();
@@ -1502,6 +1735,428 @@ mod tests {
                     sorts[j]
                 );
             }
+        }
+    }
+
+    // -- the shape-catalog census: the battery and the catalog hold each other -------------------
+    //
+    // Two SYNTHETIC MAXIMAL theories, built so that every catalog shape fires at least once
+    // across them. They are not domains anyone ships — they are the catalog's exercise yard:
+    // a boolean algebra with a relation and a partial codec (`MaxLogic`), and a non-commutative
+    // selection algebra with an action and a distance relation (`MaxSelect`). A catalog entry no
+    // maximal theory can exhibit is stale; a template that fires with no catalog entry is
+    // unratified — the census tests below assert both directions.
+
+    // MaxLogic: booleans (commutativity, associativity, idempotence, identity, annihilation,
+    // distributivity, absorption, involution, De Morgan homomorphism), a `<` relation into the
+    // boolean sort (irreflexivity), a mod-3 codec (round-trips), and a PARTIAL `half` (defined
+    // only on even values — it earns no law and must not fake one).
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum LSort {
+        B,
+        N,
+    }
+    struct MaxLogic;
+    #[derive(Clone)]
+    enum LVal {
+        B(bool),
+        N(u8),
+    }
+    fn l_bool(v: &LVal) -> bool {
+        match v {
+            LVal::B(b) => *b,
+            LVal::N(_) => unreachable!("sort-checked by the engine"),
+        }
+    }
+    fn l_nat(v: &LVal) -> u8 {
+        match v {
+            LVal::N(n) => *n,
+            LVal::B(_) => unreachable!("sort-checked by the engine"),
+        }
+    }
+    fn l_false(_: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(false))
+    }
+    fn l_true(_: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(true))
+    }
+    fn l_and(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(l_bool(&v[0]) && l_bool(&v[1])))
+    }
+    fn l_or(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(l_bool(&v[0]) || l_bool(&v[1])))
+    }
+    fn l_not(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(!l_bool(&v[0])))
+    }
+    fn l_lt(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(l_nat(&v[0]) < l_nat(&v[1])))
+    }
+    fn l_enc(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::N((l_nat(&v[0]) + 1) % 3))
+    }
+    fn l_dec(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::N((l_nat(&v[0]) + 2) % 3))
+    }
+    fn l_half(v: &[LVal]) -> Option<LVal> {
+        let n = l_nat(&v[0]);
+        n.is_multiple_of(2).then_some(LVal::N(n / 2))
+    }
+
+    impl Theory for MaxLogic {
+        type Sort = LSort;
+        type Value = LVal;
+        type Obs = u8;
+        fn name() -> &'static str {
+            "maximal logic"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            use Fixity::{Infix, Nullary, Prefix};
+            use LSort::{B, N};
+            vec![
+                Operator {
+                    name: "false",
+                    symbol: "false",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: B,
+                    eval: l_false,
+                },
+                Operator {
+                    name: "true",
+                    symbol: "true",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: B,
+                    eval: l_true,
+                },
+                Operator {
+                    name: "And",
+                    symbol: "&",
+                    fixity: Infix,
+                    inputs: vec![B, B],
+                    output: B,
+                    eval: l_and,
+                },
+                Operator {
+                    name: "Or",
+                    symbol: "|",
+                    fixity: Infix,
+                    inputs: vec![B, B],
+                    output: B,
+                    eval: l_or,
+                },
+                Operator {
+                    name: "Not",
+                    symbol: "~",
+                    fixity: Prefix,
+                    inputs: vec![B],
+                    output: B,
+                    eval: l_not,
+                },
+                Operator {
+                    name: "less-than",
+                    symbol: "<",
+                    fixity: Infix,
+                    inputs: vec![N, N],
+                    output: B,
+                    eval: l_lt,
+                },
+                Operator {
+                    name: "encode",
+                    symbol: "enc",
+                    fixity: Prefix,
+                    inputs: vec![N],
+                    output: N,
+                    eval: l_enc,
+                },
+                Operator {
+                    name: "decode",
+                    symbol: "dec",
+                    fixity: Prefix,
+                    inputs: vec![N],
+                    output: N,
+                    eval: l_dec,
+                },
+                Operator {
+                    name: "halve",
+                    symbol: "half",
+                    fixity: Prefix,
+                    inputs: vec![N],
+                    output: N,
+                    eval: l_half,
+                },
+            ]
+        }
+        fn inhabitants(sort: Self::Sort) -> Vec<Self::Value> {
+            match sort {
+                LSort::B => vec![LVal::B(false), LVal::B(true)],
+                LSort::N => (0..3).map(LVal::N).collect(),
+            }
+        }
+        fn sort_of(v: &Self::Value) -> Self::Sort {
+            match v {
+                LVal::B(_) => LSort::B,
+                LVal::N(_) => LSort::N,
+            }
+        }
+        fn observe(v: &Self::Value) -> Self::Obs {
+            match v {
+                LVal::B(b) => *b as u8,
+                LVal::N(n) => 10 + *n,
+            }
+        }
+        fn grid_size() -> usize {
+            216 // = 2³·3³, the whole space: the maximal laws are judged exhaustively.
+        }
+    }
+
+    // MaxSelect: two projections (`First` left-regular, `Last` right-regular — the bias laws), a
+    // duration monoid (`Plus`/`zero`), a mod-3 `Shift` action of durations on values (action
+    // identity, monoid action), and a `Gap` relation whose self-application is `zero`.
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum SSort {
+        V,
+        D,
+    }
+    struct MaxSelect;
+    #[derive(Clone)]
+    enum SVal {
+        V(u8),
+        D(u8),
+    }
+    fn s_v(v: &SVal) -> u8 {
+        match v {
+            SVal::V(n) => *n,
+            SVal::D(_) => unreachable!("sort-checked by the engine"),
+        }
+    }
+    fn s_d(v: &SVal) -> u8 {
+        match v {
+            SVal::D(n) => *n,
+            SVal::V(_) => unreachable!("sort-checked by the engine"),
+        }
+    }
+    fn s_first(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::V(s_v(&v[0])))
+    }
+    fn s_last(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::V(s_v(&v[1])))
+    }
+    fn s_zero(_: &[SVal]) -> Option<SVal> {
+        Some(SVal::D(0))
+    }
+    fn s_plus(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::D(s_d(&v[0]) + s_d(&v[1])))
+    }
+    fn s_shift(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::V((s_v(&v[0]) + s_d(&v[1])) % 3))
+    }
+    fn s_gap(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::D(s_v(&v[0]).abs_diff(s_v(&v[1]))))
+    }
+
+    impl Theory for MaxSelect {
+        type Sort = SSort;
+        type Value = SVal;
+        type Obs = u8;
+        fn name() -> &'static str {
+            "maximal selection"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            use Fixity::{Infix, Nullary, Prefix};
+            use SSort::{D, V};
+            vec![
+                Operator {
+                    name: "First",
+                    symbol: "fst",
+                    fixity: Prefix,
+                    inputs: vec![V, V],
+                    output: V,
+                    eval: s_first,
+                },
+                Operator {
+                    name: "Last",
+                    symbol: "lst",
+                    fixity: Prefix,
+                    inputs: vec![V, V],
+                    output: V,
+                    eval: s_last,
+                },
+                Operator {
+                    name: "zero",
+                    symbol: "zero",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: D,
+                    eval: s_zero,
+                },
+                Operator {
+                    name: "Plus",
+                    symbol: "+",
+                    fixity: Infix,
+                    inputs: vec![D, D],
+                    output: D,
+                    eval: s_plus,
+                },
+                Operator {
+                    name: "Shift",
+                    symbol: "shift",
+                    fixity: Prefix,
+                    inputs: vec![V, D],
+                    output: V,
+                    eval: s_shift,
+                },
+                Operator {
+                    name: "Gap",
+                    symbol: "gap",
+                    fixity: Prefix,
+                    inputs: vec![V, V],
+                    output: D,
+                    eval: s_gap,
+                },
+            ]
+        }
+        fn inhabitants(sort: Self::Sort) -> Vec<Self::Value> {
+            match sort {
+                SSort::V => (0..3).map(SVal::V).collect(),
+                SSort::D => (0..3).map(SVal::D).collect(),
+            }
+        }
+        fn sort_of(v: &Self::Value) -> Self::Sort {
+            match v {
+                SVal::V(_) => SSort::V,
+                SVal::D(_) => SSort::D,
+            }
+        }
+        fn observe(v: &Self::Value) -> Self::Obs {
+            match v {
+                SVal::V(n) => *n,
+                SVal::D(n) => 100 + *n,
+            }
+        }
+        fn grid_size() -> usize {
+            729 // = 3⁶, the whole space: bias and action are judged exhaustively.
+        }
+    }
+
+    /// The discovered prose of a theory, engine-level (no per-domain addenda — the census is
+    /// about what the ENGINE's battery can say).
+    fn discovered_prose<T: Theory>() -> Vec<String> {
+        Engine::<T>::new()
+            .discover()
+            .laws
+            .into_iter()
+            .map(|l| l.prose)
+            .collect()
+    }
+
+    /// CENSUS, direction one: every catalog shape FIRES at least once across the maximal
+    /// theories. A shape that never fires is stale — either its `templates()` twin was removed
+    /// or reworded without the catalog following, or the maximal theories lost the ingredient
+    /// that exhibits it.
+    #[test]
+    fn every_catalog_shape_fires_across_the_maximal_theories() {
+        let mut proses = discovered_prose::<MaxLogic>();
+        proses.extend(discovered_prose::<MaxSelect>());
+        for shape in ShapeCatalog::inventory() {
+            assert!(
+                proses.iter().any(|p| shape.matches(p)),
+                "catalog shape {:?} (template {:?}) fired on NO law of the maximal theories — \
+                 a stale catalog entry: align it with `templates()` (they must move together), \
+                 re-bless spec/shapes.spec, and ratify the diff. Discovered: {proses:#?}",
+                shape.name,
+                shape.template
+            );
+        }
+    }
+
+    /// CENSUS, direction two: every law discovered across EVERY registered theory in the crate
+    /// (plus the maximal ones) matches some catalog entry. A prose skeleton that escaped the
+    /// catalog is an UNRATIFIED template — it entered consumers' discovered specs without a
+    /// reviewed diff to spec/shapes.spec.
+    #[test]
+    fn every_discovered_law_in_the_crate_is_a_ratified_shape() {
+        use crate::discover::architect::{EscapeCodec, Reports};
+        use crate::discover::arithmetic::Arithmetic;
+        use crate::discover::coherence::{FirstMerge, GcdMerge, MaxMerge};
+        use crate::discover::date::Calendar;
+        use crate::discover::derived::{lattice::Lattice, tiers::Tiers};
+        use crate::discover::router::Router;
+        use crate::kvstore::theory::TtlStore;
+
+        let all: Vec<(&str, Vec<String>)> = vec![
+            ("interpreter arithmetic", discovered_prose::<Arithmetic>()),
+            ("router", discovered_prose::<Router>()),
+            ("date calculus", discovered_prose::<Calendar>()),
+            ("ttl store", discovered_prose::<TtlStore>()),
+            ("tri lattice", discovered_prose::<Lattice>()),
+            ("graded lattices", discovered_prose::<Tiers>()),
+            ("architect report", discovered_prose::<Reports>()),
+            ("lsp escape codec", discovered_prose::<EscapeCodec>()),
+            ("max-merge", discovered_prose::<MaxMerge>()),
+            ("gcd-merge", discovered_prose::<GcdMerge>()),
+            ("first-merge", discovered_prose::<FirstMerge>()),
+            ("maximal logic", discovered_prose::<MaxLogic>()),
+            ("maximal selection", discovered_prose::<MaxSelect>()),
+        ];
+        let inventory = ShapeCatalog::inventory();
+        for (theory, proses) in all {
+            for prose in proses {
+                assert!(
+                    inventory.iter().any(|s| s.matches(&prose)),
+                    "law {prose:?} (theory {theory:?}) matches NO catalog shape — an \
+                     unratified template escaped `templates()` into a discovered spec: add its \
+                     shape to `ShapeCatalog::inventory()` (they must move together), re-bless \
+                     spec/shapes.spec, and ratify the diff"
+                );
+            }
+        }
+    }
+
+    /// The template matcher itself has kill power: it accepts an instance of its own skeleton
+    /// and refuses prose from a different shape, a truncation, and a prefix-extended sentence —
+    /// so the census cannot be satisfied by a matcher mutated toward `true`.
+    #[test]
+    fn the_shape_matcher_accepts_instances_and_refuses_impostors() {
+        let inv = ShapeCatalog::inventory();
+        let shape = |n: &str| *inv.iter().find(|s| s.name == n).expect("shape by name");
+
+        let comm = shape("commutativity");
+        assert!(comm.matches("And gives the same result in either order."));
+        assert!(!comm.matches("And absorbs Or."), "a different shape");
+        assert!(
+            !comm.matches("And gives the same result"),
+            "a truncated skeleton is not an instance"
+        );
+        assert!(
+            !comm.matches("Oddly, And gives the same result in either order. Mostly."),
+            "the first fragment is a PREFIX and the last a SUFFIX — padding is refused"
+        );
+
+        // identity vs annihilation share their opening; the tails keep them apart.
+        let identity = shape("identity");
+        assert!(identity.matches("Multiplication with 1 leaves a value unchanged."));
+        assert!(!identity.matches("Multiplication by 0 always gives 0."));
+
+        // a hole spans multi-word operator names, so the census is robust to naming.
+        let irrefl = shape("irreflexivity");
+        assert!(irrefl.matches("A value is never less than itself."));
+    }
+
+    /// THE LOCK: the catalog's deterministic rendering matches the committed, ratified
+    /// `spec/shapes.spec` — the same spec-lock discipline as the theory specs, applied to the
+    /// law-language itself.
+    #[test]
+    fn the_committed_shape_catalog_is_fresh() {
+        let lock = ShapeCatalog::lock();
+        if spec_lock::check(std::slice::from_ref(&lock)).is_err() {
+            panic!(
+                "the shape catalog changed — a new/changed universal shape alters every \
+                 consumer's discovered spec; ratify spec/shapes.spec and note it in the \
+                 release contract. Regenerate with `cargo run --example freeze_shapes` and \
+                 put the diff through review."
+            );
         }
     }
 }

@@ -34,10 +34,10 @@ name = "boundary-algebra"
 version = "0.1.0"
 dependencies = [
  "boundary-algebra-macros",
+ "boundary-enforce",
  "proptest",
  "serde_json",
  "spec-lock",
- "syn",
  "trybuild",
  "typewit",
 ]
@@ -48,6 +48,13 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "syn",
+]
+
+[[package]]
+name = "boundary-enforce"
+version = "0.1.0"
+dependencies = [
  "syn",
 ]
 
