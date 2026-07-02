@@ -51,6 +51,11 @@
 //! detection). Both are crate-level grammar (`build.rs` exempts them from the structural
 //! rules), self-hosted by replacing their example tests with oracle-free property probes.
 
+// Let this crate refer to itself by its package name, so the proc macros
+// (`#[derive(Shaped)]`, `#[algebra]`) can emit `::boundary_algebra::…` paths that resolve
+// identically here and in a DOWNSTREAM crate — no consumer re-export shim needed.
+extern crate self as boundary_algebra;
+
 pub mod boundary;
 pub mod capability;
 pub mod discover;

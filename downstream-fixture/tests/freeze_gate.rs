@@ -41,13 +41,13 @@ fn the_committed_spec_is_fresh() {
 /// out. The lock file already gates the rendered text; this test additionally documents (and
 /// defends, one layer below the rendering) WHAT was discovered and what was refused:
 ///
-///   - `grant` is a commutative semigroup (saturating addition at the cap);
-///   - `renew` is a non-commutative band, and its BIAS is a stated law — the sandwich shape
-///     names the later operand as the winner;
-///   - `spend` satisfies NO universal shape: it appears in `uncovered_ops`, the spec's
-///     explicitly-named silence;
-///   - there is no `zero` constant in the signature (see `ops`' header for why), so no
-///     identity law can appear.
+///   - `grant` is a commutative monoid (saturating addition at the cap, `zero` identity);
+///   - `spend` is DIRECTIONAL and the spec says exactly how: deducting nothing is a no-op
+///     (`x spend zero = x`), an empty balance stays empty (`zero spend x = zero`) — and
+///     nothing more: no commutativity, no associativity. Order of deductions is semantics;
+///   - `renew` is a non-commutative band with `zero` as identity (a zero voucher is a
+///     no-op), and its BIAS is a stated law — the sandwich shape names the later operand
+///     as the winner. Its commutativity is refused.
 #[test]
 fn the_discovered_laws_are_exactly_the_ratified_ones() {
     let spec = Spec::of::<CreditMeter>();
@@ -67,6 +67,15 @@ fn the_discovered_laws_are_exactly_the_ratified_ones() {
             "((x grant y) grant z) = (x grant (y grant z))",
         ),
         (
+            "grant with zero leaves a value unchanged.",
+            "(zero grant x) = x",
+        ),
+        (
+            "spend with zero leaves a value unchanged.",
+            "(x spend zero) = x",
+        ),
+        ("spend by zero always gives zero.", "(zero spend x) = zero"),
+        (
             "With renew, the grouping of three values doesn't matter.",
             "((x renew y) renew z) = (x renew (y renew z))",
         ),
@@ -79,16 +88,21 @@ fn the_discovered_laws_are_exactly_the_ratified_ones() {
              earlier one cannot overwrite it.",
             "((x renew y) renew x) = (y renew x)",
         ),
+        (
+            "renew with zero leaves a value unchanged.",
+            "(zero renew x) = x",
+        ),
     ];
     let expected: Vec<(String, String)> = expected
         .into_iter()
         .map(|(p, e)| (p.to_string(), e.to_string()))
         .collect();
     assert_eq!(got, expected, "the discovered credit-meter algebra changed");
-    // the refusal is load-bearing: `spend` is the named silence, and nothing else is.
-    assert_eq!(
-        spec.uncovered_ops,
-        vec!["spend"],
-        "the operators the spec is silent about changed"
+    // with `zero` in the signature every operator participates in a law; the refusals
+    // (spend/renew commutativity, spend associativity) are the meaningful silences now.
+    assert!(
+        spec.uncovered_ops.is_empty(),
+        "uncovered: {:?}",
+        spec.uncovered_ops
     );
 }

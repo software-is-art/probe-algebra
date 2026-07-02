@@ -17,10 +17,11 @@
 //! * `spend`  — saturating deduction, floored at zero;
 //! * `renew`  — replace the balance with a voucher, except that a zero voucher is a no-op.
 //!
-//! Chosen so the discovered spec's SILENCES carry information: `grant` is a commutative
-//! semigroup, `renew` is a non-commutative band whose BIAS the sandwich law states ("the later
-//! operand wins"), and `spend` satisfies no universal shape at all — the engine refuses laws for
-//! it, and the lock's coverage line names it as the place human attention belongs.
+//! Chosen so the discovered spec's REFUSALS carry information: `grant` is a commutative
+//! monoid (`zero` identity), `renew` is a non-commutative band whose BIAS the sandwich law
+//! states ("the later operand wins"), and `spend` is directional — the spec grants it only
+//! its two `zero` laws and refuses commutativity and associativity, because the order of
+//! deductions is semantics.
 //!
 //! ## The pieces, and why each exists
 //!
@@ -47,25 +48,23 @@
 //!   freeze`): the ONE sanctioned writer of the lock file. Idempotent — run it twice, the
 //!   second run changes nothing.
 //!
-//! ## The re-export shim below (read this before copying)
+//! ## No shim required (a finding this fixture surfaced, now fixed)
 //!
-//! The `#[algebra]` proc-macro expands to paths spelled `crate::discover::engine::…` — hardcoded
-//! against the library's own module tree, since a proc-macro has no `$crate`. In a consumer
-//! crate `crate::` is the CONSUMER, so the expansion only resolves if the consumer re-exports
-//! the library's `discover` module at its own crate root:
+//! The `#[algebra]` and `#[derive(Shaped)]` proc-macros once expanded to `crate::…` paths and
+//! forced every consumer to re-export the library's modules at its own root. The library now
+//! aliases itself (`extern crate self as boundary_algebra;`) and the macros emit
+//! `::boundary_algebra::…`, which resolves identically in the library and in any consumer that
+//! depends on it under its package name — so this crate uses `#[algebra]` directly, with no
+//! re-export. (If you rename the dependency in your Cargo.toml, restore the alias with
+//! `extern crate boundary_algebra as <your-name>;` — or just don't rename it.)
 //!
-//! ```ignore
-//! pub use boundary_algebra::discover;   // required by #[algebra]'s expansion
-//! ```
+//! ## Edges work downstream too
 //!
-//! That is what the `pub use` below is — a wart this fixture documents rather than hides (the
-//! declarative macros `theory!` / `refined!` use `$crate` and need no shim; only the
-//! proc-macros carry this obligation). If you would rather not re-export, hand-write the
-//! `theory!` block instead — it is the same authoring surface, one explicit step down.
-
-/// The macro shim: `#[algebra]`'s generated code resolves `crate::discover::…` through this
-/// re-export. See the crate docs ("The re-export shim") for why a consumer needs it.
-pub use boundary_algebra::discover;
+//! [`meter`] mints a real entry edge — `ParseCredits`, a `Construction` registered with the
+//! library's own `value_object!` / `value_operator!` macros (public since the citizen/effect
+//! seal split) and carrying its `impl Probed`, which our build.rs's edge-probe completeness
+//! pass enforces exactly as the library's does. Only the four-level effect lattice remains
+//! sealed, because its laws are proven exhaustively over exactly those four levels.
 
 pub mod meter;
 pub mod ops;

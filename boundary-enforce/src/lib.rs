@@ -188,6 +188,10 @@ impl Enforcement {
         if let Some(spec_path) = &config.qualify_spec {
             rerun.push(spec_path.clone());
             if std::env::var(&config.bless_env).is_ok() {
+                if let Some(parent) = spec_path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .unwrap_or_else(|e| panic!("create {} ({e})", parent.display()));
+                }
                 std::fs::write(spec_path, &qualify_census)
                     .unwrap_or_else(|e| panic!("write {} ({e})", spec_path.display()));
             } else {
@@ -498,18 +502,40 @@ fn walk(
 /// operators are inside one), skipping test scaffolding like every other pass.
 fn check_loose_pub_fns(loc: &str, file: &syn::File, out: &mut Vec<String>) {
     let imports = std_effect_imports(&file.items);
-    fn go(loc: &str, items: &[Item], imports: &HashMap<String, String>, out: &mut Vec<String>) {
+    fn go(
+        loc: &str,
+        items: &[Item],
+        imports: &HashMap<String, String>,
+        in_algebra: bool,
+        out: &mut Vec<String>,
+    ) {
         for item in items {
             match item {
                 Item::Mod(m) if !is_cfg_test(&m.attrs) => {
                     if let Some((_, inner)) = &m.content {
-                        go(loc, inner, imports, out);
+                        // an `#[algebra]` module's public fns ARE its operator table — inside
+                        // one, an arity-0 fn returning a value type is a CONSTANT operator
+                        // (the identity/annihilator laws need it), not loose plumbing.
+                        let algebra = in_algebra
+                            || m.attrs.iter().any(|a| {
+                                a.path()
+                                    .segments
+                                    .last()
+                                    .is_some_and(|s| s.ident == "algebra")
+                            });
+                        go(loc, inner, imports, algebra, out);
                     }
                 }
                 Item::Fn(f)
                     if !is_cfg_test(&f.attrs) && matches!(f.vis, syn::Visibility::Public(_)) =>
                 {
-                    if operator_candidate(f, imports).is_none() {
+                    let constant_operator = in_algebra
+                        && f.sig.inputs.is_empty()
+                        && match &f.sig.output {
+                            syn::ReturnType::Type(_, ty) => named_value_type(ty).is_some(),
+                            syn::ReturnType::Default => false,
+                        };
+                    if !constant_operator && operator_candidate(f, imports).is_none() {
                         out.push(format!(
                             "{loc}: `pub fn {}` is a LOOSE public function — neither attached to \
                              a typestate nor operator-shaped. Make it a method/associated fn on \
@@ -523,7 +549,7 @@ fn check_loose_pub_fns(loc: &str, file: &syn::File, out: &mut Vec<String>) {
             }
         }
     }
-    go(loc, &file.items, &imports, out);
+    go(loc, &file.items, &imports, false, &mut *out);
 }
 
 /// The partition tiers — every source file declares exactly one (see `walk` for what each enforces).

@@ -6,17 +6,15 @@
 //! `Shaped` structure. Nothing about the algebra is declared here; the laws in
 //! `spec/credit-meter.spec` were all DISCOVERED by running these functions.
 //!
-//! Two consumer facts this file pins down:
+//! Two consumer facts this file pinned down as FINDINGS, both since fixed:
 //!
-//! * `#[algebra]` works downstream ONLY with the `pub use boundary_algebra::discover;` shim at
-//!   the consumer's crate root — its expansion hardcodes `crate::discover::…` paths (see
-//!   `lib.rs`, "The re-export shim").
-//! * A NULLARY constant operator (`pub fn zero() -> Credits`) is unauthorable on this path:
-//!   `#[algebra]` requires operators to be PUBLIC functions, but the rats-nest rule refuses a
-//!   public zero-argument function (an arity-0 constant is not operator-shaped to the census).
-//!   So this theory carries no `zero` constant and its identity laws go undiscovered — a real
-//!   gap between the macro and the enforcement, reported as a finding rather than worked
-//!   around. (`theory!` domains sidestep it: their eval functions are private.)
+//! * `#[algebra]` (and `#[derive(Shaped)]`) once expanded to `crate::…` paths and needed a
+//!   re-export shim at the consumer's root; the macros now emit `::boundary_algebra::…`
+//!   (the library aliases itself), so this module works downstream with no shim.
+//! * A NULLARY constant operator was unauthorable on this path — the rats-nest rule
+//!   refused any public zero-argument function. The rule now recognises a nullary fn
+//!   returning a value type INSIDE an `#[algebra]` module as a CONSTANT operator, so
+//!   `zero` below is authorable and the identity laws it unlocks are discovered.
 
 use boundary_algebra::algebra;
 
@@ -27,7 +25,12 @@ use boundary_algebra::algebra;
 pub mod meter_ops {
     use crate::meter::Credits;
 
-    /// Saturating top-up — discovered: commutative and associative.
+    /// The empty balance — the constant the identity laws need.
+    pub fn zero() -> Credits {
+        Credits::new(0).expect("zero is a valid balance")
+    }
+
+    /// Saturating top-up — discovered: commutative and associative, with `zero` as identity.
     pub fn grant(a: Credits, b: Credits) -> Credits {
         a.grant(b)
     }

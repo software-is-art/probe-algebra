@@ -8,17 +8,15 @@
 //! exactly the discipline the library enforces on its own `kvstore::store`. Boundary-hood is
 //! the declared tier plus the enforced shape, not a filename.
 //!
-//! CONSUMER NOTE (a finding this fixture exists to surface): the library's `refined!` /
-//! `value_object!` macros and its edge traits (`Morphism`, `Construction`, `Branch`,
-//! `Guarded`) are SEALED — `boundary::sealed` is `pub(crate)`, so a downstream crate cannot
-//! mint boundary citizens or edges at all. What a consumer CAN do, and what this file
-//! demonstrates, is keep the same shape by hand: a newtype over the primitive, a
-//! parse-don't-validate smart constructor whose predicate is the only content, operators as
-//! methods, and the structural rules held by `boundary-enforce` (which is purely syntactic and
-//! needs no marker traits). The discovery side (`Shaped`, `Theory`, `Spec`) is unsealed and
-//! fully available.
+//! CONSUMER NOTE: this fixture originally surfaced the finding that the citizen macros and
+//! edge traits were sealed shut to downstream crates. That is fixed — `boundary::citizen`
+//! is public (only the four-level EFFECT lattice stays truly sealed, because its laws are
+//! proven exhaustively), so the `value_object!` / `value_operator!` registrations and the
+//! `ParseCredits` Construction below are minted here, downstream, with the library's own
+//! macros — and our build.rs's edge-probe completeness pass now has a real obligation to
+//! enforce: delete the `impl Probed` below and this crate stops building.
 
-use boundary_algebra::boundary::Shaped;
+use boundary_algebra::boundary::{reconstructs, Construction, Probed, Pure, Shaped, Unit};
 
 /// The meter's ceiling: a balance is valid iff it lies in `0..=CAP`. The one number the whole
 /// domain pivots on — `grant` saturates to it, the validity rule quotes it, the shadow grid
@@ -57,9 +55,10 @@ impl Credits {
         crate::internal::grant(self, other)
     }
 
-    /// Deduct `other`, saturating at zero. Deliberately lawless: neither commutative nor
-    /// associative, so the engine refuses every shape for it and the spec's coverage line
-    /// names it — the silence is the signal.
+    /// Deduct `other`, saturating at zero. Directional by design: the discovered spec says
+    /// exactly how far its laws reach — deducting nothing is a no-op, an empty balance
+    /// stays empty — and refuses commutativity and associativity, because the order of
+    /// deductions is semantics. The refusals are the signal.
     pub fn spend(self, other: Credits) -> Credits {
         crate::internal::spend(self, other)
     }
@@ -92,5 +91,54 @@ impl Shaped for Credits {
             Credits(0),
         ];
         vec![neighbours.into_iter().filter(|c| c != self).collect()]
+    }
+}
+
+// ===== the entry edge: a Construction minted DOWNSTREAM ====================
+
+// Citizen registration, with the library's own macros — public since the citizen/effect
+// seal split (`boundary::citizen` is open; only the effect lattice stays sealed).
+boundary_algebra::value_object!(Credits);
+
+/// The entry edge: parse a raw `i64` into a valid balance — "parse, don't validate" as a
+/// probeable `Construction`, the same shape as the library's own `Parse`. A pure
+/// refinement: nothing is normalized away, so the residual is `Unit` and the round trip
+/// is exact.
+pub struct ParseCredits;
+boundary_algebra::value_operator!(ParseCredits);
+
+impl Construction for ParseCredits {
+    type Capability = Pure;
+    type Raw = i64;
+    type Refined = Credits;
+    type Residual = Unit;
+    fn parse(&self, raw: &i64) -> Option<(Credits, Unit)> {
+        Credits::new(*raw).map(|c| (c, Unit))
+    }
+    fn reconstruct(&self, refined: &Credits, _residual: &Unit) -> Option<i64> {
+        Some(refined.get())
+    }
+}
+
+impl Probed for ParseCredits {
+    /// The derived entry-edge laws, oracle-free, over a raw range that spans both ends
+    /// of validity: an ADMITTED raw must reconstruct exactly (`reconstructs`), and
+    /// admission must agree with the validity rule — so a constructor that silently
+    /// normalizes, widens, or narrows the range breaks the probe, not production.
+    fn probe() {
+        for raw in -3..=25 {
+            match reconstructs(&ParseCredits, &raw) {
+                Some(ok) => assert!(ok, "admitted raw {raw} must reconstruct exactly"),
+                None => assert!(
+                    Credits::new(raw).is_none(),
+                    "raw {raw} was rejected but is a valid balance"
+                ),
+            }
+            assert_eq!(
+                ParseCredits.parse(&raw).is_some(),
+                Credits::new(raw).is_some(),
+                "admission must agree with the validity rule at {raw}"
+            );
+        }
     }
 }
