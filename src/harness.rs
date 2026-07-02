@@ -633,99 +633,201 @@ mod registry {
         relation_laws(&CommutesAdd, binary(Op::Add));
     }
 
+    // `Eval`'s operand generator: the BOUNDED domain-shaped layer — small enough that the
+    // products in the probe cannot overflow `i64` (the evaluator and the independent check
+    // both compute `av * bv`), still compound (Add/Mul nesting) so the evaluator's
+    // recursion is exercised — crossed with the structure-derived base, so operands also
+    // arrive as `if`s, `let`s, bools, and variables the hand-shaped layer never builds.
+    // Draws that are open or not int-valued are inapplicable to the arithmetic pins; the
+    // probe guards on that and counts applications, `relation_laws`-style.
+    fn eval_operand() -> impl Strategy<Value = Expr> {
+        let bounded = {
+            let leaf = (0i64..=20).prop_map(|n| Expr::int(n).unwrap());
+            leaf.prop_recursive(2, 8, 2, |inner| {
+                prop_oneof![
+                    (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
+                    (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
+                ]
+            })
+        };
+        prop_oneof![
+            1 => shaped_strategy::<Expr>(SHAPE_CAP),
+            3 => bounded,
+        ]
+    }
+
     /// The evaluator's every arm, pinned ORACLE-FREE — each result compared to an
     /// INDEPENDENT computation (raw integer arithmetic / comparison, or the eval of the
     /// branch the construct names), so `Add`/`Mul`/`Lt`, the conditional, and `let`/`var`
     /// (incl. shadowing) are all certified WITHOUT a hand-written example. This is what lets
     /// the interpreter's evaluation be self-hosted: the apparatus suffices, the examples go.
+    /// Operands come from `eval_operand` — both the derived base and the bounded layer — so
+    /// the pins run over structure-derived shapes too; a draw that is not a closed int
+    /// (possible only from the derived arm) is inapplicable, and the probe guards the
+    /// application count so the arithmetic pins cannot go vacuous.
     impl Probed for Eval {
         fn probe() {
-            fn as_int(v: &Value) -> i64 {
-                match v {
-                    Value::Int(i) => i.get(),
-                    Value::Bool(_) => unreachable!("a closed int expr evaluates to an int"),
+            // a closed, int-valued operand's value — `None` marks an inapplicable draw
+            // (open, ill-typed, or bool-valued), which only the derived arm can produce.
+            fn as_closed_int(e: &Expr) -> Option<i64> {
+                match try_eval(e)? {
+                    Value::Int(i) => Some(i.get()),
+                    Value::Bool(_) => None,
                 }
             }
             let x = Ident::new("x").expect("valid identifier");
-            // BOUNDED operands: small enough that the products below cannot overflow `i64`
-            // (the evaluator and the independent check both compute `av * bv`). Still compound
-            // (Add/Mul nesting), so the evaluator's recursion is exercised, not just leaves.
-            let bounded = {
-                let leaf = (0i64..=20).prop_map(|n| Expr::int(n).unwrap());
-                leaf.prop_recursive(2, 8, 2, |inner| {
-                    prop_oneof![
-                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
-                        (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
-                    ]
-                })
-            };
+            let applied = core::cell::Cell::new(0u32);
             TestRunner::default()
-                .run(&(bounded.clone(), bounded.clone(), bounded), |(a, b, c)| {
-                    let (av, bv, cv) = (
-                        as_int(&eval_closed(&a)),
-                        as_int(&eval_closed(&b)),
-                        as_int(&eval_closed(&c)),
-                    );
-                    // arithmetic and comparison against the raw integer operations:
-                    prop_assert_eq!(
-                        eval_closed(&Expr::bin(Op::Add, a.clone(), b.clone())),
-                        Value::Int(Int::new(av + bv).unwrap())
-                    );
-                    prop_assert_eq!(
-                        eval_closed(&Expr::bin(Op::Mul, a.clone(), b.clone())),
-                        Value::Int(Int::new(av * bv).unwrap())
-                    );
-                    prop_assert_eq!(
-                        eval_closed(&Expr::bin(Op::Lt, a.clone(), b.clone())),
-                        Value::Bool(av < bv)
-                    );
-                    // the conditional selects the branch its (literal) condition names:
-                    prop_assert_eq!(
-                        eval_closed(&Expr::cond(Expr::boolean(true), a.clone(), b.clone())),
-                        eval_closed(&a)
-                    );
-                    prop_assert_eq!(
-                        eval_closed(&Expr::cond(Expr::boolean(false), a.clone(), b.clone())),
-                        eval_closed(&b)
-                    );
-                    // ... and a COMPUTED condition: `if (a < b) then b else c` against the
-                    // raw comparison choosing between the raw values. Literal conditions
-                    // alone would let an evaluator that mishandles a non-literal condition
-                    // (e.g. re-evaluating the wrong subtree) slip through this probe.
-                    prop_assert_eq!(
-                        eval_closed(&Expr::cond(
-                            Expr::bin(Op::Lt, a.clone(), b.clone()),
-                            b.clone(),
-                            c.clone()
-                        )),
-                        Value::Int(Int::new(if av < bv { bv } else { cv }).unwrap())
-                    );
-                    // `let` binds and `var` resolves: `let x = a in (x + c) == a + c`:
-                    prop_assert_eq!(
-                        eval_closed(&Expr::bind(
-                            x.clone(),
-                            a.clone(),
-                            Expr::bin(Op::Add, Expr::var(x.clone()), c.clone())
-                        )),
-                        Value::Int(Int::new(av + cv).unwrap())
-                    );
-                    // shadowing: the inner binding wins:
-                    prop_assert_eq!(
-                        eval_closed(&Expr::bind(
-                            x.clone(),
-                            a.clone(),
-                            Expr::bind(x.clone(), b.clone(), Expr::var(x.clone()))
-                        )),
-                        eval_closed(&b)
-                    );
-                    Ok(())
-                })
+                .run(
+                    &(eval_operand(), eval_operand(), eval_operand()),
+                    |(a, b, c)| {
+                        let (Some(av), Some(bv), Some(cv)) =
+                            (as_closed_int(&a), as_closed_int(&b), as_closed_int(&c))
+                        else {
+                            return Ok(()); // inapplicable draw; the count below guards vacuity
+                        };
+                        applied.set(applied.get() + 1);
+                        // arithmetic and comparison against the raw integer operations:
+                        prop_assert_eq!(
+                            eval_closed(&Expr::bin(Op::Add, a.clone(), b.clone())),
+                            Value::Int(Int::new(av + bv).unwrap())
+                        );
+                        prop_assert_eq!(
+                            eval_closed(&Expr::bin(Op::Mul, a.clone(), b.clone())),
+                            Value::Int(Int::new(av * bv).unwrap())
+                        );
+                        prop_assert_eq!(
+                            eval_closed(&Expr::bin(Op::Lt, a.clone(), b.clone())),
+                            Value::Bool(av < bv)
+                        );
+                        // the conditional selects the branch its (literal) condition names:
+                        prop_assert_eq!(
+                            eval_closed(&Expr::cond(Expr::boolean(true), a.clone(), b.clone())),
+                            eval_closed(&a)
+                        );
+                        prop_assert_eq!(
+                            eval_closed(&Expr::cond(Expr::boolean(false), a.clone(), b.clone())),
+                            eval_closed(&b)
+                        );
+                        // ... and a COMPUTED condition: `if (a < b) then b else c` against the
+                        // raw comparison choosing between the raw values. Literal conditions
+                        // alone would let an evaluator that mishandles a non-literal condition
+                        // (e.g. re-evaluating the wrong subtree) slip through this probe.
+                        prop_assert_eq!(
+                            eval_closed(&Expr::cond(
+                                Expr::bin(Op::Lt, a.clone(), b.clone()),
+                                b.clone(),
+                                c.clone()
+                            )),
+                            Value::Int(Int::new(if av < bv { bv } else { cv }).unwrap())
+                        );
+                        // `let` binds and `var` resolves: `let x = a in (x + c) == a + c`:
+                        prop_assert_eq!(
+                            eval_closed(&Expr::bind(
+                                x.clone(),
+                                a.clone(),
+                                Expr::bin(Op::Add, Expr::var(x.clone()), c.clone())
+                            )),
+                            Value::Int(Int::new(av + cv).unwrap())
+                        );
+                        // shadowing: the inner binding wins:
+                        prop_assert_eq!(
+                            eval_closed(&Expr::bind(
+                                x.clone(),
+                                a.clone(),
+                                Expr::bind(x.clone(), b.clone(), Expr::var(x.clone()))
+                            )),
+                            eval_closed(&b)
+                        );
+                        Ok(())
+                    },
+                )
                 .unwrap();
+            assert!(
+                applied.get() > 0,
+                "the arithmetic pins never fired: a vacuous probe"
+            );
         }
     }
     #[test]
     fn eval_semantics_are_probed() {
         Eval::probe();
+    }
+
+    // ===== generator COMPLETENESS: the generated space is derived AND checked ==========
+    //
+    // The thesis is "derived things can't have gaps" — and the probe GENERATORS were the
+    // exception: hand-curated strategies whose omissions no test could see (the `subst`
+    // capture bug hid behind exactly such an omission). The three tests below close that
+    // exception. The chain: `#[derive(Shaped)]` derives each type's perturbation surface →
+    // `shadow_grid` closes the inhabitant under it (variant swaps included) →
+    // `shaped_strategy` folds that grid into every probe's generator → these tests judge,
+    // with `std::mem::discriminant` (never a hand-written variant list — a hand list would
+    // just move the gap), that the chain and the hand-shaped layers it backs reach every
+    // constructor. A future `Expr::Match` enters the derive and therefore the requirement
+    // set of all three tests at once: the generated space cannot silently narrow — it
+    // fails HERE first.
+
+    /// The DERIVED space itself is discriminant-complete: every constructor that
+    /// `all_perturbations` can reach from the grid already appears in the grid. Both sides
+    /// of the comparison come from the type's own `Shaped` surface, so this test needs no
+    /// updating when a type grows — it guards the CAP (a cap too small to close over a new
+    /// variant fails) and the derive's variant-swap reach, for every probe input type.
+    #[test]
+    fn derived_space_reaches_every_constructor() {
+        use crate::discover::engine::shadow_grid;
+        use crate::interp::boundary::Lit;
+        assert!(grid_gaps(&shadow_grid::<Expr>(SHAPE_CAP)).is_empty());
+        assert!(grid_gaps(&shadow_grid::<Value>(SHAPE_CAP)).is_empty());
+        assert!(grid_gaps(&shadow_grid::<Op>(SHAPE_CAP)).is_empty());
+        assert!(grid_gaps(&shadow_grid::<Lit>(SHAPE_CAP)).is_empty());
+    }
+
+    /// The HAND-SHAPED layer is held to the derived yardstick: `var_expr` — the layer whose
+    /// omission of binder forms once hid the capture bug — must itself span every
+    /// constructor the shadow grid exhibits, because the deep, env-flavoured trees where a
+    /// capture-class bug lives are built HERE (the grid's values stay shallow, near the
+    /// inhabitant). Requirement set = the grid's discriminants; drawn set = deterministic
+    /// samples of the strategy. Re-narrowing `var_expr` (e.g. dropping its `let` arm)
+    /// fails this test on an ordinary run — no mutant, no luck, no bug needed.
+    #[test]
+    fn resolve_domain_generator_spans_the_derived_surface() {
+        let grid = crate::discover::engine::shadow_grid::<Expr>(SHAPE_CAP);
+        let missing = undrawn_discriminants(var_expr(), &grid, 2048);
+        assert!(
+            missing.is_empty(),
+            "Resolve's domain generator never builds these constructors: {:?}",
+            missing
+        );
+    }
+
+    /// The COMPOSED generators the probes actually draw from span the derived surface too —
+    /// the guard against unwiring: deleting a probe's derived-base arm (or starving its
+    /// weight to zero) re-opens the old gap silently unless something samples the real
+    /// strategy, so this does. `Eval`'s hand layer is deliberately narrow (closed bounded
+    /// Add/Mul, so the arithmetic pins are total on it) — its full-space coverage is
+    /// exactly what the derived arm contributes, and what this test would lose first.
+    #[test]
+    fn probe_generators_span_the_derived_surface() {
+        let grid = crate::discover::engine::shadow_grid::<Expr>(SHAPE_CAP);
+        for (edge, missing) in [
+            (
+                "Resolve",
+                undrawn_discriminants(resolve_expr(), &grid, 2048),
+            ),
+            ("Eval", undrawn_discriminants(eval_operand(), &grid, 2048)),
+            (
+                "Sampled (Parse/render)",
+                undrawn_discriminants(<Expr as Sampled>::sampled(), &grid, 2048),
+            ),
+        ] {
+            assert!(
+                missing.is_empty(),
+                "{} generator never draws these constructors: {:?}",
+                edge,
+                missing
+            );
+        }
     }
 
     /// NEGATIVE: `relation_holds` distinguishes holds / violated / inapplicable, so a
