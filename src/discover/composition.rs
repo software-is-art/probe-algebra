@@ -30,6 +30,33 @@ pub struct PipelineLaw {
     pub equation: String,
 }
 
+impl PipelineLaw {
+    /// Discover the end-to-end laws of a theory's transform pipelines. The discovery is an
+    /// associated function of the LAW it yields — the public surface is the value object, not a
+    /// loose function (the no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn discover<T: Theory>() -> Vec<Self> {
+        pipeline_laws::<T>()
+    }
+
+    /// Render the pipeline laws as a readable whole-program spec.
+    pub fn render<T: Theory>() -> String {
+        let laws = Self::discover::<T>();
+        let mut out = format!("module `{}`: ", T::name());
+        if laws.is_empty() {
+            out.push_str("no transform pipeline — no cross-module composite law.\n");
+            return out;
+        }
+        out.push_str("transform pipeline preserves structure end to end:\n");
+        for l in &laws {
+            out.push_str(&format!(
+                "  {} ∘ {}: {} → {} is a homomorphism — {}\n",
+                l.via[1], l.via[0], l.from_op, l.to_op, l.equation
+            ));
+        }
+        out
+    }
+}
+
 /// Apply a unary operator, threading partiality.
 fn apply1<T: Theory>(op: &Operator<T>, x: &T::Value) -> Option<T::Value> {
     (op.eval)(std::slice::from_ref(x))
@@ -54,8 +81,9 @@ fn unary<T: Theory>(op: &Operator<T>) -> Option<(T::Sort, T::Sort)> {
 /// conversions that compose across a sort (`h1 : s → t`, `h2 : t → u`) and end at a DIFFERENT sort
 /// than they start (`s ≠ u` — a genuine transform, not a round trip back home), verify that the
 /// composite `h2∘h1` carries a binary operator on `s` to one on `u` as a homomorphism, over the
-/// source grid. Each that holds is a whole-program law of that pipeline.
-pub fn pipeline_laws<T: Theory>() -> Vec<PipelineLaw> {
+/// source grid. Each that holds is a whole-program law of that pipeline. (Private — reached as
+/// `PipelineLaw::discover`.)
+fn pipeline_laws<T: Theory>() -> Vec<PipelineLaw> {
     let ops = T::operators();
     let mut laws = Vec::new();
 
@@ -108,24 +136,6 @@ pub fn pipeline_laws<T: Theory>() -> Vec<PipelineLaw> {
         }
     }
     laws
-}
-
-/// Render the pipeline laws as a readable whole-program spec.
-pub fn render<T: Theory>() -> String {
-    let laws = pipeline_laws::<T>();
-    let mut out = format!("module `{}`: ", T::name());
-    if laws.is_empty() {
-        out.push_str("no transform pipeline — no cross-module composite law.\n");
-        return out;
-    }
-    out.push_str("transform pipeline preserves structure end to end:\n");
-    for l in &laws {
-        out.push_str(&format!(
-            "  {} ∘ {}: {} → {} is a homomorphism — {}\n",
-            l.via[1], l.via[0], l.from_op, l.to_op, l.equation
-        ));
-    }
-    out
 }
 
 #[cfg(test)]
@@ -214,14 +224,14 @@ mod tests {
     /// source grid, not assumed.
     #[test]
     fn a_transform_pipeline_preserves_structure_end_to_end() {
-        let laws = pipeline_laws::<Stages>();
+        let laws = PipelineLaw::discover::<Stages>();
         assert_eq!(laws.len(), 1, "exactly the A→C composite: {laws:?}");
         let l = &laws[0];
         assert_eq!(l.via, vec!["hAB", "hBC"], "composed source-first");
         assert_eq!(l.from_op, "maxA");
         assert_eq!(l.to_op, "maxC");
         assert!(l.equation.contains("hBC∘hAB"));
-        assert!(render::<Stages>().contains("preserves structure end to end"));
+        assert!(PipelineLaw::render::<Stages>().contains("preserves structure end to end"));
     }
 
     /// When a stage is NOT a homomorphism, the composite is not reported — the law is checked, not
@@ -229,19 +239,19 @@ mod tests {
     #[test]
     fn a_broken_stage_yields_no_pipeline_law() {
         assert!(
-            pipeline_laws::<Broken>().is_empty(),
+            PipelineLaw::discover::<Broken>().is_empty(),
             "a non-homomorphic stage must not produce a composite law"
         );
-        assert!(render::<Broken>().contains("no transform pipeline"));
+        assert!(PipelineLaw::render::<Broken>().contains("no transform pipeline"));
     }
 
     /// Theories with no chained conversions have no pipeline law — arithmetic and the router have no
     /// unary transforms at all, so there is nothing to compose. No false positives.
     #[test]
     fn theories_without_pipelines_report_none() {
-        assert!(pipeline_laws::<Arithmetic>().is_empty());
-        assert!(pipeline_laws::<Router>().is_empty());
-        assert!(render::<Router>().contains("no transform pipeline"));
+        assert!(PipelineLaw::discover::<Arithmetic>().is_empty());
+        assert!(PipelineLaw::discover::<Router>().is_empty());
+        assert!(PipelineLaw::render::<Router>().contains("no transform pipeline"));
     }
 
     /// `binary_on` requires ALL of: two inputs, both of the sort, output of the sort. Pins every

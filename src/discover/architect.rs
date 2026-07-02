@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use super::scaffold::{scaffold, Scaffold};
+use super::scaffold::Scaffold;
 use crate::discover::arithmetic::Arithmetic;
 use crate::discover::date::Calendar;
 use crate::discover::engine::Theory;
@@ -67,7 +67,7 @@ struct Entry {
 /// The theories the architect analyses (the crate's real discovery domains).
 fn registry() -> Vec<Entry> {
     fn s<T: Theory>() -> Option<Scaffold> {
-        scaffold::<T>()
+        Scaffold::of::<T>()
     }
     vec![
         Entry {
@@ -107,54 +107,69 @@ fn theory_line(file: &str) -> usize {
         .unwrap_or(1)
 }
 
-/// Analyse the registry and produce a finding (diagnostic + scaffold code action) for every module
-/// whose discovered algebra DECOMPOSES — the cohesive ones produce nothing, exactly as an editor
-/// would surface a hint only where there is something to act on.
-pub fn analyze() -> Vec<Finding> {
-    let mut findings = Vec::new();
-    for e in registry() {
-        let Some(sc) = (e.scaffold)() else {
-            continue;
-        };
-        let edits = sc
-            .modules
-            .iter()
-            .enumerate()
-            .map(|(i, m)| FileEdit {
-                path: format!("{}/module{i}.rs", e.out_dir),
-                contents: m.source.clone(),
-            })
-            .collect();
-        let seams: Vec<&str> = sc
-            .seams
-            .iter()
-            .map(|s| match s.kind {
-                super::cohesion::SeamKind::Transport => "transport",
-                super::cohesion::SeamKind::Transform => "transform",
-            })
-            .collect();
-        findings.push(Finding {
-            name: e.name.to_string(),
-            diagnostic: Diagnostic {
-                file: e.file.to_string(),
-                line: theory_line(e.file),
-                severity: Severity::Hint,
-                message: format!(
-                    "`{}` is secretly {} modules — its algebra decomposes (seam: {}). Consider splitting.",
-                    e.name,
-                    sc.modules.len(),
-                    seams.join(", ")
-                ),
-            },
-            action: CodeAction {
-                title: format!("Split `{}` into {} modules", e.name, sc.modules.len()),
-                edits,
-            },
-        });
+/// The architect tool itself, as a TYPESTATE — the surface its analysis, serialisation, and
+/// auto-apply hang off, so the tool's public callables are associated functions of the tool's
+/// value object, not loose ones (the no-rats-nest rule: every public callable hangs off a
+/// typestate).
+pub struct Architect;
+
+impl Architect {
+    /// Analyse the registry and produce a finding (diagnostic + scaffold code action) for every module
+    /// whose discovered algebra DECOMPOSES — the cohesive ones produce nothing, exactly as an editor
+    /// would surface a hint only where there is something to act on. The analysis is an associated
+    /// function of the TOOL — the public surface is the typestate, not a loose function (the
+    /// no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn analyze() -> Vec<Finding> {
+        let mut findings = Vec::new();
+        for e in registry() {
+            let Some(sc) = (e.scaffold)() else {
+                continue;
+            };
+            let edits = sc
+                .modules
+                .iter()
+                .enumerate()
+                .map(|(i, m)| FileEdit {
+                    path: format!("{}/module{i}.rs", e.out_dir),
+                    contents: m.source.clone(),
+                })
+                .collect();
+            let seams: Vec<&str> = sc
+                .seams
+                .iter()
+                .map(|s| match s.kind {
+                    super::cohesion::SeamKind::Transport => "transport",
+                    super::cohesion::SeamKind::Transform => "transform",
+                })
+                .collect();
+            findings.push(Finding {
+                name: e.name.to_string(),
+                diagnostic: Diagnostic {
+                    file: e.file.to_string(),
+                    line: theory_line(e.file),
+                    severity: Severity::Hint,
+                    message: format!(
+                        "`{}` is secretly {} modules — its algebra decomposes (seam: {}). Consider splitting.",
+                        e.name,
+                        sc.modules.len(),
+                        seams.join(", ")
+                    ),
+                },
+                action: CodeAction {
+                    title: format!("Split `{}` into {} modules", e.name, sc.modules.len()),
+                    edits,
+                },
+            });
+        }
+        findings
     }
-    findings
 }
 
+/// Escape a string to its RFC 8259 wire form: `"` and `\` and the three whitespace controls take
+/// their short escapes; every OTHER C0 control (U+0000–U+001F, which raw JSON forbids outright)
+/// takes the generic `\u00XX` form. Deliberately a PER-CHARACTER map — each char's wire form is
+/// independent of its neighbours — so `esc` is a monoid homomorphism over concatenation, exactly
+/// the law the `EscapeCodec` theory discovers below.
 fn esc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -166,6 +181,9 @@ fn esc(s: &str) -> String {
             // ESCAPED, not dropped: `esc` must be INVERTIBLE or the engine refuses the codec
             // round-trip below (a dropping escaper loses `\r` and `unesc(esc(s)) != s`).
             '\r' => out.push_str("\\r"),
+            // the REMAINING C0 controls (`\x08`, `\x0c`, ...): RFC 8259 forbids every one of
+            // them raw, so each becomes `\u00XX` — still a fixed per-character map.
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
             _ => out.push(c),
         }
     }
@@ -185,6 +203,19 @@ fn unesc(s: &str) -> String {
                 Some('n') => out.push('\n'),
                 Some('t') => out.push('\t'),
                 Some('r') => out.push('\r'),
+                // exactly what `esc` emits for the remaining C0 controls: `\u` then four hex
+                // digits. A malformed tail (not `esc` output) is kept literally — `unesc` is
+                // total, and on `esc`'s image this arm is the exact inverse of `\u00XX`.
+                Some('u') => {
+                    let hex: String = chars.by_ref().take(4).collect();
+                    match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                        Some(decoded) if hex.len() == 4 => out.push(decoded),
+                        _ => {
+                            out.push_str("\\u");
+                            out.push_str(&hex);
+                        }
+                    }
+                }
                 Some(other) => out.push(other),
                 None => out.push('\\'),
             }
@@ -195,52 +226,54 @@ fn unesc(s: &str) -> String {
     out
 }
 
-/// Serialise the findings to the LSP JSON an editor consumes: a `diagnostics` array and a
-/// `codeActions` array (each action a `refactor.extract` whose `documentChanges` create the files).
-pub fn render_lsp(findings: &[Finding]) -> String {
-    let diags: Vec<String> = findings
-        .iter()
-        .map(|f| {
-            let d = &f.diagnostic;
-            let line = d.line.saturating_sub(1);
-            format!(
-                "{{\"uri\":\"{}\",\"range\":{{\"start\":{{\"line\":{line},\"character\":0}},\
-                 \"end\":{{\"line\":{line},\"character\":0}}}},\"severity\":{},\
-                 \"source\":\"architect\",\"message\":\"{}\"}}",
-                esc(&d.file),
-                d.severity as u8,
-                esc(&d.message)
-            )
-        })
-        .collect();
-    let actions: Vec<String> = findings
-        .iter()
-        .map(|f| {
-            let changes: Vec<String> = f
-                .action
-                .edits
-                .iter()
-                .map(|e| {
-                    format!(
-                        "{{\"kind\":\"create\",\"uri\":\"{}\",\"text\":\"{}\"}}",
-                        esc(&e.path),
-                        esc(&e.contents)
-                    )
-                })
-                .collect();
-            format!(
-                "{{\"title\":\"{}\",\"kind\":\"refactor.extract\",\
-                 \"edit\":{{\"documentChanges\":[{}]}}}}",
-                esc(&f.action.title),
-                changes.join(",")
-            )
-        })
-        .collect();
-    format!(
-        "{{\"diagnostics\":[{}],\"codeActions\":[{}]}}",
-        diags.join(","),
-        actions.join(",")
-    )
+impl Architect {
+    /// Serialise the findings to the LSP JSON an editor consumes: a `diagnostics` array and a
+    /// `codeActions` array (each action a `refactor.extract` whose `documentChanges` create the files).
+    pub fn render_lsp(findings: &[Finding]) -> String {
+        let diags: Vec<String> = findings
+            .iter()
+            .map(|f| {
+                let d = &f.diagnostic;
+                let line = d.line.saturating_sub(1);
+                format!(
+                    "{{\"uri\":\"{}\",\"range\":{{\"start\":{{\"line\":{line},\"character\":0}},\
+                     \"end\":{{\"line\":{line},\"character\":0}}}},\"severity\":{},\
+                     \"source\":\"architect\",\"message\":\"{}\"}}",
+                    esc(&d.file),
+                    d.severity as u8,
+                    esc(&d.message)
+                )
+            })
+            .collect();
+        let actions: Vec<String> = findings
+            .iter()
+            .map(|f| {
+                let changes: Vec<String> = f
+                    .action
+                    .edits
+                    .iter()
+                    .map(|e| {
+                        format!(
+                            "{{\"kind\":\"create\",\"uri\":\"{}\",\"text\":\"{}\"}}",
+                            esc(&e.path),
+                            esc(&e.contents)
+                        )
+                    })
+                    .collect();
+                format!(
+                    "{{\"title\":\"{}\",\"kind\":\"refactor.extract\",\
+                     \"edit\":{{\"documentChanges\":[{}]}}}}",
+                    esc(&f.action.title),
+                    changes.join(",")
+                )
+            })
+            .collect();
+        format!(
+            "{{\"diagnostics\":[{}],\"codeActions\":[{}]}}",
+            diags.join(","),
+            actions.join(",")
+        )
+    }
 }
 
 /// `apply` is the architect's one EFFECTFUL edge — everything else here (the analysis, the codec)
@@ -257,33 +290,35 @@ fn confined(rel: &Path) -> bool {
             .any(|c| c == std::path::Component::ParentDir)
 }
 
-/// Apply a code action: write every created file under `root`. Returns the paths written. This is
-/// the "auto-apply" — the scaffolded skeletons land on disk; the developer (or an agent) then moves
-/// the operator functions in and names the modules.
-///
-/// The effect is BOUNDED to `root`: an edit whose path escapes it (absolute, or via `..`) is
-/// rejected rather than written, so the declared `Effectful`-confined-to-`root` capability is real,
-/// not a vacuous claim.
-///
-/// Capability: Effectful — writes files to disk (confined to `root`; see `APPLY_CAPABILITY`).
-pub fn apply(action: &CodeAction, root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
-    let mut written = Vec::new();
-    for e in &action.edits {
-        let rel = Path::new(&e.path);
-        if !confined(rel) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("edit path `{}` escapes the root", e.path),
-            ));
+impl Architect {
+    /// Apply a code action: write every created file under `root`. Returns the paths written. This is
+    /// the "auto-apply" — the scaffolded skeletons land on disk; the developer (or an agent) then moves
+    /// the operator functions in and names the modules.
+    ///
+    /// The effect is BOUNDED to `root`: an edit whose path escapes it (absolute, or via `..`) is
+    /// rejected rather than written, so the declared `Effectful`-confined-to-`root` capability is real,
+    /// not a vacuous claim.
+    ///
+    /// Capability: Effectful — writes files to disk (confined to `root`; see `APPLY_CAPABILITY`).
+    pub fn apply(action: &CodeAction, root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
+        let mut written = Vec::new();
+        for e in &action.edits {
+            let rel = Path::new(&e.path);
+            if !confined(rel) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("edit path `{}` escapes the root", e.path),
+                ));
+            }
+            let path = root.join(rel);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&path, &e.contents)?;
+            written.push(path);
         }
-        let path = root.join(rel);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(&path, &e.contents)?;
-        written.push(path);
+        Ok(written)
     }
-    Ok(written)
 }
 
 // ----- the architect's OWN algebra: a report is a join-semilattice ----------
@@ -301,15 +336,17 @@ use std::collections::BTreeSet;
 pub struct Report(BTreeSet<String>);
 
 impl Report {
+    /// The architect's output AS a value object — the set of flagged modules from one analysis
+    /// run. An associated function of the value object it yields (the no-rats-nest rule: every
+    /// public callable hangs off a typestate).
+    pub fn of() -> Report {
+        Report(Architect::analyze().into_iter().map(|f| f.name).collect())
+    }
+
     /// The flagged module names, sorted.
     pub fn flagged(&self) -> Vec<String> {
         self.0.iter().cloned().collect()
     }
-}
-
-/// The architect's output AS a value object — the set of flagged modules from one analysis run.
-pub fn report() -> Report {
-    Report(analyze().into_iter().map(|f| f.name).collect())
 }
 
 /// The report theory's single sort.
@@ -357,10 +394,11 @@ crate::theory! {
 //     forced `\r` to be escaped rather than dropped: the round-trip would not hold otherwise).
 //
 // What the algebra does NOT determine is the ENCODING — which character maps to which escape. That
-// is a representation CONVENTION (conformance to the JSON wire standard), not a law: many invertible
-// homomorphisms exist (the identity is one), so the specific arms `'\t' => "\\t"` … are a LEAF the
-// laws cannot derive. The in-format model thus locates the irreducible bit precisely: the codec
-// STRUCTURE is discovered; the encoding is an oracle pinned by `esc_conforms_to_the_json_encoding`.
+// is a representation CONVENTION (conformance to the RFC 8259 JSON wire standard), not a law: many
+// invertible homomorphisms exist (the identity is one), so the specific arms `'\t' => "\\t"` … and
+// the `\u00XX` form for the remaining C0 controls are a LEAF the laws cannot derive. The in-format
+// model thus locates the irreducible bit precisely: the codec STRUCTURE is discovered; the encoding
+// is an oracle pinned by `esc_conforms_to_the_json_encoding`.
 
 /// The escape codec's single sort.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -377,7 +415,9 @@ fn esc_op(v: &[String]) -> Option<String> {
 fn unesc_op(v: &[String]) -> Option<String> {
     Some(unesc(&v[0]))
 }
-/// One inhabitant per escape arm, plus plain text AND already-escaped SEQUENCES (`\n` as the two
+/// One inhabitant per short-form escape arm (the generic `\u00XX` C0 arm is pinned by the
+/// `esc_conforms_to_the_json_encoding` oracle instead — the laws hold either way, so the grid
+/// stays minimal), plus plain text AND already-escaped SEQUENCES (`\n` as the two
 /// chars backslash-n, a trailing backslash). The sequences matter: without them the grid is too weak
 /// and discovery over-fits — `unesc` looks like an involution and a homomorphism (it is neither);
 /// the sequences refute both, leaving only the TRUE laws (esc homomorphism, the codec round-trip,
@@ -408,7 +448,7 @@ crate::theory! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::discover::cohesion::cohesion;
+    use crate::discover::cohesion::CohesionReport;
     use crate::discover::engine::Engine;
 
     /// The architect surfaces a finding for every DECOMPOSABLE module and none for the cohesive
@@ -416,7 +456,7 @@ mod tests {
     /// router is cohesive, so it is silent.
     #[test]
     fn it_surfaces_findings_only_for_decomposable_modules() {
-        let f = analyze();
+        let f = Architect::analyze();
         let named: Vec<&str> = f.iter().map(|x| x.diagnostic.message.as_str()).collect();
         assert!(named
             .iter()
@@ -439,7 +479,7 @@ mod tests {
     /// The diagnostic points at the `theory!` declaration line, not the top of the file.
     #[test]
     fn the_diagnostic_points_at_the_theory_declaration() {
-        let date = analyze()
+        let date = Architect::analyze()
             .into_iter()
             .find(|f| f.diagnostic.message.contains("date calculus"))
             .expect("date finding");
@@ -491,25 +531,42 @@ mod tests {
             "uncovered: {:?}",
             d.uncovered_ops
         );
-        assert_eq!(d.consequences, 43, "consequence count changed");
+        assert_eq!(d.consequences, 39, "consequence count changed");
     }
 
     /// The codec STRUCTURE is discovered (above); the ENCODING is not a law — many invertible
     /// homomorphisms exist, so which character maps to which escape is a representation CONVENTION,
-    /// conformance to the JSON wire standard. This is the irreducible leaf the algebra cannot
-    /// derive, pinned here as an oracle (and pinning every `esc` arm against deletion).
+    /// conformance to the RFC 8259 JSON wire standard. This is the irreducible leaf the algebra
+    /// cannot derive, pinned here as an oracle (and pinning every `esc` arm against deletion) —
+    /// including the standard's blanket rule that EVERY C0 control (U+0000–U+001F), not just the
+    /// five with short forms, must be escaped.
     #[test]
     fn esc_conforms_to_the_json_encoding() {
         assert_eq!(esc("a\"b\\c\nd\te\rf"), "a\\\"b\\\\c\\nd\\te\\rf");
         // and it round-trips through `unesc` — invertibility, including the once-dropped `\r`.
         assert_eq!(unesc(&esc("a\"b\\c\nd\te\rf")), "a\"b\\c\nd\te\rf");
+        // the controls WITHOUT short forms take the generic `\u00XX` escape (the once-raw leak).
+        assert_eq!(
+            esc("\u{0}a\u{8}b\u{c}c\u{1f}"),
+            "\\u0000a\\u0008b\\u000cc\\u001f"
+        );
+        // and EVERY C0 control leaves no raw control byte on the wire and round-trips exactly.
+        for c in '\u{0}'..='\u{1f}' {
+            let s = c.to_string();
+            let wire = esc(&s);
+            assert!(
+                wire.chars().all(|w| w as u32 >= 0x20),
+                "raw control {c:?} leaked into the wire form {wire:?}"
+            );
+            assert_eq!(unesc(&wire), s, "control {c:?} must round-trip");
+        }
     }
 
     /// `render_lsp` emits the LSP payloads an editor consumes — a Hint (severity 4) diagnostic and a
     /// `refactor.extract` code action whose documentChange CREATES the scaffolded module file.
     #[test]
     fn it_renders_lsp_json() {
-        let json = render_lsp(&analyze());
+        let json = Architect::render_lsp(&Architect::analyze());
         assert!(json.contains("\"diagnostics\":["));
         assert!(json.contains("\"severity\":4"));
         assert!(json.contains("\"source\":\"architect\""));
@@ -546,11 +603,11 @@ mod tests {
             "associativity"
         );
         assert!(
-            cohesion::<Reports>().is_cohesive(),
+            CohesionReport::of::<Reports>().is_cohesive(),
             "the architect itself is one algebra"
         );
-        // and `report()` yields the architect's output as that value object.
-        assert!(report().flagged().iter().any(|n| n == "date calculus"));
+        // and `Report::of()` yields the architect's output as that value object.
+        assert!(Report::of().flagged().iter().any(|n| n == "date calculus"));
     }
 
     /// `apply` writes the scaffolded files to disk — the auto-apply — and its effect is CONFINED to
@@ -558,12 +615,12 @@ mod tests {
     /// capability, made real). Uses the scratch dir.
     #[test]
     fn apply_writes_the_split_files_confined_to_root() {
-        let date = analyze()
+        let date = Architect::analyze()
             .into_iter()
             .find(|f| f.diagnostic.message.contains("date calculus"))
             .expect("date finding");
         let dir = std::env::temp_dir().join(format!("architect-test-{}", std::process::id()));
-        let written = apply(&date.action, &dir).expect("write");
+        let written = Architect::apply(&date.action, &dir).expect("write");
         assert_eq!(written.len(), date.action.edits.len());
         assert_eq!(APPLY_CAPABILITY, crate::boundary::Capability::Effectful);
         // CONFINEMENT: every write stayed under the root — the effect is bounded as declared.
@@ -590,7 +647,7 @@ mod tests {
                 }],
             };
             assert!(
-                apply(&action, &dir).is_err(),
+                Architect::apply(&action, &dir).is_err(),
                 "escaping path `{bad}` should be rejected"
             );
         }

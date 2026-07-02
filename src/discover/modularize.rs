@@ -29,7 +29,7 @@
 use std::collections::BTreeSet;
 
 use super::engine::{Engine, Term, Theory};
-use super::layering::layering;
+use super::layering::LayeringReport;
 
 /// One proposed module read off the bag: the functions that cluster together, how many discovered
 /// laws bind them, and whether the cluster is internally atomic or sprawling.
@@ -58,6 +58,36 @@ pub struct Proposal {
 }
 
 impl Proposal {
+    /// Propose a modular decomposition of a theory's (flat) algebra. The analysis is an
+    /// associated function of its PROPOSAL — the public surface is the value object, not a
+    /// loose function (the no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn of<T: Theory>() -> Self {
+        modularize::<T>()
+    }
+
+    /// Render the proposal as a readable suggestion — the shapes ranked, the misfits named.
+    pub fn render(&self) -> String {
+        let mut out = format!("bag `{}` → proposed decomposition:\n", self.theory);
+        for (i, m) in self.modules.iter().filter(|m| m.is_shape()).enumerate() {
+            let layer = if m.atomic { "atomic" } else { "layered" };
+            out.push_str(&format!(
+                "  shape {i}: {{ {} }} — {} law(s), {layer}\n",
+                m.operators.join(", "),
+                m.laws
+            ));
+        }
+        let misfits = self.misfits();
+        if misfits.is_empty() {
+            out.push_str("  no misfits — every function found a shape.\n");
+        } else {
+            out.push_str(&format!(
+                "  misfits (bound by no law — left unstructured): {}\n",
+                misfits.join(", ")
+            ));
+        }
+        out
+    }
+
     /// The proposed shapes — clusters that carry at least one law, best first.
     pub fn shapes(&self) -> Vec<&ProposedModule> {
         self.modules.iter().filter(|m| m.is_shape()).collect()
@@ -85,10 +115,11 @@ fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
 
 /// Propose a modular decomposition of a theory's (flat) algebra. Partition by law-connectivity, score
 /// each cluster by the laws it holds, mark its tightness, and rank the shapes ahead of the misfits.
-pub fn modularize<T: Theory>() -> Proposal {
+/// (Private — reached as `Proposal::of`.)
+fn modularize<T: Theory>() -> Proposal {
     let engine = Engine::<T>::new();
     let sigs = engine.signatures();
-    let layers = layering::<T>();
+    let layers = LayeringReport::of::<T>();
 
     // score: how many discovered laws live entirely inside each component. Because the components are
     // the law-connectivity clusters, every law's operators fall wholly within exactly one — so a law
@@ -128,30 +159,6 @@ pub fn modularize<T: Theory>() -> Proposal {
         theory: T::name(),
         modules,
     }
-}
-
-/// Render the proposal as a readable suggestion — the shapes ranked, the misfits named.
-pub fn render<T: Theory>() -> String {
-    let p = modularize::<T>();
-    let mut out = format!("bag `{}` → proposed decomposition:\n", p.theory);
-    for (i, m) in p.modules.iter().filter(|m| m.is_shape()).enumerate() {
-        let layer = if m.atomic { "atomic" } else { "layered" };
-        out.push_str(&format!(
-            "  shape {i}: {{ {} }} — {} law(s), {layer}\n",
-            m.operators.join(", "),
-            m.laws
-        ));
-    }
-    let misfits = p.misfits();
-    if misfits.is_empty() {
-        out.push_str("  no misfits — every function found a shape.\n");
-    } else {
-        out.push_str(&format!(
-            "  misfits (bound by no law — left unstructured): {}\n",
-            misfits.join(", ")
-        ));
-    }
-    out
 }
 
 /// A deliberately PATHOLOGICAL flat bag: four functions over three unrelated value types, all dumped
@@ -221,7 +228,7 @@ mod tests {
     /// laws.
     #[test]
     fn it_selects_the_hidden_shapes_and_flags_the_misfit() {
-        let p = modularize::<Soup>();
+        let p = Proposal::of::<Soup>();
         let shapes = p.shapes();
         assert_eq!(
             shapes.len(),
@@ -259,7 +266,7 @@ mod tests {
     /// sort and the shape/misfit split against a flipped comparison.
     #[test]
     fn shapes_are_ranked_by_richness_above_the_misfits() {
-        let p = modularize::<Soup>();
+        let p = Proposal::of::<Soup>();
         // shapes carry laws, misfit modules carry none.
         assert!(p
             .modules
@@ -284,7 +291,7 @@ mod tests {
     /// against the layering report.
     #[test]
     fn the_proposed_shapes_are_atomic() {
-        let p = modularize::<Soup>();
+        let p = Proposal::of::<Soup>();
         assert!(
             p.shapes().iter().all(|m| m.atomic),
             "both hidden algebras are single tight layers"
@@ -295,7 +302,7 @@ mod tests {
     /// left unstructured.
     #[test]
     fn the_report_renders_readably() {
-        let text = render::<Soup>();
+        let text = Proposal::of::<Soup>().render();
         assert!(text.contains("bag `flat soup`"));
         assert!(text.contains("shape 0: { both, either } — 10 law(s), atomic"));
         assert!(text.contains("shape 1: { peak } — 3 law(s), atomic"));

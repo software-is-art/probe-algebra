@@ -63,12 +63,14 @@ by probes, and the probes are checked by mutation:
 - the **autogen harness** registers each edge once and gets its whole suite generically — the
   parse round-trip, the capability/residual laws, `ConstFold`'s fold-preserves-value law,
   `Resolve`'s two-route law, and `eval_semantics_are_probed`, which pins every evaluator arm
-  oracle-free against an independent computation — so evaluation needs *no hand-written examples*.
+  oracle-free against an independent computation — so evaluation needs *no hand-written
+  examples* (the disclosed exceptions — the grammar-combinator exercises and one
+  witness-threading demo — pin the plumbing, not the arithmetic).
 - **value laws are *discovered* by a generic engine, not declared** — a domain implements one trait,
   `discover::engine::Theory` (its sorts, operators, a grid of inhabitants, and an OBSERVATION on
   values), and the engine ENUMERATES terms over the operators, groups them by behaviour on the grid,
   instantiates the universal algebraic shapes over the operators (identity, commutativity,
-  associativity, annihilation, idempotence, distributivity, absorption, involution, round-trip, and
+  associativity, annihilation, idempotence, the regular-band bias laws, distributivity, absorption, involution, round-trip, and
   the heterogeneous shapes — monoid action and homomorphism), and keeps the
   ones that run true — counting the rest as consequences and reporting operators in no law (**where
   the spec is silent**). It is not arithmetic-specific: the same engine discovers the interpreter's
@@ -126,9 +128,12 @@ The discipline runs on *every* runtime module. `select` (the kill-matrix selecto
 structural self-host; `gdp` and `capability` are self-hosted by *verification* — example tests
 replaced with oracle-free property probes (`permute ∘ unpermute == id`, the liveness rule, the
 audit's claim/behaviour reconciliation), kept in the sweep. And `gdp` is load-bearing: `select`
-reads its matrix through gdp's `InBounds` proof, so an index proven for one matrix can't index
-another and an out-of-range read is a type error, not a panic — the same proof-carrying that
-makes `Eval` uncallable without `Check`'s witness, lifted to a *relation between two values*.
+reads its matrix through gdp's `InBounds` proof, which *holds the matrix's borrow* — a proof
+minted for one matrix cannot read another, and an unproven read is not writable at all — the
+same proof-carrying that makes `Eval` uncallable without `Check`'s witness, lifted to a
+*relation between two values*. (An honest redesign lives here: a proof keyed only on a phantom
+brand was not value-unique — a region brands many values — so the proofs now carry the borrow;
+the brand carries provenance, the borrow carries identity.)
 
 Once the abstraction certifies itself:
 

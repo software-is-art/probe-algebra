@@ -5,8 +5,8 @@
 //! or `run_within::<Lossy, _>`.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use boundary_algebra::boundary::run_pure;
-use boundary_algebra::interp::boundary::{ConstFold, Expr};
+use boundary_spec::boundary::run_pure;
+use boundary_spec::interp::boundary::{ConstFold, Expr};
 
 fn main() {
     let e = Expr::int(2).unwrap();

@@ -6,11 +6,11 @@
 //! directly: an edge that UNDER-declares `Pure` over a `Bound` input is rejected on STRUCTURE, not
 //! on its (lie-able) annotation — the hidden state dependency is a compile error. (The over-claim
 //! direction is a negative the type system can't express, so it stays the behavioural audit's job;
-//! and `ValueOperator` is sealed, so a downstream crate cannot even mint an edge that lies here.)
+//! and the check reads the INPUT type, not the annotation, so a downstream edge cannot lie here.)
 #![allow(dead_code)]
 
-use boundary_algebra::boundary::{AtMost, InputEffect, Pure};
-use boundary_algebra::interp::boundary::Bound;
+use boundary_spec::boundary::{AtMost, InputEffect, Pure};
+use boundary_spec::interp::boundary::Bound;
 
 /// The exact floor `run_pure` demands of an edge's input.
 fn demand_pure_input<T>()

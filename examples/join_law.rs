@@ -10,7 +10,7 @@
 //! `to_right`-coerces a composed capability between the two join orders, in generic code where
 //! the two `Out` types are not otherwise known to be equal.
 
-use boundary_algebra::boundary::{Join, JoinCommutes, Lossy, Pure};
+use boundary_spec::boundary::{Join, JoinCommutes, Lossy, Pure};
 
 /// Coerce a composed capability from the `Join<A,B>` order to the `Join<B,A>` order in GENERIC
 /// code, using the carried commutativity witness. Impossible without the proof — the two `Out`

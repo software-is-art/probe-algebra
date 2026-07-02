@@ -1,18 +1,18 @@
-error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
+error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
   --> tests/compile_fail/incomplete_probe_rejected.rs:18:30
    |
 18 |     require_complete::<Expr, _>(&PartialProbe);
    |                              ^ unsatisfied trait bound
    |
-help: the trait `Covers<boundary_algebra::boundary::Field<Expr, 1>>` is not implemented for `PartialProbe`
-      but trait `Covers<boundary_algebra::boundary::Field<Expr, 0>>` is implemented for it
+help: the trait `Covers<boundary_spec::boundary::Field<Expr, 1>>` is not implemented for `PartialProbe`
+      but trait `Covers<boundary_spec::boundary::Field<Expr, 0>>` is implemented for it
   --> tests/compile_fail/incomplete_probe_rejected.rs:14:1
    |
 14 | impl Covers<Field<Expr, 0>> for PartialProbe {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>`
    = note: 1 redundant requirement hidden
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>`
 note: required by a bound in `require_complete`
   --> src/boundary.rs
    |
@@ -22,21 +22,21 @@ note: required by a bound in `require_complete`
    |     C: CoversAll<<T as HasDofs>::Dofs>,
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `require_complete`
 
-error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
+error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
   --> tests/compile_fail/incomplete_probe_rejected.rs:18:30
    |
 18 |     require_complete::<Expr, _>(&PartialProbe);
    |                              ^ unsatisfied trait bound
    |
-help: the trait `Covers<boundary_algebra::boundary::Field<Expr, 2>>` is not implemented for `PartialProbe`
-      but trait `Covers<boundary_algebra::boundary::Field<Expr, 0>>` is implemented for it
+help: the trait `Covers<boundary_spec::boundary::Field<Expr, 2>>` is not implemented for `PartialProbe`
+      but trait `Covers<boundary_spec::boundary::Field<Expr, 0>>` is implemented for it
   --> tests/compile_fail/incomplete_probe_rejected.rs:14:1
    |
 14 | impl Covers<Field<Expr, 0>> for PartialProbe {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>`
    = note: 2 redundant requirements hidden
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>`
 note: required by a bound in `require_complete`
   --> src/boundary.rs
    |
@@ -46,21 +46,21 @@ note: required by a bound in `require_complete`
    |     C: CoversAll<<T as HasDofs>::Dofs>,
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `require_complete`
 
-error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
+error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
   --> tests/compile_fail/incomplete_probe_rejected.rs:18:30
    |
 18 |     require_complete::<Expr, _>(&PartialProbe);
    |                              ^ unsatisfied trait bound
    |
-help: the trait `Covers<boundary_algebra::boundary::Field<Expr, 3>>` is not implemented for `PartialProbe`
-      but trait `Covers<boundary_algebra::boundary::Field<Expr, 0>>` is implemented for it
+help: the trait `Covers<boundary_spec::boundary::Field<Expr, 3>>` is not implemented for `PartialProbe`
+      but trait `Covers<boundary_spec::boundary::Field<Expr, 0>>` is implemented for it
   --> tests/compile_fail/incomplete_probe_rejected.rs:14:1
    |
 14 | impl Covers<Field<Expr, 0>> for PartialProbe {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>`
    = note: 3 redundant requirements hidden
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>`
 note: required by a bound in `require_complete`
   --> src/boundary.rs
    |
@@ -70,21 +70,21 @@ note: required by a bound in `require_complete`
    |     C: CoversAll<<T as HasDofs>::Dofs>,
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `require_complete`
 
-error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
+error[E0277]: the trait bound `PartialProbe: CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>` is not satisfied
   --> tests/compile_fail/incomplete_probe_rejected.rs:18:30
    |
 18 |     require_complete::<Expr, _>(&PartialProbe);
    |                              ^ unsatisfied trait bound
    |
-help: the trait `Covers<boundary_algebra::boundary::Field<Expr, 4>>` is not implemented for `PartialProbe`
-      but trait `Covers<boundary_algebra::boundary::Field<Expr, 0>>` is implemented for it
+help: the trait `Covers<boundary_spec::boundary::Field<Expr, 4>>` is not implemented for `PartialProbe`
+      but trait `Covers<boundary_spec::boundary::Field<Expr, 0>>` is implemented for it
   --> tests/compile_fail/incomplete_probe_rejected.rs:14:1
    |
 14 | impl Covers<Field<Expr, 0>> for PartialProbe {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>`
    = note: 4 redundant requirements hidden
-   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_algebra::boundary::Field<Expr, 0>, DofCons<boundary_algebra::boundary::Field<Expr, 1>, DofCons<boundary_algebra::boundary::Field<Expr, 2>, DofCons<boundary_algebra::boundary::Field<Expr, 3>, DofCons<boundary_algebra::boundary::Field<Expr, 4>, DofNil>>>>>>`
+   = note: required for `PartialProbe` to implement `CoversAll<DofCons<boundary_spec::boundary::Field<Expr, 0>, DofCons<boundary_spec::boundary::Field<Expr, 1>, DofCons<boundary_spec::boundary::Field<Expr, 2>, DofCons<boundary_spec::boundary::Field<Expr, 3>, DofCons<boundary_spec::boundary::Field<Expr, 4>, DofNil>>>>>>`
 note: required by a bound in `require_complete`
   --> src/boundary.rs
    |

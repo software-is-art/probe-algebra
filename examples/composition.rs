@@ -12,10 +12,10 @@
 //!
 //! Run `cargo run --example composition`.
 
-use boundary_algebra::discover::arithmetic::Arithmetic;
-use boundary_algebra::discover::composition::render;
-use boundary_algebra::discover::date::Calendar;
-use boundary_algebra::discover::router::Router;
+use boundary_spec::discover::arithmetic::Arithmetic;
+use boundary_spec::discover::composition::PipelineLaw;
+use boundary_spec::discover::date::Calendar;
+use boundary_spec::discover::router::Router;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 enum Stage {
@@ -42,7 +42,7 @@ fn report(v: &[(u8, i64)]) -> Option<(u8, i64)> {
     Some((2, v[0].1))
 }
 
-boundary_algebra::theory! {
+boundary_spec::theory! {
     Readings : "reading pipeline", Value = (u8, i64), Obs = (u8, i64), Sort = Stage,
     sort_of = |v: &(u8, i64)| match v.0 { 0 => Stage::Raw, 1 => Stage::Scaled, _ => Stage::Reported },
     observe = |v: &(u8, i64)| *v,
@@ -63,10 +63,10 @@ boundary_algebra::theory! {
 
 fn main() {
     println!("Composition analysis — what survives a transform pipeline:\n");
-    print!("{}", render::<Readings>());
-    print!("{}", render::<Arithmetic>());
-    print!("{}", render::<Router>());
-    print!("{}", render::<Calendar>());
+    print!("{}", PipelineLaw::render::<Readings>());
+    print!("{}", PipelineLaw::render::<Arithmetic>());
+    print!("{}", PipelineLaw::render::<Router>());
+    print!("{}", PipelineLaw::render::<Calendar>());
     println!(
         "\nThe operation changes at every stage (combineRaw → combineScaled → combineReported), but\n\
          the composite report∘scale is still a homomorphism: the dataflow preserves the algebra end\n\

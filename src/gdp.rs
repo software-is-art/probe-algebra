@@ -12,13 +12,16 @@
 //! This is LOAD-BEARING grammar, not a spike. Two live consumers exercise it: the
 //! interpreter's `WellTyped`/`IllTyped` are gdp proofs (minted only by `Check`, demanded by
 //! `Eval`), and the kill-matrix selector reads its matrix entirely through the `InBounds`
-//! relational proof (`positions` ⇒ `at_in_bounds`), so an out-of-range read is a type error
-//! rather than a panic.
+//! relational proof (`positions` ⇒ `get`), so an unproven read is not writable at all.
 //!
 //! Division of labour: the name uniqueness is sound (it bottoms out in the GhostCell HRTB +
-//! invariant-lifetime trick at `with_seed` / `with_region`). The PROOF is only as true as the
-//! code that mints it — `prove_permutation` earns its bijection proof with a real check. We
-//! never mint a proof from a statistical probe; that would carry an unproven fact in the type.
+//! invariant-lifetime trick at `with_seed` / `with_region`) — but a NAME is not a VALUE: a
+//! region brands many values, and `map` derives new values under an old name, so a name alone
+//! cannot pin "the proof is about THIS collection". The relational proofs therefore hold
+//! their subject's BORROW (see the coupling note below); the brand carries provenance, the
+//! borrow carries identity. And the PROOF is only as true as the code that mints it —
+//! `prove_permutation` earns its bijection proof with a real check. We never mint a proof
+//! from a statistical probe; that would carry an unproven fact in the type.
 //!
 //! Cost to note: everything runs inside one `with_seed` / `with_region` continuation — fine
 //! for a program, an imposition on a library's callers.
@@ -38,8 +41,12 @@ pub trait Name {}
 pub struct Life<'name>(PhantomData<*mut &'name ()>);
 impl<'name> Name for Life<'name> {}
 
-/// A value tagged with a unique name. A `Named<N, T>` is effectively a singleton:
-/// Rust's affine types mean no two values can share the same `N`.
+/// A value tagged with a name. A name is unique to its minting scope, but NOT to a
+/// value: a `Seed`-minted `Named` starts as a singleton, while a region deliberately
+/// stamps many values with one brand and `map` derives new values under an old name.
+/// The brand is therefore an identity of PROVENANCE (which scope/dataflow this value
+/// belongs to), not of value — facts that must pin one specific value carry its
+/// borrow (see the relational proofs below).
 pub struct Named<N, T>(T, PhantomData<N>);
 impl<N, T> Named<N, T> {
     pub fn value(&self) -> &T {
@@ -139,142 +146,135 @@ pub fn stamp<N, M: Morphism>(r: &Brander<N>, m: &M, input: &Named<N, M::In>) -> 
 }
 
 // ===== a proof carried across a seam ======================================
-
-/// A proof that predicate `P` holds for the value named `N`. Its constructor is
-/// private to this module, so a proof can be minted ONLY by the checks here —
-/// and `N` ties it to one specific named value. (The relational predicates and the
-/// proofs that carry domain facts across a seam are now demonstrated on the
-/// interpreter — `interp`'s `WellTyped`/`IllTyped` are exactly such name-branded
-/// proofs, minted only by the `Check` branch.)
-pub struct Proof<N, P>(PhantomData<(N, P)>);
-
-// ===== a witness that an OPERATION occurred (the audit) ===================
-
-/// A named value bundled with a proof about it under one shared name — e.g. an
-/// output together with a witness of the operation that produced it.
-pub struct Witnessed<N, T, P>(Named<N, T>, Proof<N, P>);
-impl<N, T, P> Witnessed<N, T, P> {
-    pub fn split(self) -> (Named<N, T>, Proof<N, P>) {
-        (self.0, self.1)
-    }
-
-    /// The named value, borrowed — read a witness repeatedly without consuming it.
-    pub fn named(&self) -> &Named<N, T> {
-        &self.0
-    }
-
-    /// The carried proof, borrowed — pass it to a proof-demanding reader (`at_in_bounds`)
-    /// without consuming the witness.
-    pub fn proof(&self) -> &Proof<N, P> {
-        &self.1
-    }
-}
+//
+// A SINGLE-name proof — "predicate P holds for the value named N" — is realized as a
+// branded zero-data token minted only by its check: that is `boundary`'s
+// `proof_token!` (`interp`'s `WellTyped`/`IllTyped`, minted only by the `Check`
+// branch and demanded by `Eval`). The RELATIONAL proofs below are the two-value
+// case, and they carry their subject's BORROW rather than only its brand — see the
+// coupling note.
 
 // ===== relational coupling: an index bound to its collection ==============
 //
-// The proofs above are SINGLE-name (a fact about one value). COUPLING is the
-// two-name case: a proof relating a FRESH output to a DISTINCT existing named value.
-// The canonical example (mononym's `exists!(LookupResult(idx): InBounds(Map, idx))`):
-// a lookup yields a named index PLUS a proof it is in bounds of THAT map, so indexing
-// needs no runtime check and an index for map A cannot index map B.
+// The proofs above are SINGLE-name (a fact about one value). COUPLING relates a
+// position to a DISTINCT collection. An honest finding forced a redesign here: a
+// BRAND is not value-unique — `Brander::brand` stamps arbitrarily many values with
+// one name, and `Named::map` derives a new value under the old name — so a proof
+// keyed only on a phantom brand could be minted for collection A and discharged
+// against a same-branded collection B, making the "unreachable" reads reachable.
+// The fix is that a coupling proof HOLDS THE BORROW of the collection it certifies:
+// reading goes through the proof itself, so applying it to any other collection is
+// not a convention but unrepresentable, and the collection cannot change while the
+// proof lives (the borrow checker is the jailer). "A proof for A cannot be used
+// with B" is thereby restored as a type-level fact, not a usage discipline.
 
-/// Predicate: the named index is a valid position in the collection named `Coll`. A
-/// TWO-name relational proof — `Proof<Idx, InBounds<Coll>>` carries BOTH the index's
-/// name and the collection's, tying them together.
-pub struct InBounds<Coll>(PhantomData<Coll>);
+/// A key's hit in ONE map — the position, plus the borrow of THAT map. Minted only by
+/// `lookup` (where the relation is EARNED: the position is real), and the only way to
+/// read through it is `get`, so the proof cannot be pointed at another map and the map
+/// cannot change under it.
+pub struct Found<'m, Coll, K, V> {
+    map: &'m Named<Coll, BTreeMap<K, V>>,
+    idx: usize,
+}
 
-/// Look up a key in a NAMED map: on a hit, return the value's position FRESHLY named
-/// and an `InBounds` proof coupling it to THIS map. This is where the relation is
-/// EARNED (the position is real); the proof carries it onward at no cost.
-pub fn lookup<Coll, N: Name, K: Ord, V>(
-    // consumed for the index's unique fresh name (affine).
-    _seed: Seed<N>,
-    map: &Named<Coll, BTreeMap<K, V>>,
+impl<'m, Coll, K, V> Found<'m, Coll, K, V> {
+    /// The position of the found key in the map's ordered key sequence.
+    pub fn index(&self) -> usize {
+        self.idx
+    }
+
+    /// Read the found value. Total by construction: `idx` was a real position when
+    /// minted and the held borrow keeps the map unchanged, so the read cannot miss.
+    pub fn get(&self) -> &'m V {
+        self.map
+            .value()
+            .values()
+            .nth(self.idx)
+            .expect("Found holds the map's borrow, so the minted position stays valid")
+    }
+}
+
+/// Look up a key in a NAMED map: on a hit, return the value's position coupled to THIS
+/// map by borrow. The provenance complement to a runtime check.
+pub fn lookup<'m, Coll, K: Ord, V>(
+    map: &'m Named<Coll, BTreeMap<K, V>>,
     key: &K,
-) -> Option<Witnessed<impl Name, usize, InBounds<Coll>>> {
+) -> Option<Found<'m, Coll, K, V>> {
     map.value()
         .keys()
         .position(|k| k == key)
-        .map(|idx| Witnessed(Named::<N, _>(idx, PhantomData), Proof(PhantomData)))
+        .map(|idx| Found { map, idx })
 }
 
-/// Read a NAMED map at an index PROVEN in bounds of THAT map. The proof discharges
-/// the bounds obligation, so this cannot be called with an index proven for a
-/// different map, and the internal lookup is total by construction (the `expect` is
-/// unreachable given the proof). The provenance complement to a runtime check.
-pub fn get_in_bounds<'m, Coll, Idx, K, V>(
-    map: &'m Named<Coll, BTreeMap<K, V>>,
-    index: &Named<Idx, usize>,
-    _proof: &Proof<Idx, InBounds<Coll>>,
-) -> &'m V {
-    map.value()
-        .values()
-        .nth(*index.value())
-        .expect("the InBounds proof guarantees the index is valid")
-}
-
-// ===== SEQUENCE positions proven in bounds (the n-ary InBounds) ===========
+// ===== SEQUENCE positions proven in bounds (the n-ary form) ===============
 //
 // `lookup` couples ONE index to a map by key. A whole ALGORITHM that indexes a sequence
-// repeatedly wants the n-ary form: every valid position of a named sequence, each proven in
-// bounds of THAT sequence, minted together so a loop indexes with no bounds check and a
-// position from one sequence cannot index another. This is what lets `select` (the kill-
+// repeatedly wants the n-ary form: every valid position of a sequence, each holding the
+// borrow of THAT sequence, minted together so a loop indexes with no bounds check and a
+// position from one sequence cannot read another. This is what lets `select` (the kill-
 // matrix kernel) read its matrix entirely by proof — the relational proof made load-bearing.
 
-/// Every position of a named sequence, branded with the sequence's own name and each
-/// carrying a proof it indexes THAT sequence. Turns a runtime length into a set of in-bounds
-/// positions: a loop over them needs no bounds check, and a position witnessed for sequence A
-/// will not type-check against sequence B (their brands do not unify).
-pub fn positions<Coll, T>(
-    seq: &Named<Coll, Vec<T>>,
-) -> Vec<Witnessed<Coll, usize, InBounds<Coll>>> {
+/// A position proven in bounds of ONE sequence — the proof holds the sequence's borrow,
+/// so it reads only THAT sequence and the sequence cannot change while it lives.
+pub struct InBounds<'s, Coll, T> {
+    seq: &'s Named<Coll, Vec<T>>,
+    idx: usize,
+}
+
+impl<'s, Coll, T> InBounds<'s, Coll, T> {
+    /// The proven position.
+    pub fn index(&self) -> usize {
+        self.idx
+    }
+
+    /// Read the element at the proven position. Total by construction: the position was
+    /// in range when minted and the held borrow keeps the sequence unchanged.
+    pub fn get(&self) -> &'s T {
+        &self.seq.value()[self.idx]
+    }
+}
+
+/// Every position of a named sequence, each holding the sequence's own borrow. Turns a
+/// runtime length into a set of in-bounds positions: a loop over them needs no bounds
+/// check, and a position minted for sequence A cannot read sequence B.
+pub fn positions<Coll, T>(seq: &Named<Coll, Vec<T>>) -> Vec<InBounds<'_, Coll, T>> {
     (0..seq.value().len())
-        .map(|i| Witnessed(Named(i, PhantomData), Proof(PhantomData)))
+        .map(|idx| InBounds { seq, idx })
         .collect()
 }
 
-/// Prove a single position is in bounds of a named sequence — the checked, region-style
-/// analog of `lookup` (by position, not by key). `None` if out of range; on success the
-/// `InBounds` proof ties the position to THIS sequence.
+/// Prove a single position is in bounds of a named sequence — the checked analog of
+/// `lookup` (by position, not by key). `None` if out of range; on success the proof
+/// holds THIS sequence's borrow.
 pub fn prove_position<Coll, T>(
     seq: &Named<Coll, Vec<T>>,
     pos: usize,
-) -> Option<Witnessed<Coll, usize, InBounds<Coll>>> {
-    (pos < seq.value().len()).then_some(Witnessed(Named(pos, PhantomData), Proof(PhantomData)))
-}
-
-/// Read a named sequence at a position PROVEN in bounds of THAT sequence. TOTAL — the
-/// `InBounds` proof discharges the bounds obligation, so the read cannot miss (the `expect`
-/// is unreachable). The sequence analog of `get_in_bounds`.
-pub fn at_in_bounds<'s, Coll, Idx, T>(
-    seq: &'s Named<Coll, Vec<T>>,
-    index: &Named<Idx, usize>,
-    _proof: &Proof<Idx, InBounds<Coll>>,
-) -> &'s T {
-    seq.value()
-        .get(*index.value())
-        .expect("the InBounds proof guarantees the position is valid")
+) -> Option<InBounds<'_, Coll, T>> {
+    (pos < seq.value().len()).then_some(InBounds { seq, idx: pos })
 }
 
 // ===== a PERMUTATION proven valid for its collection ======================
 //
 // The `InBounds` proof bounds ONE index; reordering a whole sequence needs a
 // stronger relation — that an index vector is a valid PERMUTATION (a bijection). With
-// it proven, an un-permute is TOTAL: no per-index bounds check and no missing/dup
+// it proven, an un-permute needs no per-index bounds check and no missing/dup
 // slots. This is what lets a coupling-aware construction reconstruct without the
 // runtime checks the plain `Construction::reconstruct` carries.
 
-/// Predicate: the named `Vec<usize>` is a PERMUTATION of `0..len` — a bijection.
-/// Earned by `prove_permutation`, and tied to the order's own name, so a permutation
-/// proven for one vector cannot stand in for another.
-pub struct PermutationOf;
+/// Proof that a `Vec<usize>` is a PERMUTATION of `0..len` — a bijection. Earned by
+/// `prove_permutation` with the real check, and holding the order's borrow, so a
+/// permutation proven for one vector cannot stand in for another (and the vector
+/// cannot change while the proof lives).
+pub struct PermutationOf<'o, N> {
+    order: &'o Named<N, Vec<usize>>,
+}
 
 /// Earn a `PermutationOf` proof by the real bijection check: right length, every
 /// index in range, none repeated. `None` if the order is not a valid permutation.
 pub fn prove_permutation<N>(
     order: &Named<N, Vec<usize>>,
     len: usize,
-) -> Option<Proof<N, PermutationOf>> {
+) -> Option<PermutationOf<'_, N>> {
     let o = order.value();
     if o.len() != len {
         return None;
@@ -285,24 +285,30 @@ pub fn prove_permutation<N>(
             return None;
         }
     }
-    Some(Proof(PhantomData))
+    Some(PermutationOf { order })
 }
 
-/// Reorder `sorted` by a PROVEN permutation whose `order[k]` is the ORIGINAL index of
-/// `sorted[k]`. TOTAL — the `PermutationOf` proof guarantees a bijection of the right
-/// length, so every output slot is filled exactly once (the `expect` is unreachable).
-pub fn unpermute<N, T: Clone>(
-    order: &Named<N, Vec<usize>>,
-    _proof: &Proof<N, PermutationOf>,
-    sorted: &[T],
-) -> Vec<T> {
-    let mut out: Vec<Option<T>> = vec![None; sorted.len()];
-    for (k, &orig) in order.value().iter().enumerate() {
-        out[orig] = Some(sorted[k].clone());
+impl<N> PermutationOf<'_, N> {
+    /// Reorder `sorted` by the proven permutation, whose `order[k]` is the ORIGINAL index
+    /// of `sorted[k]`. The proof guarantees a bijection over the held order, so every
+    /// output slot is filled exactly once (those `expect`s are unreachable); the one fact
+    /// a borrow cannot carry is about the OTHER argument, so a `sorted` of the wrong
+    /// length is an explicit `None`, not a panic.
+    pub fn unpermute<T: Clone>(&self, sorted: &[T]) -> Option<Vec<T>> {
+        let order = self.order.value();
+        if sorted.len() != order.len() {
+            return None;
+        }
+        let mut out: Vec<Option<T>> = vec![None; sorted.len()];
+        for (k, &orig) in order.iter().enumerate() {
+            out[orig] = Some(sorted[k].clone());
+        }
+        Some(
+            out.into_iter()
+                .map(|slot| slot.expect("the bijection fills every slot exactly once"))
+                .collect(),
+        )
     }
-    out.into_iter()
-        .map(|slot| slot.expect("PermutationOf proof guarantees every slot is filled"))
-        .collect()
 }
 
 #[cfg(test)]
@@ -345,23 +351,20 @@ mod tests {
 
     proptest! {
         /// POSITIONS round-trip: branding a sequence yields one proven position per element,
-        /// in order, and `at_in_bounds` reads exactly the raw element — the n-ary InBounds
-        /// the selector consumes, checked against the raw `Vec`.
+        /// in order, and reading through the proof yields exactly the raw element — the
+        /// n-ary InBounds the selector consumes, checked against the raw `Vec`.
         #[test]
         fn positions_index_every_element_in_order(xs in prop::collection::vec(any::<i64>(), 0..6)) {
             let (shape_ok, reads): (bool, Vec<i64>) = with_region(|r| {
                 let named = r.brand(xs.clone());
                 let ps = positions(&named);
                 let ordered = ps.len() == xs.len()
-                    && ps.iter().enumerate().all(|(i, w)| *w.named().value() == i);
-                let reads = ps
-                    .iter()
-                    .map(|w| *at_in_bounds(&named, w.named(), w.proof()))
-                    .collect::<Vec<_>>();
+                    && ps.iter().enumerate().all(|(i, w)| w.index() == i);
+                let reads = ps.iter().map(|w| *w.get()).collect::<Vec<_>>();
                 (ordered, reads)
             });
             prop_assert!(shape_ok, "positions must enumerate 0..len in order");
-            prop_assert_eq!(reads, xs, "at_in_bounds must read the raw element");
+            prop_assert_eq!(reads, xs, "an InBounds read must return the raw element");
         }
 
         /// PROVE_POSITION exactness: a position is provable iff it is in range — every index
@@ -384,16 +387,23 @@ mod tests {
 
         /// PERMUTATION round-trip: with `sorted[k] = xs[order[k]]`, the proven `unpermute`
         /// restores `xs` exactly — `permute ∘ unpermute == id`, oracle = the original.
+        /// And the one fact the proof cannot carry — `sorted`'s length — is an explicit
+        /// `None`, not a panic.
         #[test]
         fn unpermute_inverts_any_permutation(order in permutation()) {
             let n = order.len();
             let xs: Vec<i64> = (0..n as i64).collect();
-            let restored = with_seed(|seed| {
+            let (short_refused, restored) = with_seed(|seed| {
                 let named = seed.new_named(order.clone());
                 let proof = prove_permutation(&named, n).expect("a genuine permutation");
                 let sorted: Vec<i64> = order.iter().map(|&i| xs[i]).collect();
-                unpermute(&named, &proof, &sorted)
+                let short = proof.unpermute(&sorted[..sorted.len().saturating_sub(1)]);
+                (
+                    n == 0 || short.is_none(),
+                    proof.unpermute(&sorted).expect("lengths match by construction"),
+                )
             });
+            prop_assert!(short_refused, "a short `sorted` must be refused, not read");
             prop_assert_eq!(restored, xs, "unpermute did not invert the permutation");
         }
 
@@ -420,12 +430,8 @@ mod tests {
             let map: BTreeMap<i16, i64> = entries.into_iter().collect();
             let expected = map.get(&probe).copied();
             let got = with_seed(|seed| {
-                let (s_map, s_idx) = seed.replicate();
-                let named = s_map.new_named(map.clone());
-                lookup(s_idx, &named, &probe).map(|w| {
-                    let (idx, proof) = w.split();
-                    *get_in_bounds(&named, &idx, &proof)
-                })
+                let named = seed.new_named(map.clone());
+                lookup(&named, &probe).map(|found| *found.get())
             });
             prop_assert_eq!(got, expected, "coupled lookup disagreed with BTreeMap::get");
         }

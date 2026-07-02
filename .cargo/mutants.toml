@@ -17,7 +17,7 @@
 #   - `src/main.rs` — the `demo` binary only prints, no assertions, so its
 #     mutants are noise.
 #
-# The `#[derive(Shaped)]` proc-macro (`boundary-algebra-macros`) is NO LONGER excluded,
+# The `#[derive(Shaped)]` proc-macro (`boundary-spec-macros`) is NO LONGER excluded,
 # but it generates ZERO mutants: its functions return `proc_macro2::TokenStream` (built
 # with `quote!`), which cargo-mutants cannot synthesize a replacement for, so there is no
 # mutable surface. Its OUTPUT is dogfooded instead — every derived `Shaped` impl is hit by

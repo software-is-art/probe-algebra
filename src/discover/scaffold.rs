@@ -17,7 +17,7 @@
 //! that must be a HOMOMORPHISM, and the scaffold emits that obligation so a bad cut is a failing
 //! check, not a silent bug.
 
-use super::cohesion::{cohesion, SeamKind};
+use super::cohesion::{CohesionReport, SeamKind};
 use super::engine::{Engine, Theory};
 
 /// A generated sub-module: its placeholder name, the operators it owns, and its `theory!` skeleton.
@@ -40,10 +40,44 @@ pub struct Scaffold {
     pub seams: Vec<SeamObligation>,
 }
 
+impl Scaffold {
+    /// Generate the split for a theory's discovered cohesion components. Returns `None` when the
+    /// module is cohesive (a single algebra — nothing to split). The generation is an associated
+    /// function of its SCAFFOLD — the public surface is the value object, not a loose function
+    /// (the no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn of<T: Theory>() -> Option<Self> {
+        scaffold::<T>()
+    }
+
+    /// Render the whole scaffold as a readable, paste-able skeleton.
+    pub fn render<T: Theory>() -> String {
+        match Self::of::<T>() {
+            None => format!("module `{}` is cohesive — nothing to split.\n", T::name()),
+            Some(s) => {
+                let mut out = format!(
+                    "// scaffold for `{}` — {} sub-modules. Move the operator `eval` functions into the\n\
+                     // matching block, name the modules, and fill the value-level plumbing.\n\n",
+                    s.theory,
+                    s.modules.len()
+                );
+                for m in &s.modules {
+                    out.push_str(&format!("// {} owns: {}\n", m.name, m.operators.join(", ")));
+                    out.push_str(&m.source);
+                    out.push('\n');
+                }
+                for seam in &s.seams {
+                    out.push_str(&format!("// SEAM — {}\n", seam.note));
+                }
+                out
+            }
+        }
+    }
+}
+
 /// Generate the split for a theory's discovered cohesion components. Returns `None` when the module
-/// is cohesive (a single algebra — nothing to split).
-pub fn scaffold<T: Theory>() -> Option<Scaffold> {
-    let report = cohesion::<T>();
+/// is cohesive (a single algebra — nothing to split). (Private — reached as `Scaffold::of`.)
+fn scaffold<T: Theory>() -> Option<Scaffold> {
+    let report = CohesionReport::of::<T>();
     if report.is_cohesive() {
         return None;
     }
@@ -134,30 +168,6 @@ fn render_module<T: Theory>(idx: usize, ops: &[&super::engine::OpDeclaration<T::
     out
 }
 
-/// Render the whole scaffold as a readable, paste-able skeleton.
-pub fn render<T: Theory>() -> String {
-    match scaffold::<T>() {
-        None => format!("module `{}` is cohesive — nothing to split.\n", T::name()),
-        Some(s) => {
-            let mut out = format!(
-                "// scaffold for `{}` — {} sub-modules. Move the operator `eval` functions into the\n\
-                 // matching block, name the modules, and fill the value-level plumbing.\n\n",
-                s.theory,
-                s.modules.len()
-            );
-            for m in &s.modules {
-                out.push_str(&format!("// {} owns: {}\n", m.name, m.operators.join(", ")));
-                out.push_str(&m.source);
-                out.push('\n');
-            }
-            for seam in &s.seams {
-                out.push_str(&format!("// SEAM — {}\n", seam.note));
-            }
-            out
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,15 +178,15 @@ mod tests {
     /// A cohesive module scaffolds to nothing — there is no split to make.
     #[test]
     fn a_cohesive_module_does_not_scaffold() {
-        assert!(scaffold::<Router>().is_none());
-        assert!(render::<Router>().contains("cohesive"));
+        assert!(Scaffold::of::<Router>().is_none());
+        assert!(Scaffold::render::<Router>().contains("cohesive"));
     }
 
     /// The date calculus scaffolds into TWO sub-modules across a TRANSFORM seam (the layer line).
     /// The `since`/`at` module owns exactly the conversion; the seam obligation is the homomorphism.
     #[test]
     fn the_date_calculus_scaffolds_into_two_modules() {
-        let s = scaffold::<Calendar>().expect("date decomposes");
+        let s = Scaffold::of::<Calendar>().expect("date decomposes");
         assert_eq!(s.modules.len(), 2);
         let conversion = s
             .modules
@@ -194,7 +204,7 @@ mod tests {
     /// symbol, fixity, and sorts, and marks its `eval` as move-here. Pins the renderer.
     #[test]
     fn the_generated_source_is_a_faithful_theory_block() {
-        let s = scaffold::<Arithmetic>().expect("arithmetic decomposes");
+        let s = Scaffold::of::<Arithmetic>().expect("arithmetic decomposes");
         let arith = s
             .modules
             .iter()
@@ -227,7 +237,7 @@ mod tests {
         }
         let engine = Engine::<Calendar>::new();
         let sigs = engine.signatures();
-        let s = scaffold::<Calendar>().expect("date decomposes");
+        let s = Scaffold::of::<Calendar>().expect("date decomposes");
         for law in engine.discover().laws {
             let mut idxs = Vec::new();
             ops_in(&law.lhs, &mut idxs);

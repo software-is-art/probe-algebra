@@ -6,11 +6,11 @@
 
 use std::path::PathBuf;
 
-use boundary_algebra::discover::architect::{analyze, apply, render_lsp};
+use boundary_spec::discover::architect::Architect;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let findings = analyze();
+    let findings = Architect::analyze();
     if let Some(pos) = args.iter().position(|a| a == "--apply") {
         let dir = PathBuf::from(
             args.get(pos + 1)
@@ -18,10 +18,10 @@ fn main() {
                 .unwrap_or("scaffold_out"),
         );
         for f in &findings {
-            let written = apply(&f.action, &dir).expect("apply");
+            let written = Architect::apply(&f.action, &dir).expect("apply");
             println!("applied `{}` -> {} files", f.action.title, written.len());
         }
     } else {
-        println!("{}", render_lsp(&findings));
+        println!("{}", Architect::render_lsp(&findings));
     }
 }

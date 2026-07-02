@@ -1,4 +1,4 @@
-# boundary-algebra
+# boundary-spec
 
 **Can a module boundary be specified precisely enough that the tests which validate it
 write themselves?**
@@ -10,10 +10,11 @@ survive.
 
 **The answer is yes.** The demonstration is an expression-language interpreter — lexer,
 parser, type checker, evaluator — whose interior has **zero tests of its own**, and whose
-entire *positive* behaviour is certified with **zero hand-written examples** — and its algebraic
-laws are **discovered by running the operators**, not declared, by a generic engine that does the
-same for a non-commutative router and a multi-sorted date calculus, rendering as a plain-language
-spec. Mutate the interior and **every viable mutant dies**; the only survivors are a handful of
+*positive* behaviour is certified by **derived probes and discovered laws, not example tests**
+(the only hand-written examples that remain are a disclosed few that exercise the grammar
+plumbing itself — see `src/tests.rs`'s inventory) — and its algebraic laws are **discovered by
+running the operators**, not declared, by a generic engine that does the same for a
+non-commutative router and a multi-sorted date calculus, rendering as a plain-language spec. Mutate the interior and **every viable mutant dies**; the only survivors are a handful of
 documented equivalents (genuine free choices), carved out in `.cargo/mutants.toml`.
 
 ```
@@ -85,13 +86,27 @@ And it **enforces**, at compile time, claims that can be statically false:
   `INTERIOR` (the workshop / leaves), or `ALGEBRA` (a discovered-law / report layer) — with a
   `//! Tier:` marker `build.rs` reads to dispatch the right discipline. A file that names no tier is
   a build error, so a new module cannot land silently un-categorized; placement is ratified in the
-  diff. This replaces the old path heuristics (the blanket `discover/` exemption is gone).
+  diff. This replaces the old path heuristics (the blanket `discover/` exemption is gone). And
+  because `KERNEL` is exempt from the structural rules, claiming it is not self-service: kernel
+  files are enumerated in an allowlist in `build.rs` itself, so joining the trusted floor is a
+  diff to the floor's own gate.
 - **effects in an ALGEBRA file are honest, or they don't build.** That layer may touch the world (a
   report tool reads sources, writes a scaffold) — but not *silently*: a function whose body reaches
-  `std::fs`/`io`/`process`/`net`/`env` must declare a `Capability:` in its doc, else build error. So
-  the fine seam/capability/leaf split *inside* an ALGEBRA file is enforced the same way the file-level
-  tier is — the dev tool's `apply` (writes) and `theory_line` (reads) are named edges, not hidden
-  dependencies. (Adding the rule immediately flagged two world-reads we'd left undeclared.)
+  `std::fs`/`io`/`process`/`net`/`env` — fully qualified, through a `use` import or alias, or inside
+  a macro's tokens — must declare a real `Capability:` (one of the four levels) in its doc, else
+  build error. So the fine seam/capability/leaf split *inside* an ALGEBRA file is enforced the same
+  way the file-level tier is — the dev tool's `apply` (writes) and `theory_line` (reads) are named
+  edges, not hidden dependencies. (Adding the rule immediately flagged two world-reads we'd left
+  undeclared.) The residual honesty gap is transitive effects — a helper that does the I/O for you —
+  which `build.rs` documents rather than pretends to close.
+- **no loose public functions — the rats-nest rule.** Outside the ratified kernel, a fully public
+  function must be **attached to a typestate** (a method or associated fn on the value object it
+  serves — `CohesionReport::of`, `Spec::lock`, `Architect::analyze`) or be **operator-shaped**
+  (bare named value types in and out — the shape `#[algebra]` and the qualify census read; an
+  operator is already attached, to its value objects). Anything else public is a build error;
+  private / `pub(super)` / `pub(crate)` helpers stay free — local defs. So the public surface of
+  every module is exactly its typestates and its operators, and "where does this function belong?"
+  has an enforced answer.
 
 The interior backing these edges (`interp::internal`) is private, untested, and kept in the
 mutation sweep, so the bought correctness is *measured*, not asserted.
@@ -105,7 +120,7 @@ one trait — `Theory` (its sorts, operators, a grid of inhabitants, and an OBSE
 and the generic **engine** enumerates terms over the operators, groups them by how they behave on
 the grid, instantiates the universal algebraic shapes over the operators, and keeps the ones that
 run true. The spec falls out of the operators' behaviour, not a human's list. The algebra was never
-about numbers; numbers were just *legible*. `cargo run --example discovered_spec` discovers three
+about numbers; numbers were just *legible*. `cargo run --example discovered_spec` discovers four
 very different algebras from the **same engine**:
 
 ```
@@ -119,7 +134,29 @@ router (a monoid)         Or with empty leaves a value unchanged.           (emp
 date calculus (2 sorts)   Plus with zero leaves a value unchanged.          (zero + p) = p
                           Add with zero leaves a value unchanged.           add(s, zero) = s
                           at undoes since — the round trip is the identity.  at(since(s)) = s
+ttl store (STATEFUL)      With Merge, the grouping doesn't matter.          ((s <+ t) <+ u) = …
+                          Repeated Tick combines its parameters with Plus.  tick(tick(s,p),q) = tick(s,(p+q))
+                          — and NOT merge commutativity: last-write-wins makes order semantics,
+                            so the engine correctly refuses to report it.
 ```
+
+The TTL store is the first **stateful** domain: `Store` is the state itself, time moves only
+through an explicit `tick` edge (deterministic — `Stateful`, never `Effectful`), and the
+observation is the store's *live entries at its own clock*, so expiry is visible to the engine.
+What discovery finds on state is exactly what a reviewer would want certified: accumulated state
+composes as a **monoid** (replaying a batch is safe — idempotent), time is a **monoid action** of
+durations on stores (sweep-then-sweep equals sweep-once), and merge **order is meaning**. Its
+surface file is deliberately named `store.rs`, not `boundary.rs`: boundary-hood is the declared
+tier plus the enforced shape, never a filename.
+
+And this domain improved the engine. A planted first-write-wins mutant **survived** the monoid
+laws — they are *bias-blind* (both merge directions satisfy identical laws), so which write wins
+was invisible to the spec. That finding became a new universal shape: on every non-commutative
+binary the engine now tries the **regular-band sandwich laws** (`(x⊕y)⊕x = y⊕x` — the later
+operand wins; `= x⊕y` — the earlier does), and the bias is now a *stated law* in two specs at
+once: the store's merge ("the later operand wins where the two disagree") and the router's
+first-match `or` ("the earlier operand wins"). A hostile domain found the blind spot; the blind
+spot became a template; the template immediately explained an older domain better.
 
 The universal shapes the engine tries cover the heterogeneous cases too — monoid **actions**
 (date's `add`), **homomorphisms** (boolean De Morgan, `¬(x∧y) = ¬x ∨ ¬y`), absorption,
@@ -147,7 +184,10 @@ no constant — can't bootstrap a grid at all. The fix is a **shadow algebra**: 
 the author never writes and that never enter the spec. Reusing the same `#[derive(Shaped)]` that
 mints the probe surface for edges, the grid is grown from the value type's *structure* — start at the
 canonical inhabitant, close under its variant/field perturbations — so it is fattened by the type,
-not by the operators or by hand. A domain then collapses to *just its operators*:
+not by the operators or by hand. And the assignments the laws are judged on keep pace: a small
+variable/inhabitant cross-product is enumerated **exhaustively** (every combination, not a sample);
+a large one is sampled by a coprime-stride mixed-radix decode, so every variable varies
+independently of every other. A domain then collapses to *just its operators*:
 
 ```rust,ignore
 theory! {
@@ -369,8 +409,9 @@ ratified in the diff. And running it on the crate's *own* code finds what you'd 
 nobody wrote as an algebra qualifying anyway:
 
 ```
-src/capability.rs:        QUALIFIES — operators [cap_of] over sorts {Capability, Source}
-src/discover/derived.rs:  QUALIFIES — operators [meet, join, lift, …] over sorts {Tri, Small, Large}
+src/capability.rs:          QUALIFIES — operators [cap_of] over sorts {Capability, Source}
+src/discover/derived.rs:    QUALIFIES — operators [meet, join, lift, …] over sorts {Tri, Small, Large}
+src/discover/modularize.rs: QUALIFIES — operators [both, either, peak, rotate] over sorts {Count, Flag, Spin}
 ```
 
 `capability`'s `cap_of : Source → Capability` is an operator over value objects, so the audit module
@@ -413,8 +454,11 @@ The strongest evidence is that the method is **turned on its own runtime**:
   oracle-free property probes, kept in the sweep.
 
 And `gdp`'s relational proof is load-bearing, not a demo: `select`'s kernel reads its kill
-matrix through gdp's `InBounds` proof, so an out-of-range read is a **type error, not a panic** —
-"make illegal states unrepresentable" lifted from one value to a *relation between two values*.
+matrix through gdp's `InBounds` proof, which **holds the matrix's borrow** — a proof minted for
+one matrix cannot read another, and an unproven read is not writable at all — "make illegal
+states unrepresentable" lifted from one value to a *relation between two values*. (A ratified
+redesign: a proof keyed only on a phantom brand was not value-unique, since a region brands
+many values; the borrow now carries the identity the brand alone could not.)
 
 ---
 
@@ -426,6 +470,9 @@ matrix through gdp's `InBounds` proof, so an out-of-range read is a **type error
 - **[docs/how-it-works.md](docs/how-it-works.md)** — the end-to-end mechanism: what you write,
   what compile time and autotest time each give you, and why an under-specified probe is
   unrepresentable.
+- **[docs/ci-discipline.md](docs/ci-discipline.md)** — the extractable CI pattern (deterministic
+  spec → frozen file → drift gate → diff-scoped mutation), what each move buys and costs, and the
+  standalone [`spec-lock`](spec-lock) crate that carries the freeze/gate mechanics to any project.
 
 ## Using it
 
@@ -434,7 +481,7 @@ calculus show the discovery engine generalises, and none of it is the limit:
 
 ```toml
 [dependencies]
-boundary-algebra = { git = "https://github.com/software-is-art/probe-algebra" }
+boundary-spec = { git = "https://github.com/software-is-art/probe-algebra" }
 ```
 
 Model your boundary as value objects and edges, write the interior in any style, and let the

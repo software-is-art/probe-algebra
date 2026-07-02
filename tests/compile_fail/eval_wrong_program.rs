@@ -5,8 +5,8 @@
 //! cannot evaluate an expression except with ITS OWN type-correctness witness.
 #![allow(unused_variables, unused_imports, dead_code)]
 
-use boundary_algebra::gdp::with_seed;
-use boundary_algebra::interp::boundary::{Check, Eval, Expr};
+use boundary_spec::gdp::with_seed;
+use boundary_spec::interp::boundary::{Check, Eval, Expr};
 
 fn main() {
     with_seed(|sa| {

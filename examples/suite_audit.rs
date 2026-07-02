@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use boundary_algebra::select::boundary::KillMatrix;
+use boundary_spec::select::boundary::KillMatrix;
 use serde_json::Value;
 
 /// One mutant from the sweep: its cargo-mutants name, whether it was caught, and the set of

@@ -21,11 +21,16 @@
 //! long left as a native `fn new` OUTSIDE the algebra, is just another morphism: the edge
 //! INTO the domain, now probeable like every other.
 //!
-//! This file defines that grammar once, for the whole crate:
+//! This file defines that grammar once, for the whole crate — and for CONSUMERS:
 //!
-//!   - sealed marker traits `ValueObject` / `Typestate` / `ValueOperator`, so the set
-//!     of citizens is CLOSED — no module can invent a new kind, and no external crate
-//!     can implement them; and
+//!   - marker traits `ValueObject` / `Typestate` / `ValueOperator`, registered only
+//!     through the citizen macros (`value_object!` / `refined!` / `typestate!` /
+//!     `value_operator!` / `proof_token!`), so no module invents a new KIND of
+//!     citizen. A downstream crate mints its own citizens with the same macros; the
+//!     closure that matters — every citizen is macro-registered, every edge probed,
+//!     every file tiered — is enforced per-crate by `boundary-enforce`, not by a
+//!     type-level seal (only the effect lattice stays truly sealed, because its
+//!     laws are proven exhaustively over exactly four levels); and
 //!   - the generic `Morphism` / `Construction` algebra `… -> (Out, Residual)` with
 //!     `backward` / `reconstruct`, the generic completeness probes (`probe`,
 //!     `reconstructs`), residual `Compose`-ition / `Then`-composition (loss as a
@@ -40,33 +45,48 @@ use core::marker::PhantomData;
 
 use typewit::TypeEq;
 
-/// The sealing module. `Sealed` is `pub(crate)`, so only THIS crate can satisfy
-/// the marker supertraits — downstream crates cannot mint boundary citizens.
+/// The sealing module for the EFFECT LATTICE only. `Sealed` is `pub(crate)` because the
+/// lattice's laws (`Join` commutativity/associativity/idempotence, `AtMost` agreement)
+/// are proven EXHAUSTIVELY over exactly four levels — a fifth implementor would make
+/// those proofs silently non-exhaustive, so no crate may add one.
 pub(crate) mod sealed {
     pub trait Sealed {}
+}
+
+/// The citizen-registration module — PUBLIC, unlike the effect seal, so a DOWNSTREAM
+/// crate can mint its own value objects and operators with the same macros this crate
+/// uses. `Registered` is the supertrait the citizen macros implement; registering by
+/// hand instead of through a macro is possible but pointless — the structural closure
+/// that actually protects a codebase (every citizen macro-registered, every edge
+/// probed, every file tiered) is `boundary-enforce`'s job, per-crate, where it can see
+/// the source. The kind-set stays closed: there are exactly three marker traits, and
+/// no crate can add a fourth.
+pub mod citizen {
+    /// Implemented (via the citizen macros) by every boundary citizen.
+    pub trait Registered {}
 }
 
 // ===== the boundary citizens: objects and morphisms ======================
 
 /// Marker: an OBJECT of the category — an immutable, validated, value-equality datum.
-pub trait ValueObject: Clone + PartialEq + Debug + sealed::Sealed {}
+pub trait ValueObject: Clone + PartialEq + Debug + citizen::Registered {}
 
 /// Marker: an INDEX that distinguishes objects (a compile-time protocol position), so
 /// illegal sequencing fails to compile. Not an object itself — `Carried<M, Retained>` is
 /// the object; `Retained` is the index.
-pub trait Typestate: sealed::Sealed {}
+pub trait Typestate: citizen::Registered {}
 
 /// Marker: a MORPHISM of the category — a pure operator-as-value over value objects
 /// (`Morphism`, `Construction`, `Branch`, `Guarded`). (Free pure functions are morphisms
 /// too; this marks the operator-as-object case.)
-pub trait ValueOperator: sealed::Sealed {}
+pub trait ValueOperator: citizen::Registered {}
 
 /// Declarative sugar so per-module `boundary.rs` files read like a grammar:
 /// `value_object!(Int, Expr, Value);`
 #[macro_export]
 macro_rules! value_object {
     ($($t:ty),+ $(,)?) => {$(
-        impl $crate::boundary::sealed::Sealed for $t {}
+        impl $crate::boundary::citizen::Registered for $t {}
         impl $crate::boundary::ValueObject for $t {}
     )+};
 }
@@ -75,7 +95,7 @@ macro_rules! value_object {
 #[macro_export]
 macro_rules! typestate {
     ($($t:ty),+ $(,)?) => {$(
-        impl $crate::boundary::sealed::Sealed for $t {}
+        impl $crate::boundary::citizen::Registered for $t {}
         impl $crate::boundary::Typestate for $t {}
     )+};
 }
@@ -84,7 +104,7 @@ macro_rules! typestate {
 #[macro_export]
 macro_rules! value_operator {
     ($($t:ty),+ $(,)?) => {$(
-        impl $crate::boundary::sealed::Sealed for $t {}
+        impl $crate::boundary::citizen::Registered for $t {}
         impl $crate::boundary::ValueOperator for $t {}
     )+};
 }
@@ -128,7 +148,7 @@ macro_rules! proof_token {
                 f.write_str(stringify!($name))
             }
         }
-        impl<N> $crate::boundary::sealed::Sealed for $name<N> {}
+        impl<N> $crate::boundary::citizen::Registered for $name<N> {}
         impl<N> $crate::boundary::ValueObject for $name<N> {}
     };
 }
@@ -1003,7 +1023,7 @@ where
 // derives the perturbation surface from a value object's own STRUCTURE, and the fused probe
 // below collapses the structural, value, and semantic layers into a SINGLE operator: a map
 // is faithful iff it responds to every derived degree of freedom. `#[derive(Shaped)]`
-// (in `boundary-algebra-macros`) generates it for composites; leaves with smart-constructor
+// (in `boundary-spec-macros`) generates it for composites; leaves with smart-constructor
 // invariants impl it by hand.
 
 /// A value object whose probe surface is its STRUCTURE. `inhabitant` is one canonical seed
@@ -1011,7 +1031,8 @@ where
 /// per degree of freedom — the variant choice (STRUCTURE) and each field (VALUE / deeper
 /// SEMANTICS). Derivable: `#[derive(Shaped)]` reads the variants and fields.
 pub trait Shaped: Sized + Clone + PartialEq {
-    /// One canonical inhabitant — the first variant / the struct of field inhabitants.
+    /// One canonical inhabitant — a LEAF variant (the first whose fields don't mention the
+    /// type itself, so the recursion bottoms out) / the struct of field inhabitants.
     fn inhabitant() -> Self;
     /// Neighbours grouped by degree of freedom (one group per variant-choice and per field).
     fn perturbation_classes(&self) -> Vec<Vec<Self>>;
@@ -1843,7 +1864,7 @@ mod cost_laws {
 /// Product of two residuals — loss COMPOSES as a value object.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pair<A, B>(pub A, pub B);
-impl<A: ValueObject, B: ValueObject> sealed::Sealed for Pair<A, B> {}
+impl<A: ValueObject, B: ValueObject> citizen::Registered for Pair<A, B> {}
 impl<A: ValueObject, B: ValueObject> ValueObject for Pair<A, B> {}
 
 /// Sequential composition `g ∘ f` as a single morphism. Its residual is the
@@ -1854,7 +1875,7 @@ pub struct Compose<F, G> {
     pub f: F,
     pub g: G,
 }
-impl<F, G> sealed::Sealed for Compose<F, G> {}
+impl<F, G> citizen::Registered for Compose<F, G> {}
 impl<F, G> ValueOperator for Compose<F, G> {}
 impl<F, G> Morphism for Compose<F, G>
 where
@@ -2144,7 +2165,7 @@ pub struct Then<C, M> {
     pub construct: C,
     pub then: M,
 }
-impl<C, M> sealed::Sealed for Then<C, M> {}
+impl<C, M> citizen::Registered for Then<C, M> {}
 impl<C, M> ValueOperator for Then<C, M> {}
 impl<C, M> Construction for Then<C, M>
 where
@@ -2300,7 +2321,7 @@ impl<M, T> Profiled<M, T> {
         Profiled { inner, meter }
     }
 }
-impl<M, T> sealed::Sealed for Profiled<M, T> {}
+impl<M, T> citizen::Registered for Profiled<M, T> {}
 impl<M, T> ValueOperator for Profiled<M, T> {}
 impl<M: Morphism, T: Meter> Morphism for Profiled<M, T> {
     // profiling is transparent to the effect — it just times the inner edge.

@@ -16,7 +16,7 @@
 //! disagreement is a coherence bug the types can't see. (Grid-bounded, like all discovery: it finds
 //! DISAGREEMENT, it does not prove coherence.)
 
-use super::engine::{Engine, Theory};
+use super::engine::{Engine, Operator, Theory};
 
 /// One sort: an integer-valued "key" several modules merge.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -74,14 +74,84 @@ merge_theory!(MaxMerge, "max-merge", max_merge);
 merge_theory!(GcdMerge, "gcd-merge", gcd_merge);
 merge_theory!(FirstMerge, "first-merge", first_merge);
 
-/// The coherence violations between two same-signature theories: the laws one module discovers that
-/// do NOT hold under the other's operators (checked both directions). Empty ⇒ the modules agree
-/// about the shared algebra; non-empty ⇒ they are connectable but INCOHERENT.
-pub fn coherence_violations<A, B>() -> Vec<String>
+/// Where two theories' operator TABLES first disagree, if anywhere. A discovered law's `Term`s
+/// reference operators by INDEX into the discovering engine's table, so re-checking A's laws under
+/// B's engine is only meaningful when index `i` names the same operator in both — same table
+/// length, and pairwise the same name, input sorts, and output sort (comparable because the
+/// signatures share `Sort`, which also fixes the engines' variable indexing). `None` ⇒ aligned.
+fn signature_mismatch<A, B>() -> Option<String>
 where
     A: Theory,
     B: Theory<Sort = A::Sort, Value = A::Value, Obs = A::Obs>,
 {
+    let (a, b): (Vec<Operator<A>>, Vec<Operator<B>>) = (A::operators(), B::operators());
+    if a.len() != b.len() {
+        return Some(format!(
+            "{} declares {} operators but {} declares {}",
+            A::name(),
+            a.len(),
+            B::name(),
+            b.len()
+        ));
+    }
+    for (i, (oa, ob)) in a.iter().zip(&b).enumerate() {
+        if oa.name != ob.name || oa.inputs != ob.inputs || oa.output != ob.output {
+            return Some(format!(
+                "operator {i} is `{}` (arity {}) in {} but `{}` (arity {}) in {}",
+                oa.name,
+                oa.inputs.len(),
+                A::name(),
+                ob.name,
+                ob.inputs.len(),
+                B::name()
+            ));
+        }
+    }
+    None
+}
+
+/// The coherence analysis of a pair of same-signature theories: the laws one module discovers that
+/// do NOT hold under the other's operators (checked both directions).
+#[derive(Debug)]
+pub struct CoherenceReport {
+    /// The rendered disagreements — empty when the modules agree about the shared algebra.
+    pub violations: Vec<String>,
+}
+
+impl CoherenceReport {
+    /// The coherence violations between two same-signature theories: the laws one module discovers
+    /// that do NOT hold under the other's operators (checked both directions). `Ok` with no
+    /// violations ⇒ the modules agree about the shared algebra; `Ok` with violations ⇒ they are
+    /// connectable but INCOHERENT.
+    ///
+    /// `Err` ⇒ the question was ill-posed: the operator tables do not align index-for-index
+    /// (`signature_mismatch`), so a law's operator indices would silently resolve to the WRONG
+    /// operators in the other engine — misalignment is reported, never judged as (in)coherence.
+    ///
+    /// The analysis is an associated function of its REPORT — the public surface is the value
+    /// object, not a loose function (the no-rats-nest rule: every public callable hangs off a
+    /// typestate).
+    pub fn between<A, B>() -> Result<Self, String>
+    where
+        A: Theory,
+        B: Theory<Sort = A::Sort, Value = A::Value, Obs = A::Obs>,
+    {
+        coherence_violations::<A, B>().map(|violations| CoherenceReport { violations })
+    }
+}
+
+/// The violation scan (private — reached as `CoherenceReport::between`).
+fn coherence_violations<A, B>() -> Result<Vec<String>, String>
+where
+    A: Theory,
+    B: Theory<Sort = A::Sort, Value = A::Value, Obs = A::Obs>,
+{
+    if let Some(m) = signature_mismatch::<A, B>() {
+        return Err(format!(
+            "operator tables misaligned ({m}) — laws carry operator indices, so cross-checking \
+             would judge the wrong operators"
+        ));
+    }
     let (ea, eb) = (Engine::<A>::new(), Engine::<B>::new());
     let mut out = Vec::new();
     for law in ea.discover().laws {
@@ -104,7 +174,7 @@ where
             ));
         }
     }
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -117,7 +187,10 @@ mod tests {
     #[test]
     fn max_and_gcd_merge_are_coherent() {
         assert!(
-            coherence_violations::<MaxMerge, GcdMerge>().is_empty(),
+            CoherenceReport::between::<MaxMerge, GcdMerge>()
+                .expect("identical signatures")
+                .violations
+                .is_empty(),
             "max and gcd merge share the same laws — they must be coherent"
         );
     }
@@ -127,7 +200,9 @@ mod tests {
     /// the bug class the type system cannot see.
     #[test]
     fn max_and_first_merge_are_incoherent() {
-        let v = coherence_violations::<MaxMerge, FirstMerge>();
+        let v = CoherenceReport::between::<MaxMerge, FirstMerge>()
+            .expect("identical signatures")
+            .violations;
         assert!(
             v.iter()
                 .any(|s| s.contains("either order") && s.contains("max-merge")),
@@ -153,8 +228,36 @@ mod tests {
     /// disagreement is. Pins that coherence is not vacuously "everything differs".
     #[test]
     fn only_the_genuine_disagreement_is_reported() {
-        let v = coherence_violations::<MaxMerge, FirstMerge>();
+        let v = CoherenceReport::between::<MaxMerge, FirstMerge>()
+            .expect("identical signatures")
+            .violations;
         // exactly the commutativity law disagrees (in one direction); everything else is shared.
         assert_eq!(v.len(), 1, "only commutativity should disagree, got: {v:?}");
+    }
+
+    /// MISALIGNED tables are an ERROR, not a judgement: `SwappedMerge` computes exactly `max` but
+    /// declares its operators in the opposite order, so a law's operator INDICES would resolve
+    /// `empty` to `merge` (and vice versa) in the other engine. Feeding those laws through anyway
+    /// would silently judge the wrong operators — the mismatch must be reported instead.
+    #[test]
+    fn misaligned_operator_tables_are_reported_not_judged() {
+        pub struct SwappedMerge;
+        crate::theory! {
+            SwappedMerge : "swapped-merge", Value = i64, Obs = i64, Sort = Sort,
+            sort_of = |_: &i64| Sort::Key,
+            observe = |v: &i64| *v,
+            vars { Sort::Key => &["a", "b", "c"], }
+            inhabit { Sort::Key => vec![0, 1, 2, 3, 4, 6, 12], }
+            ops {
+                Infix   "Merge" "merge" (Sort::Key, Sort::Key) -> Sort::Key = max_merge;
+                Nullary "Empty" "empty" () -> Sort::Key = empty;
+            }
+        }
+        let err = CoherenceReport::between::<MaxMerge, SwappedMerge>()
+            .expect_err("misaligned operator tables must be an error, not a coherence verdict");
+        assert!(
+            err.contains("misaligned") && err.contains("Empty") && err.contains("Merge"),
+            "the report must name the mismatch, got: {err}"
+        );
     }
 }

@@ -1,12 +1,12 @@
 //! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
 //! demo — exercises the boundary algebra THROUGH the interpreter, the sole demonstration
-//! substrate. The bin names only `boundary_algebra::boundary` (the grammar) and
-//! `boundary_algebra::interp::boundary` (the interpreter's interface); the lexer, parser,
+//! substrate. The bin names only `boundary_spec::boundary` (the grammar) and
+//! `boundary_spec::interp::boundary` (the interpreter's interface); the lexer, parser,
 //! type checker, and evaluator in `interp::internal` are private and unreachable here.
 
-use boundary_algebra::gdp::with_seed;
-use boundary_algebra::interp::boundary::{Check, Eval, Parse};
+use boundary_spec::gdp::with_seed;
+use boundary_spec::interp::boundary::{Check, Eval, Parse, Value};
 
 fn banner(s: &str) {
     println!("\n=== {s} ===");
@@ -40,7 +40,11 @@ fn main() {
         match Check.classify(&named) {
             Ok(proof) => {
                 let value = Eval.run(&named, &proof);
-                println!("  well-typed -> evaluates to : {:?}", value.value());
+                let shown = match value.value() {
+                    Value::Int(n) => n.get().to_string(),
+                    Value::Bool(b) => b.to_string(),
+                };
+                println!("  well-typed -> evaluates to : {shown}");
             }
             Err(_) => println!("  ill-typed (unreachable for this program)"),
         }

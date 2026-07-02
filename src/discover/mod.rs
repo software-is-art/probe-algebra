@@ -26,7 +26,9 @@ pub mod composition;
 pub mod date;
 pub mod derived;
 pub mod engine;
+pub mod expect;
 pub mod freeze;
+pub mod genesis;
 pub mod layering;
 pub mod modularize;
 pub mod residue;
@@ -51,6 +53,24 @@ pub mod scaffold;
 ///     }
 /// }
 /// ```
+///
+/// Every form takes an OPTIONAL trailing `expects { ... }` clause — the theory's DECLARED
+/// laws, the top-down half of the loop (see `discover::expect`). Each line is a ratified
+/// catalog shape applied to operator symbols (a bare identifier for an identifier-shaped
+/// symbol, a string literal for a symbolic one like `"+"`):
+///
+/// ```ignore
+///     expects {
+///         commutative(or);
+///         associative(or);
+///         identity(or, empty);
+///     }
+/// ```
+///
+/// The clause generates the `expect::Expected` impl, so `expect::Distance::of::<Router>()`
+/// reports the distance between what was declared and what discovery finds. A shape name
+/// outside the catalog fails loudly, by name, the first time the expectations are read.
+/// No clause, no impl — nothing else changes.
 #[macro_export]
 macro_rules! theory {
     (
@@ -65,6 +85,9 @@ macro_rules! theory {
         ops {
             $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
         }
+        $( expects {
+            $( $eshape:ident ( $($eop:tt),* ); )+
+        } )?
     ) => {
         impl $crate::discover::engine::Theory for $thy {
             type Sort = $Sort;
@@ -98,6 +121,7 @@ macro_rules! theory {
                 match sort { $( $vpat => $vlist, )+ }
             }
         }
+        $( $crate::__theory_expects! { $thy; $( $eshape ( $($eop),* ); )+ } )?
     };
 
     // DERIVED-GRID form: no `vars`, no hand-written `inhabit` — the grid is GENERATED from the value
@@ -117,6 +141,9 @@ macro_rules! theory {
         ops {
             $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
         }
+        $( expects {
+            $( $eshape:ident ( $($eop:tt),* ); )+
+        } )?
     ) => {
         impl $crate::discover::engine::Theory for $thy {
             type Sort = $Sort;
@@ -151,6 +178,7 @@ macro_rules! theory {
                 ($observe)(value)
             }
         }
+        $( $crate::__theory_expects! { $thy; $( $eshape ( $($eop),* ); )+ } )?
     };
 
     // MINIMAL form: the floor of a discovered domain. No `Obs`, no `observe`, no `vars`, no `inhabit`
@@ -167,6 +195,7 @@ macro_rules! theory {
         ops {
             $( $fix:ident $opname:literal $opsym:literal ( $($insort:path),* ) -> $outsort:path = $eval:expr; )+
         }
+        $( expects { $($etail:tt)+ } )?
     ) => {
         $crate::theory! {
             $thy : $namestr,
@@ -178,7 +207,42 @@ macro_rules! theory {
             ops {
                 $( $fix $opname $opsym ( $($insort),* ) -> $outsort = $eval; )+
             }
+            $( expects { $($etail)+ } )?
         }
+    };
+}
+
+/// The `expects { ... }` clause's expansion — one `expect::Expected` impl, each line an
+/// `Expectation` (shape key, operator symbols). Split out of `theory!` so all three forms share
+/// one expansion. Hidden: only ever invoked by `theory!` itself.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __theory_expects {
+    ( $thy:ty; $( $shape:ident ( $($op:tt),* ); )+ ) => {
+        impl $crate::discover::expect::Expected for $thy {
+            fn expectations() -> ::std::vec::Vec<$crate::discover::expect::Expectation> {
+                ::std::vec![ $(
+                    $crate::discover::expect::Expectation::of(
+                        ::std::stringify!($shape),
+                        ::std::vec![ $( $crate::__expect_op!($op) ),* ],
+                    )
+                ),+ ]
+            }
+        }
+    };
+}
+
+/// One operator symbol inside an `expects` line: a bare identifier stringifies (`grant` →
+/// `"grant"`); a string literal passes through, for symbols no identifier can spell (`"+"`,
+/// `"-."`). Hidden: only ever invoked by `__theory_expects!`'s expansion.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __expect_op {
+    ( $op:literal ) => {
+        $op
+    };
+    ( $op:ident ) => {
+        ::std::stringify!($op)
     };
 }
 
@@ -212,21 +276,26 @@ pub struct Spec {
     pub uncovered_ops: Vec<&'static str>,
 }
 
-/// Discover the named value-algebra laws of any theory, rendered into a `Spec`.
-fn theory_spec<T: Theory>() -> Spec {
-    let discovered = Engine::<T>::new().discover();
-    Spec {
-        theory: T::name(),
-        laws: discovered
-            .laws
-            .iter()
-            .map(|l| Law {
-                prose: l.prose.clone(),
-                equation: l.equation.clone(),
-            })
-            .collect(),
-        consequences: discovered.consequences,
-        uncovered_ops: discovered.uncovered_ops,
+impl Spec {
+    /// Discover the named value-algebra laws of any theory, rendered into a `Spec` — the
+    /// public constructor, attached per the no-rats-nest rule. A downstream crate implements
+    /// `engine::Theory` for its own boundary and calls `Spec::of::<MyTheory>()`; the result
+    /// freezes into the consumer's own repo via [`Spec::lock_in`] (see `freeze`).
+    pub fn of<T: Theory>() -> Spec {
+        let discovered = Engine::<T>::new().discover();
+        Spec {
+            theory: T::name(),
+            laws: discovered
+                .laws
+                .iter()
+                .map(|l| Law {
+                    prose: l.prose.clone(),
+                    equation: l.equation.clone(),
+                })
+                .collect(),
+            consequences: discovered.consequences,
+            uncovered_ops: discovered.uncovered_ops,
+        }
     }
 }
 
@@ -234,7 +303,7 @@ fn theory_spec<T: Theory>() -> Spec {
 /// the `Arithmetic` theory) plus the structural `U` law. The author supplied only the operators;
 /// everything here was found by running them, not declared.
 pub fn interpreter_spec() -> Spec {
-    let mut spec = theory_spec::<Arithmetic>();
+    let mut spec = Spec::of::<Arithmetic>();
     if observer_is_sensitive(render()) {
         spec.laws.push(Law {
             prose: "No two distinct programs look the same — the faithful rendering distinguishes \
@@ -248,17 +317,27 @@ pub fn interpreter_spec() -> Spec {
 
 /// The router's discovered spec (a non-commutative monoid).
 pub fn router_spec() -> Spec {
-    theory_spec::<router::Router>()
+    Spec::of::<router::Router>()
 }
 
 /// The date calculus's discovered spec (a multi-sorted domain with a partial operator).
 pub fn date_spec() -> Spec {
-    theory_spec::<date::Calendar>()
+    Spec::of::<date::Calendar>()
+}
+
+/// The TTL store's discovered spec (the first STATEFUL domain: merge monoid, tick action).
+pub fn kvstore_spec() -> Spec {
+    Spec::of::<crate::kvstore::theory::TtlStore>()
 }
 
 /// Every theory's discovered spec — what the freeze records and the staleness gate checks.
 pub fn all_specs() -> Vec<Spec> {
-    vec![interpreter_spec(), router_spec(), date_spec()]
+    vec![
+        interpreter_spec(),
+        router_spec(),
+        date_spec(),
+        kvstore_spec(),
+    ]
 }
 
 /// The interpreter's discovered laws (named value-algebra laws + the `U` law), for consumers that
@@ -373,7 +452,7 @@ mod tests {
             spec.uncovered_ops
         );
         // the count of further (consequence) equalities — pins enumeration depth and dedup.
-        assert_eq!(spec.consequences, 316, "consequence count changed");
+        assert_eq!(spec.consequences, 333, "consequence count changed");
     }
 
     /// Enumeration over the (richer) arithmetic theory emits no reflexive `t = t` equality — every

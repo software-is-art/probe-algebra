@@ -10,11 +10,11 @@
 //!
 //! Run `cargo run --example residue`.
 
-use boundary_algebra::discover::residue::{render, simplifiable};
+use boundary_spec::discover::residue::Inert;
 
 fn main() {
-    print!("{}", render());
-    let simp = simplifiable();
+    print!("{}", Inert::render_census());
+    let simp = Inert::simplifiable();
     println!(
         "\n{} of them are REDUNDANT — simplify them away and the carve-out disappears; the rest are\n\
          genuine free choices the spec does not constrain. The drift gate fails CI if this list and\n\

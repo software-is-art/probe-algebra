@@ -13,10 +13,10 @@
 //!     without that witness — so "well-typed programs don't go wrong" is a COMPILE-time
 //!     fact, not a runtime hope; while
 //!   - the INTERNALS (the lexer, parser, type checker, and evaluator in `internal.rs`)
-//!     are ordinary code, validated by a few example tests and deliberately left OUT of
-//!     the mutation sweep (`.cargo/mutants.toml`). The boundary contracts constrain
-//!     them, so they need not be exhaustively re-tested — the over-testing the structure
-//!     is meant to eliminate.
+//!     are ordinary code with NO tests of their own, and they are deliberately KEPT IN
+//!     the mutation sweep: the boundary's derived probes are their entire verification,
+//!     and the sweep MEASURES whether that suffices (see `internal.rs`'s preamble and
+//!     `.cargo/mutants.toml`, which carves out only documented equivalents).
 //!
 //! The language: non-negative integer and boolean literals, `+`/`*`/`<`, `if/then/else`,
 //! and `let x = e in e`, written in a fully-parenthesized CANONICAL form so the parse is

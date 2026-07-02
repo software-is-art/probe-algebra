@@ -52,69 +52,70 @@ impl Inert {
             Inertia::FreeChoice => "ACCEPT — a genuine free choice, or tighten the spec to pin it",
         }
     }
-}
 
-/// The ratified equivalent-mutant residue — the behaviourally-inert spots the gate excludes, each
-/// classified. The patterns mirror `.cargo/mutants.toml`'s `exclude_re` (kept in lockstep by the
-/// drift gate in the tests); the CLASSIFICATION is the irreducible human judgement — why each mutant
-/// is inert — surfaced here instead of buried in a config comment.
-pub fn residue() -> Vec<Inert> {
-    vec![
-        Inert {
-            pattern: "<impl Shaped for bool>::inhabitant",
-            kind: Inertia::FreeChoice,
-            note: "the canonical seed is an arbitrary bool (`false` == `Default::default()`), \
-                   unobservable by any sensitivity probe",
-        },
-        Inert {
-            pattern: "<impl Declares for ResolvePretendsPure>::declared_sources",
-            kind: Inertia::FreeChoice,
-            note: "it legitimately declares NOTHING (the under-claim being demonstrated), so an \
-                   empty-slice mutant is indistinguishable",
-        },
-        Inert {
-            pattern: "match guard c.is_ascii_alphabetic",
-            kind: Inertia::RedundantGuard,
-            note:
-                "the lexer's first-char guard is re-imposed by `Ident::new`, so relaxing it admits \
-                   nothing new — the guard is redundant",
-        },
-    ]
-}
-
-/// The redundant-guard residue — the entries that should be SIMPLIFIED AWAY, shrinking the carve-out
-/// list toward only genuine free choices.
-pub fn simplifiable() -> Vec<Inert> {
-    residue()
-        .into_iter()
-        .filter(|i| i.kind == Inertia::RedundantGuard)
-        .collect()
-}
-
-/// Render the residue as a readable report — the redundant ones first, as work to do.
-pub fn render() -> String {
-    let r = residue();
-    let mut out = format!(
-        "equivalent-mutant residue — {} ratified, behaviourally inert:\n",
-        r.len()
-    );
-    for i in r.iter().filter(|i| i.kind == Inertia::RedundantGuard) {
-        out.push_str(&format!(
-            "  [redundant] {} — {}\n      {}\n",
-            i.pattern,
-            i.note,
-            i.remedy()
-        ));
+    /// The ratified equivalent-mutant residue — the behaviourally-inert spots the gate excludes,
+    /// each classified. The patterns mirror `.cargo/mutants.toml`'s `exclude_re` (kept in lockstep
+    /// by the drift gate in the tests); the CLASSIFICATION is the irreducible human judgement — why
+    /// each mutant is inert — surfaced here instead of buried in a config comment. The census is an
+    /// associated function of its FINDING — the public surface is the value object, not a loose
+    /// function (the no-rats-nest rule: every public callable hangs off a typestate).
+    pub fn census() -> Vec<Inert> {
+        vec![
+            Inert {
+                pattern: "<impl Shaped for bool>::inhabitant",
+                kind: Inertia::FreeChoice,
+                note: "the canonical seed is an arbitrary bool (`false` == `Default::default()`), \
+                       unobservable by any sensitivity probe",
+            },
+            Inert {
+                pattern: "<impl Declares for ResolvePretendsPure>::declared_sources",
+                kind: Inertia::FreeChoice,
+                note: "it legitimately declares NOTHING (the under-claim being demonstrated), so \
+                       an empty-slice mutant is indistinguishable",
+            },
+            Inert {
+                pattern: "match guard c.is_ascii_alphabetic",
+                kind: Inertia::RedundantGuard,
+                note: "the lexer's first-char guard is re-imposed by `Ident::new`, so relaxing it \
+                       admits nothing new — the guard is redundant",
+            },
+        ]
     }
-    for i in r.iter().filter(|i| i.kind == Inertia::FreeChoice) {
-        out.push_str(&format!(
-            "  [free choice] {} — {}\n      {}\n",
-            i.pattern,
-            i.note,
-            i.remedy()
-        ));
+
+    /// The redundant-guard residue — the entries that should be SIMPLIFIED AWAY, shrinking the
+    /// carve-out list toward only genuine free choices.
+    pub fn simplifiable() -> Vec<Inert> {
+        Inert::census()
+            .into_iter()
+            .filter(|i| i.kind == Inertia::RedundantGuard)
+            .collect()
     }
-    out
+
+    /// Render the residue as a readable report — the redundant ones first, as work to do.
+    pub fn render_census() -> String {
+        let r = Inert::census();
+        let mut out = format!(
+            "equivalent-mutant residue — {} ratified, behaviourally inert:\n",
+            r.len()
+        );
+        for i in r.iter().filter(|i| i.kind == Inertia::RedundantGuard) {
+            out.push_str(&format!(
+                "  [redundant] {} — {}\n      {}\n",
+                i.pattern,
+                i.note,
+                i.remedy()
+            ));
+        }
+        for i in r.iter().filter(|i| i.kind == Inertia::FreeChoice) {
+            out.push_str(&format!(
+                "  [free choice] {} — {}\n      {}\n",
+                i.pattern,
+                i.note,
+                i.remedy()
+            ));
+        }
+        out
+    }
 }
 
 #[cfg(test)]
@@ -146,13 +147,13 @@ mod tests {
             })
             .collect();
 
-        let mut declared: Vec<&str> = residue().iter().map(|i| i.pattern).collect();
+        let mut declared: Vec<&str> = Inert::census().iter().map(|i| i.pattern).collect();
         let mut gated = carveouts.clone();
         declared.sort_unstable();
         gated.sort_unstable();
         assert_eq!(
             declared, gated,
-            "residue() and .cargo/mutants.toml exclude_re have drifted"
+            "Inert::census() and .cargo/mutants.toml exclude_re have drifted"
         );
     }
 
@@ -160,12 +161,12 @@ mod tests {
     /// two are free choices. Pins the kinds against a flip.
     #[test]
     fn equivalents_are_classified_redundant_vs_free() {
-        let simp = simplifiable();
+        let simp = Inert::simplifiable();
         assert_eq!(simp.len(), 1, "exactly one redundant guard");
         assert_eq!(simp[0].pattern, "match guard c.is_ascii_alphabetic");
         assert!(simp[0].remedy().contains("SIMPLIFY"));
         // the free choices are not offered up for simplification.
-        let free: Vec<_> = residue()
+        let free: Vec<_> = Inert::census()
             .into_iter()
             .filter(|i| i.kind == Inertia::FreeChoice)
             .collect();
@@ -177,7 +178,7 @@ mod tests {
     /// guard and both free choices, each under its own heading.
     #[test]
     fn the_report_surfaces_every_finding() {
-        let text = render();
+        let text = Inert::render_census();
         assert!(text.contains("[redundant]") && text.contains("is_ascii_alphabetic"));
         // both free choices appear (so the free-choice section actually lists them, not a mislabel).
         assert!(text.contains("[free choice]"));

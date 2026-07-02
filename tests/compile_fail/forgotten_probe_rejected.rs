@@ -4,8 +4,8 @@
 //! `AllProbed` is unsatisfied and the program is rejected BEFORE any test runs. This is the
 //! "you added an edge but forgot its probe" mistake, turned from a late surviving mutant into
 //! an immediate build error.
-use boundary_algebra::boundary::assert_all_probed;
-use boundary_algebra::edges;
+use boundary_spec::boundary::assert_all_probed;
+use boundary_spec::edges;
 
 struct Unprobed; // an edge with no probe
 
