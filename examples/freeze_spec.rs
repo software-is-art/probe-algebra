@@ -5,7 +5,8 @@
 //! the RATIFICATION of the new spec. CI's staleness gate (`freeze::the_committed_specs_are_fresh`)
 //! fails if the committed locks are out of date, so an unintended behaviour change is caught.
 //! The write itself is `spec_lock::bless` — the generic regeneration path; `Spec::lock` supplies
-//! this repo's artifacts (path + rendered text).
+//! this repo's artifacts (path + rendered text). A downstream crate writes the same loop over its
+//! own theories with `Spec::of::<MyTheory>().lock_in(spec_dir)`, rooting the locks in ITS repo.
 //!
 //! Run `cargo run --example freeze_spec`.
 

@@ -212,21 +212,26 @@ pub struct Spec {
     pub uncovered_ops: Vec<&'static str>,
 }
 
-/// Discover the named value-algebra laws of any theory, rendered into a `Spec`.
-fn theory_spec<T: Theory>() -> Spec {
-    let discovered = Engine::<T>::new().discover();
-    Spec {
-        theory: T::name(),
-        laws: discovered
-            .laws
-            .iter()
-            .map(|l| Law {
-                prose: l.prose.clone(),
-                equation: l.equation.clone(),
-            })
-            .collect(),
-        consequences: discovered.consequences,
-        uncovered_ops: discovered.uncovered_ops,
+impl Spec {
+    /// Discover the named value-algebra laws of any theory, rendered into a `Spec` — the
+    /// public constructor, attached per the no-rats-nest rule. A downstream crate implements
+    /// `engine::Theory` for its own boundary and calls `Spec::of::<MyTheory>()`; the result
+    /// freezes into the consumer's own repo via [`Spec::lock_in`] (see `freeze`).
+    pub fn of<T: Theory>() -> Spec {
+        let discovered = Engine::<T>::new().discover();
+        Spec {
+            theory: T::name(),
+            laws: discovered
+                .laws
+                .iter()
+                .map(|l| Law {
+                    prose: l.prose.clone(),
+                    equation: l.equation.clone(),
+                })
+                .collect(),
+            consequences: discovered.consequences,
+            uncovered_ops: discovered.uncovered_ops,
+        }
     }
 }
 
@@ -234,7 +239,7 @@ fn theory_spec<T: Theory>() -> Spec {
 /// the `Arithmetic` theory) plus the structural `U` law. The author supplied only the operators;
 /// everything here was found by running them, not declared.
 pub fn interpreter_spec() -> Spec {
-    let mut spec = theory_spec::<Arithmetic>();
+    let mut spec = Spec::of::<Arithmetic>();
     if observer_is_sensitive(render()) {
         spec.laws.push(Law {
             prose: "No two distinct programs look the same — the faithful rendering distinguishes \
@@ -248,17 +253,17 @@ pub fn interpreter_spec() -> Spec {
 
 /// The router's discovered spec (a non-commutative monoid).
 pub fn router_spec() -> Spec {
-    theory_spec::<router::Router>()
+    Spec::of::<router::Router>()
 }
 
 /// The date calculus's discovered spec (a multi-sorted domain with a partial operator).
 pub fn date_spec() -> Spec {
-    theory_spec::<date::Calendar>()
+    Spec::of::<date::Calendar>()
 }
 
 /// The TTL store's discovered spec (the first STATEFUL domain: merge monoid, tick action).
 pub fn kvstore_spec() -> Spec {
-    theory_spec::<crate::kvstore::theory::TtlStore>()
+    Spec::of::<crate::kvstore::theory::TtlStore>()
 }
 
 /// Every theory's discovered spec — what the freeze records and the staleness gate checks.

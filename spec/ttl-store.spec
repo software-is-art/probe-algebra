@@ -19,5 +19,4 @@
 - Plus with zero leaves a value unchanged.
       (zero + p) = p
 
-# 149 further consequence equalities (implied by the laws above)
 # operators in no law (where the spec is silent): none — every operator participates in a law

@@ -11,27 +11,36 @@
 //!
 //! The freeze/drift mechanics (compare live text to a committed file; write the regeneration) are
 //! the domain-agnostic `spec-lock` crate; this module is the thin adapter that knows what THIS
-//! repo's artifacts are — where a theory's lock lives (`lock_path`) and how a `Spec` renders
+//! repo's artifacts are — where a theory's lock lives (`Spec::lock_in`) and how a `Spec` renders
 //! (`render`). See `docs/ci-discipline.md` for the whole discipline.
+//!
+//! One principle governs what gets rendered INTO a lock: **a lock contains only facts about the
+//! DOMAIN, never facts about the engine.** The header, the named laws, and the coverage line
+//! (which operators no law speaks for) are all statements about the boundary's behaviour; they
+//! belong in the lock. The consequence-equality count is NOT — it measures how many implied
+//! equalities OUR enumeration happened to sample, so it churns whenever the engine's sampling
+//! improves, with no behaviour change underneath. Keeping it out means an engine upgrade can only
+//! drift a consumer's lock by changing the LAWS — which is exactly the drift a consumer must
+//! ratify. (Consequence counts stay visible where engine facts belong: this repo's golden tests
+//! and the `discovered_spec` example.)
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use spec_lock::Lock;
 
 use super::{all_specs, Spec};
 
-/// The committed lock file for a theory, under `spec/` (the theory name slugified).
-fn lock_path(theory: &str) -> PathBuf {
+/// The lock file for a theory inside a given spec directory (the theory name slugified).
+fn lock_path(spec_dir: &Path, theory: &str) -> PathBuf {
     let slug: String = theory
         .chars()
         .map(|c| if c == ' ' { '-' } else { c })
         .collect();
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("spec")
-        .join(format!("{slug}.spec"))
+    spec_dir.join(format!("{slug}.spec"))
 }
 
-/// The canonical text of a discovered spec — deterministic, human-readable, diffable.
+/// The canonical text of a discovered spec — deterministic, human-readable, diffable. Renders
+/// only domain facts (header, named laws, coverage) per the lock principle in the module docs.
 fn render(spec: &Spec) -> String {
     let mut out = String::new();
     out.push_str(&format!(
@@ -42,10 +51,6 @@ fn render(spec: &Spec) -> String {
         out.push_str(&format!("- {}\n      {}\n", law.prose(), law.equation()));
     }
     out.push('\n');
-    out.push_str(&format!(
-        "# {} further consequence equalities (implied by the laws above)\n",
-        spec.consequences
-    ));
     let coverage = if spec.uncovered_ops.is_empty() {
         "none — every operator participates in a law".to_string()
     } else {
@@ -58,18 +63,32 @@ fn render(spec: &Spec) -> String {
 }
 
 impl Spec {
-    /// This spec as a `spec_lock::Lock` — its name, committed lock file, and live rendered
-    /// text. This is the whole adapter: everything domain-specific about the freeze is in
-    /// here (`lock_path` + `render`); the compare (`spec_lock::check`) and the regeneration
-    /// write (`spec_lock::bless`, used by `examples/freeze_spec.rs`) are generic. Attached
-    /// to the `Spec` value object per the no-rats-nest rule: every public callable hangs
-    /// off a typestate.
-    pub fn lock(&self) -> Lock {
+    /// This spec as a `spec_lock::Lock` rooted in a caller-supplied spec directory — the
+    /// CONSUMER-facing form. The lock file lives at `spec_dir/<slugified-theory>.spec` and
+    /// carries the canonical rendering (`render`). This is the whole adapter: everything
+    /// domain-specific about the freeze is in here (`lock_path` + `render`); the compare
+    /// (`spec_lock::check`) and the regeneration write (`spec_lock::bless`) are generic.
+    /// Attached to the `Spec` value object per the no-rats-nest rule: every public callable
+    /// hangs off a typestate.
+    ///
+    /// A downstream crate points `spec_dir` at a directory in ITS OWN repository (e.g.
+    /// `Path::new("spec")` resolved against its manifest dir) — the lock must live where the
+    /// consumer's CI can diff and ratify it, never inside the library checkout.
+    pub fn lock_in(&self, spec_dir: &Path) -> Lock {
         Lock {
             name: self.theory.to_string(),
-            path: lock_path(self.theory),
+            path: lock_path(spec_dir, self.theory),
             live: render(self),
         }
+    }
+
+    /// This spec as a `spec_lock::Lock` in THIS repo's `spec/` directory — a convenience for
+    /// this repository's own freeze (`examples/freeze_spec.rs`) and staleness gate. The path
+    /// is fixed at this crate's compile time (`CARGO_MANIFEST_DIR`), so for a downstream
+    /// crate it would point into the cargo checkout, not the consumer's repo: consumers use
+    /// [`Spec::lock_in`] with their own spec directory instead.
+    pub fn lock(&self) -> Lock {
+        self.lock_in(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec"))
     }
 
     /// Check every theory's LIVE spec against its committed lock. On success returns the

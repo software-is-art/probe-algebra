@@ -78,10 +78,13 @@ re-established on a schedule — you pay the sweep once per week, not once per c
 - **Determinism is a real engineering obligation** (move 1). Any nondeterminism in the
   derivation — parallel iteration order, float formatting, environment leakage — must be
   hunted down before the gate is trustworthy.
-- **Engine changes churn every lock at once.** When the *deriving tool* changes (a new law
-  shape, a renderer tweak), every committed lock regenerates in one PR. That diff is large and
-  mostly mechanical, and it still deserves a human eye — the golden-count churn is the price of
-  the ratification being real. Budget for it when touching the engine.
+- **Engine changes can churn every lock at once.** When the *deriving tool* changes in a way
+  that changes the law set (a new law shape, a renderer tweak), every committed lock
+  regenerates in one PR. That diff is large and mostly mechanical, and it still deserves a
+  human eye — the churn is the price of the ratification being real. Budget for it when
+  touching the engine. (Engine facts that would churn with *no* behaviour change — the
+  consequence-equality counts — are deliberately kept out of the locks; they live in this
+  repo's golden tests instead. See the upgrade contract below.)
 - **Timeout mutants leave a reviewable residue.** A non-termination mutant (a relaxed loop
   guard) makes the mutant hang while the original terminates — that is a *detection*, not a
   survivor, so the gate passes a timeouts-only run. The honest caveat, from
@@ -93,6 +96,31 @@ re-established on a schedule — you pay the sweep once per week, not once per c
   they don't change behaviour. Here each is classified (redundant guard → simplify it away;
   free choice → carve it out in `.cargo/mutants.toml`) and the classified list is itself
   drift-gated, so an exclusion cannot accumulate undocumented.
+
+## The upgrade contract, for downstream consumers
+
+A consumer of this library can run the same discipline over *its own* boundary: implement
+`engine::Theory`, build the spec with `Spec::of::<MyTheory>()`, and freeze it into the
+consumer's own repository with `Spec::lock_in(spec_dir)` (`Spec::lock` without a directory is
+this repo's convenience — its path is baked in at this crate's compile time). What that lock
+contains is a contract this library commits to:
+
+- **What you freeze: laws + coverage, nothing else.** A lock records only facts about *your
+  domain* — the header, the named laws discovery found true of your operators, and the
+  coverage line (which operators no law speaks for). It never records facts about the engine.
+  In particular the consequence-equality count — a property of our enumeration and sampling,
+  not of your behaviour — is not in the lock.
+- **What a library upgrade can do to your lock.** A new release may add universal shapes, so
+  discovery may find *new* named laws over your unchanged operators — additive lock drift,
+  which you re-freeze and ratify like any other diff (a pleasant one: the spec got more
+  articulate about behaviour you already had). What an upgrade cannot do is drift your lock
+  through engine internals alone: sampling and enumeration improvements change no lock unless
+  the law set changes. If your lock drifts, the *laws* changed — which is exactly the drift
+  the gate exists to put in front of you.
+- **The semver policy.** A new universal shape (your lock may gain laws) is a **minor**
+  release. A change to an existing shape's prose or semantics, or a removed shape (your lock
+  may lose or reword laws you ratified), is a **major** release, called out in the release
+  notes.
 
 ## How this repo instantiates each move
 
