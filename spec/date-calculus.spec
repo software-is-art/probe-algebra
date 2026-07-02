@@ -17,5 +17,5 @@
 - since undoes at — the round trip is the identity.
       since(at(p)) = p
 
-# 248 further consequence equalities (implied by the laws above)
+# 250 further consequence equalities (implied by the laws above)
 # operators in no law (where the spec is silent): none — every operator participates in a law

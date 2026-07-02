@@ -155,6 +155,11 @@ pub fn analyze() -> Vec<Finding> {
     findings
 }
 
+/// Escape a string to its RFC 8259 wire form: `"` and `\` and the three whitespace controls take
+/// their short escapes; every OTHER C0 control (U+0000–U+001F, which raw JSON forbids outright)
+/// takes the generic `\u00XX` form. Deliberately a PER-CHARACTER map — each char's wire form is
+/// independent of its neighbours — so `esc` is a monoid homomorphism over concatenation, exactly
+/// the law the `EscapeCodec` theory discovers below.
 fn esc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -166,6 +171,9 @@ fn esc(s: &str) -> String {
             // ESCAPED, not dropped: `esc` must be INVERTIBLE or the engine refuses the codec
             // round-trip below (a dropping escaper loses `\r` and `unesc(esc(s)) != s`).
             '\r' => out.push_str("\\r"),
+            // the REMAINING C0 controls (`\x08`, `\x0c`, ...): RFC 8259 forbids every one of
+            // them raw, so each becomes `\u00XX` — still a fixed per-character map.
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
             _ => out.push(c),
         }
     }
@@ -185,6 +193,19 @@ fn unesc(s: &str) -> String {
                 Some('n') => out.push('\n'),
                 Some('t') => out.push('\t'),
                 Some('r') => out.push('\r'),
+                // exactly what `esc` emits for the remaining C0 controls: `\u` then four hex
+                // digits. A malformed tail (not `esc` output) is kept literally — `unesc` is
+                // total, and on `esc`'s image this arm is the exact inverse of `\u00XX`.
+                Some('u') => {
+                    let hex: String = chars.by_ref().take(4).collect();
+                    match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                        Some(decoded) if hex.len() == 4 => out.push(decoded),
+                        _ => {
+                            out.push_str("\\u");
+                            out.push_str(&hex);
+                        }
+                    }
+                }
                 Some(other) => out.push(other),
                 None => out.push('\\'),
             }
@@ -357,10 +378,11 @@ crate::theory! {
 //     forced `\r` to be escaped rather than dropped: the round-trip would not hold otherwise).
 //
 // What the algebra does NOT determine is the ENCODING — which character maps to which escape. That
-// is a representation CONVENTION (conformance to the JSON wire standard), not a law: many invertible
-// homomorphisms exist (the identity is one), so the specific arms `'\t' => "\\t"` … are a LEAF the
-// laws cannot derive. The in-format model thus locates the irreducible bit precisely: the codec
-// STRUCTURE is discovered; the encoding is an oracle pinned by `esc_conforms_to_the_json_encoding`.
+// is a representation CONVENTION (conformance to the RFC 8259 JSON wire standard), not a law: many
+// invertible homomorphisms exist (the identity is one), so the specific arms `'\t' => "\\t"` … and
+// the `\u00XX` form for the remaining C0 controls are a LEAF the laws cannot derive. The in-format
+// model thus locates the irreducible bit precisely: the codec STRUCTURE is discovered; the encoding
+// is an oracle pinned by `esc_conforms_to_the_json_encoding`.
 
 /// The escape codec's single sort.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -377,7 +399,9 @@ fn esc_op(v: &[String]) -> Option<String> {
 fn unesc_op(v: &[String]) -> Option<String> {
     Some(unesc(&v[0]))
 }
-/// One inhabitant per escape arm, plus plain text AND already-escaped SEQUENCES (`\n` as the two
+/// One inhabitant per short-form escape arm (the generic `\u00XX` C0 arm is pinned by the
+/// `esc_conforms_to_the_json_encoding` oracle instead — the laws hold either way, so the grid
+/// stays minimal), plus plain text AND already-escaped SEQUENCES (`\n` as the two
 /// chars backslash-n, a trailing backslash). The sequences matter: without them the grid is too weak
 /// and discovery over-fits — `unesc` looks like an involution and a homomorphism (it is neither);
 /// the sequences refute both, leaving only the TRUE laws (esc homomorphism, the codec round-trip,
@@ -491,18 +515,35 @@ mod tests {
             "uncovered: {:?}",
             d.uncovered_ops
         );
-        assert_eq!(d.consequences, 43, "consequence count changed");
+        assert_eq!(d.consequences, 39, "consequence count changed");
     }
 
     /// The codec STRUCTURE is discovered (above); the ENCODING is not a law — many invertible
     /// homomorphisms exist, so which character maps to which escape is a representation CONVENTION,
-    /// conformance to the JSON wire standard. This is the irreducible leaf the algebra cannot
-    /// derive, pinned here as an oracle (and pinning every `esc` arm against deletion).
+    /// conformance to the RFC 8259 JSON wire standard. This is the irreducible leaf the algebra
+    /// cannot derive, pinned here as an oracle (and pinning every `esc` arm against deletion) —
+    /// including the standard's blanket rule that EVERY C0 control (U+0000–U+001F), not just the
+    /// five with short forms, must be escaped.
     #[test]
     fn esc_conforms_to_the_json_encoding() {
         assert_eq!(esc("a\"b\\c\nd\te\rf"), "a\\\"b\\\\c\\nd\\te\\rf");
         // and it round-trips through `unesc` — invertibility, including the once-dropped `\r`.
         assert_eq!(unesc(&esc("a\"b\\c\nd\te\rf")), "a\"b\\c\nd\te\rf");
+        // the controls WITHOUT short forms take the generic `\u00XX` escape (the once-raw leak).
+        assert_eq!(
+            esc("\u{0}a\u{8}b\u{c}c\u{1f}"),
+            "\\u0000a\\u0008b\\u000cc\\u001f"
+        );
+        // and EVERY C0 control leaves no raw control byte on the wire and round-trips exactly.
+        for c in '\u{0}'..='\u{1f}' {
+            let s = c.to_string();
+            let wire = esc(&s);
+            assert!(
+                wire.chars().all(|w| w as u32 >= 0x20),
+                "raw control {c:?} leaked into the wire form {wire:?}"
+            );
+            assert_eq!(unesc(&wire), s, "control {c:?} must round-trip");
+        }
     }
 
     /// `render_lsp` emits the LSP payloads an editor consumes — a Hint (severity 4) diagnostic and a

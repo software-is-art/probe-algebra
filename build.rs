@@ -27,8 +27,21 @@
 //!            inward rule. Its finer seam / capability-edge / leaf split is enforced WITHIN it by
 //!            discovered laws and declared capabilities (see `discover::architect`), not by this
 //!            structural pass.
+//!
+//! KNOWN LIMITATIONS — holes we know about and have not closed, named here so they are a documented
+//! residue rather than a false claim of totality:
+//!
+//!   * Probe/edge matching is by BARE type name (the last path segment), so two same-named edge
+//!     types in different modules would share one probe obligation — a cross-module name collision
+//!     satisfies the check without covering both edges.
+//!   * Effect detection is SYNTACTIC and local to a function body: a helper function that does the
+//!     I/O and is merely CALLED is invisible (transitive effects are not traced), and only paths
+//!     that lexically reach `std::{io,fs,process,net,thread,env}` — directly or via this file's
+//!     `use std::…` imports — are seen.
+//!   * A type alias (`type Name = String;`) can smuggle a raw primitive past the inward rule and
+//!     the boundary field checks, because we match names, not resolved types.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use syn::visit::{self, Visit};
@@ -49,7 +62,7 @@ fn main() {
     // grading-law proofs.
     let mut edges: Vec<EdgeImpl> = Vec::new();
     let mut probed: HashSet<String> = HashSet::new();
-    collect_edges_and_probes(&src, &mut edges, &mut probed);
+    collect_edges_and_probes(&src, &root, &mut edges, &mut probed);
     for e in &edges {
         if !probed.contains(&e.ty) {
             violations.push(format!(
@@ -146,8 +159,9 @@ fn collect_qualifications(dir: &Path, manifest: &str, scanned: &mut usize, out: 
         }
         let Ok(file) = parse(&path) else { continue };
         *scanned += 1;
+        let imports = std_effect_imports(&file.items);
         let mut ops: Vec<Op> = Vec::new();
-        qualify_items(&file.items, &mut ops);
+        qualify_items(&file.items, &imports, &mut ops);
         if ops.is_empty() {
             continue;
         }
@@ -177,17 +191,17 @@ struct Op {
 }
 
 /// Collect operator functions from items, descending into non-test inline modules.
-fn qualify_items(items: &[Item], out: &mut Vec<Op>) {
+fn qualify_items(items: &[Item], imports: &HashMap<String, String>, out: &mut Vec<Op>) {
     for it in items {
         match it {
             Item::Fn(f) if !is_cfg_test(&f.attrs) => {
-                if let Some(op) = operator_candidate(f) {
+                if let Some(op) = operator_candidate(f, imports) {
                     out.push(op);
                 }
             }
             Item::Mod(m) if !is_cfg_test(&m.attrs) => {
                 if let Some((_, inner)) = &m.content {
-                    qualify_items(inner, out);
+                    qualify_items(inner, imports, out);
                 }
             }
             _ => {}
@@ -198,7 +212,7 @@ fn qualify_items(items: &[Item], out: &mut Vec<Op>) {
 /// Is `f` an operator over value objects? Every argument and the return must be a BARE NAMED value
 /// type (a path with no generics, not a raw primitive or `bool`), and the body must do no I/O — the
 /// shape `#[algebra]` reads. A `&[Value]`-style evaluator, a primitive return, or an effect is not.
-fn operator_candidate(f: &ItemFn) -> Option<Op> {
+fn operator_candidate(f: &ItemFn, imports: &HashMap<String, String>) -> Option<Op> {
     let ret = match &f.sig.output {
         ReturnType::Type(_, ty) => named_value_type(ty)?,
         ReturnType::Default => return None,
@@ -215,7 +229,10 @@ fn operator_candidate(f: &ItemFn) -> Option<Op> {
         // bare `fn() -> T` is not enough signal, so require at least one argument here.
         return None;
     }
-    let mut eff = EffectFinder { found: None };
+    let mut eff = EffectFinder {
+        found: None,
+        imports,
+    };
     eff.visit_item_fn(f);
     if eff.found.is_some() {
         return None;
@@ -250,6 +267,11 @@ fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
+            // Register the DIRECTORY too, not just the files in it — a brand-new file in a
+            // subdirectory changes the directory entry, so it must re-trigger the build script;
+            // watching only the files that existed at the last build would let a new module land
+            // unchecked until something else happened to dirty the build.
+            println!("cargo:rerun-if-changed={}", path.display());
             walk(&path, _src_root, manifest, out);
             continue;
         }
@@ -295,7 +317,19 @@ fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
         //              the world (`std::fs`/`io`/`process`/`net`/`env`/`thread`) must DECLARE a
         //              capability — the fine seam/capability/leaf split, made a build obligation.
         match tier {
-            "KERNEL" => continue,
+            "KERNEL" => {
+                // Claiming kernel-hood is claiming EXEMPTION from every rule below, so it cannot
+                // be self-serve: the file must ALSO be on the allowlist here, making every new
+                // kernel member a diff in build.rs itself — ratified, not asserted.
+                if !KERNEL_ALLOWLIST.contains(&loc.as_str()) {
+                    out.push(format!(
+                        "{loc}: declares `Tier: KERNEL` but is not in KERNEL_ALLOWLIST — KERNEL \
+                         tier must be ratified in build.rs. Add the file to the allowlist there \
+                         (making the exemption a reviewed diff), or declare its real tier."
+                    ));
+                }
+                continue;
+            }
             "BOUNDARY" | "INTERIOR" | "ALGEBRA" => {}
             _ => continue,
         }
@@ -319,10 +353,33 @@ fn walk(dir: &Path, _src_root: &Path, manifest: &str, out: &mut Vec<String>) {
 /// The partition tiers — every source file declares exactly one (see `walk` for what each enforces).
 const TIERS: &[&str] = &["KERNEL", "BOUNDARY", "INTERIOR", "ALGEBRA"];
 
-/// The tier a file declares, via a `Tier: <NAME>` marker in its header (the module doc). `None` if
-/// it declares none — which `walk` turns into a violation, so the partition stays total.
+/// The RATIFIED kernel — the only files allowed to declare `Tier: KERNEL` (manifest-relative
+/// paths). The marker alone is not enough: kernel-hood exempts a file from every structural rule,
+/// so admitting a new member must be a diff HERE, in the enforcement script itself, where review
+/// cannot miss it. A file declaring KERNEL that is not on this list is a violation.
+const KERNEL_ALLOWLIST: &[&str] = &[
+    "src/boundary.rs",
+    "src/capability.rs",
+    "src/discover/engine.rs",
+    "src/discover/mod.rs",
+    "src/gdp.rs",
+    "src/harness.rs",
+    "src/lib.rs",
+    "src/main.rs",
+    "src/tests.rs",
+];
+
+/// The tier a file declares, via a `//! Tier: <NAME>` marker in its header (the module doc). `None`
+/// if it declares none — which `walk` turns into a violation, so the partition stays total. Only
+/// lines that ARE module-doc lines (`//!`) count: a `Tier:` mention in a string literal, a code
+/// comment, or prose cannot satisfy (or spoof) the declaration. We keep the simple fixed 40-line
+/// window — every real header opens the file, so a marker below line 40 is a marker hidden from the
+/// reader, and we would rather reject it than hunt for it.
 fn declared_tier(source: &str) -> Option<&'static str> {
     for line in source.lines().take(40) {
+        if !line.trim_start().starts_with("//!") {
+            continue;
+        }
         let Some((_, rest)) = line.split_once("Tier:") else {
             continue;
         };
@@ -357,7 +414,12 @@ const EDGE_TRAITS: &[&str] = &["Morphism", "Construction", "Branch", "Guarded"];
 /// Walk EVERY `.rs` under `src/` (including the crate-root files `walk` exempts, since the
 /// `Probed` impls live in `src/harness.rs`), collecting concrete production edges and the set of
 /// types that carry an `impl Probed`.
-fn collect_edges_and_probes(dir: &Path, edges: &mut Vec<EdgeImpl>, probed: &mut HashSet<String>) {
+fn collect_edges_and_probes(
+    dir: &Path,
+    manifest: &str,
+    edges: &mut Vec<EdgeImpl>,
+    probed: &mut HashSet<String>,
+) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -365,13 +427,19 @@ fn collect_edges_and_probes(dir: &Path, edges: &mut Vec<EdgeImpl>, probed: &mut 
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            collect_edges_and_probes(&path, edges, probed);
+            collect_edges_and_probes(&path, manifest, edges, probed);
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("rs") {
             continue;
         }
-        let loc = path.display().to_string();
+        // manifest-relative, like every other pass — a violation message must not leak the
+        // machine's absolute path, and the sorted/deduped output must be stable across checkouts.
+        let loc = path
+            .strip_prefix(manifest)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
         if let Ok(file) = parse(&path) {
             collect_items(&file.items, &loc, edges, probed);
         }
@@ -388,7 +456,10 @@ fn collect_items(
 ) {
     for item in items {
         match item {
-            Item::Mod(m) => {
+            // a `#[cfg(test)]` module is test scaffolding, not a production edge — skip it whole,
+            // matching `qualify_items` and `check_algebra_items`; checking only the impl's own
+            // attrs would let a test-module edge masquerade as production.
+            Item::Mod(m) if !is_cfg_test(&m.attrs) => {
                 if let Some((_, inner)) = &m.content {
                     collect_items(inner, loc, edges, probed);
                 }
@@ -496,6 +567,7 @@ fn check_boundary(loc: &str, file: &syn::File, out: &mut Vec<String>) {
 
     let mut purity = PurityVisitor {
         loc: loc.to_string(),
+        imports: std_effect_imports(&file.items),
         hits: Vec::new(),
     };
     purity.visit_file(file);
@@ -577,23 +649,42 @@ fn describe(item: &Item) -> &'static str {
 // hand on `architect`) turned into a build obligation, the analogue of the file-level `Tier:` rule.
 
 fn check_algebra(loc: &str, file: &syn::File, out: &mut Vec<String>) {
-    check_algebra_items(loc, &file.items, out);
+    let imports = std_effect_imports(&file.items);
+    check_algebra_items(loc, &file.items, &imports, out);
 }
 
-fn check_algebra_items(loc: &str, items: &[Item], out: &mut Vec<String>) {
+fn check_algebra_items(
+    loc: &str,
+    items: &[Item],
+    imports: &HashMap<String, String>,
+    out: &mut Vec<String>,
+) {
     for item in items {
         match item {
             // a `#[cfg(test)]` module is test scaffolding, not a production edge — skip it.
             Item::Mod(m) if !is_cfg_test(&m.attrs) => {
                 if let Some((_, inner)) = &m.content {
-                    check_algebra_items(loc, inner, out);
+                    check_algebra_items(loc, inner, imports, out);
                 }
             }
             Item::Fn(f) if !is_cfg_test(&f.attrs) => {
-                let mut eff = EffectFinder { found: None };
+                let decl = capability_declaration(&f.attrs);
+                if let CapabilityDecl::Malformed(text) = &decl {
+                    out.push(format!(
+                        "{loc}: `{}` has a `Capability:` line that names no capability (`{text}`) — \
+                         the word after `Capability:` must be one of {} for the declaration to be a \
+                         contract rather than decoration.",
+                        f.sig.ident,
+                        CAPABILITY_NAMES.join(" / ")
+                    ));
+                }
+                let mut eff = EffectFinder {
+                    found: None,
+                    imports,
+                };
                 eff.visit_item_fn(f);
                 if let Some(effect) = eff.found {
-                    if !declares_capability(&f.attrs) {
+                    if !matches!(decl, CapabilityDecl::Declared) {
                         out.push(format!(
                             "{loc}: `{}` touches the world (`{effect}`) but declares no capability — \
                              an ALGEBRA-tier effect must be an honest edge. Add a `Capability: \
@@ -608,45 +699,165 @@ fn check_algebra_items(loc: &str, items: &[Item], out: &mut Vec<String>) {
     }
 }
 
-/// Whether any doc attribute carries a `Capability:` declaration.
-fn declares_capability(attrs: &[syn::Attribute]) -> bool {
-    attrs.iter().any(|a| {
-        if let Meta::NameValue(nv) = &a.meta {
-            if nv.path.is_ident("doc") {
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(s),
-                    ..
-                }) = &nv.value
-                {
-                    return s.value().contains("Capability:");
+/// The capability names a declaration may claim (mirrors `crate::boundary::Capability`).
+const CAPABILITY_NAMES: &[&str] = &["Pure", "Lossy", "Stateful", "Effectful"];
+
+/// What a function's doc says about its capability.
+enum CapabilityDecl {
+    /// no `Capability:` line at all.
+    Absent,
+    /// a `Capability:` line whose first word is one of `CAPABILITY_NAMES`.
+    Declared,
+    /// a `Capability:` line naming NONE of them (the offending text is carried for the message).
+    /// A bare-substring acceptance would let `Capability: whatever` satisfy the honesty rule —
+    /// the declaration must NAME a capability, or it declares nothing.
+    Malformed(String),
+}
+
+/// Read the `Capability:` declaration off a function's doc attributes, requiring the word after
+/// the marker to be a real capability name.
+fn capability_declaration(attrs: &[syn::Attribute]) -> CapabilityDecl {
+    let mut decl = CapabilityDecl::Absent;
+    for a in attrs {
+        let Meta::NameValue(nv) = &a.meta else {
+            continue;
+        };
+        if !nv.path.is_ident("doc") {
+            continue;
+        }
+        let syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(s),
+            ..
+        }) = &nv.value
+        else {
+            continue;
+        };
+        let text = s.value();
+        let Some((_, rest)) = text.split_once("Capability:") else {
+            continue;
+        };
+        let word: String = rest
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_alphabetic())
+            .collect();
+        if CAPABILITY_NAMES.contains(&word.as_str()) {
+            return CapabilityDecl::Declared;
+        }
+        decl = CapabilityDecl::Malformed(rest.trim().to_string());
+    }
+    decl
+}
+
+/// The `std` modules whose reach constitutes a world-touch.
+const EFFECT_MODULES: &[&str] = &["io", "fs", "process", "net", "thread", "env"];
+
+/// The per-file map from a locally-visible name to the `std` effect module it reaches: `use
+/// std::fs;` maps `fs`, `use std::fs::write;` maps `write`, `use std::fs as f;` maps `f`, and a
+/// grouped `use std::{fs, io};` maps both. Without this map, an import was a loophole — the path
+/// visitors only see two-segment `std::…` windows, so `use std::fs;` followed by `fs::write(…)`
+/// was invisible. We take the UNION over the whole file (nested modules included): an
+/// over-approximation we accept, because a shadowing name at worst flags a call for review, never
+/// hides one. (A glob — `use std::fs::*;` — names nothing we can map; it remains a known gap.)
+fn std_effect_imports(items: &[Item]) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    collect_std_effect_imports(items, &mut map);
+    map
+}
+
+fn collect_std_effect_imports(items: &[Item], map: &mut HashMap<String, String>) {
+    for item in items {
+        match item {
+            Item::Use(u) => record_use_tree(&u.tree, &mut Vec::new(), map),
+            Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    collect_std_effect_imports(inner, map);
                 }
             }
+            _ => {}
         }
-        false
-    })
+    }
 }
 
-/// Detects a world-touch: a path through `std::{fs,io,process,net,thread,env}`.
-struct EffectFinder {
-    found: Option<String>,
-}
-
-impl<'ast> Visit<'ast> for EffectFinder {
-    fn visit_path(&mut self, node: &'ast syn::Path) {
-        let segs: Vec<String> = node.segments.iter().map(|s| s.ident.to_string()).collect();
-        for w in segs.windows(2) {
-            if w[0] == "std"
-                && matches!(
-                    w[1].as_str(),
-                    "io" | "fs" | "process" | "net" | "thread" | "env"
-                )
-                && self.found.is_none()
-            {
-                self.found = Some(format!("std::{}", w[1]));
+/// Walk one `use` tree, recording every leaf whose path passes through a `std` effect module.
+fn record_use_tree(
+    tree: &syn::UseTree,
+    prefix: &mut Vec<String>,
+    map: &mut HashMap<String, String>,
+) {
+    match tree {
+        syn::UseTree::Path(p) => {
+            prefix.push(p.ident.to_string());
+            record_use_tree(&p.tree, prefix, map);
+            prefix.pop();
+        }
+        syn::UseTree::Group(g) => {
+            for t in &g.items {
+                record_use_tree(t, prefix, map);
             }
+        }
+        syn::UseTree::Name(n) => {
+            record_import(prefix, &n.ident.to_string(), &n.ident.to_string(), map)
+        }
+        syn::UseTree::Rename(r) => {
+            record_import(prefix, &r.ident.to_string(), &r.rename.to_string(), map)
+        }
+        syn::UseTree::Glob(_) => {}
+    }
+}
+
+/// Record one imported leaf: `local` is the name the file will use, `ident` the item imported.
+fn record_import(prefix: &[String], ident: &str, local: &str, map: &mut HashMap<String, String>) {
+    if prefix.first().map(String::as_str) != Some("std") {
+        return;
+    }
+    let module = match prefix.get(1) {
+        // an item WITHIN an effect module: `use std::fs::write;`, `use std::io::Write as W;`.
+        Some(second) if EFFECT_MODULES.contains(&second.as_str()) => second.as_str(),
+        Some(_) => return,
+        // the effect module ITSELF: `use std::fs;` / `use std::fs as f;`.
+        None if EFFECT_MODULES.contains(&ident) => ident,
+        None => return,
+    };
+    // `use std::fs::{self};` imports the MODULE under its own name, not a leaf called `self`.
+    let local = if local == "self" {
+        prefix.last().map(String::as_str).unwrap_or(local)
+    } else {
+        local
+    };
+    map.insert(local.to_string(), format!("std::{module}"));
+}
+
+/// Detects a world-touch: a path through `std::{fs,io,process,net,thread,env}` — written out in
+/// full, or reaching the module through one of the file's `use std::…` imports.
+struct EffectFinder<'a> {
+    found: Option<String>,
+    imports: &'a HashMap<String, String>,
+}
+
+impl<'ast> Visit<'ast> for EffectFinder<'_> {
+    fn visit_path(&mut self, node: &'ast syn::Path) {
+        if self.found.is_none() {
+            self.found = effect_in_path(node, self.imports);
         }
         visit::visit_path(self, node);
     }
+}
+
+/// The effect module a path reaches, if any: a `std::<eff>` window anywhere in the path, or a
+/// FIRST segment an import maps into one (`fs::write` after `use std::fs;`, bare `write(…)` after
+/// `use std::fs::write;`).
+fn effect_in_path(node: &syn::Path, imports: &HashMap<String, String>) -> Option<String> {
+    let segs: Vec<String> = node.segments.iter().map(|s| s.ident.to_string()).collect();
+    for w in segs.windows(2) {
+        if w[0] == "std" && EFFECT_MODULES.contains(&w[1].as_str()) {
+            return Some(format!("std::{}", w[1]));
+        }
+    }
+    if let Some(module) = segs.first().and_then(|s| imports.get(s.as_str())) {
+        return Some(format!("{module} (reached via `use`)"));
+    }
+    None
 }
 
 // ===== tier 2: the inward rule (parse-don't-validate) ====================
@@ -723,9 +934,12 @@ impl<'ast> Visit<'ast> for PrimitiveFinder {
     }
 }
 
-/// Flags I/O and `unsafe` anywhere in a boundary file (tier 1 only).
+/// Flags I/O and `unsafe` anywhere in a boundary file (tier 1 only). `imports` is the file's
+/// `use std::…` effect-import map (see `std_effect_imports`), so an imported name is as visible
+/// to this pass as a fully written path.
 struct PurityVisitor {
     loc: String,
+    imports: HashMap<String, String>,
     hits: Vec<String>,
 }
 
@@ -736,6 +950,29 @@ impl<'ast> Visit<'ast> for PurityVisitor {
             self.loc
         ));
         visit::visit_expr_unsafe(self, node);
+    }
+
+    // `unsafe` is a KEYWORD in three positions, and a block is only one of them — an `unsafe fn`
+    // (free or in an impl) and an `unsafe impl` must be caught too, or the rule reads "no unsafe"
+    // while enforcing "no unsafe *blocks*".
+    fn visit_signature(&mut self, sig: &'ast Signature) {
+        if sig.unsafety.is_some() {
+            self.hits.push(format!(
+                "{}: `unsafe fn {}` — boundaries are safe code",
+                self.loc, sig.ident
+            ));
+        }
+        visit::visit_signature(self, sig);
+    }
+
+    fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
+        if node.unsafety.is_some() {
+            self.hits.push(format!(
+                "{}: `unsafe impl` — boundaries are safe code",
+                self.loc
+            ));
+        }
+        visit::visit_item_impl(self, node);
     }
 
     fn visit_macro(&mut self, node: &'ast syn::Macro) {
@@ -750,24 +987,31 @@ impl<'ast> Visit<'ast> for PurityVisitor {
                     self.loc, id
                 ));
             }
+            // A macro's TOKENS are unparsed, so the path visitor never sees them — a
+            // `std::fs::write(…)` smuggled inside any macro invocation would slip through the
+            // name check alone. A token-level scan closes that: any `std :: <eff>` sequence in
+            // the flattened token stream is a world-reach. (The stream stringifies with a space
+            // around `::`, so the needle is `std :: fs` etc.)
+            let tokens = node.tokens.to_string();
+            for eff in EFFECT_MODULES {
+                if tokens.contains(&format!("std :: {eff}")) {
+                    self.hits.push(format!(
+                        "{}: `{}!` carries `std::{}` in its tokens — a boundary performs no \
+                         I/O / side effects",
+                        self.loc, id, eff
+                    ));
+                }
+            }
         }
         visit::visit_macro(self, node);
     }
 
     fn visit_path(&mut self, node: &'ast syn::Path) {
-        let segs: Vec<String> = node.segments.iter().map(|s| s.ident.to_string()).collect();
-        for w in segs.windows(2) {
-            if w[0] == "std"
-                && matches!(
-                    w[1].as_str(),
-                    "io" | "fs" | "process" | "net" | "thread" | "env"
-                )
-            {
-                self.hits.push(format!(
-                    "{}: `std::{}` — a boundary performs no I/O / side effects",
-                    self.loc, w[1]
-                ));
-            }
+        if let Some(eff) = effect_in_path(node, &self.imports) {
+            self.hits.push(format!(
+                "{}: `{}` — a boundary performs no I/O / side effects",
+                self.loc, eff
+            ));
         }
         visit::visit_path(self, node);
     }

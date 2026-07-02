@@ -21,5 +21,5 @@
 - No two distinct programs look the same — the faithful rendering distinguishes every structural and semantic difference.
       U(p) = U(q)  ⟹  p = q   (U = faithful render)
 
-# 316 further consequence equalities (implied by the laws above)
+# 333 further consequence equalities (implied by the laws above)
 # operators in no law (where the spec is silent): none — every operator participates in a law

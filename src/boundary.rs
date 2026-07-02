@@ -1011,7 +1011,8 @@ where
 /// per degree of freedom — the variant choice (STRUCTURE) and each field (VALUE / deeper
 /// SEMANTICS). Derivable: `#[derive(Shaped)]` reads the variants and fields.
 pub trait Shaped: Sized + Clone + PartialEq {
-    /// One canonical inhabitant — the first variant / the struct of field inhabitants.
+    /// One canonical inhabitant — a LEAF variant (the first whose fields don't mention the
+    /// type itself, so the recursion bottoms out) / the struct of field inhabitants.
     fn inhabitant() -> Self;
     /// Neighbours grouped by degree of freedom (one group per variant-choice and per field).
     fn perturbation_classes(&self) -> Vec<Vec<Self>>;

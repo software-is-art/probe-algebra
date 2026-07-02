@@ -373,7 +373,7 @@ mod tests {
             spec.uncovered_ops
         );
         // the count of further (consequence) equalities — pins enumeration depth and dedup.
-        assert_eq!(spec.consequences, 316, "consequence count changed");
+        assert_eq!(spec.consequences, 333, "consequence count changed");
     }
 
     /// Enumeration over the (richer) arithmetic theory emits no reflexive `t = t` equality — every

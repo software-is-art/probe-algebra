@@ -3,8 +3,10 @@
 //! `#[derive(Shaped)]` reads a value object's STRUCTURE and emits its probe surface, so the
 //! "structure supplies the test surface" thesis is mechanized rather than hand-written:
 //!
-//!   - `inhabitant()` — one canonical seed, the first variant / the struct built from each
-//!     field's own inhabitant (recursion bottoms out because a leaf variant is chosen); and
+//!   - `inhabitant()` — one canonical seed: for an enum, the first LEAF variant (the first whose
+//!     field types don't mention the enum itself, so direct self-recursion bottoms out; indirect
+//!     recursion through another type is not detected — see `enum_body`); for a struct, the
+//!     constructor filled with each field's own inhabitant; and
 //!   - `perturbation_classes()` — one neighbour-GROUP per degree of freedom: the
 //!     variant-swap group (STRUCTURAL — every other constructor) and one group per field
 //!     (VALUE / deep, the field's own perturbations threaded back through the constructor).
@@ -72,18 +74,76 @@ pub fn algebra(attr: TokenStream, item: TokenStream) -> TokenStream {
             .to_compile_error()
             .into();
     }
+    // Two operators sharing a name would emit two `__op_<name>` wrappers — surface the clash
+    // here, at the second function, rather than as a duplicate-definition error in generated code.
+    for (i, a) in ops.iter().enumerate() {
+        if let Some(b) = ops[i + 1..].iter().find(|b| b.name == a.name) {
+            return syn::Error::new_spanned(
+                &b.name,
+                format!(
+                    "#[algebra]: duplicate operator `{}` — operator functions must have \
+                     distinct names",
+                    a.name
+                ),
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
 
     // the sorts are the distinct value types appearing in the signatures, in first-seen order.
     let sorts = distinct_sorts(&ops);
+    // DISTINCT sorts (dedup'd by FULL path) become variants named by their LAST segment, so
+    // `foo::Date` and `bar::Date` would collide inside the synthesised enums — an opaque error
+    // deep in generated code. Name the clash at the signature that introduced it instead.
+    if let Some(err) = sort_name_collision(&sorts) {
+        return err.to_compile_error().into();
+    }
     let generated = if sorts.len() == 1 {
         single_sort_impl(&marker, &name, &ops, &sorts[0])
     } else {
         multi_sort_impl(&marker, &name, &ops, &sorts)
     };
 
-    let parsed: syn::File = syn::parse2(generated).expect("generated algebra items parse");
+    let parsed: syn::File = match syn::parse2(generated) {
+        Ok(file) => file,
+        Err(e) => {
+            // an internal macro bug, but reported as a diagnostic rather than a panic — the
+            // user sees WHERE and WHY instead of a proc-macro abort.
+            return syn::Error::new(
+                e.span(),
+                format!("#[algebra]: internal error — the generated items failed to parse: {e}"),
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
     content.extend(parsed.items);
     quote! { #module }.into()
+}
+
+/// The last-segment clash among DISTINCT sorts, if any: `distinct_sorts` dedups by the FULL type
+/// path, but the synthesised `Value`/`Sort` enums name variants by the LAST segment only
+/// (`variant_of`), so two different sorts ending in the same identifier cannot coexist.
+fn sort_name_collision(sorts: &[Type]) -> Option<syn::Error> {
+    for (i, a) in sorts.iter().enumerate() {
+        for b in &sorts[i + 1..] {
+            if variant_of(a) == variant_of(b) {
+                return Some(syn::Error::new_spanned(
+                    b,
+                    format!(
+                        "#[algebra]: sorts `{}` and `{}` collide on the variant name `{}` — the \
+                         synthesised Value/Sort enums need distinct last path segments (rename \
+                         one type, or introduce a type alias)",
+                        type_str(a).replace(' ', ""),
+                        type_str(b).replace(' ', ""),
+                        variant_of(a),
+                    ),
+                ));
+            }
+        }
+    }
+    None
 }
 
 /// One operator read off a function: its name, the (named) argument types, and the return type.
@@ -333,7 +393,10 @@ pub fn derive_shaped(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let (inhabitant, classes) = match &input.data {
-        Data::Enum(data) => enum_body(name, data),
+        Data::Enum(data) => match enum_body(name, data) {
+            Ok(parts) => parts,
+            Err(e) => return e.to_compile_error().into(),
+        },
         Data::Struct(data) => struct_body(name, &data.fields),
         Data::Union(_) => {
             return syn::Error::new_spanned(&input, "Shaped cannot be derived for a union")
@@ -480,16 +543,43 @@ fn struct_body(name: &Ident, fields: &Fields) -> (TokenStream2, TokenStream2) {
     (inhabitant, classes)
 }
 
-fn enum_body(name: &Ident, data: &DataEnum) -> (TokenStream2, TokenStream2) {
-    let first = data
+/// True iff `ty` mentions `name` anywhere in its tokens — a SYNTACTIC recursion probe. It sees
+/// through wrappers (`Box<E>`, `Vec<E>`, `(E, u8)`), but it cannot see INDIRECT recursion through
+/// another type (`Rec(Wrapper)` where `Wrapper` privately holds an `E`) — that residual case
+/// still recurses at runtime, and only a semantic (post-resolution) analysis could catch it.
+fn mentions(ty: &Type, name: &Ident) -> bool {
+    fn walk(ts: TokenStream2, name: &str) -> bool {
+        ts.into_iter().any(|tt| match tt {
+            proc_macro2::TokenTree::Ident(i) => i == name,
+            proc_macro2::TokenTree::Group(g) => walk(g.stream(), name),
+            _ => false,
+        })
+    }
+    walk(quote! { #ty }, &name.to_string())
+}
+
+fn enum_body(name: &Ident, data: &DataEnum) -> syn::Result<(TokenStream2, TokenStream2)> {
+    // The seed must come from a LEAF variant or `inhabitant()` never bottoms out: on
+    // `enum E { Rec(Box<E>), Leaf }` the FIRST variant's inhabitant would need an `E` to build an
+    // `E` — infinite recursion. So pick the first variant none of whose field types mention the
+    // enum itself (see `mentions` for the syntactic limit), falling back to the first variant
+    // when every variant self-references (that enum has no finite inhabitant anyway).
+    let seed = data
         .variants
-        .first()
-        .expect("Shaped cannot be derived for an empty enum");
-    let first_path = {
-        let v = &first.ident;
+        .iter()
+        .find(|v| v.fields.iter().all(|f| !mentions(&f.ty, name)))
+        .or_else(|| data.variants.first())
+        .ok_or_else(|| {
+            syn::Error::new(
+                name.span(),
+                "Shaped cannot be derived for an empty enum — it has no inhabitant",
+            )
+        })?;
+    let seed_path = {
+        let v = &seed.ident;
         quote! { #name::#v }
     };
-    let inhabitant = inhabitant_ctor(&first_path, &first.fields);
+    let inhabitant = inhabitant_ctor(&seed_path, &seed.fields);
 
     // The variant-swap class: every variant's inhabitant, minus the one equal to `self`.
     let all_variants = data.variants.iter().map(|v| {
@@ -513,5 +603,85 @@ fn enum_body(name: &Ident, data: &DataEnum) -> (TokenStream2, TokenStream2) {
             #(#arms)*
         }
     };
-    (inhabitant, classes)
+    Ok((inhabitant, classes))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn enum_data(di: &DeriveInput) -> &DataEnum {
+        match &di.data {
+            Data::Enum(data) => data,
+            _ => panic!("test input must be an enum"),
+        }
+    }
+
+    /// A FIRST-recursive enum must seed from its leaf variant, or the generated `inhabitant()`
+    /// recurses forever (`E::Rec` needs an `E` to build an `E`).
+    #[test]
+    fn a_first_recursive_enum_seeds_from_a_leaf_variant() {
+        let di: DeriveInput = syn::parse_quote! { enum E { Rec(Box<E>), Leaf } };
+        let (inhabitant, _) = enum_body(&di.ident, enum_data(&di)).expect("derivable");
+        let src = inhabitant.to_string();
+        assert!(src.contains("Leaf"), "must seed from the leaf, got: {src}");
+        assert!(!src.contains("Rec"), "must not seed recursively: {src}");
+    }
+
+    /// A non-recursive enum keeps the ORIGINAL behaviour: the first variant is the seed.
+    #[test]
+    fn a_plain_enum_still_seeds_from_its_first_variant() {
+        let di: DeriveInput = syn::parse_quote! { enum Op { Add, Mul, Lt } };
+        let (inhabitant, _) = enum_body(&di.ident, enum_data(&di)).expect("derivable");
+        assert!(inhabitant.to_string().contains("Add"));
+    }
+
+    /// The syntactic probe looks INSIDE wrappers and named-field variants, not just at the
+    /// outermost type: `Rec { next: Vec<Box<E>> }` is recursive, `Wrap(Vec<u8>)` is not.
+    #[test]
+    fn the_recursion_probe_sees_through_nesting() {
+        let di: DeriveInput = syn::parse_quote! {
+            enum E { Rec { next: Vec<Box<E>> }, Wrap(Vec<u8>) }
+        };
+        let (inhabitant, _) = enum_body(&di.ident, enum_data(&di)).expect("derivable");
+        assert!(inhabitant.to_string().contains("Wrap"));
+    }
+
+    /// Every variant self-referencing falls BACK to the first variant (documented residual: such
+    /// an enum has no finite inhabitant, and indirect recursion is likewise not detected).
+    #[test]
+    fn an_all_recursive_enum_falls_back_to_the_first_variant() {
+        let di: DeriveInput = syn::parse_quote! { enum E { A(Box<E>), B(Box<E>) } };
+        let (inhabitant, _) = enum_body(&di.ident, enum_data(&di)).expect("derivable");
+        assert!(inhabitant.to_string().contains("A"));
+    }
+
+    /// An EMPTY enum is a clean diagnostic, not a proc-macro panic.
+    #[test]
+    fn an_empty_enum_is_a_diagnostic_not_a_panic() {
+        let di: DeriveInput = syn::parse_quote! { enum Never {} };
+        let err = enum_body(&di.ident, enum_data(&di)).expect_err("empty enums are rejected");
+        assert!(err.to_string().contains("empty enum"), "got: {err}");
+    }
+
+    /// Two distinct sorts sharing a LAST path segment are named as a clash (the synthesised
+    /// enums would otherwise emit duplicate variants — an opaque error in generated code).
+    #[test]
+    fn colliding_sort_names_are_reported() {
+        let sorts: Vec<Type> = vec![
+            syn::parse_quote! { foo::Date },
+            syn::parse_quote! { Duration },
+            syn::parse_quote! { bar::Date },
+        ];
+        let err = sort_name_collision(&sorts).expect("the Date/Date clash must be caught");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("foo::Date") && msg.contains("bar::Date") && msg.contains("`Date`"),
+            "the clash must name both sorts and the shared variant, got: {msg}"
+        );
+        assert!(
+            sort_name_collision(&sorts[..2]).is_none(),
+            "distinct last segments must not be flagged"
+        );
+    }
 }

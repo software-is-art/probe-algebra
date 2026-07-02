@@ -10,10 +10,11 @@ survive.
 
 **The answer is yes.** The demonstration is an expression-language interpreter — lexer,
 parser, type checker, evaluator — whose interior has **zero tests of its own**, and whose
-entire *positive* behaviour is certified with **zero hand-written examples** — and its algebraic
-laws are **discovered by running the operators**, not declared, by a generic engine that does the
-same for a non-commutative router and a multi-sorted date calculus, rendering as a plain-language
-spec. Mutate the interior and **every viable mutant dies**; the only survivors are a handful of
+*positive* behaviour is certified by **derived probes and discovered laws, not example tests**
+(the only hand-written examples that remain are a disclosed few that exercise the grammar
+plumbing itself — see `src/tests.rs`'s inventory) — and its algebraic laws are **discovered by
+running the operators**, not declared, by a generic engine that does the same for a
+non-commutative router and a multi-sorted date calculus, rendering as a plain-language spec. Mutate the interior and **every viable mutant dies**; the only survivors are a handful of
 documented equivalents (genuine free choices), carved out in `.cargo/mutants.toml`.
 
 ```
@@ -85,13 +86,19 @@ And it **enforces**, at compile time, claims that can be statically false:
   `INTERIOR` (the workshop / leaves), or `ALGEBRA` (a discovered-law / report layer) — with a
   `//! Tier:` marker `build.rs` reads to dispatch the right discipline. A file that names no tier is
   a build error, so a new module cannot land silently un-categorized; placement is ratified in the
-  diff. This replaces the old path heuristics (the blanket `discover/` exemption is gone).
+  diff. This replaces the old path heuristics (the blanket `discover/` exemption is gone). And
+  because `KERNEL` is exempt from the structural rules, claiming it is not self-service: kernel
+  files are enumerated in an allowlist in `build.rs` itself, so joining the trusted floor is a
+  diff to the floor's own gate.
 - **effects in an ALGEBRA file are honest, or they don't build.** That layer may touch the world (a
   report tool reads sources, writes a scaffold) — but not *silently*: a function whose body reaches
-  `std::fs`/`io`/`process`/`net`/`env` must declare a `Capability:` in its doc, else build error. So
-  the fine seam/capability/leaf split *inside* an ALGEBRA file is enforced the same way the file-level
-  tier is — the dev tool's `apply` (writes) and `theory_line` (reads) are named edges, not hidden
-  dependencies. (Adding the rule immediately flagged two world-reads we'd left undeclared.)
+  `std::fs`/`io`/`process`/`net`/`env` — fully qualified, through a `use` import or alias, or inside
+  a macro's tokens — must declare a real `Capability:` (one of the four levels) in its doc, else
+  build error. So the fine seam/capability/leaf split *inside* an ALGEBRA file is enforced the same
+  way the file-level tier is — the dev tool's `apply` (writes) and `theory_line` (reads) are named
+  edges, not hidden dependencies. (Adding the rule immediately flagged two world-reads we'd left
+  undeclared.) The residual honesty gap is transitive effects — a helper that does the I/O for you —
+  which `build.rs` documents rather than pretends to close.
 
 The interior backing these edges (`interp::internal`) is private, untested, and kept in the
 mutation sweep, so the bought correctness is *measured*, not asserted.
@@ -147,7 +154,10 @@ no constant — can't bootstrap a grid at all. The fix is a **shadow algebra**: 
 the author never writes and that never enter the spec. Reusing the same `#[derive(Shaped)]` that
 mints the probe surface for edges, the grid is grown from the value type's *structure* — start at the
 canonical inhabitant, close under its variant/field perturbations — so it is fattened by the type,
-not by the operators or by hand. A domain then collapses to *just its operators*:
+not by the operators or by hand. And the assignments the laws are judged on keep pace: a small
+variable/inhabitant cross-product is enumerated **exhaustively** (every combination, not a sample);
+a large one is sampled by a coprime-stride mixed-radix decode, so every variable varies
+independently of every other. A domain then collapses to *just its operators*:
 
 ```rust,ignore
 theory! {
@@ -369,8 +379,9 @@ ratified in the diff. And running it on the crate's *own* code finds what you'd 
 nobody wrote as an algebra qualifying anyway:
 
 ```
-src/capability.rs:        QUALIFIES — operators [cap_of] over sorts {Capability, Source}
-src/discover/derived.rs:  QUALIFIES — operators [meet, join, lift, …] over sorts {Tri, Small, Large}
+src/capability.rs:          QUALIFIES — operators [cap_of] over sorts {Capability, Source}
+src/discover/derived.rs:    QUALIFIES — operators [meet, join, lift, …] over sorts {Tri, Small, Large}
+src/discover/modularize.rs: QUALIFIES — operators [both, either, peak, rotate] over sorts {Count, Flag, Spin}
 ```
 
 `capability`'s `cap_of : Source → Capability` is an operator over value objects, so the audit module
@@ -413,8 +424,11 @@ The strongest evidence is that the method is **turned on its own runtime**:
   oracle-free property probes, kept in the sweep.
 
 And `gdp`'s relational proof is load-bearing, not a demo: `select`'s kernel reads its kill
-matrix through gdp's `InBounds` proof, so an out-of-range read is a **type error, not a panic** —
-"make illegal states unrepresentable" lifted from one value to a *relation between two values*.
+matrix through gdp's `InBounds` proof, which **holds the matrix's borrow** — a proof minted for
+one matrix cannot read another, and an unproven read is not writable at all — "make illegal
+states unrepresentable" lifted from one value to a *relation between two values*. (A ratified
+redesign: a proof keyed only on a phantom brand was not value-unique, since a region brands
+many values; the borrow now carries the identity the brand alone could not.)
 
 ---
 

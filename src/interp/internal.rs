@@ -342,20 +342,43 @@ pub(super) fn fold(e: &Expr, combine: &dyn Fn(Op, Int, Int) -> Option<Lit>) -> E
 
 // ===== substitution (the Stateful `Resolve` edge's engine) =================
 
-/// Substitute the bindings carried in `env` into an expression: every free `Var(name)`
+/// Substitute the bindings carried in `env` into an expression: every FREE `Var(name)`
 /// for which `env` has a value becomes that integer literal; unbound variables and all
-/// other nodes are left as-is. This is the `Resolve` edge READING its carried state, which
-/// is exactly why that edge is `Stateful` — its output depends on the environment, not the
-/// expression alone.
+/// other nodes are left as-is. "Free" is load-bearing: a `let` SHADOWS its name inside its
+/// body, so occurrences bound by an interior `let` must survive untouched — the walk
+/// carries the set of currently-shadowed names and skips them. (Rewriting a bound
+/// occurrence is variable capture, the classic substitution bug; the `Resolve` two-route
+/// probe caught exactly that here once its generator learned to emit shadowing `let`s.)
+/// This is the `Resolve` edge READING its carried state, which is exactly why that edge is
+/// `Stateful` — its output depends on the environment, not the expression alone.
 pub(super) fn subst(e: &Expr, env: &Env) -> Expr {
-    match e {
-        Expr::Var(name) => match env.get(name) {
-            Some(v) => Expr::Lit(Lit::Int(v)),
-            None => e.clone(),
-        },
-        Expr::Lit(_) => e.clone(),
-        Expr::Bin(op, a, b) => Expr::bin(*op, subst(a, env), subst(b, env)),
-        Expr::If(c, t, f) => Expr::cond(subst(c, env), subst(t, env), subst(f, env)),
-        Expr::Let(name, v, body) => Expr::bind(name.clone(), subst(v, env), subst(body, env)),
+    fn go(e: &Expr, env: &Env, shadowed: &[Ident]) -> Expr {
+        match e {
+            Expr::Var(name) => {
+                if shadowed.contains(name) {
+                    return e.clone(); // bound by an interior `let` — not ours to rewrite
+                }
+                match env.get(name) {
+                    Some(v) => Expr::Lit(Lit::Int(v)),
+                    None => e.clone(),
+                }
+            }
+            Expr::Lit(_) => e.clone(),
+            Expr::Bin(op, a, b) => Expr::bin(*op, go(a, env, shadowed), go(b, env, shadowed)),
+            Expr::If(c, t, f) => Expr::cond(
+                go(c, env, shadowed),
+                go(t, env, shadowed),
+                go(f, env, shadowed),
+            ),
+            Expr::Let(name, v, body) => {
+                // the bound VALUE is evaluated outside the binding, so it substitutes
+                // under the outer shadow set; only the BODY sees the new name.
+                let v2 = go(v, env, shadowed);
+                let mut inner = shadowed.to_vec();
+                inner.push(name.clone());
+                Expr::bind(name.clone(), v2, go(body, env, &inner))
+            }
+        }
     }
+    go(e, env, &[])
 }

@@ -9,10 +9,14 @@
 //! declared laws are only one of its parts — it also holds the generators, the per-shape
 //! round-trips, and the registry that runs them.)
 //!
-//! Division of labour: these derived laws + the structure-derived probes are the ENTIRE
-//! positive verification of the interpreter — its evaluation, parsing, and type-checker
-//! acceptance carry no hand-written examples. The NEGATIVE tests (a probe CATCHING a planted
-//! bug; a rejection) stay hand-written in `tests.rs`. cargo-mutants certifies it all is strong.
+//! Division of labour: these derived laws + the structure-derived probes carry the positive
+//! verification of the interpreter — its evaluation, parsing, and type-checker acceptance need
+//! no hand-written examples beyond two DISCLOSED exceptions: the grammar-combinator exercises
+//! (`tests.rs::algebra_surface`, which pin `fold`/`Parse` with concrete values because the
+//! generic grammar is the host, not a self-hosted module) and the brand-threading headline demo
+//! (`tests.rs::the_brand_threads_parse_check_eval`, one concrete `(2 + 3) == 5` kept for its
+//! GDP story, not for coverage). The NEGATIVE tests (a probe CATCHING a planted bug; a
+//! rejection) stay hand-written in `tests.rs`. cargo-mutants certifies it all is strong.
 
 use proptest::prelude::*;
 use proptest::strategy::BoxedStrategy;
@@ -260,9 +264,9 @@ mod registry {
     // ===== algebraic LAWS: the spec is DISCOVERED, not declared =====================
     //
     // The interpreter's algebra is no longer hand-listed. `discover::discover_laws()` instantiates
-    // the universal algebraic shapes over the operators and keeps the ones that RUN true (see
-    // `eval_laws_are_probed`), so the author writes no law and names no structure — the spec falls
-    // out of the operators' behaviour and renders as a non-mathy report.
+    // the universal algebraic shapes over the operators and keeps the ones that RUN true (pinned
+    // by `discover`'s `the_interpreter_spec_is_exact`), so the author writes no law and names no
+    // structure — the spec falls out of the operators' behaviour and renders as a non-mathy report.
     //
     // What remains here is the generic `Relation` MACHINERY — the metamorphic-probe runner with its
     // applicability guard and non-vacuity check — kept and demonstrated on the fixtures below. A
@@ -352,13 +356,21 @@ mod registry {
     /// `Resolve` — the `Stateful`, irreversible edge. Oracle-free TWO-ROUTE law: substituting
     /// the carried `Env` then evaluating equals let-binding the same env then evaluating — two
     /// independent paths to one value, so a wrong `subst` (or one that ignores the env, like the
-    /// retired over-claiming counterexample) makes the routes diverge.
+    /// retired over-claiming counterexample) makes the routes diverge. The generated programs
+    /// include `let`s that SHADOW the env-bound names (so capture — substituting into a bound
+    /// occurrence — diverges) and the generated envs sometimes bind a name twice (so
+    /// `Env::get`'s last-binding-wins scan is what keeps the routes agreeing).
     impl Probed for Resolve {
         fn probe() {
             let x = Ident::new("x").expect("valid ident");
             let y = Ident::new("y").expect("valid ident");
             // expressions over {x, y} and int leaves: closed once x, y are bound, and int-typed
-            // so `eval` is total down both routes.
+            // so `eval` is total down both routes. The recursive layer deliberately includes
+            // `let` — with binder names drawn from {x, y, z}, so generated programs SHADOW the
+            // env-bound names — and `if` over a computed `<` condition. A substitution that
+            // rewrites BOUND occurrences (capture) can only diverge from the let-binding route
+            // on such programs; a generator of bare Add/Mul trees would never exercise it,
+            // which is exactly how the capture bug in `subst` once hid from this probe.
             let var_expr = {
                 let (xx, yy) = (x.clone(), y.clone());
                 let leaf = prop_oneof![
@@ -366,31 +378,54 @@ mod registry {
                     Just(Expr::var(xx)),
                     Just(Expr::var(yy)),
                 ];
-                leaf.prop_recursive(3, 12, 2, |inner| {
+                let binder = prop_oneof![Just("x"), Just("y"), Just("z")]
+                    .prop_map(|s| Ident::new(s).expect("valid ident"));
+                leaf.prop_recursive(3, 12, 2, move |inner| {
                     prop_oneof![
                         (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Add, a, b)),
                         (inner.clone(), inner.clone()).prop_map(|(a, b)| Expr::bin(Op::Mul, a, b)),
+                        // a computed boolean condition keeps the whole tree int-typed while
+                        // routing `subst` through the `If` arm on both condition and branches.
+                        (inner.clone(), inner.clone(), inner.clone(), inner.clone())
+                            .prop_map(|(a, b, t, f)| Expr::cond(Expr::bin(Op::Lt, a, b), t, f)),
+                        (binder.clone(), inner.clone(), inner.clone())
+                            .prop_map(|(n, v, b)| Expr::bind(n, v, b)),
                     ]
                 })
             };
+            // `stale` sometimes prepends an EARLIER binding for `x`, so the generated env
+            // carries a duplicate name and last-binding-wins is what the two routes agree
+            // on. This makes `Env::get`'s reverse scan LOAD-BEARING under the probe: an
+            // `Env` that returned the first binding for a name would resolve `x` to the
+            // stale value while the let-binding route uses `vx`, and the routes diverge.
+            let stale = proptest::option::of(0i64..=20i64);
             TestRunner::default()
-                .run(&(0i64..=20i64, 0i64..=20i64, var_expr), |(vx, vy, e)| {
-                    let env = Env::new()
-                        .bind(x.clone(), Int::new(vx).unwrap())
-                        .bind(y.clone(), Int::new(vy).unwrap());
-                    // route 1: resolve (substitute the env), then evaluate.
-                    let (resolved, _unit) = Resolve.forward(&Bound::new(env, e.clone()));
-                    let via_resolve = eval_closed(&resolved);
-                    // route 2: let-bind the same env, then evaluate.
-                    let lets = Expr::bind(
-                        x.clone(),
-                        Expr::int(vx).unwrap(),
-                        Expr::bind(y.clone(), Expr::int(vy).unwrap(), e.clone()),
-                    );
-                    let via_let = eval_closed(&lets);
-                    prop_assert_eq!(via_resolve, via_let, "resolve diverged from let-binding");
-                    Ok(())
-                })
+                .run(
+                    &(0i64..=20i64, 0i64..=20i64, stale, var_expr),
+                    |(vx, vy, stale_x, e)| {
+                        let base = match stale_x {
+                            Some(s) => Env::new().bind(x.clone(), Int::new(s).unwrap()),
+                            None => Env::new(),
+                        };
+                        let env = base
+                            .bind(x.clone(), Int::new(vx).unwrap())
+                            .bind(y.clone(), Int::new(vy).unwrap());
+                        // route 1: resolve (substitute the env), then evaluate.
+                        let (resolved, _unit) = Resolve.forward(&Bound::new(env, e.clone()));
+                        let via_resolve = eval_closed(&resolved);
+                        // route 2: let-bind the same env, then evaluate. Only the LAST
+                        // binding per name appears here — the definition of what a
+                        // duplicate-carrying env must mean.
+                        let lets = Expr::bind(
+                            x.clone(),
+                            Expr::int(vx).unwrap(),
+                            Expr::bind(y.clone(), Expr::int(vy).unwrap(), e.clone()),
+                        );
+                        let via_let = eval_closed(&lets);
+                        prop_assert_eq!(via_resolve, via_let, "resolve diverged from let-binding");
+                        Ok(())
+                    },
+                )
                 .unwrap();
         }
     }
@@ -441,24 +476,12 @@ mod registry {
             .unwrap();
     }
 
-    /// The structural `U` law, re-probed: the faithful rendering is sensitive to every structural
-    /// and semantic perturbation, over random programs. The interpreter's VALUE-algebra laws are
-    /// discovered and pinned by `discover`'s exact-spec test (re-derived against the real
-    /// interpreter, so a mutant that breaks the algebra changes the discovered set), and per-arm
-    /// evaluator correctness is pinned by `eval_semantics_are_probed` — the author wrote no law.
-    #[test]
-    fn eval_laws_are_probed() {
-        TestRunner::default()
-            .run(&<Expr as Sampled>::sampled(), |e| {
-                prop_assert!(
-                    sensitive_to_all(|x: &Expr| x.render(), &e),
-                    "the universal observer missed a dimension at {:?}",
-                    e
-                );
-                Ok(())
-            })
-            .unwrap();
-    }
+    // (The eval-LAW verification itself lives elsewhere, and deliberately so: the interpreter's
+    // VALUE-algebra laws are discovered and pinned by `discover`'s `the_interpreter_spec_is_exact`
+    // — re-derived against the real interpreter, so a mutant that breaks the algebra changes the
+    // discovered set — and per-arm evaluator correctness is pinned by `eval_semantics_are_probed`.
+    // A former `eval_laws_are_probed` here merely repeated `render_is_universally_sensitive`
+    // under a misleading name, so it was removed rather than kept as dead weight.)
 
     /// The generic `Relation` machinery itself — the metamorphic-probe runner with its non-vacuity
     /// guard — demonstrated on a true relation. (The spec runs as discovered equations above; this
@@ -522,6 +545,18 @@ mod registry {
                     prop_assert_eq!(
                         eval_closed(&Expr::cond(Expr::boolean(false), a.clone(), b.clone())),
                         eval_closed(&b)
+                    );
+                    // ... and a COMPUTED condition: `if (a < b) then b else c` against the
+                    // raw comparison choosing between the raw values. Literal conditions
+                    // alone would let an evaluator that mishandles a non-literal condition
+                    // (e.g. re-evaluating the wrong subtree) slip through this probe.
+                    prop_assert_eq!(
+                        eval_closed(&Expr::cond(
+                            Expr::bin(Op::Lt, a.clone(), b.clone()),
+                            b.clone(),
+                            c.clone()
+                        )),
+                        Value::Int(Int::new(if av < bv { bv } else { cv }).unwrap())
                     );
                     // `let` binds and `var` resolves: `let x = a in (x + c) == a + c`:
                     prop_assert_eq!(

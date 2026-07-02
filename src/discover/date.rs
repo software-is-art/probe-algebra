@@ -139,7 +139,7 @@ mod tests {
             .map(|(p, q)| (p.to_string(), q.to_string()))
             .collect();
         assert_eq!(got, expected, "the discovered calendar algebra changed");
-        assert_eq!(d.consequences, 248);
+        assert_eq!(d.consequences, 250);
         // every operator now participates in a law (the action templates cover `add`).
         assert!(
             d.uncovered_ops.is_empty(),

@@ -6,7 +6,7 @@
 //! type checker, and evaluator in `interp::internal` are private and unreachable here.
 
 use boundary_algebra::gdp::with_seed;
-use boundary_algebra::interp::boundary::{Check, Eval, Parse};
+use boundary_algebra::interp::boundary::{Check, Eval, Parse, Value};
 
 fn banner(s: &str) {
     println!("\n=== {s} ===");
@@ -40,7 +40,11 @@ fn main() {
         match Check.classify(&named) {
             Ok(proof) => {
                 let value = Eval.run(&named, &proof);
-                println!("  well-typed -> evaluates to : {:?}", value.value());
+                let shown = match value.value() {
+                    Value::Int(n) => n.get().to_string(),
+                    Value::Bool(b) => b.to_string(),
+                };
+                println!("  well-typed -> evaluates to : {shown}");
             }
             Err(_) => println!("  ill-typed (unreachable for this program)"),
         }

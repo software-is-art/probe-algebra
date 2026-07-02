@@ -37,8 +37,9 @@
 //! `gdp` is the name/proof vocabulary (Ghosts of Departed Proofs): unique type-level names
 //! and proofs phrased about a named value. It is load-bearing two ways — `interp`'s
 //! `WellTyped`/`IllTyped` are gdp proofs, and `select`'s kernel indexes its matrix entirely
-//! through gdp's `InBounds` relational proof (`positions`/`at_in_bounds`), so an out-of-range
-//! read is a type error, not a panic. `capability` is the behavioural audit that reconciles
+//! through gdp's `InBounds` relational proof (`positions` ⇒ `get`), which HOLDS the matrix's
+//! borrow — an unproven or cross-matrix read is not writable at all, so no bounds check
+//! survives in the kernel. `capability` is the behavioural audit that reconciles
 //! an edge's declared capability with what it actually does (over- and under-claim
 //! detection). Both are crate-level grammar (`build.rs` exempts them from the structural
 //! rules), self-hosted by replacing their example tests with oracle-free property probes.

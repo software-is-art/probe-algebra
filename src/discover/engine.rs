@@ -128,6 +128,25 @@ pub struct Engine<T: Theory> {
 /// A term's behavioural signature: the observation at each grid assignment (`None` where undefined).
 type Sig<T> = Vec<Option<<T as Theory>::Obs>>;
 
+/// The sampling stride for a grid space too large to enumerate: the first integer at or above the
+/// golden-ratio point `space · φ⁻¹` (the classic low-discrepancy multiplier) that is coprime to
+/// the space, so `k · step (mod space)` visits distinct, well-spread assignments.
+fn coprime_step(space: u128) -> u128 {
+    let mut step = (space.saturating_mul(618) / 1000).max(1);
+    while gcd(step, space) != 1 {
+        step += 1;
+    }
+    step
+}
+
+fn gcd(a: u128, b: u128) -> u128 {
+    if b == 0 {
+        a
+    } else {
+        gcd(b, a % b)
+    }
+}
+
 /// An operator's signature, by index: `(symbol, input sorts, output sort)`.
 pub type OpSignature<S> = (&'static str, Vec<S>, S);
 
@@ -156,26 +175,51 @@ impl<T: Theory> Engine<T> {
             }
         }
 
-        // variables: num_vars per sort.
+        // variables: num_vars per sort. A sort with NO inhabitants mints no variables — there is
+        // nothing to assign one to, so its laws can only come from constant-built terms (the old
+        // code would instead have hit a divide-by-zero constructing the grid).
         let mut vars: Vec<Var<T::Sort>> = Vec::new();
         for &sort in &sorts {
+            if T::inhabitants(sort).is_empty() {
+                continue;
+            }
             for ord in 0..T::num_vars() {
                 vars.push(Var { sort, ord });
             }
         }
 
-        // the grid: a deterministic spread of assignments. Variable `i` at assignment `k` takes
-        // inhabitant `(k * stride_i + ord) mod len` — coprime-ish strides separate the variables.
-        let grid_size = T::grid_size();
-        let mut grid: Vec<Vec<T::Value>> = Vec::with_capacity(grid_size);
+        // the grid: assignments drawn from the cross-product of the variables' inhabitant sets.
+        // A small space is enumerated EXHAUSTIVELY — the laws are judged on every combination, not
+        // a sample. A larger one is sampled by decoding `k · step (mod space)` in mixed radix (one
+        // digit per variable; `step` coprime to the space, so distinct `k` pick distinct
+        // assignments). The decode gives every variable its own digit, so no variable's value is a
+        // function of another's. The previous odd-stride spread aliased variables of
+        // same-cardinality sorts — two boolean variables were always equal or complementary, and a
+        // three-element sort pinned its middle variable constant — which is exactly the
+        // over-fitting the grid exists to refute.
         let inhabitants: Vec<Vec<T::Value>> = vars.iter().map(|v| T::inhabitants(v.sort)).collect();
-        for k in 0..grid_size {
+        // clamped so `k * step` below cannot overflow u128; the decode stays valid either way.
+        let space: u128 = inhabitants
+            .iter()
+            .fold(1u128, |acc, inh| acc.saturating_mul(inh.len() as u128))
+            .min(1 << 96);
+        let exhaustive_cap = (T::grid_size() as u128).max(64);
+        let picks: Vec<u128> = if space <= exhaustive_cap {
+            (0..space).collect()
+        } else {
+            let step = coprime_step(space);
+            (0..T::grid_size() as u128)
+                .map(|k| (k * step) % space)
+                .collect()
+        };
+        let mut grid: Vec<Vec<T::Value>> = Vec::with_capacity(picks.len());
+        for pick in picks {
+            let mut rest = pick;
             let mut asn: Vec<T::Value> = Vec::with_capacity(vars.len());
-            for (i, inh) in inhabitants.iter().enumerate() {
-                let len = inh.len().max(1);
-                let stride = 1 + (i * 2);
-                let idx = (k.wrapping_mul(stride).wrapping_add(vars[i].ord)) % len;
-                asn.push(inh[idx % inh.len()].clone());
+            for inh in &inhabitants {
+                let len = inh.len() as u128;
+                asn.push(inh[(rest % len) as usize].clone());
+                rest /= len;
             }
             grid.push(asn);
         }
@@ -211,7 +255,9 @@ impl<T: Theory> Engine<T> {
             .collect()
     }
 
-    /// Does a signature carry any information (defined somewhere, and not vacuously identical)?
+    /// Does a signature carry any information — is the term defined on at least one assignment?
+    /// A term undefined everywhere is noise: two all-undefined constants would otherwise share
+    /// the empty behaviour and collide into a bogus equality.
     fn meaningful(sig: &Sig<T>) -> bool {
         sig.iter().any(|o| o.is_some())
     }
@@ -917,7 +963,7 @@ mod tests {
             .map(|(p, q)| (p.to_string(), q.to_string()))
             .collect();
         assert_eq!(got, expected, "the discovered boolean algebra changed");
-        assert_eq!(d.consequences, 1, "consequence count changed");
+        assert_eq!(d.consequences, 41, "consequence count changed");
         assert!(
             d.uncovered_ops.is_empty(),
             "uncovered: {:?}",

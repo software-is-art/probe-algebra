@@ -112,7 +112,7 @@ mod tests {
             !d.laws.iter().any(|l| l.prose.contains("either order")),
             "router `or` is not commutative — it must not be reported as such"
         );
-        assert_eq!(d.consequences, 11);
+        assert_eq!(d.consequences, 14);
         assert!(d.uncovered_ops.is_empty());
         // the laws hold on replay, and `check` would reject a false commutativity claim.
         assert_eq!(e.check(&d.laws), Ok(()));

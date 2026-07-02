@@ -50,7 +50,10 @@ fn well_typed(expr: Expr) -> bool {
 // `parse_inverts_render` round-trips parsing against rendering, and `accessors_round_trip`
 // pins the accessors. What remains in this file is the IRREDUCIBLE hand-written layer:
 // NEGATIVE tests (ill-typed / malformed rejection — you cannot derive "X is rejected" from
-// the thing under test) and the grammar-combinator exercises (`algebra_surface`). The
+// the thing under test), the grammar-combinator exercises (`algebra_surface`), and ONE
+// disclosed positive example: `the_brand_threads_parse_check_eval` below asserts the concrete
+// `(2 + 3) == 5` through parse/Check/Eval — kept as the GDP headline demo, so evaluation is
+// not literally example-free here, only example-free where the derived probes do the work. The
 // blind-spot map is no longer hand-written here: it is DERIVED from the real mutation kill
 // matrix (`examples/suite_audit` reads which probe catches which planted bug), so the
 // hand-rolled counterexamples that used to stand in for mutants were retired.
