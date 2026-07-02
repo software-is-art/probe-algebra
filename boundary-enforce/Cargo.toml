@@ -5,8 +5,9 @@ edition = "2021"
 description = "Build-time enforcement of the boundary discipline: a total tier partition, the strict boundary grammar, the interior inward rule, capability honesty, edge-probe completeness, and a drift-gated qualification census — consumable from any crate's build.rs."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/software-is-art/probe-algebra"
+readme = "README.md"
 keywords = ["boundary", "architecture", "lint", "build-script", "verification"]
-categories = ["development-tools", "rust-patterns"]
+categories = ["development-tools::build-utils", "rust-patterns"]
 
 [dependencies]
 syn = { version = "2", features = ["full", "visit"] }

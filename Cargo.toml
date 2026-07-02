@@ -8,6 +8,11 @@ repository = "https://github.com/software-is-art/probe-algebra"
 readme = "README.md"
 keywords = ["mutation-testing", "property-testing", "boundary", "category", "verification"]
 categories = ["development-tools::testing", "rust-patterns"]
+# CI plumbing is not part of the library contract; everything else (src/, spec/, docs/,
+# examples/, tests/) ships so the packaged crate is self-verifying — build.rs re-runs the
+# boundary discipline over the packaged tree and drift-gates spec/qualify.spec, which
+# therefore MUST stay in the package.
+exclude = [".github/", ".cargo/"]
 
 [workspace]
 members = [

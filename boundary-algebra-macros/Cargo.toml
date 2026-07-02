@@ -5,6 +5,9 @@ edition = "2021"
 description = "Derive macros for boundary-algebra: generate a value object's probe surface from its structure."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/software-is-art/probe-algebra"
+readme = "README.md"
+keywords = ["derive", "proc-macro", "probe", "boundary", "testing"]
+categories = ["development-tools::procedural-macro-helpers", "development-tools::testing"]
 
 [lib]
 proc-macro = true
