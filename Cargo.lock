@@ -71,6 +71,7 @@ dependencies = [
  "boundary-algebra",
  "boundary-enforce",
  "spec-lock",
+ "trybuild",
 ]
 
 [[package]]

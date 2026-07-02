@@ -20,6 +20,11 @@ boundary-algebra = { path = ".." }
 # regeneration example (`examples/freeze.rs`) touch it, so a dev-dependency suffices — the
 # library code never needs it.
 spec-lock = { path = "../spec-lock" }
+# The NEGATIVE specification's harness: `tests/compile_fail.rs` proves the witness discipline
+# binds DOWNSTREAM — forging, wrong-arm, and wrong-order uses of `Deduct` must not compile.
+# The `.stderr` files are committed against the CI-pinned toolchain (see the workspace's
+# `.github/workflows/ci.yml`); regenerate with `TRYBUILD=overwrite` when the pin moves.
+trybuild = "1.0.117"
 
 [build-dependencies]
 # The build-time discipline (tier partition, boundary grammar, inward rule, rats-nest,

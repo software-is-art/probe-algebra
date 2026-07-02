@@ -1,0 +1,23 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+  --> tests/compile_fail/deduct_forged_witness.rs:18:22
+   |
+18 |         let forged = Affordable(PhantomData);
+   |                      ^^^^^^^^^^
+   |
+note: constructor is not visible here due to private fields
+  --> $WORKSPACE/src/boundary.rs
+   |
+   |           pub struct $name<N>(::core::marker::PhantomData<N>);
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private field
+   |
+  ::: src/meter.rs
+   |
+   | / boundary_algebra::proof_token!(
+   | |     /// A proof that the order named `N` is AFFORDABLE (its purchase does not exceed its
+   | |     /// balance — the deduction will not saturate). Branded with the order's name, so a
+   | |     /// proof for order A cannot authorize deducting order B; minted ONLY by
+...  |
+   | |     Affordable
+   | | );
+   | |_- in this macro invocation
+   = note: this error originates in the macro `boundary_algebra::proof_token` (in Nightly builds, run with -Z macro-backtrace for more info)

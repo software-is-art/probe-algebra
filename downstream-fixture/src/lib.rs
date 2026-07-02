@@ -60,11 +60,26 @@
 //!
 //! ## Edges work downstream too
 //!
-//! [`meter`] mints a real entry edge — `ParseCredits`, a `Construction` registered with the
-//! library's own `value_object!` / `value_operator!` macros (public since the citizen/effect
-//! seal split) and carrying its `impl Probed`, which our build.rs's edge-probe completeness
-//! pass enforces exactly as the library's does. Only the four-level effect lattice remains
-//! sealed, because its laws are proven exhaustively over exactly those four levels.
+//! [`meter`] mints three of the four edge shapes, through public API alone:
+//!
+//! * **`ParseCredits`** — a `Construction`, the entry edge: "parse, don't validate" with a
+//!   certified round trip, registered with the library's own `value_object!` /
+//!   `value_operator!` macros (public since the citizen/effect seal split).
+//! * **`CheckFunds`** — a `Branch`, the classifier: a named order lands in
+//!   `Affordable<N> + Insufficient<N>`, both arms `proof_token!`-minted witnesses (the macro
+//!   is `$crate`-hygienic, so it mints downstream unchanged), the refusal first-class.
+//! * **`Deduct`** — a `Guarded` edge whose `Proof<N>` is `Affordable<N>`: the deduction is
+//!   UNCALLABLE without `CheckFunds`' witness for the SAME brand, so "you forgot the funds
+//!   check" is a compile error in this consumer's tree. `tests/compile_fail.rs` (trybuild)
+//!   pins the negatives: the witness cannot be forged, the wrong arm does not discharge,
+//!   and a proof for one order cannot deduct another.
+//!
+//! Every edge carries its `impl Probed`, which our build.rs's edge-probe completeness pass
+//! enforces exactly as the library's does — delete one and this crate stops building.
+//! Honestly incomplete: the fourth shape, `Morphism`, is not exercised here (the meter has
+//! no lossy/stateful transformation to model); the library's `ConstFold` / `Resolve` remain
+//! its reference instances. Only the four-level effect lattice remains sealed, because its
+//! laws are proven exhaustively over exactly those four levels.
 
 pub mod meter;
 pub mod ops;

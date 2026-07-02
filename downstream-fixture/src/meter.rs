@@ -15,8 +15,21 @@
 //! `ParseCredits` Construction below are minted here, downstream, with the library's own
 //! macros — and our build.rs's edge-probe completeness pass now has a real obligation to
 //! enforce: delete the `impl Probed` below and this crate stops building.
+//!
+//! Beyond the entry edge, this file mints the WITNESS-PASSING pair downstream: `CheckFunds`
+//! is a `Branch` that classifies a named order into `Affordable<N>` / `Insufficient<N>`
+//! (both arms `proof_token!`-minted, both first-class), and `Deduct` is a `Guarded` edge
+//! whose `Proof<N>` is `Affordable<N>` — so a deduction whose funds were never checked is a
+//! COMPILE error in the consumer's own tree, not a runtime hope. See `tests/compile_fail/`
+//! for the negatives pinned as fixtures.
 
-use boundary_algebra::boundary::{reconstructs, Construction, Probed, Pure, Shaped, Unit};
+use core::marker::PhantomData;
+
+use boundary_algebra::boundary::{
+    reconstructs, Branch, Construction, Guarded, Probed, Pure, Shaped, Unit,
+};
+use boundary_algebra::discover::engine::shadow_grid;
+use boundary_algebra::gdp::{with_seed, Named};
 
 /// The meter's ceiling: a balance is valid iff it lies in `0..=CAP`. The one number the whole
 /// domain pivots on — `grant` saturates to it, the validity rule quotes it, the shadow grid
@@ -140,5 +153,208 @@ impl Probed for ParseCredits {
                 "admission must agree with the validity rule at {raw}"
             );
         }
+    }
+}
+
+// ===== the witness-passing pair: a Branch and a Guarded edge, minted DOWNSTREAM ======
+//
+// The crown-jewel pattern, run through public API: `CheckFunds` MINTS a name-branded
+// witness that only `Deduct` can consume, and only for the SAME order — so "you forgot
+// to check the funds" and "you checked a different order" are both compile errors in
+// this consumer's tree (pinned in `tests/compile_fail/`). This mirrors the library's
+// own `Check`/`Eval` pair exactly; the domain is just money instead of types.
+
+/// A purchase: the amount a caller wants deducted. The same number as a `Credits`
+/// balance, but a different ROLE — re-tagging it as its own value object is what keeps
+/// `Order::new(balance, purchase)` un-swappable at the call site (a transposed-arguments
+/// bug is a type error, not a wrong classification).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Purchase(Credits);
+
+impl Purchase {
+    /// Re-tag a (already valid) amount as a purchase. Total: validity was `Credits`'s job.
+    pub fn of(amount: Credits) -> Purchase {
+        Purchase(amount)
+    }
+
+    /// The amount to deduct — the sanctioned exit hatch back to `Credits`.
+    pub fn amount(&self) -> Credits {
+        self.0
+    }
+}
+
+/// An order awaiting classification: a balance and the purchase to be deducted from it,
+/// bundled into ONE citizen so the `Branch` input is a value object, not a loose tuple
+/// (the same shape as the library's `Bound`). What `CheckFunds` classifies and `Deduct`
+/// deducts is the SAME named order — the brand ties the two edges to one value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Order {
+    balance: Credits,
+    purchase: Purchase,
+}
+
+impl Order {
+    pub fn new(balance: Credits, purchase: Purchase) -> Order {
+        Order { balance, purchase }
+    }
+    pub fn balance(&self) -> Credits {
+        self.balance
+    }
+    pub fn purchase(&self) -> Purchase {
+        self.purchase
+    }
+}
+
+boundary_algebra::value_object!(Purchase, Order);
+
+boundary_algebra::proof_token!(
+    /// A proof that the order named `N` is AFFORDABLE (its purchase does not exceed its
+    /// balance — the deduction will not saturate). Branded with the order's name, so a
+    /// proof for order A cannot authorize deducting order B; minted ONLY by
+    /// `CheckFunds::classify` (the field is private to this module — see
+    /// `tests/compile_fail/deduct_forged_witness.rs`). It is the witness `Deduct` demands.
+    Affordable
+);
+boundary_algebra::proof_token!(
+    /// A proof that the order named `N` is INSUFFICIENT — the NEGATIVE witness, kept
+    /// (not discarded as a `None`) so the refusal path is first-class. It discharges
+    /// nothing: handing it to `Deduct` is a type error
+    /// (`tests/compile_fail/deduct_insufficient_witness.rs`).
+    Insufficient
+);
+
+/// The classifier: a `Branch` that compares a named order's purchase against its balance
+/// and lands in `Affordable<N> + Insufficient<N>`, keeping BOTH witnesses. Pure (a
+/// read-only comparison).
+pub struct CheckFunds;
+/// The deduction: a `Guarded` edge `Order -> Credits` admitted by an `Affordable<N>` for
+/// the SAME name. You cannot deduct an order whose funds have not been checked — the
+/// witness comes from `CheckFunds`, exactly as the library's `Eval` demands `Check`'s.
+pub struct Deduct;
+boundary_algebra::value_operator!(CheckFunds, Deduct);
+
+impl Branch for CheckFunds {
+    type Capability = Pure;
+    type In<N> = Named<N, Order>;
+    type Left<N> = Affordable<N>;
+    type Right<N> = Insufficient<N>;
+
+    fn branch<N>(&self, order: &Named<N, Order>) -> Result<Affordable<N>, Insufficient<N>> {
+        let order = order.value();
+        if order.purchase().amount().get() <= order.balance().get() {
+            Ok(Affordable(PhantomData))
+        } else {
+            Err(Insufficient(PhantomData))
+        }
+    }
+}
+
+impl CheckFunds {
+    /// Classify a named order — the ergonomic name for the `Branch` edge. Both arms carry
+    /// a proof; an unaffordable order is an `Insufficient` witness, never a silent `None`.
+    pub fn classify<N>(&self, order: &Named<N, Order>) -> Result<Affordable<N>, Insufficient<N>> {
+        self.branch(order)
+    }
+}
+
+impl Guarded for Deduct {
+    type Capability = Pure;
+    type In<N> = Named<N, Order>;
+    type Proof<N> = Affordable<N>;
+    // Deduction KEEPS the order's brand `N`: the resulting balance is provably the
+    // remainder of the order that was checked, not some other.
+    type Out<N> = Named<N, Credits>;
+
+    fn guard<N>(&self, order: &Named<N, Order>, _proof: &Affordable<N>) -> Named<N, Credits> {
+        order.map(|o| o.balance().spend(o.purchase().amount()))
+    }
+}
+
+impl Deduct {
+    /// Deduct a checked, named order — the ergonomic name for the `Guarded` edge.
+    /// Requires an `Affordable<N>` for the same name, so an unchecked or insufficient
+    /// order will not type-check, and there is no other way to reach the new balance.
+    pub fn run<N>(&self, order: &Named<N, Order>, proof: &Affordable<N>) -> Named<N, Credits> {
+        self.guard(order, proof)
+    }
+}
+
+impl Probed for CheckFunds {
+    /// The branch's derived law, oracle-free, over every pair drawn from the
+    /// `Shaped`-derived grid (which closes over the whole valid range, both saturation
+    /// points included): classification must agree with an INDEPENDENT raw comparison —
+    /// `Ok` iff `purchase <= balance` — so a classifier that flips the comparison,
+    /// drops the boundary case (`purchase == balance` IS affordable), or collapses into
+    /// one arm dies here, not in production. Totality (every pair lands in exactly one
+    /// arm) is the `Result`'s own guarantee; the probe pins WHICH arm, and the counters
+    /// guard that BOTH arms actually fire (a degenerate grid cannot go green vacuously).
+    fn probe() {
+        let grid = shadow_grid::<Credits>(64);
+        let (mut ok, mut err) = (0u32, 0u32);
+        for &balance in &grid {
+            for &amount in &grid {
+                let affordable = with_seed(|seed| {
+                    let order = seed.new_named(Order::new(balance, Purchase::of(amount)));
+                    CheckFunds.classify(&order).is_ok()
+                });
+                assert_eq!(
+                    affordable,
+                    amount.get() <= balance.get(),
+                    "classification must agree with the raw comparison at \
+                     balance {} / purchase {}",
+                    balance.get(),
+                    amount.get()
+                );
+                if affordable {
+                    ok += 1
+                } else {
+                    err += 1
+                }
+            }
+        }
+        assert!(ok > 0 && err > 0, "both arms must fire: a vacuous probe");
+    }
+}
+
+impl Probed for Deduct {
+    /// The guarded edge's derived law, oracle-free, over every AFFORDABLE pair in the
+    /// grid: with the witness in hand the deduction is EXACT — the result agrees with
+    /// the `spend` operator AND with raw subtraction, because affordability is precisely
+    /// the condition under which `spend`'s zero-floor never engages. A deduction that
+    /// swaps its operands, saturates early, or grants instead of spending dies here.
+    /// Every witness comes from `CheckFunds`, never minted by hand — a proof is only as
+    /// true as its mint — so the probe also drives the branch→guard chain end to end.
+    fn probe() {
+        let grid = shadow_grid::<Credits>(64);
+        let mut affordable = 0u32;
+        for &balance in &grid {
+            for &amount in &grid {
+                with_seed(|seed| {
+                    let order = seed.new_named(Order::new(balance, Purchase::of(amount)));
+                    let Ok(proof) = CheckFunds.classify(&order) else {
+                        return; // insufficient: nothing to deduct; the count guards vacuity
+                    };
+                    affordable += 1;
+                    let after = Deduct.run(&order, &proof);
+                    assert_eq!(
+                        *after.value(),
+                        balance.spend(amount),
+                        "deduction must agree with the spend operator at \
+                         balance {} / purchase {}",
+                        balance.get(),
+                        amount.get()
+                    );
+                    assert_eq!(
+                        after.value().get(),
+                        balance.get() - amount.get(),
+                        "an affordable deduction is exact — the zero-floor must not engage"
+                    );
+                });
+            }
+        }
+        assert!(
+            affordable > 0,
+            "no affordable pair in the grid: a vacuous probe"
+        );
     }
 }
