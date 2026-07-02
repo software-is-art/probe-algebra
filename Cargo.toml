@@ -20,6 +20,7 @@ members = [
     "boundary-spec-macros",
     "boundary-enforce",
     "downstream-fixture",
+    "genesis-demo",
     "spec-lock",
 ]
 

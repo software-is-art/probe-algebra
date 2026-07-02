@@ -1,57 +1,59 @@
 # Roadmap — the next brick
 
-The state as of this writing: the module-level loop is closed in both directions.
-Bottom-up, a theory's algebra is discovered, frozen (`spec/*.spec`), and drift-gated;
-top-down, a theory declares its laws (`expects { … }` on `theory!` / `#[algebra]`),
-`Distance::of::<T>()` reports exactly what is unmet, and `genesis` derives a whole
-crate layout from one `system!` declaration file — target locks born red, every
-meaning hole a greppable `todo!("MEANING: …")`. The consumer story is proven by
-`downstream-fixture`, the shape catalog and enforcement rules are themselves
-spec-locked, and the four crates are publish-ready (`docs/publishing.md`).
+The state as of this writing: the loop is closed at BOTH levels.
 
-## The next brick: the compiled `system!` graph layer
+**Module level** (both directions): bottom-up, a theory's algebra is discovered, frozen
+(`spec/*.spec`), and drift-gated; top-down, a theory declares its laws (`expects { … }` on
+`theory!` / `#[algebra]`) and `Distance::of::<T>()` reports exactly what is unmet.
 
-Make the SEAM GRAPH a declared, locked, compiled artifact — the application-level
-spec that composes module specs — and demo blank-slate-to-green on top of it.
+**System level** (the brick just laid): the SEAM GRAPH is a declared, locked, compiled
+artifact. `discover::system` is the compiled twin of the grammar `genesis` parses — a
+`system!` declaration compiles into a `System` marker whose `modules()` IS the spec registry
+(`all_specs()` reads the committed `BoundarySpec` declaration; the graph replaced the
+hand-maintained list) and whose seams wire to the existing checkers: transport →
+`CoherenceReport::between` (or a by-construction discharge with a compile-time `fn(V) -> V`
+witness), transform → the named conversion's discovered homomorphism law plus
+`PipelineLaw` composites inside a spanning theory — run, never assumed. The graph freezes
+into `spec/<system>.system.spec` under the same spec-lock discipline, so ratification is
+hierarchical: interior changes touch no lock, module law changes touch one module lock, only
+a re-drawn seam (or a flipped verdict) touches the system lock.
 
-A large application's spec is not a big law list; it is a graph of algebras:
-nodes are module specs, edges are seam obligations. Exactly two edge kinds exist,
-and both already have checkers:
+**The flagship demo** (`genesis-demo/`, a CI-tested workspace member): the committed sample
+declaration (`examples/genesis_demo.rs`) was genesis'd from blank slate, ONLY its
+`MEANING:` holes were filled, and it converged to green at both levels — the expectations
+gate (module distances met), the seam obligation (discharged by construction, witnessed at
+compile time), and all locks fresh (two module locks, the system lock, the qualify census).
+The ratification diff is readable in its `spec/`: the three declared laws came back with
+seven discovered surprises (associativity, both distributivities, renew's identity and
+annihilation with zero), exactly as the workflow intends. That is the "large application
+from scratch" story in miniature, driven by a declaration that fits in one context window.
 
-- **transport** — two modules share a value object and must agree on its laws
-  (`CoherenceReport::between`, where signatures align; a documented obligation
-  stub where they don't yet);
-- **transform** — a conversion crosses modules and must be a homomorphism
-  (`PipelineLaw::discover` — and composites are checked by running, never assumed,
-  so verification scales with modules + seams, not their product).
+Also landed with the brick, the flagged unifications: genesis's parse-side `Expect` enum is
+gone (a parsed expectation IS a `discover::expect::Expectation`, whose `ops` generalised to
+owned strings); genesis's target-lock prose comes from `ShapeCatalog`'s own templates
+(`ShapeInfo::instantiate` — one source, no restatement); `shadow_grid` is re-exported from
+`boundary`, where its consumers live.
 
-What to build, in order:
+## The next brick: candidates
 
-1. **The compiled `system!` form.** `genesis` already parses the grammar from
-   tokens (see `discover::genesis`'s module header for the productions); this step
-   makes the same declaration COMPILE in a finished codebase: a `System` marker
-   whose `modules()` replaces the hand-maintained `all_specs()` registry (the
-   graph IS the registry, ratified in the diff like the kernel allowlist), and
-   whose seams wire to the existing coherence/composition checks.
-2. **The system lock.** Render the graph — modules, seams, each seam's obligation
-   and status — to `spec/<system>.system.spec`, drift-gated like every other lock.
-   Hierarchical ratification falls out: interior changes touch no lock, module law
-   changes touch one module lock, only a re-drawn seam touches the system lock.
-   Review attention scales with blast radius.
-3. **Unifications** (small, flagged during construction):
-   - replace `genesis`'s parse-side `Expect` enum with `discover::expect::Expectation`
-     (the mapping is 1:1 by key);
-   - derive `genesis`'s target-lock law rendering from `ShapeCatalog::inventory()`
-     instead of restating the prose templates (its byte-exact render pin already
-     forces sync, but derivation removes the duplication);
-   - `shadow_grid` deserves a re-export nearer `boundary` (consumers' `Probed`
-     impls legitimately want it; `discover::engine::` reads engine-internal).
-4. **The flagship demo.** Genesis a two-module system from blank slate (the
-   committed sample `examples/genesis_demo.rs` is the seed), implement the meaning
-   holes, and watch it converge to green at BOTH levels — module distances, then
-   seam obligations, then all locks fresh. That is the "large application from
-   scratch" story in miniature, driven by a declaration that fits in one context
-   window.
+1. **Transform seams end to end in genesis.** The compiled `system!` grammar can already
+   discharge a transform seam (`A -- B : transform on V via h in Span;`), but genesis still
+   leaves declared transform seams as `tests/seams.rs` meaning holes — it cannot name the
+   conversion or the spanning theory. Extend the declaration grammar so a transform seam
+   names its conversion op, and have genesis emit the spanning theory's skeleton (the
+   conversion as one more `#[algebra]` operator with a `MEANING:` body) plus the compiled
+   seam — then the flagship story covers both edge kinds.
+
+2. **The system-level distance.** `Distance` reports declared-vs-discovered per module;
+   the analogous report for the graph would compare the DECLARED seams against what
+   `CohesionReport` finds latent in the composed operator tables — "you declared one system
+   but the algebra decomposes into two", or "these two modules share laws no seam names".
+   The pieces (cohesion, coherence, the compiled graph) all exist; the brick is the report.
+
+3. **Equation render unification.** Genesis's target-lock EQUATIONS still restate the
+   engine's term-render format by hand (the prose half is unified through the catalog). The
+   byte-exact render pin forces sync, but deriving the equation from the shape's canonical
+   terms would remove the last restatement.
 
 ## Standing follow-ups
 
