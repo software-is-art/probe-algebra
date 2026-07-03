@@ -53,11 +53,17 @@
 //!               `self_application` or leave it to discovery.) The keys are the same ones
 //!               `discover::expect` and the `#[algebra]` macro's `expects(...)` speak.
 //! seams    := "seams" "{" seam* "}"
-//! seam     := Ident "--" Ident ":" ("transport" | "transform") "on" Ident ";"
+//! seam     := Ident "--" Ident ":" ("transport" | "transform") "on" Ident ("via" Ident)? ";"
 //!             — a declared seam between two modules on a shared value: `transport` promises
 //!               the sort is the SAME type on both sides (discharged by construction — genesis
 //!               defines each value once); `transform` promises a conversion that must be a
-//!               HOMOMORPHISM, emitted as a test obligation.
+//!               HOMOMORPHISM. Naming the conversion (`via h`, a declared unary operator from
+//!               the seam's value into the other side's) turns the whole obligation into
+//!               STRUCTURE: genesis emits the seam's SPANNING theory (source operator,
+//!               conversion, target operator, with the homomorphism expectation riding the
+//!               attribute), compiles the seam into the `system!` graph, gates the declared
+//!               law in `tests/expectations.rs`, and renders the preserved stanza into the
+//!               system target lock. Unnamed, the obligation stays a `tests/seams.rs` hole.
 //! ```
 //!
 //! # The output is the fixture's shape
@@ -181,12 +187,17 @@ pub struct OpDecl {
     pub output: String,
 }
 
-/// A declared seam between two modules on a shared value.
+/// A declared seam between two modules on a shared value. A TRANSFORM seam may name the
+/// conversion that crosses it (`via h`) — with the conversion named, the whole obligation
+/// becomes structure genesis can emit (a spanning theory, a compiled seam, a verdict test);
+/// without it, the obligation stays a meaning hole in `tests/seams.rs`.
 pub struct SeamDecl {
     pub left: String,
     pub right: String,
     pub kind: SeamKindDecl,
     pub on: String,
+    /// The crossing conversion's operator name (transform seams only).
+    pub via: Option<String>,
 }
 
 /// The declared seam kind (parse-side twin of `cohesion::SeamKind`).
@@ -294,6 +305,7 @@ mod kw {
     syn::custom_keyword!(on);
     syn::custom_keyword!(transport);
     syn::custom_keyword!(transform);
+    syn::custom_keyword!(via);
 }
 
 /// A raw type's canonical text: `quote`'s token render with its inter-token spacing
@@ -484,12 +496,26 @@ fn parse_seam(input: ParseStream) -> syn::Result<SeamDecl> {
     };
     input.parse::<kw::on>()?;
     let on: Ident = input.parse()?;
+    let via = if input.peek(kw::via) {
+        let via_kw = input.parse::<kw::via>()?;
+        if kind == SeamKindDecl::Transport {
+            return Err(syn::Error::new(
+                via_kw.span,
+                "only a transform seam names a conversion — a transport seam shares the one \
+                 type unchanged",
+            ));
+        }
+        Some(input.parse::<Ident>()?.to_string())
+    } else {
+        None
+    };
     input.parse::<Token![;]>()?;
     Ok(SeamDecl {
         left: left.to_string(),
         right: right.to_string(),
         kind,
         on: on.to_string(),
+        via,
     })
 }
 
@@ -713,26 +739,133 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
                 s.on
             ));
         }
-        for side in [&s.left, &s.right] {
-            let module = sys
-                .modules
-                .iter()
-                .find(|m| m.name == *side)
-                .expect("checked");
-            let touches = module
-                .ops
-                .iter()
-                .any(|op| op.inputs.iter().any(|t| t == &s.on) || op.output == s.on);
-            if !touches {
+        if let Some(via) = &s.via {
+            // a NAMED conversion: the seam becomes emit-able structure, so its pieces are
+            // validated here — the conversion itself and the one endpoint binary per side
+            // the spanning theory will carry.
+            let module = |name: &String| {
+                sys.modules
+                    .iter()
+                    .find(|m| m.name == *name)
+                    .expect("checked above")
+            };
+            let (left, right) = (module(&s.left), module(&s.right));
+            let Some(h) = left.ops.iter().chain(&right.ops).find(|o| o.name == *via) else {
                 return err(format!(
-                    "seam on `{}` claims module `{side}` shares it, but no operator of \
-                     `{side}` touches it",
+                    "seam `{} -- {}` names conversion `{via}`, which neither module declares",
+                    s.left, s.right
+                ));
+            };
+            if h.inputs.len() != 1 {
+                return err(format!(
+                    "seam conversion `{via}` must be unary — `{via}({}) -> {}` is not a \
+                     conversion",
+                    h.inputs.join(", "),
+                    h.output
+                ));
+            }
+            if h.inputs[0] != s.on {
+                return err(format!(
+                    "seam conversion `{via}` converts from `{}`, but the seam is on `{}`",
+                    h.inputs[0], s.on
+                ));
+            }
+            if h.output == s.on {
+                return err(format!(
+                    "seam conversion `{via}` returns `{}` — a transform must land on a \
+                     DIFFERENT value than it leaves",
                     s.on
                 ));
+            }
+            let from: Vec<&OpDecl> = left
+                .ops
+                .iter()
+                .filter(|o| is_binary_on_value(o, &s.on))
+                .collect();
+            let to: Vec<&OpDecl> = right
+                .ops
+                .iter()
+                .filter(|o| is_binary_on_value(o, &h.output))
+                .collect();
+            for (found, side, sort) in [(&from, &s.left, &s.on), (&to, &s.right, &h.output)] {
+                if found.len() != 1 {
+                    return err(format!(
+                        "the `{} -- {}` seam needs module `{side}` to declare exactly one \
+                         homogeneous binary on `{sort}` for the homomorphism (found {})",
+                        s.left,
+                        s.right,
+                        found.len()
+                    ));
+                }
+            }
+        } else {
+            for side in [&s.left, &s.right] {
+                let module = sys
+                    .modules
+                    .iter()
+                    .find(|m| m.name == *side)
+                    .expect("checked");
+                let touches = module
+                    .ops
+                    .iter()
+                    .any(|op| op.inputs.iter().any(|t| t == &s.on) || op.output == s.on);
+                if !touches {
+                    return err(format!(
+                        "seam on `{}` claims module `{side}` shares it, but no operator of \
+                         `{side}` touches it",
+                        s.on
+                    ));
+                }
             }
         }
     }
     Ok(())
+}
+
+/// Is `op` a homogeneous binary over declared value `v` (`v × v → v`)?
+fn is_binary_on_value(op: &OpDecl, v: &str) -> bool {
+    op.inputs.len() == 2 && op.inputs[0] == v && op.inputs[1] == v && op.output == v
+}
+
+/// The resolved pieces of a `via` transform seam — the conversion and the two endpoint
+/// binaries the spanning theory carries: `(h, from_op, to_op)`. Only callable on a
+/// VALIDATED system (every lookup was checked by `validate`).
+fn via_seam_parts<'a>(sys: &'a SystemDecl, s: &SeamDecl) -> (&'a OpDecl, &'a OpDecl, &'a OpDecl) {
+    let module = |name: &String| {
+        sys.modules
+            .iter()
+            .find(|m| m.name == *name)
+            .expect("validated: seam modules exist")
+    };
+    let (left, right) = (module(&s.left), module(&s.right));
+    let via = s.via.as_deref().expect("a via seam");
+    let h = left
+        .ops
+        .iter()
+        .chain(&right.ops)
+        .find(|o| o.name == via)
+        .expect("validated: the conversion is declared");
+    let from = left
+        .ops
+        .iter()
+        .find(|o| is_binary_on_value(o, &s.on))
+        .expect("validated: exactly one source binary");
+    let to = right
+        .ops
+        .iter()
+        .find(|o| is_binary_on_value(o, &h.output))
+        .expect("validated: exactly one target binary");
+    (h, from, to)
+}
+
+/// A `via` seam's spanning-theory naming: `(ops module, theory marker, display name)` —
+/// `meter`/`billing` → (`meter_billing_seam_ops`, `MeterBillingSeam`, "meter-billing seam").
+fn seam_theory_names(s: &SeamDecl) -> (String, String, String) {
+    (
+        format!("{}_{}_seam_ops", s.left, s.right),
+        format!("{}{}Seam", camel(&s.left), camel(&s.right)),
+        format!("{}-{} seam", s.left, s.right),
+    )
 }
 
 // ===== naming and placement =================================================================
@@ -1293,6 +1426,49 @@ fn emit_ops(sys: &SystemDecl) -> String {
         }
         out.push_str("}\n");
     }
+
+    // one SPANNING theory per `via` transform seam: the two endpoint operators and the
+    // crossing conversion in ONE operator table, so discovery can find — and the compiled
+    // seam demand — the homomorphism law. Same mechanical delegation as the module theories.
+    for s in sys.seams.iter().filter(|s| s.via.is_some()) {
+        let (module_name, marker, display) = seam_theory_names(s);
+        let (h, from, to) = via_seam_parts(sys, s);
+        let (source, target) = (&s.on, &h.output);
+        out.push_str(&format!(
+            "\n/// The SPANNING theory for the `{l} -- {r}` transform seam: source operator, \
+             conversion, and\n/// target operator in one table — the homomorphism expectation \
+             rides the attribute, and the\n/// compiled seam (`src/system.rs`) holds discovery \
+             to it.\n#[algebra({marker}, \"{display}\", expects(homomorphism({h}, {from}, \
+             {to})))]\npub mod {module_name} {{\n",
+            l = s.left,
+            r = s.right,
+            h = h.name,
+            from = from.name,
+            to = to.name,
+        ));
+        let mut imports = BTreeSet::new();
+        for value in [source, target] {
+            let owner = owner_of(sys, value).expect("validated: every value has an owner");
+            imports.insert(format!("    use crate::{owner}::{value};\n"));
+        }
+        for line in &imports {
+            out.push_str(line);
+        }
+        out.push_str(&format!(
+            "\n    /// `{from}` — the source-side operator, delegated to the boundary surface.\n    \
+             pub fn {from}(a: {v}, b: {v}) -> {v} {{\n        a.{from}(b)\n    }}\n\n    \
+             /// `{h}` — the crossing conversion, delegated to the boundary surface.\n    \
+             pub fn {h}(a: {v}) -> {w} {{\n        a.{h}()\n    }}\n\n    \
+             /// `{to}` — the target-side operator, delegated to the boundary surface.\n    \
+             pub fn {to}(a: {w}, b: {w}) -> {w} {{\n        a.{to}(b)\n    }}\n",
+            from = from.name,
+            h = h.name,
+            to = to.name,
+            v = source,
+            w = target,
+        ));
+        out.push_str("}\n");
+    }
     out
 }
 
@@ -1355,12 +1531,15 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
 /// name, so it stays a loud hole in `tests/seams.rs` until a spanning theory exists.
 fn emit_system(sys: &SystemDecl) -> String {
     let marker = camel(&sys.name);
-    let transports: Vec<&SeamDecl> = sys
+    // compiled seams: every transport (by construction) and every transform whose conversion
+    // is NAMED (`via h` — checked in the spanning theory). A via-less transform stays a loud
+    // hole in tests/seams.rs, counted below.
+    let compiled: Vec<&SeamDecl> = sys
         .seams
         .iter()
-        .filter(|s| s.kind == SeamKindDecl::Transport)
+        .filter(|s| s.kind == SeamKindDecl::Transport || s.via.is_some())
         .collect();
-    let transforms = sys.seams.len() - transports.len();
+    let holes = sys.seams.len() - compiled.len();
 
     let mut out = String::from(
         "//! Tier: ALGEBRA — the compiled `system!` graph: the application-level spec as a \
@@ -1376,18 +1555,18 @@ fn emit_system(sys: &SystemDecl) -> String {
          //! each shared value object is defined exactly once, and the `system!` macro emits the\n\
          //! compile-time witness that keeps that true.\n",
     );
-    if transforms > 0 {
+    if holes > 0 {
         out.push_str(&format!(
             "//!\n\
-             //! NOTE: {transforms} declared TRANSFORM seam(s) are not compiled into this graph —\n\
-             //! a transform's conversion is meaning, not structure. Each remains a loud hole in\n\
-             //! `tests/seams.rs`; once a spanning theory exists, declare the seam here as\n\
-             //! `Left -- Right : transform on Value via conversion in SpanningTheory;`.\n"
+             //! NOTE: {holes} declared TRANSFORM seam(s) name no conversion (`via h`), so they\n\
+             //! are not compiled into this graph — each remains a loud hole in `tests/seams.rs`.\n\
+             //! Name the conversion in the declaration and regenerate to compile them.\n"
         ));
     }
     out.push('\n');
 
-    // imports: every module's theory marker, plus each transport seam's value (for the witness).
+    // imports: every module's theory marker, each transport seam's value (for the witness),
+    // and each via seam's spanning-theory marker.
     let mut imports = BTreeSet::new();
     for m in &sys.modules {
         imports.insert(format!(
@@ -1396,9 +1575,14 @@ fn emit_system(sys: &SystemDecl) -> String {
             camel(&m.name)
         ));
     }
-    for s in &transports {
-        let owner = owner_of(sys, &s.on).expect("validated: seam value has an owner");
-        imports.insert(format!("use crate::{owner}::{};\n", s.on));
+    for s in &compiled {
+        if s.via.is_some() {
+            let (module_name, seam_marker, _) = seam_theory_names(s);
+            imports.insert(format!("use crate::ops::{module_name}::{seam_marker};\n"));
+        } else {
+            let owner = owner_of(sys, &s.on).expect("validated: seam value has an owner");
+            imports.insert(format!("use crate::{owner}::{};\n", s.on));
+        }
     }
     for line in &imports {
         out.push_str(line);
@@ -1414,15 +1598,26 @@ fn emit_system(sys: &SystemDecl) -> String {
         out.push_str(&format!("        {};\n", camel(&m.name)));
     }
     out.push_str("    }\n");
-    if !transports.is_empty() {
+    if !compiled.is_empty() {
         out.push_str("    seams {\n");
-        for s in &transports {
-            out.push_str(&format!(
-                "        {} -- {} : transport on {} by construction;\n",
-                camel(&s.left),
-                camel(&s.right),
-                s.on
-            ));
+        for s in &compiled {
+            match &s.via {
+                None => out.push_str(&format!(
+                    "        {} -- {} : transport on {} by construction;\n",
+                    camel(&s.left),
+                    camel(&s.right),
+                    s.on
+                )),
+                Some(via) => {
+                    let (_, seam_marker, _) = seam_theory_names(s);
+                    out.push_str(&format!(
+                        "        {} -- {} : transform on {} via {via} in {seam_marker};\n",
+                        camel(&s.left),
+                        camel(&s.right),
+                        s.on
+                    ));
+                }
+            }
         }
         out.push_str("    }\n");
     }
@@ -1444,26 +1639,55 @@ fn emit_system_lock(sys: &SystemDecl) -> String {
         out.push_str(&format!("- {}\n", m.name));
     }
     out.push('\n');
-    let transports: Vec<&SeamDecl> = sys
+    let compiled: Vec<&SeamDecl> = sys
         .seams
         .iter()
-        .filter(|s| s.kind == SeamKindDecl::Transport)
+        .filter(|s| s.kind == SeamKindDecl::Transport || s.via.is_some())
         .collect();
-    if transports.is_empty() {
+    if compiled.is_empty() {
         out.push_str("seams: none — no module pair declares a shared-value obligation.\n");
         return out;
     }
     out.push_str("seams (each edge: its obligation, then the verdict its checker returned):\n");
-    for s in &transports {
-        out.push_str(&format!(
-            "- {} -- {} : transport on {}\n",
-            s.left, s.right, s.on
-        ));
-        out.push_str("      obligation: the modules share this value and must agree on its laws\n");
-        out.push_str(
-            "      status: discharged by construction — the shared value is one type on both \
-             sides (the declaration carries the compile-time witness)\n",
-        );
+    for s in &compiled {
+        match &s.via {
+            None => {
+                out.push_str(&format!(
+                    "- {} -- {} : transport on {}\n",
+                    s.left, s.right, s.on
+                ));
+                out.push_str(
+                    "      obligation: the modules share this value and must agree on its laws\n",
+                );
+                out.push_str(
+                    "      status: discharged by construction — the shared value is one type on both \
+                     sides (the declaration carries the compile-time witness)\n",
+                );
+            }
+            Some(via) => {
+                // the CONVERGED target: once the conversion's meaning earns the declared
+                // homomorphism, the live verdict renders exactly this (no composites — a
+                // discovered chain shows up in the bless diff, which is the ratification).
+                let (_, _, display) = seam_theory_names(s);
+                let (h, from, to) = via_seam_parts(sys, s);
+                let _ = h;
+                out.push_str(&format!(
+                    "- {} -- {} : transform on {}\n",
+                    s.left, s.right, s.on
+                ));
+                out.push_str(
+                    "      obligation: the conversion across the seam must be a homomorphism\n",
+                );
+                out.push_str(&format!(
+                    "      status: preserved — the conversion `{via}` is a discovered homomorphism \
+                     (spanning theory: {display}):\n"
+                ));
+                out.push_str(&format!(
+                    "        * {via} turns {} into {}.\n",
+                    from.name, to.name
+                ));
+            }
+        }
     }
     out
 }
@@ -1492,6 +1716,10 @@ fn emit_expectations(sys: &SystemDecl) -> String {
             camel(&m.name)
         ));
     }
+    for seam in sys.seams.iter().filter(|s| s.via.is_some()) {
+        let (module_name, marker, _) = seam_theory_names(seam);
+        out.push_str(&format!("use {krate}::ops::{module_name}::{marker};\n"));
+    }
     for m in sys.modules.iter().filter(|m| !m.expects.is_empty()) {
         out.push_str(&format!(
             "\n/// `{m}` declares {n} law(s); the distance report names any that discovery has\n\
@@ -1503,6 +1731,19 @@ fn emit_expectations(sys: &SystemDecl) -> String {
             m = m.name,
             n = m.expects.len(),
             theory = camel(&m.name),
+        ));
+    }
+    for seam in sys.seams.iter().filter(|s| s.via.is_some()) {
+        let (_, marker, display) = seam_theory_names(seam);
+        out.push_str(&format!(
+            "\n/// The `{display}` spanning theory declares the seam's homomorphism; red names\n\
+             /// exactly the law the conversion has not yet earned.\n\
+             #[test]\n\
+             fn {l}_{r}_seam_meets_its_declared_expectations() {{\n    \
+             let distance = Distance::of::<{marker}>();\n    \
+             assert!(distance.is_met(), \"{{}}\", distance.render());\n}}\n",
+            l = seam.left,
+            r = seam.right,
         ));
     }
     out
@@ -1618,9 +1859,18 @@ fn emit_seams(sys: &SystemDecl) -> String {
          //! GENERATED by genesis for `{}`. A seam names what a module split must preserve:\n\
          //! a `transport` seam shares a sort that is the SAME type on both sides (preserved by\n\
          //! construction — genesis defines each value object exactly once); a `transform` seam\n\
-         //! carries a conversion that must be a HOMOMORPHISM, and that check is a meaning hole.\n",
+         //! carries a conversion that must be a HOMOMORPHISM — checked by discovery in the\n\
+         //! seam's spanning theory when the conversion is NAMED (`via h`), a meaning hole when\n\
+         //! it is not.\n",
         sys.name
     );
+    if sys.seams.iter().any(|s| s.via.is_some()) {
+        out.push_str(&format!(
+            "\nuse boundary_spec::discover::system::{{SeamKind, SystemReport}};\n\n\
+             use {krate}::system::{};\n",
+            camel(&sys.name)
+        ));
+    }
     for s in &sys.seams {
         let owner = owner_of(sys, &s.on).expect("validated: seam value has an owner");
         let test = format!(
@@ -1646,17 +1896,38 @@ fn emit_seams(sys: &SystemDecl) -> String {
                 r = s.right,
                 v = s.on,
             )),
-            SeamKindDecl::Transform => out.push_str(&format!(
-                "\n/// TRANSFORM seam `{l} -- {r}` on `{v}`: a conversion crosses it, and the \
-                 conversion must be\n/// a HOMOMORPHISM — `h(a op b) == h(a) op' h(b)` — or \
-                 the cut is bad. Naming `h` and the two\n/// operators is meaning; probing the \
-                 equation over the grid is the discharge.\n#[test]\nfn {test}() {{\n    \
-                 todo!(\"MEANING: name the conversion across `{l} -- {r}` and probe h(a op b) \
-                 == h(a) op'(h(b))\")\n}}\n",
-                l = s.left,
-                r = s.right,
-                v = s.on,
-            )),
+            SeamKindDecl::Transform => match &s.via {
+                Some(via) => out.push_str(&format!(
+                    "\n/// TRANSFORM seam `{l} -- {r}` on `{v}` via `{via}`: the conversion must \
+                     be a HOMOMORPHISM,\n/// checked by DISCOVERY in the seam's spanning theory \
+                     (`ops::{span}`) and verdict-bearing in\n/// the compiled graph — this test \
+                     holds the verdict, and the system lock freezes it.\n#[test]\nfn {test}() \
+                     {{\n    let seam = SystemReport::of::<{marker}>()\n        .seams\n        \
+                     .into_iter()\n        .find(|s| (s.left, s.right, s.kind) == (\"{l}\", \
+                     \"{r}\", SeamKind::Transform))\n        .expect(\"declared in \
+                     src/system.rs\");\n    assert!(\n        seam.status.is_met(),\n        \
+                     \"the conversion `{via}` does not yet preserve the algebra: {{:?}}\",\n        \
+                     seam.status\n    );\n}}\n",
+                    l = s.left,
+                    r = s.right,
+                    v = s.on,
+                    span = seam_theory_names(s).0,
+                    marker = camel(&sys.name),
+                )),
+                None => out.push_str(&format!(
+                    "\n/// TRANSFORM seam `{l} -- {r}` on `{v}`: a conversion crosses it, and the \
+                     conversion must be\n/// a HOMOMORPHISM — `h(a op b) == h(a) op' h(b)` — or \
+                     the cut is bad. Naming `h` and the two\n/// operators is meaning; probing the \
+                     equation over the grid is the discharge (or name the\n/// conversion in the \
+                     declaration — `via h` — and regenerate to compile the check).\n#[test]\nfn \
+                     {test}() {{\n    \
+                     todo!(\"MEANING: name the conversion across `{l} -- {r}` and probe h(a op b) \
+                     == h(a) op'(h(b))\")\n}}\n",
+                    l = s.left,
+                    r = s.right,
+                    v = s.on,
+                )),
+            },
         }
     }
     out
@@ -1747,7 +2018,9 @@ impl Genesis {
             path: "tests/freeze_gate.rs".to_string(),
             contents: emit_freeze_gate(&system),
         });
-        if system.modules.iter().any(|m| !m.expects.is_empty()) {
+        if system.modules.iter().any(|m| !m.expects.is_empty())
+            || system.seams.iter().any(|s| s.via.is_some())
+        {
             edits.push(FileEdit {
                 path: "tests/expectations.rs".to_string(),
                 contents: emit_expectations(&system),
@@ -1982,10 +2255,143 @@ mod tests {
             .find(|e| e.path == "src/system.rs")
             .expect("system module")
             .contents;
-        assert!(system.contains("1 declared TRANSFORM seam(s) are not compiled"));
+        assert!(system.contains("1 declared TRANSFORM seam(s) name no conversion"));
         assert!(!system.contains("seams {"), "no compiled seam block");
         // ... while the seam test hole is still emitted.
         assert!(plan.listing().contains(&"tests/seams.rs"));
+    }
+
+    /// A transform seam with a NAMED conversion (`via h`) is compiled END TO END: the
+    /// spanning theory (source op, conversion, target op, homomorphism expectation) lands in
+    /// `src/ops.rs`; the compiled seam wires it in `src/system.rs`; the expectations gate
+    /// covers the seam theory; `tests/seams.rs` holds the verdict instead of a hole; and the
+    /// system target lock renders the PRESERVED stanza (kept in step with
+    /// `SystemReport::render` — the byte pin here is the sync point).
+    #[test]
+    fn a_named_conversion_compiles_the_transform_seam_end_to_end() {
+        let decl = "system! { name: \"pipe-app\", \
+                    values { Raw = i64 where \"any\"; Cooked = i64 where \"any\"; } \
+                    modules { \
+                    source { ops { blend(Raw, Raw) -> Raw; cook(Raw) -> Cooked; } } \
+                    sink { ops { fuse(Cooked, Cooked) -> Cooked; } } } \
+                    seams { source -- sink : transform on Raw via cook; } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let body = |path: &str| {
+            &plan
+                .edits
+                .iter()
+                .find(|e| e.path == path)
+                .unwrap_or_else(|| panic!("missing {path}"))
+                .contents
+        };
+
+        let ops = body("src/ops.rs");
+        assert!(ops.contains(
+            "#[algebra(SourceSinkSeam, \"source-sink seam\", \
+             expects(homomorphism(cook, blend, fuse)))]"
+        ));
+        assert!(ops.contains("pub mod source_sink_seam_ops {"));
+        assert!(ops.contains("pub fn cook(a: Raw) -> Cooked {"));
+        assert!(ops.contains("pub fn fuse(a: Cooked, b: Cooked) -> Cooked {"));
+
+        let system = body("src/system.rs");
+        assert!(system.contains("use crate::ops::source_sink_seam_ops::SourceSinkSeam;"));
+        assert!(system.contains("Source -- Sink : transform on Raw via cook in SourceSinkSeam;"));
+        assert!(
+            !system.contains("not compiled"),
+            "no hole note — the seam compiled"
+        );
+
+        let expectations = body("tests/expectations.rs");
+        assert!(expectations.contains("use pipe_app::ops::source_sink_seam_ops::SourceSinkSeam;"));
+        assert!(expectations.contains("fn source_sink_seam_meets_its_declared_expectations()"));
+        assert!(expectations.contains("Distance::of::<SourceSinkSeam>()"));
+
+        let seams = body("tests/seams.rs");
+        assert!(seams.contains("fn seam_source_sink_transform_on_raw()"));
+        assert!(seams
+            .contains("(s.left, s.right, s.kind) == (\"source\", \"sink\", SeamKind::Transform)"));
+        assert!(
+            !seams.contains("todo!"),
+            "the verdict test replaced the hole"
+        );
+
+        let lock = body("spec/pipe-app.system.spec");
+        let expected = "\
+# system spec: pipe-app — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.
+
+modules (the ratified registry — one committed module lock each):
+- source
+- sink
+
+seams (each edge: its obligation, then the verdict its checker returned):
+- source -- sink : transform on Raw
+      obligation: the conversion across the seam must be a homomorphism
+      status: preserved — the conversion `cook` is a discovered homomorphism (spanning theory: source-sink seam):
+        * cook turns blend into fuse.
+";
+        assert_eq!(lock, expected);
+
+        for edit in &plan.edits {
+            if edit.path.ends_with(".rs") {
+                syn::parse_file(&edit.contents)
+                    .unwrap_or_else(|e| panic!("generated `{}` does not parse: {e}", edit.path));
+            }
+        }
+    }
+
+    /// Malformed `via` declarations are refused by name: an undeclared conversion, a
+    /// non-unary one, a wrong source, a transform landing where it left, a missing endpoint
+    /// binary, and a transport claiming a conversion.
+    #[test]
+    fn malformed_via_seams_are_refused_by_name() {
+        let wrap = |seam: &str| {
+            format!(
+                "system! {{ name: \"app\", \
+                 values {{ V = i64 where \"any\"; W = i64 where \"any\"; }} \
+                 modules {{ \
+                 a {{ ops {{ blend(V, V) -> V; cook(V) -> W; mix(V, V) -> V; }} }} \
+                 b {{ ops {{ fuse(W, W) -> W; }} }} }} \
+                 seams {{ {seam} }} }}"
+            )
+        };
+        let cases: Vec<(String, &str)> = vec![
+            (
+                wrap("a -- b : transform on V via boil;"),
+                "neither module declares",
+            ),
+            (wrap("a -- b : transform on V via blend;"), "must be unary"),
+            (
+                wrap("a -- b : transform on W via cook;"),
+                "converts from `V`, but the seam is on `W`",
+            ),
+            (
+                wrap("a -- b : transform on V via cook;"),
+                "exactly one homogeneous binary on `V`",
+            ),
+            (
+                wrap("a -- b : transport on V via cook;"),
+                "only a transform seam names a conversion",
+            ),
+        ];
+        for (decl, expected) in cases {
+            let err = Genesis::plan(&decl, &Deps::Version("0".to_string()))
+                .err()
+                .unwrap_or_else(|| panic!("should refuse: {decl}"));
+            assert!(
+                err.contains(expected),
+                "expected `{expected}` in the refusal, got: {err}"
+            );
+        }
+        // a self-landing conversion is refused too.
+        let decl = "system! { name: \"app\", values { V = i64 where \"any\"; } \
+                    modules { a { ops { blend(V, V) -> V; spin(V) -> V; } } \
+                    b { ops { merge(V, V) -> V; } } } \
+                    seams { a -- b : transform on V via spin; } }";
+        let err = Genesis::plan(decl, &Deps::Version("0".to_string()))
+            .err()
+            .unwrap();
+        assert!(err.contains("must land on a DIFFERENT value"), "got: {err}");
     }
 
     /// The TARGET system lock is the declared graph in the EXACT committed lock format —

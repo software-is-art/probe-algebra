@@ -51,13 +51,15 @@ program (effects as theories, the world lock) — are inventoried with their bri
 [experience.md](experience.md); its pillar 2 (executable validity rules) is in progress.
 The items below predate that inventory and remain live:
 
-1. **Transform seams end to end in genesis.** The compiled `system!` grammar can already
-   discharge a transform seam (`A -- B : transform on V via h in Span;`), but genesis still
-   leaves declared transform seams as `tests/seams.rs` meaning holes — it cannot name the
-   conversion or the spanning theory. Extend the declaration grammar so a transform seam
-   names its conversion op, and have genesis emit the spanning theory's skeleton (the
-   conversion as one more `#[algebra]` operator with a `MEANING:` body) plus the compiled
-   seam — then the flagship story covers both edge kinds.
+1. **Transform seams end to end in genesis — DONE.** A declared
+   `a -- b : transform on V via h;` (the conversion is a regular declared unary operator, so
+   its interior is an ordinary meaning hole) now generates: the seam's SPANNING theory in
+   `src/ops.rs` (source op, conversion, target op, `expects(homomorphism(h, from, to))`),
+   the compiled seam in `src/system.rs`, a distance gate in `tests/expectations.rs`, a
+   verdict test in `tests/seams.rs` (replacing the hole), and the PRESERVED stanza in the
+   system target lock. A via-less transform keeps the old hole, with the fix named. The
+   flagship story now covers both edge kinds; a two-module transform demo (a second
+   genesis-demo-style member) would exercise it in CI end to end.
 
 2. **The system-level distance.** `Distance` reports declared-vs-discovered per module;
    the analogous report for the graph would compare the DECLARED seams against what
