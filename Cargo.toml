@@ -21,6 +21,7 @@ members = [
     "boundary-enforce",
     "downstream-fixture",
     "genesis-demo",
+    "relay-demo",
     "spec-lock",
 ]
 

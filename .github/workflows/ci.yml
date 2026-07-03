@@ -33,8 +33,8 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      - run: cargo clippy --all-targets --all-features -- -D warnings
-      - run: cargo test --all-targets
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-targets
 
   # Per-change dogfood: mutate only the lines this PR touches. New code that a probe
   # cannot kill fails the gate; pre-existing documented equivalents are not in the diff,

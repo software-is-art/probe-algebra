@@ -21,10 +21,11 @@ impl Credits {
     pub fn new(raw: i64) -> Option<Credits> {
         // MEANING (filled): the declared rule is literal — a balance is a whole number of
         // credits between empty and the cap, inclusive.
-        (0..=20).contains(&raw).then(|| Credits(raw))
+        (0..=20).contains(&raw).then_some(Credits(raw))
     }
 
     /// The raw value — the sanctioned exit hatch.
+    #[allow(clippy::clone_on_copy)] // the generic form: raw may or may not be Copy
     pub fn get(&self) -> i64 {
         self.0.clone()
     }

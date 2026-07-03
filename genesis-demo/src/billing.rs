@@ -22,7 +22,7 @@ impl Receipt {
     pub fn new(raw: String) -> Option<Receipt> {
         // MEANING (filled): the declared rule is literal — a receipt is any non-empty
         // reference string; there is nothing to charge against a blank one.
-        (!raw.is_empty()).then(|| Receipt(raw))
+        (!raw.is_empty()).then_some(Receipt(raw))
     }
 
     /// The raw value — the sanctioned exit hatch.

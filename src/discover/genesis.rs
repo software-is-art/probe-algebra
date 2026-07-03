@@ -1118,7 +1118,7 @@ fn emit_value_object(v: &ValueDecl) -> String {
         Rule::Range { lo, hi, .. } => format!(
             "{indent}    // GENERATED from the declared rule `{rule_doc}` — a structured rule is\n\
              {indent}    // tokens, so its predicate is derived, never re-transcribed by hand.\n\
-             {indent}    ({lo}..={hi}).contains(&raw).then(|| {name}(raw))\n"
+             {indent}    ({lo}..={hi}).contains(&raw).then_some({name}(raw))\n"
         ),
     };
 
@@ -1206,6 +1206,7 @@ fn emit_value_object(v: &ValueDecl) -> String {
          {indent}}}\n\
          \n\
          {indent}/// The raw value — the sanctioned exit hatch.\n\
+         {indent}#[allow(clippy::clone_on_copy)] // the generic form: raw may or may not be Copy\n\
          {indent}pub fn get(&self) -> {raw} {{\n\
          {indent}    self.0.clone()\n\
          {indent}}}\n\
@@ -2467,7 +2468,7 @@ seams (each edge: its obligation, then the verdict its checker returned):
             .expect("boundary")
             .contents;
 
-        assert!(boundary.contains("(0..=20).contains(&raw).then(|| C(raw))"));
+        assert!(boundary.contains("(0..=20).contains(&raw).then_some(C(raw))"));
         assert!(boundary.contains("C(raw.clamp(0, 20))"));
         assert!(
             boundary.contains("C(0)"),
