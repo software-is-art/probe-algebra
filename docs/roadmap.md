@@ -84,10 +84,16 @@ its recorded residuals. The items below predate that inventory:
    each with its suggested seam kind — byte-pinned as a deliberate keep-whole decision.
    Follow-up: genesis could emit a distance report example per generated crate.
 
-3. **Equation render unification.** Genesis's target-lock EQUATIONS still restate the
-   engine's term-render format by hand (the prose half is unified through the catalog). The
-   byte-exact render pin forces sync, but deriving the equation from the shape's canonical
-   terms would remove the last restatement.
+3. **Equation render unification — DONE.** Every shape's canonical equation is now catalog
+   DATA: `ShapeInfo` carries schematic lhs/rhs terms (`SchemaTerm`, over slot indices and
+   sort-variable ordinals) plus the placeholder symbols its display `schema` string renders
+   with, and `ShapeInfo::equation` renders a concrete equation exactly the way the engine
+   renders a discovered law's terms. Genesis's `law()` derives its equation there — the
+   16-arm hand-written `format!` match is gone — and a census test holds the displayed
+   schema string to the same term data, so `spec/shapes.spec`'s schemas, genesis's
+   target-lock equations, and the engine's render conventions cannot drift apart. The
+   dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
+   end-to-end net over the freeze's actual render.
 
 ## Standing follow-ups
 

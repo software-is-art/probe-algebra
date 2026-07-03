@@ -451,6 +451,56 @@ pub struct ShapeInfo {
     /// The prose template a discovered instance renders with — the exact `format!` skeleton in
     /// `templates()`, with `{...}` holes where operator/constant names are substituted.
     pub template: &'static str,
+    /// The canonical left-hand term, as DATA over slot indices — the single source a concrete
+    /// symbolic equation renders from ([`ShapeInfo::equation`]). For the two-sided shapes
+    /// (identity, annihilation) this is the left/first-tried variant, the one a declared
+    /// expectation's target lock predicts.
+    pub lhs: SchemaTerm,
+    /// The canonical right-hand term (see `lhs`).
+    pub rhs: SchemaTerm,
+    /// The placeholder symbol per slot the DISPLAY `schema` string renders with (`⊕`, `act`,
+    /// `e`) — the census test holds `schema` against `lhs`/`rhs` rendered through these, so
+    /// the displayed string and the term data cannot drift apart.
+    pub placeholders: &'static [&'static str],
+}
+
+/// A schematic term: the shape's canonical equation halves as data, over SLOT indices (into
+/// `gate_slots.slots` / `placeholders`) and variables named by `(sort variable, ordinal)` —
+/// the same sort variables the gate's slots bind. Rendering follows [`Engine`]'s term
+/// renderer exactly (infix parenthesised, prefix `f(a, b)`, nullary bare), so a concrete
+/// equation derived here is byte-identical to the one a confirming discovery renders.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SchemaTerm {
+    /// The `ord`-th variable of sort variable `.0`.
+    Var(u8, u8),
+    /// Slot `.0`'s operator applied to argument terms (empty for a constant).
+    App(u8, &'static [SchemaTerm]),
+}
+
+impl SchemaTerm {
+    /// Render over concrete operators: `ops[slot]` is that slot's `(symbol, fixity)`;
+    /// `vars[sort_var][ord]` names the variables. Mirrors `Engine::render` case for case.
+    pub fn render(&self, ops: &[(&str, Fixity)], vars: &[&[&str]]) -> String {
+        match self {
+            SchemaTerm::Var(sort, ord) => vars[*sort as usize][*ord as usize].to_string(),
+            SchemaTerm::App(slot, args) => {
+                let (symbol, fixity) = ops[*slot as usize];
+                match fixity {
+                    Fixity::Nullary => symbol.to_string(),
+                    Fixity::Infix => format!(
+                        "({} {} {})",
+                        args[0].render(ops, vars),
+                        symbol,
+                        args[1].render(ops, vars)
+                    ),
+                    Fixity::Prefix => {
+                        let inner: Vec<String> = args.iter().map(|a| a.render(ops, vars)).collect();
+                        format!("{}({})", symbol, inner.join(", "))
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// A shape's applicability gate as data: one [`Slot`] per operator the shape ranges over (in
@@ -626,6 +676,19 @@ impl ShapeInfo {
         }
         out
     }
+
+    /// The shape's canonical symbolic equation over concrete operators — `lhs`/`rhs` rendered
+    /// through `ops` (one `(symbol, fixity)` per slot, in slot order) and `vars` (variable
+    /// letters per sort variable). The catalog is thereby the SINGLE source of a law's
+    /// equation, exactly as `instantiate` makes it the single source of the prose — genesis's
+    /// target locks derive their equations here instead of restating the render format.
+    pub fn equation(&self, ops: &[(&str, Fixity)], vars: &[&[&str]]) -> String {
+        format!(
+            "{} = {}",
+            self.lhs.render(ops, vars),
+            self.rhs.render(ops, vars)
+        )
+    }
 }
 
 /// The engine's shape catalog — the library's LAW-LANGUAGE surface, as a value object.
@@ -665,6 +728,17 @@ impl ShapeCatalog {
         };
         const HETERO: &[(u8, u8)] = &[(0, 1)];
 
+        // the canonical-term shorthand: variables of the carrier sort (X, Y, Z), of the
+        // action-parameter sort (P, Q), and slot 1's constant (C — identity's `e`,
+        // annihilation's `a`, a relation's verdict constant).
+        use SchemaTerm::{App, Var};
+        const X: SchemaTerm = Var(0, 0);
+        const Y: SchemaTerm = Var(0, 1);
+        const Z: SchemaTerm = Var(0, 2);
+        const P: SchemaTerm = Var(1, 0);
+        const Q: SchemaTerm = Var(1, 1);
+        const C: SchemaTerm = App(1, &[]);
+
         vec![
             ShapeInfo {
                 name: "commutativity",
@@ -672,6 +746,9 @@ impl ShapeCatalog {
                 gate: "homogeneous binary (s × s → s)",
                 gate_slots: BINARY,
                 template: "{op} gives the same result in either order.",
+                lhs: App(0, &[X, Y]),
+                rhs: App(0, &[Y, X]),
+                placeholders: &["⊕"],
             },
             ShapeInfo {
                 name: "associativity",
@@ -679,6 +756,9 @@ impl ShapeCatalog {
                 gate: "homogeneous binary (s × s → s)",
                 gate_slots: BINARY,
                 template: "With {op}, the grouping of three values doesn't matter.",
+                lhs: App(0, &[App(0, &[X, Y]), Z]),
+                rhs: App(0, &[X, App(0, &[Y, Z])]),
+                placeholders: &["⊕"],
             },
             ShapeInfo {
                 name: "idempotence",
@@ -686,6 +766,9 @@ impl ShapeCatalog {
                 gate: "homogeneous binary (s × s → s)",
                 gate_slots: BINARY,
                 template: "{op} of a value with itself gives that value.",
+                lhs: App(0, &[X, X]),
+                rhs: X,
+                placeholders: &["⊕"],
             },
             ShapeInfo {
                 name: "bias (right-regular)",
@@ -695,6 +778,9 @@ impl ShapeCatalog {
                 gate_slots: BINARY,
                 template: "With {op}, the later operand wins where the two disagree — \
                            re-applying an earlier one cannot overwrite it.",
+                lhs: App(0, &[App(0, &[X, Y]), X]),
+                rhs: App(0, &[Y, X]),
+                placeholders: &["⊕"],
             },
             ShapeInfo {
                 name: "bias (left-regular)",
@@ -704,6 +790,9 @@ impl ShapeCatalog {
                 gate_slots: BINARY,
                 template: "With {op}, the earlier operand wins where the two disagree — \
                            a later one cannot overwrite it.",
+                lhs: App(0, &[App(0, &[X, Y]), X]),
+                rhs: App(0, &[X, Y]),
+                placeholders: &["⊕"],
             },
             ShapeInfo {
                 name: "identity",
@@ -712,6 +801,9 @@ impl ShapeCatalog {
                        deduplicated by prose",
                 gate_slots: WITH_CONSTANT,
                 template: "{op} with {const} leaves a value unchanged.",
+                lhs: App(0, &[C, X]),
+                rhs: X,
+                placeholders: &["⊕", "e"],
             },
             ShapeInfo {
                 name: "annihilation",
@@ -720,6 +812,9 @@ impl ShapeCatalog {
                        deduplicated by prose",
                 gate_slots: WITH_CONSTANT,
                 template: "{op} by {const} always gives {const}.",
+                lhs: App(0, &[C, X]),
+                rhs: C,
+                placeholders: &["⊕", "a"],
             },
             ShapeInfo {
                 name: "distributivity",
@@ -727,6 +822,9 @@ impl ShapeCatalog {
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
                 gate_slots: BINARY_PAIR,
                 template: "{op} distributes over {other}.",
+                lhs: App(0, &[X, App(1, &[Y, Z])]),
+                rhs: App(1, &[App(0, &[X, Y]), App(0, &[X, Z])]),
+                placeholders: &["⊕", "⊗"],
             },
             ShapeInfo {
                 name: "absorption",
@@ -734,6 +832,9 @@ impl ShapeCatalog {
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
                 gate_slots: BINARY_PAIR,
                 template: "{op} absorbs {other}.",
+                lhs: App(0, &[X, App(1, &[X, Y])]),
+                rhs: X,
+                placeholders: &["⊕", "⊗"],
             },
             ShapeInfo {
                 name: "action identity",
@@ -746,6 +847,9 @@ impl ShapeCatalog {
                     distinct_ops: &[],
                 },
                 template: "{op} with {const} leaves a value unchanged.",
+                lhs: App(0, &[X, C]),
+                rhs: X,
+                placeholders: &["act", "e"],
             },
             ShapeInfo {
                 name: "monoid action",
@@ -758,6 +862,9 @@ impl ShapeCatalog {
                     distinct_ops: &[],
                 },
                 template: "Repeated {op} combines its parameters with {other}.",
+                lhs: App(0, &[App(0, &[X, P]), Q]),
+                rhs: App(0, &[X, App(1, &[P, Q])]),
+                placeholders: &["act", "⊗"],
             },
             ShapeInfo {
                 name: "irreflexivity",
@@ -770,6 +877,9 @@ impl ShapeCatalog {
                     distinct_ops: &[],
                 },
                 template: "A value is never {op} itself.",
+                lhs: App(0, &[X, X]),
+                rhs: C,
+                placeholders: &["rel", "false"],
             },
             ShapeInfo {
                 name: "self-application",
@@ -781,6 +891,9 @@ impl ShapeCatalog {
                     distinct_ops: &[],
                 },
                 template: "{op} of a value with itself gives {const}.",
+                lhs: App(0, &[X, X]),
+                rhs: C,
+                placeholders: &["rel", "c"],
             },
             ShapeInfo {
                 name: "involution",
@@ -788,6 +901,9 @@ impl ShapeCatalog {
                 gate: "unary s → s",
                 gate_slots: open(&[Slot::Unary(0, 0)]),
                 template: "{op} twice returns the original value.",
+                lhs: App(0, &[App(0, &[X])]),
+                rhs: X,
+                placeholders: &["u"],
             },
             ShapeInfo {
                 name: "round-trip",
@@ -799,6 +915,9 @@ impl ShapeCatalog {
                     distinct_ops: &[(0, 1)],
                 },
                 template: "{op} undoes {other} — the round trip is the identity.",
+                lhs: App(0, &[App(1, &[X])]),
+                rhs: X,
+                placeholders: &["g", "f"],
             },
             ShapeInfo {
                 name: "homomorphism",
@@ -806,6 +925,9 @@ impl ShapeCatalog {
                 gate: "unary h : s → t plus a homogeneous binary on s and one on t",
                 gate_slots: open(&[Slot::Unary(0, 1), Slot::Binary(0), Slot::Binary(1)]),
                 template: "{op} turns {other} into {via}.",
+                lhs: App(0, &[App(1, &[X, Y])]),
+                rhs: App(2, &[App(0, &[X]), App(0, &[Y])]),
+                placeholders: &["h", "⊕", "⊗"],
             },
         ]
     }
@@ -2600,6 +2722,50 @@ mod tests {
             annihilation.instantiate(&[("op", "spend")]),
             "spend by {const} always gives {const}."
         );
+    }
+
+    /// The displayed `schema` string IS the canonical terms rendered over the shape's
+    /// placeholder symbols — the string and the term data cannot drift apart, so the data
+    /// genesis derives its equations from is exactly what `spec/shapes.spec` ratifies.
+    /// (Identity and annihilation append an `(or …)` note for the mirrored variant the
+    /// engine also tries; the canonical render is then the schema's strict prefix.)
+    #[test]
+    fn the_schema_string_is_the_canonical_terms_rendered() {
+        for shape in ShapeCatalog::inventory() {
+            assert_eq!(
+                shape.gate_slots.slots.len(),
+                shape.placeholders.len(),
+                "`{}` needs one placeholder per slot",
+                shape.name
+            );
+            // the display convention: binaries render infix (`x ⊕ y`), everything else
+            // applied (`act(x, e)`, `rel(x, x)`, `u(x)`), constants bare.
+            let ops: Vec<(&str, Fixity)> = shape
+                .gate_slots
+                .slots
+                .iter()
+                .zip(shape.placeholders)
+                .map(|(slot, sym)| {
+                    let fixity = match slot {
+                        Slot::Binary(_) => Fixity::Infix,
+                        Slot::Constant(_) => Fixity::Nullary,
+                        Slot::Unary(..) | Slot::Action(..) | Slot::Relation(..) => Fixity::Prefix,
+                    };
+                    (*sym, fixity)
+                })
+                .collect();
+            let rendered = shape.equation(&ops, &[&["x", "y", "z"], &["p", "q"]]);
+            if shape.schema == rendered {
+                continue;
+            }
+            assert!(
+                shape.schema.starts_with(&rendered) && shape.schema.contains("(or "),
+                "`{}`: schema {:?} is not its canonical terms rendered ({:?})",
+                shape.name,
+                shape.schema,
+                rendered
+            );
+        }
     }
 
     /// The DATA gate admits every law the CODE gate fires — the two sides of `ShapeInfo`
