@@ -23,6 +23,20 @@ declaration (or vice versa) then fails to COMPILE, with the declaration as the n
 of truth. The registry story ("the graph IS the registry") becomes literal: one block of
 tokens is the application's spec at every point in its life.
 
+*Status: BUILT.* The `system!` macro grew a FULL-GRAMMAR arm (`Marker:` followed by the
+genesis declaration verbatim): module names resolve to their genesis-conventional theories
+via `paste` ident derivation, every declared operator signature compiles into a
+`const _: () = { let _: fn(…) -> … = path; }` witness, `transport on V;` discharges by
+construction, `transform on V via h;` checks in the genesis-named spanning theory, and ops
+modules PUB-re-export their sorts so the declaration can name every type it mentions.
+Genesis now emits `src/system.rs` as the ORIGINAL declaration text, spliced verbatim (span
+offsets preserve the author's formatting) — `relay-demo/` was regenerated in this form and
+converged identically (locks byte-for-byte unchanged), which is the compile-level proof.
+Residual v1 honesty: `values` rules and `expects` clauses are carried but not re-checked by
+the macro (the rules already generated their artifacts; expectations stay gated by
+`Distance` through the `#[algebra]` attribute), and raw-representation drift is caught at
+`get()`'s call sites rather than by a declaration witness.
+
 ## Pillar 2 — executable validity rules (shrink the holes to pure meaning)
 
 Converging the demo, the holes split cleanly in two:

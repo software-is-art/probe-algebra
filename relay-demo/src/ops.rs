@@ -16,8 +16,8 @@ use boundary_spec::algebra;
 /// `#[algebra]` reads off the signatures below.
 #[algebra(Mixer, "mixer", expects(commutative(blend), idempotent(blend)))]
 pub mod mixer_ops {
-    use crate::mixer::Level;
-    use crate::mixer::Signal;
+    pub use crate::mixer::Level;
+    pub use crate::mixer::Signal;
 
     /// `blend` — mechanical delegation to the boundary surface.
     pub fn blend(a: Signal, b: Signal) -> Signal {
@@ -34,7 +34,7 @@ pub mod mixer_ops {
 /// `#[algebra]` reads off the signatures below.
 #[algebra(Gauge, "gauge", expects(commutative(fuse)))]
 pub mod gauge_ops {
-    use crate::mixer::Level;
+    pub use crate::mixer::Level;
 
     /// `fuse` — mechanical delegation to the boundary surface.
     pub fn fuse(a: Level, b: Level) -> Level {
@@ -51,8 +51,8 @@ pub mod gauge_ops {
     expects(homomorphism(cook, blend, fuse))
 )]
 pub mod mixer_gauge_seam_ops {
-    use crate::mixer::Level;
-    use crate::mixer::Signal;
+    pub use crate::mixer::Level;
+    pub use crate::mixer::Signal;
 
     /// `blend` — the source-side operator, delegated to the boundary surface.
     pub fn blend(a: Signal, b: Signal) -> Signal {

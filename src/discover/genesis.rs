@@ -562,7 +562,7 @@ fn parse_system(input: ParseStream) -> syn::Result<SystemDecl> {
 }
 
 /// Find the `system! { ... }` invocation in the declaration file and parse its token stream.
-fn parse_declaration(source: &str) -> Result<SystemDecl, String> {
+fn parse_declaration(source: &str) -> Result<(SystemDecl, String), String> {
     let file = syn::parse_file(source)
         .map_err(|e| format!("genesis: the declaration is not parseable Rust: {e}"))?;
     let mac = file
@@ -583,9 +583,52 @@ fn parse_declaration(source: &str) -> Result<SystemDecl, String> {
         .ok_or_else(|| {
             "genesis: no `system! { ... }` invocation found in the declaration".to_string()
         })?;
-    parse_system
-        .parse2(mac.tokens)
-        .map_err(|e| format!("genesis: system! declaration: {e}"))
+    let system = parse_system
+        .parse2(mac.tokens.clone())
+        .map_err(|e| format!("genesis: system! declaration: {e}"))?;
+    // the ORIGINAL text between the macro's braces, author formatting intact — what the
+    // generated `src/system.rs` splices verbatim (one declaration, two lifecycle stages).
+    let text = match &mac.delimiter {
+        syn::MacroDelimiter::Brace(brace) => {
+            let open = brace.span.open().end();
+            let close = brace.span.close().start();
+            slice_by_line_column(source, open, close)
+                .trim_matches(|c| c == '\n' || c == '\r')
+                .to_string()
+        }
+        // paren/bracket invocations lose author formatting; fall back to the token render.
+        _ => mac.tokens.to_string(),
+    };
+    Ok((system, text))
+}
+
+/// The byte slice of `source` between two proc-macro2 line/column positions (lines are
+/// 1-based, columns are UTF-8-character offsets within the line).
+fn slice_by_line_column(
+    source: &str,
+    start: proc_macro2::LineColumn,
+    end: proc_macro2::LineColumn,
+) -> &str {
+    let offset = |pos: proc_macro2::LineColumn| {
+        let mut remaining_lines = pos.line - 1;
+        let mut byte = 0;
+        for (i, c) in source.char_indices() {
+            if remaining_lines == 0 {
+                let line_start = byte;
+                return source[line_start..]
+                    .char_indices()
+                    .nth(pos.column)
+                    .map(|(o, _)| line_start + o)
+                    .unwrap_or(source.len());
+            }
+            if c == '\n' {
+                remaining_lines -= 1;
+                byte = i + 1;
+            }
+        }
+        source.len()
+    };
+    &source[offset(start)..offset(end)]
 }
 
 // ===== validation (the declaration must be coherent before anything is emitted) =============
@@ -1394,9 +1437,11 @@ fn emit_ops(sys: &SystemDecl) -> String {
              pub mod {m}_ops {{\n",
             m = m.name,
         ));
-        // imports (indented one level inside the module).
+        // imports (indented one level inside the module) — PUBLIC re-exports, so the
+        // full-grammar `system!` block can name every sort through the module the
+        // declaration mentions (`crate::ops::meter_ops::Credits`).
         for line in value_imports(sys, m, false).lines() {
-            out.push_str(&format!("    {line}\n"));
+            out.push_str(&format!("    pub {line}\n"));
         }
         for op in &m.ops {
             if op.inputs.is_empty() {
@@ -1450,7 +1495,7 @@ fn emit_ops(sys: &SystemDecl) -> String {
         let mut imports = BTreeSet::new();
         for value in [source, target] {
             let owner = owner_of(sys, value).expect("validated: every value has an owner");
-            imports.insert(format!("    use crate::{owner}::{value};\n"));
+            imports.insert(format!("    pub use crate::{owner}::{value};\n"));
         }
         for line in &imports {
             out.push_str(line);
@@ -1525,104 +1570,49 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
     out
 }
 
-/// The compiled `system!` twin of the declaration (see `discover::system`): the marker, the
-/// module registry, and every TRANSPORT seam — discharged by construction, because genesis
-/// defines each value object exactly once (the macro's compile-time witness pins it). A
-/// declared TRANSFORM seam is NOT compiled here: its conversion is meaning genesis cannot
-/// name, so it stays a loud hole in `tests/seams.rs` until a spanning theory exists.
-fn emit_system(sys: &SystemDecl) -> String {
+/// The compiled `system!` stage of the declaration — ONE artifact, two lifecycle stages
+/// (see `discover::system`'s full-grammar form): the marker struct plus the ORIGINAL
+/// declaration tokens, spliced VERBATIM into a `boundary_spec::system! { Marker: ... }`
+/// invocation. The macro maps module names to their genesis-conventional theories, turns
+/// every declared operator signature into a compile-time witness, discharges transport
+/// seams by construction, and checks named transform seams in their spanning theories — so
+/// declaration↔code drift is a COMPILE error whose message points back at the declaration.
+/// A via-less transform seam is skipped by the macro; its hole lives in `tests/seams.rs`.
+fn emit_system(sys: &SystemDecl, declaration: &str) -> String {
     let marker = camel(&sys.name);
-    // compiled seams: every transport (by construction) and every transform whose conversion
-    // is NAMED (`via h` — checked in the spanning theory). A via-less transform stays a loud
-    // hole in tests/seams.rs, counted below.
-    let compiled: Vec<&SeamDecl> = sys
+    let holes = sys
         .seams
         .iter()
-        .filter(|s| s.kind == SeamKindDecl::Transport || s.via.is_some())
-        .collect();
-    let holes = sys.seams.len() - compiled.len();
+        .filter(|s| s.kind == SeamKindDecl::Transform && s.via.is_none())
+        .count();
 
     let mut out = String::from(
-        "//! Tier: ALGEBRA — the compiled `system!` graph: the application-level spec as a \
-         checked artifact.\n",
+        "//! Tier: ALGEBRA — the compiled `system!` graph: ONE declaration, two lifecycle \
+         stages.\n",
     );
     out.push_str(&banner(&sys.name));
     out.push_str(
         "//!\n\
-         //! The graph IS the registry: `modules()` is the list the freeze loop records and the\n\
-         //! drift gate checks (a module cannot silently fall out of it), and the rendered graph\n\
-         //! — modules, seams, each seam's obligation and status — freezes into the committed\n\
-         //! `spec/*.system.spec` lock. Declared transport seams are discharged BY CONSTRUCTION:\n\
-         //! each shared value object is defined exactly once, and the `system!` macro emits the\n\
-         //! compile-time witness that keeps that true.\n",
+         //! The block below is the ORIGINAL system declaration, spliced VERBATIM — the same\n\
+         //! tokens genesis derived this whole crate from, now COMPILING: `modules()` (the\n\
+         //! registry the freeze loop reads) resolves each module name to its theory, every\n\
+         //! declared operator signature is a compile-time witness against the code, and the\n\
+         //! seams wire to their checkers. Edit the declaration HERE and the crate follows or\n\
+         //! fails to build — the declaration cannot go stale.\n",
     );
     if holes > 0 {
         out.push_str(&format!(
             "//!\n\
-             //! NOTE: {holes} declared TRANSFORM seam(s) name no conversion (`via h`), so they\n\
-             //! are not compiled into this graph — each remains a loud hole in `tests/seams.rs`.\n\
-             //! Name the conversion in the declaration and regenerate to compile them.\n"
+             //! NOTE: {holes} declared TRANSFORM seam(s) name no conversion (`via h`), so the\n\
+             //! macro skips them — each remains a loud hole in `tests/seams.rs`. Name the\n\
+             //! conversion in the declaration below to compile the check.\n"
         ));
     }
-    out.push('\n');
-
-    // imports: every module's theory marker, each transport seam's value (for the witness),
-    // and each via seam's spanning-theory marker.
-    let mut imports = BTreeSet::new();
-    for m in &sys.modules {
-        imports.insert(format!(
-            "use crate::ops::{}_ops::{};\n",
-            m.name,
-            camel(&m.name)
-        ));
-    }
-    for s in &compiled {
-        if s.via.is_some() {
-            let (module_name, seam_marker, _) = seam_theory_names(s);
-            imports.insert(format!("use crate::ops::{module_name}::{seam_marker};\n"));
-        } else {
-            let owner = owner_of(sys, &s.on).expect("validated: seam value has an owner");
-            imports.insert(format!("use crate::{owner}::{};\n", s.on));
-        }
-    }
-    for line in &imports {
-        out.push_str(line);
-    }
-
     out.push_str(&format!(
         "\n/// The system marker — `SystemReport::of::<{marker}>()` is the graph the lock \
-         freezes.\npub struct {marker};\n\nboundary_spec::system! {{\n    {marker} : \
-         \"{name}\",\n    modules {{\n",
-        name = sys.name
+         freezes.\npub struct {marker};\n\nboundary_spec::system! {{\n    {marker}:\n\
+         {declaration}\n}}\n"
     ));
-    for m in &sys.modules {
-        out.push_str(&format!("        {};\n", camel(&m.name)));
-    }
-    out.push_str("    }\n");
-    if !compiled.is_empty() {
-        out.push_str("    seams {\n");
-        for s in &compiled {
-            match &s.via {
-                None => out.push_str(&format!(
-                    "        {} -- {} : transport on {} by construction;\n",
-                    camel(&s.left),
-                    camel(&s.right),
-                    s.on
-                )),
-                Some(via) => {
-                    let (_, seam_marker, _) = seam_theory_names(s);
-                    out.push_str(&format!(
-                        "        {} -- {} : transform on {} via {via} in {seam_marker};\n",
-                        camel(&s.left),
-                        camel(&s.right),
-                        s.on
-                    ));
-                }
-            }
-        }
-        out.push_str("    }\n");
-    }
-    out.push_str("}\n");
     out
 }
 
@@ -1941,6 +1931,10 @@ fn emit_seams(sys: &SystemDecl) -> String {
 pub struct Plan {
     /// The parsed, validated declaration.
     pub system: SystemDecl,
+    /// The ORIGINAL declaration text (the tokens between `system! {` and `}`), verbatim —
+    /// spliced into the generated `src/system.rs` so one artifact serves both lifecycle
+    /// stages.
+    pub declaration: String,
     /// Every file to write, target-root-relative, in emission order.
     pub edits: Vec<FileEdit>,
 }
@@ -1966,7 +1960,7 @@ impl Genesis {
     /// validate it, and derive every file. No I/O — the same plan can be inspected, tested, or
     /// applied.
     pub fn plan(declaration: &str, deps: &Deps) -> Result<Plan, String> {
-        let system = parse_declaration(declaration)?;
+        let (system, declaration_text) = parse_declaration(declaration)?;
         validate(&system)?;
 
         let mut edits = vec![
@@ -1999,7 +1993,7 @@ impl Genesis {
         });
         edits.push(FileEdit {
             path: "src/system.rs".to_string(),
-            contents: emit_system(&system),
+            contents: emit_system(&system, &declaration_text),
         });
         for m in &system.modules {
             edits.push(FileEdit {
@@ -2037,7 +2031,11 @@ impl Genesis {
                 contents: emit_seams(&system),
             });
         }
-        Ok(Plan { system, edits })
+        Ok(Plan {
+            system,
+            declaration: declaration_text,
+            edits,
+        })
     }
 
     /// The one EFFECTFUL edge: write every planned file under `root`, through
@@ -2216,10 +2214,12 @@ mod tests {
         );
     }
 
-    /// The COMPILED `system!` twin: the marker, the module registry, and the transport seam
-    /// as a by-construction declaration (genesis defines each value once); the roster admits
-    /// the module. A transform seam would stay OUT of the compiled graph (meaning, not
-    /// structure) — pinned by the second declaration.
+    /// The COMPILED `system!` stage is the ORIGINAL declaration, spliced VERBATIM after the
+    /// marker — one artifact, two lifecycle stages: the sample's own tokens (its name line,
+    /// its lowercase module names, its seam line) appear unchanged, and the ops modules
+    /// PUB-re-export their sorts so the macro can name every type through the declaration.
+    /// A via-less transform seam is skipped by the macro — pinned by the second declaration,
+    /// whose doc note names the fix.
     #[test]
     fn the_compiled_system_declaration_is_emitted() {
         let plan = sample_plan();
@@ -2230,11 +2230,21 @@ mod tests {
             .expect("system module")
             .contents;
         assert!(system.contains("pub struct CreditApp;"));
-        assert!(system.contains("boundary_spec::system! {"));
-        assert!(system.contains("CreditApp : \"credit-app\","));
-        assert!(system.contains("        Meter;\n        Billing;\n"));
-        assert!(system.contains("Meter -- Billing : transport on Credits by construction;"));
-        assert!(system.contains("use crate::meter::Credits;"));
+        assert!(system.contains("boundary_spec::system! {\n    CreditApp:\n"));
+        // the sample's ORIGINAL tokens, verbatim — not a re-render.
+        assert!(system.contains("name: \"credit-app\","));
+        assert!(system.contains("Credits = i64 where \"0..=20\";"));
+        assert!(system.contains("meter -- billing : transport on Credits;"));
+        let ops = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/ops.rs")
+            .expect("ops")
+            .contents;
+        assert!(
+            ops.contains("pub use crate::meter::Credits;"),
+            "ops modules re-export their sorts for the macro's paths"
+        );
 
         let lib = plan
             .edits
@@ -2257,7 +2267,8 @@ mod tests {
             .expect("system module")
             .contents;
         assert!(system.contains("1 declared TRANSFORM seam(s) name no conversion"));
-        assert!(!system.contains("seams {"), "no compiled seam block");
+        // the verbatim block still CARRIES the seam tokens (the macro skips them) ...
+        assert!(system.contains("a -- b : transform on V;"));
         // ... while the seam test hole is still emitted.
         assert!(plan.listing().contains(&"tests/seams.rs"));
     }
@@ -2296,10 +2307,17 @@ mod tests {
         assert!(ops.contains("pub fn fuse(a: Cooked, b: Cooked) -> Cooked {"));
 
         let system = body("src/system.rs");
-        assert!(system.contains("use crate::ops::source_sink_seam_ops::SourceSinkSeam;"));
-        assert!(system.contains("Source -- Sink : transform on Raw via cook in SourceSinkSeam;"));
         assert!(
-            !system.contains("not compiled"),
+            system.contains("PipeApp:"),
+            "the marker heads the verbatim block"
+        );
+        assert!(
+            system.contains("source -- sink : transform on Raw via cook;"),
+            "the ORIGINAL seam tokens are spliced verbatim — the macro derives the spanning \
+             theory path itself"
+        );
+        assert!(
+            !system.contains("name no conversion"),
             "no hole note — the seam compiled"
         );
 

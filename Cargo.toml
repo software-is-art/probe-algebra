@@ -44,6 +44,13 @@ syn = { version = "2", features = ["full"] }
 # Genesis renders a declared raw TYPE (any `syn::Type`, not just a plain path) back to text
 # for the generated newtypes. Already transitive via syn; named so the render is first-class.
 quote = "1"
+# The FULL-GRAMMAR `system!` arm derives module paths from declaration idents
+# (`meter` -> `meter_ops`/`Meter`) — paste's case/concat conversion is what lets ONE
+# declaration text serve both lifecycle stages. Re-exported (hidden) for downstream macro use.
+paste = "1"
+# Genesis splices the ORIGINAL `system! { ... }` declaration text into the generated
+# `src/system.rs` verbatim — span-locations supplies the byte offsets of the parsed block.
+proc-macro2 = { version = "1", features = ["span-locations"] }
 
 [dev-dependencies]
 proptest = "1"

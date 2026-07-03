@@ -378,8 +378,100 @@ impl SystemReport {
 ///   - `A -- B : transform on V via h in Spanning;` — the conversion `h` crosses the seam,
 ///     discharged inside the spanning theory (its homomorphism law must be discovered;
 ///     composites through it are run, never assumed).
+///
+/// # The FULL-GRAMMAR form: one declaration, two lifecycle stages
+///
+/// The macro also accepts the ENTIRE genesis declaration — the same tokens
+/// `examples/genesis_*.rs` carry — after a leading `Marker:`:
+///
+/// ```ignore
+/// pub struct CreditApp;
+/// boundary_spec::system! {
+///     CreditApp:
+///     name: "credit-app",
+///     values { Credits = i64 where 0..=20 saturating; }
+///     modules {
+///         meter {
+///             ops { zero() -> Credits; grant(Credits, Credits) -> Credits; }
+///             expects { commutative(grant); identity(grant, zero); }
+///         }
+///     }
+///     seams { /* the genesis seam grammar, verbatim */ }
+/// }
+/// ```
+///
+/// Genesis emits `src/system.rs` in exactly this shape — the ORIGINAL declaration tokens,
+/// spliced verbatim — so the declaration is ONE artifact at every point in the crate's life,
+/// and declaration↔code drift is a COMPILE error, not a stale document:
+///
+///   - each module name resolves to its genesis-conventional theory
+///     (`meter` → `crate::ops::meter_ops::Meter`), so a module missing from code fails to
+///     compile, and `modules()` — the registry — reads straight off the declaration;
+///   - every declared operator signature becomes a WITNESS
+///     (`const _: () = { let _: fn(Credits, Credits) -> Credits = crate::ops::…::grant; }`),
+///     so renaming an operator, changing its arity, or moving a sort breaks the build with
+///     the declaration as the named source of truth;
+///   - `transport on V;` compiles to the by-construction discharge (genesis defines each
+///     value once — the witness pins it); `transform on V via h;` compiles to the
+///     homomorphism check in the genesis-named spanning theory
+///     (`meter_billing_seam_ops::MeterBillingSeam`); a via-less transform is skipped here
+///     (its hole lives in `tests/seams.rs`);
+///   - `values { … }` rules and `expects { … }` clauses are accepted and carried (the rules
+///     already generated their artifacts; the expectations are semantically gated by
+///     `Distance` through the `#[algebra]` attribute) — v1 does not re-check them here.
+///
+/// The module-name → path derivation is why ops modules PUB-re-export their sorts (genesis
+/// emits `pub use crate::meter::Credits;` inside `meter_ops`): the macro can only name a
+/// value through a module the declaration mentions.
+// `crate::` inside the expansion is DELIBERATE (and the whole point): the paths must
+// resolve in the INVOKING crate's tree (`crate::ops::meter_ops::Meter`), which is exactly
+// what bare `crate` does in a macro_rules expansion — `$crate` would wrongly point here.
+#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
 macro_rules! system {
+    // ===== the full-grammar form: the genesis declaration verbatim, after `Marker:` =========
+    (
+        $sys:ident :
+        name : $namestr:literal ,
+        values { $($values:tt)* }
+        modules {
+            $( $m:ident {
+                ops { $( $f:ident ( $($arg:ident),* ) -> $ret:ident ; )+ }
+                $( expects { $($expects:tt)* } )?
+            } )+
+        }
+        $( seams {
+            $($seams:tt)*
+        } )?
+    ) => {
+        impl $crate::discover::system::System for $sys {
+            fn name() -> &'static str {
+                $namestr
+            }
+            fn modules() -> ::std::vec::Vec<$crate::discover::Spec> {
+                ::std::vec![ $(
+                    $crate::__paste! {
+                        $crate::discover::Spec::of::<crate::ops::[<$m _ops>]::[<$m:camel>]>()
+                    }
+                ),+ ]
+            }
+            fn seams() -> ::std::vec::Vec<$crate::discover::system::SeamReport> {
+                $crate::__full_seams!( @parsed [] $( $($seams)* )? )
+            }
+        }
+        // DRIFT WITNESSES — every declared operator signature, held against the code at
+        // compile time. The paths go through the declaration's own module names, so the
+        // declaration is the source of truth the error message points back to.
+        $( $crate::__paste! {
+            const _: () = {
+                $( let _: fn( $( crate::ops::[<$m _ops>]::$arg ),* )
+                    -> crate::ops::[<$m _ops>]::$ret
+                    = crate::ops::[<$m _ops>]::$f; )+
+            };
+        } )+
+    };
+
+    // ===== the compact form: theory types and explicit discharges ===========================
     (
         $sys:ident : $namestr:literal,
         modules {
@@ -400,6 +492,51 @@ macro_rules! system {
                 $crate::__system_seams!( @parsed [] $( $($seams)* )? )
             }
         }
+    };
+}
+
+/// The seam lines of a FULL-GRAMMAR `system!` declaration — the genesis seam grammar,
+/// munched one line at a time: `transport on V;` discharges by construction (with the
+/// one-type witness through the left module's re-export), `transform on V via h;` checks the
+/// homomorphism in the genesis-named spanning theory, and a via-less transform is dropped
+/// (its hole lives in `tests/seams.rs`). Hidden: only ever invoked by `system!`'s expansion.
+#[doc(hidden)]
+#[allow(clippy::crate_in_macro_def)] // call-site paths on purpose — see `system!`
+#[macro_export]
+macro_rules! __full_seams {
+    ( @parsed [ $($done:expr,)* ] ) => {
+        ::std::vec![ $($done),* ]
+    };
+    ( @parsed [ $($done:expr,)* ]
+      $l:ident -- $r:ident : transport on $v:ident ; $($rest:tt)* ) => {
+        $crate::__full_seams!( @parsed [ $($done,)*
+            $crate::__paste! {{
+                // the compile-time discharge: `$v` names ONE type, reachable through the
+                // left module's ops re-exports — two diverged types stop compiling here.
+                let _witness: fn(crate::ops::[<$l _ops>]::$v) -> crate::ops::[<$l _ops>]::$v =
+                    |value| value;
+                $crate::discover::system::SeamReport::transport_by_construction::<
+                    crate::ops::[<$l _ops>]::[<$l:camel>],
+                    crate::ops::[<$r _ops>]::[<$r:camel>],
+                >(::std::stringify!($v))
+            }}, ]
+            $($rest)* )
+    };
+    ( @parsed [ $($done:expr,)* ]
+      $l:ident -- $r:ident : transform on $v:ident via $h:ident ; $($rest:tt)* ) => {
+        $crate::__full_seams!( @parsed [ $($done,)*
+            $crate::__paste! {
+                $crate::discover::system::SeamReport::transform::<
+                    crate::ops::[<$l _ops>]::[<$l:camel>],
+                    crate::ops::[<$r _ops>]::[<$r:camel>],
+                    crate::ops::[<$l _ $r _seam_ops>]::[<$l:camel $r:camel Seam>],
+                >(::std::stringify!($v), ::std::stringify!($h))
+            }, ]
+            $($rest)* )
+    };
+    ( @parsed [ $($done:expr,)* ]
+      $l:ident -- $r:ident : transform on $v:ident ; $($rest:tt)* ) => {
+        $crate::__full_seams!( @parsed [ $($done,)* ] $($rest)* )
     };
 }
 

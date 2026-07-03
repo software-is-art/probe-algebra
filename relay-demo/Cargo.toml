@@ -4,13 +4,14 @@
 # THE TRANSFORM-SEAM DEMO (examples/genesis_relay.rs is the seed): generated, then ONLY the
 # three operator interiors and the probes stub were filled — the structured validity rules
 # generated everything else. Same three mechanical workspace-member deviations as
-# genesis-demo/: no [workspace] table, fixture version/publish flags, cargo fmt.
+# genesis-demo/: no [workspace] table, fixture version/publish flags, cargo fmt. Regenerated
+# for pillar 1 (docs/experience.md): src/system.rs now carries the ORIGINAL declaration
+# verbatim, compiling through the full-grammar system! macro.
 [package]
 name = "relay-app"
 version = "0.0.0"
-publish = false
 edition = "2021"
-
+publish = false
 
 [dependencies]
 # The discipline under consumption: value objects, edges, discovery, `#[algebra]`.
