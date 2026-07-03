@@ -44,6 +44,16 @@ the audit that a grid's structural closure completed — was promoted from the t
 the library (`boundary::grid_gaps`), so downstream grids hold it as an invariant instead of
 a convention.
 
+**The pipeline is a lock** (the shift-left brick): CI/CD is subsumed into the declaration
+discipline. `discover::gates` declares every gate (command, cadence, capability, promise);
+`spec/gates.spec` locks the inventory and `.github/workflows/ci.yml` is ITSELF a derived,
+drift-gated lock (`cargo run --example freeze_gates` regenerates; never hand-edit), so the
+pipeline can no longer drift the way it did (the `--workspace` gap is now a census test
+over registry DATA). `cargo run --example gate` executes the every-change gates locally
+from the same declaration — CI stops being where verification is defined and keeps only
+what cannot shift left: countersigning, effects, and the economics of the expensive
+sweeps, all three visible as cadence/capability data.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research
