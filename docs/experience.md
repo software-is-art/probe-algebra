@@ -66,6 +66,15 @@ seam's homomorphism becomes DECLARABLE — which is the missing piece for genesi
 spanning-theory skeletons and compile transform seams end to end (the standing roadmap
 brick). One data structure unlocks all three.
 
+*Status: BUILT.* `ShapeGate`/`Slot` sit inside every `ShapeInfo` (`gate_slots`), one generic
+checker (`ShapeGate::admit`) serves the engine census and genesis validation, and the
+genesis `expects` vocabulary is the whole catalog (minus `irreflexive`, whose `false`
+witness no identifier can spell — refused with the alternative named). The declared-law
+renderer is held to discovery by a dynamic sync pin: fixtures fire every newly-declarable
+shape, every discovered law is declared back, and the emitted target lock must equal the
+freeze's live render byte for byte. The remaining payoff — genesis emitting spanning-theory
+skeletons so transform seams compile end to end — is now unblocked.
+
 ## Pillar 4 (research) — effects as theories: the world lock
 
 The library kept I/O at the edges because effects resist the mental model. The kvstore

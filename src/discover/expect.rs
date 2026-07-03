@@ -94,6 +94,22 @@ impl Expectation {
         }
     }
 
+    /// The canonical catalog name for a declaration key (or an exact catalog name) — the
+    /// NON-PANICKING twin of [`Expectation::of`], for parsers (genesis) that must refuse an
+    /// unknown shape gracefully rather than abort.
+    pub fn canonical(shape: &str) -> Option<&'static str> {
+        VOCABULARY
+            .iter()
+            .find(|(key, name)| *key == shape || *name == shape)
+            .map(|(_, name)| *name)
+    }
+
+    /// The declaration keys, in catalog order — what a parser lists when refusing an unknown
+    /// shape, so the refusal teaches the whole vocabulary.
+    pub fn vocabulary_keys() -> Vec<&'static str> {
+        VOCABULARY.iter().map(|(key, _)| *key).collect()
+    }
+
     /// The declaration key for this expectation's shape — the identifier it renders under in a
     /// distance report, so the report reads back in the same vocabulary the agent declares in.
     fn key(&self) -> &'static str {

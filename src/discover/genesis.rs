@@ -39,14 +39,19 @@
 //!             — an operator signature over declared value names. Zero inputs declares a
 //!               CONSTANT (a nullary operator, e.g. `zero() -> Credits`).
 //! expects  := "expects" "{" expect+ "}"
-//! expect   := shape "(" Ident ("," Ident)? ")" ";"
-//! shape    := "commutative" | "associative" | "idempotent" | "bias_later" | "bias_earlier"
-//!           | "identity" | "annihilation"
-//!             — the declared LAW EXPECTATIONS, a subset of the engine's shape catalog
-//!               (`ShapeCatalog::inventory`) restricted to homogeneous binary operators:
-//!               one-argument shapes take the operator; `identity`/`annihilation` take the
-//!               operator and a declared nullary constant of its sort. The keys are the same
-//!               ones `discover::expect` and the `#[algebra]` macro's `expects(...)` speak.
+//! expect   := shape "(" Ident ("," Ident)* ")" ";"
+//! shape    := any `discover::expect` declaration key except "irreflexive"
+//!             — the declared LAW EXPECTATIONS: the engine's WHOLE ratified shape catalog
+//!               (`ShapeCatalog::inventory`), each line validated against the shape's DATA
+//!               gate (`ShapeGate::admit`) — the same gate discovery tries operators
+//!               against, so declarable and discoverable are one vocabulary. Arities and
+//!               sort relations come from the gate: `commutative(op)`,
+//!               `identity(op, constant)`, `monoid_action(action, combiner)`,
+//!               `round_trip(outer, inner)`, `homomorphism(conversion, from_op, to_op)`, …
+//!               (`irreflexive` alone is refused here: its witness constant must render as
+//!               `false`, which no operator identifier can spell — declare
+//!               `self_application` or leave it to discovery.) The keys are the same ones
+//!               `discover::expect` and the `#[algebra]` macro's `expects(...)` speak.
 //! seams    := "seams" "{" seam* "}"
 //! seam     := Ident "--" Ident ":" ("transport" | "transform") "on" Ident ";"
 //!             — a declared seam between two modules on a shared value: `transport` promises
@@ -193,20 +198,6 @@ pub enum SeamKindDecl {
     Transform,
 }
 
-/// The v1 expectation vocabulary: the shape catalog's homogeneous-binary rows by declaration
-/// key, each with the argument count it takes (the operator, plus a nullary constant for the
-/// last two). The keys are exactly the ones `discover::expect` speaks, so a parsed line is an
-/// `Expectation`, not a genesis-private twin.
-const V1_EXPECT_KEYS: &[(&str, usize)] = &[
-    ("commutative", 1),
-    ("associative", 1),
-    ("idempotent", 1),
-    ("bias_later", 1),
-    ("bias_earlier", 1),
-    ("identity", 2),
-    ("annihilation", 2),
-];
-
 /// The catalog row a (validated) expectation instantiates.
 fn shape_info(e: &Expectation) -> ShapeInfo {
     ShapeCatalog::inventory()
@@ -224,22 +215,30 @@ fn shape_rank(e: &Expectation) -> usize {
         .expect("an Expectation's shape is always a ratified catalog name")
 }
 
-/// Does the expectation's shape take a constant (its second declared name)?
-fn takes_constant(e: &Expectation) -> bool {
-    matches!(e.shape, "identity" | "annihilation")
-}
-
 /// The declared law as the lock will state it: `(prose, equation)`. The PROSE is the ratified
 /// shape catalog's own template (`ShapeInfo::instantiate`) — one source, never restated — over
 /// the declared names; the EQUATION is the canonical form the engine renders for the shape's
-/// discovered instance (default variable names `x`, `y`, `z`, the operator infix under its own
-/// name — the byte-exact render pin in the tests holds this side in sync).
+/// discovered instance over an `#[algebra]` theory: default variable names (`x`, `y`, `z` per
+/// sort), binaries infix under their own names, unaries prefix. The dynamic sync test
+/// (`the_target_lock_reproduces_discovery_byte_for_byte`) holds every arm to the freeze's
+/// actual render.
 fn law(e: &Expectation) -> (String, String) {
     let op = e.ops[0].as_str();
-    let prose = match e.ops.get(1) {
-        Some(konst) => shape_info(e).instantiate(&[("op", op), ("const", konst)]),
-        None => shape_info(e).instantiate(&[("op", op)]),
+    let subs: Vec<(&str, &str)> = match e.shape {
+        "identity" | "annihilation" | "action identity" | "self-application" => {
+            vec![("op", op), ("const", e.ops[1].as_str())]
+        }
+        "distributivity" | "absorption" | "monoid action" | "round-trip" => {
+            vec![("op", op), ("other", e.ops[1].as_str())]
+        }
+        "homomorphism" => vec![
+            ("op", op),
+            ("other", e.ops[1].as_str()),
+            ("via", e.ops[2].as_str()),
+        ],
+        _ => vec![("op", op)],
     };
+    let prose = shape_info(e).instantiate(&subs);
     let equation = match e.shape {
         "commutativity" => format!("(x {op} y) = (y {op} x)"),
         "associativity" => format!("((x {op} y) {op} z) = (x {op} (y {op} z))"),
@@ -248,7 +247,28 @@ fn law(e: &Expectation) -> (String, String) {
         "bias (left-regular)" => format!("((x {op} y) {op} x) = (x {op} y)"),
         "identity" => format!("({} {op} x) = x", e.ops[1]),
         "annihilation" => format!("({konst} {op} x) = {konst}", konst = e.ops[1]),
-        other => unreachable!("v1 admits no `{other}` expectation"),
+        "distributivity" => {
+            format!(
+                "(x {op} (y {g} z)) = ((x {op} y) {g} (x {op} z))",
+                g = e.ops[1]
+            )
+        }
+        "absorption" => format!("(x {op} (x {g} y)) = x", g = e.ops[1]),
+        "action identity" => format!("(x {op} {e}) = x", e = e.ops[1]),
+        "monoid action" => {
+            format!("((x {op} x) {op} y) = (x {op} (x {g} y))", g = e.ops[1])
+        }
+        "self-application" => format!("(x {op} x) = {c}", c = e.ops[1]),
+        "involution" => format!("{op}({op}(x)) = x"),
+        "round-trip" => format!("{op}({f}(x)) = x", f = e.ops[1]),
+        "homomorphism" => {
+            format!(
+                "{op}((x {p} y)) = ({op}(x) {q} {op}(y))",
+                p = e.ops[1],
+                q = e.ops[2]
+            )
+        }
+        other => unreachable!("genesis refuses `{other}` at parse time"),
     };
     (prose, equation)
 }
@@ -358,29 +378,57 @@ fn parse_expect(input: ParseStream) -> syn::Result<Expectation> {
     let idents: Punctuated<Ident, Token![,]> = args.parse_terminated(Ident::parse, Token![,])?;
     input.parse::<Token![;]>()?;
     let names: Vec<String> = idents.iter().map(Ident::to_string).collect();
-    let known = V1_EXPECT_KEYS
-        .iter()
-        .find(|(key, arity)| shape == key && *arity == names.len());
-    let Some((key, arity)) = known else {
+    if shape == "irreflexive" {
+        // Declarable in `#[algebra]` (its witness constant is a string literal there), but
+        // not here: the shape's witness must RENDER as `false`, and no genesis operator
+        // identifier can spell that keyword. Refuse with the alternative named.
+        return Err(syn::Error::new(
+            shape.span(),
+            "`irreflexive` is not declarable in a genesis declaration — its witness constant \
+             must render as `false`, which no operator identifier can spell. Declare \
+             `self_application(op, constant)` instead, or leave the law to discovery",
+        ));
+    }
+    // arity per key, from the catalog's DATA gate — the same source validation checks.
+    let arity_of = |key: &'static str| {
+        let canonical = Expectation::canonical(key).expect("vocabulary key");
+        ShapeCatalog::inventory()
+            .into_iter()
+            .find(|info| info.name == canonical)
+            .map(|info| info.gate_slots.slots.len())
+            .expect("the vocabulary and the catalog move in lockstep")
+    };
+    let key = Expectation::vocabulary_keys()
+        .into_iter()
+        .find(|key| shape == key && arity_of(key) == names.len());
+    let Some(key) = key else {
+        let vocabulary: Vec<String> = Expectation::vocabulary_keys()
+            .into_iter()
+            .filter(|key| *key != "irreflexive")
+            .map(|key| format!("{key}/{}", arity_of(key)))
+            .collect();
         return Err(syn::Error::new(
             shape.span(),
             format!(
-                "unknown expectation `{shape}` with {} argument(s); the v1 vocabulary is \
-                 commutative(op), associative(op), idempotent(op), bias_later(op), \
-                 bias_earlier(op), identity(op, const), annihilation(op, const)",
-                names.len()
+                "unknown expectation `{shape}` with {} argument(s); the declarable vocabulary \
+                 (key/arity) is {}",
+                names.len(),
+                vocabulary.join(", ")
             ),
         ));
     };
-    if *arity == 2 && names[0] == names[1] {
-        // `Expectation` normalises to DISTINCT names (a discovered law's fingerprint does the
-        // same), so a self-paired declaration would silently lose its constant — refuse it.
+    let mut distinct = names.clone();
+    distinct.sort();
+    distinct.dedup();
+    if distinct.len() != names.len() {
+        // `Expectation` normalises to DISTINCT names (a discovered law's fingerprint does
+        // the same), so a repeated name would silently drop a slot — refuse it.
         return Err(syn::Error::new(
             shape.span(),
             format!(
-                "expectation `{key}({0}, {0})` names the same operator twice — the constant \
-                 must be a distinct nullary operator",
-                names[0]
+                "expectation `{shape}({})` names the same operator twice — each slot needs a \
+                 distinct operator in a genesis declaration",
+                names.join(", ")
             ),
         ));
     }
@@ -613,42 +661,26 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
             }
         }
         for e in &m.expects {
-            let Some(op) = m.ops.iter().find(|o| o.name == e.ops[0]) else {
-                return err(format!(
-                    "expectation `{}` names `{}`, which module `{}` does not declare",
-                    e.render(),
-                    e.ops[0],
-                    m.name
-                ));
-            };
-            let homogeneous_binary =
-                op.inputs.len() == 2 && op.inputs[0] == op.output && op.inputs[1] == op.output;
-            if !homogeneous_binary {
-                return err(format!(
-                    "expectation `{}` needs a homogeneous binary operator (s × s → s); \
-                     `{}` is `{}({}) -> {}`",
-                    e.render(),
-                    op.name,
-                    op.name,
-                    op.inputs.join(", "),
-                    op.output
-                ));
-            }
-            if takes_constant(e) {
-                let konst = &e.ops[1];
-                let ok = m
-                    .ops
-                    .iter()
-                    .any(|o| o.name == *konst && o.inputs.is_empty() && o.output == op.output);
-                if !ok {
+            // every named operator must be this module's; then the shape's DATA gate — the
+            // same one discovery tries operators against — judges the signatures.
+            let mut sigs: Vec<(Vec<String>, String)> = Vec::new();
+            for op_name in &e.ops {
+                let Some(op) = m.ops.iter().find(|o| o.name == *op_name) else {
                     return err(format!(
-                        "expectation `{}` needs `{konst}` to be a declared constant \
-                         (a nullary operator) of sort `{}` in module `{}`",
+                        "expectation `{}` names `{op_name}`, which module `{}` does not declare",
                         e.render(),
-                        op.output,
                         m.name
                     ));
-                }
+                };
+                sigs.push((op.inputs.clone(), op.output.clone()));
+            }
+            let names: Vec<&str> = e.ops.iter().map(String::as_str).collect();
+            if let Err(why) = shape_info(e).gate_slots.admit(&sigs, &names) {
+                return err(format!(
+                    "expectation `{}` in module `{}`: {why}",
+                    e.render(),
+                    m.name
+                ));
             }
         }
     }
@@ -1272,11 +1304,26 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
         "# discovered spec: {} — a behaviour lock; regenerate via this repo's freeze path and ratify the diff.\n\n",
         m.name
     );
-    for op in &m.ops {
-        for e in expects_for(m, &op.name) {
-            let (prose, equation) = law(e);
-            out.push_str(&format!("- {prose}\n      {equation}\n"));
-        }
+    // laws in the order a confirming discovery renders them: grouped by the operator the
+    // engine FIRES the shape on (the first declared op — except a round trip, which fires on
+    // its INNER conversion), then in catalog order, declaration order breaking ties. The
+    // dynamic sync test holds this to the freeze's actual render.
+    let fire_index = |e: &Expectation| {
+        let fire_op = if e.shape == "round-trip" {
+            &e.ops[1]
+        } else {
+            &e.ops[0]
+        };
+        m.ops
+            .iter()
+            .position(|o| o.name == *fire_op)
+            .expect("validated: every named operator is declared")
+    };
+    let mut declared: Vec<&Expectation> = m.expects.iter().collect();
+    declared.sort_by_key(|e| (fire_index(e), shape_rank(e)));
+    for e in declared {
+        let (prose, equation) = law(e);
+        out.push_str(&format!("- {prose}\n      {equation}\n"));
     }
     out.push('\n');
     let covered: BTreeSet<&str> = m
@@ -2133,6 +2180,182 @@ seams (each edge: its obligation, then the verdict its checker returned):
         }
     }
 
+    // ===== the FULL-VOCABULARY sync: genesis's declared-law render IS the freeze's ==========
+    //
+    // Three fixture theories mirroring what `#[algebra]` emits (operator name == symbol,
+    // default `x`/`y`/`z` variables, binaries infix, unaries prefix), chosen so every
+    // newly-declarable shape fires: a lattice (distributivity, absorption), a two-sort
+    // conversion domain (involution, round-trip, homomorphism), and an action domain
+    // (action identity, monoid action, self-application). The test below declares EVERY law
+    // discovery finds and demands the emitted target lock equal the freeze's render byte
+    // for byte — order, prose, and equations at once.
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    struct L;
+    struct Latt;
+    fn and_op(v: &[bool]) -> Option<bool> {
+        Some(v[0] && v[1])
+    }
+    fn or_op(v: &[bool]) -> Option<bool> {
+        Some(v[0] || v[1])
+    }
+    crate::theory! {
+        Latt : "latt", Value = bool, Obs = bool, Sort = L,
+        sort_of = |_: &bool| L,
+        observe = |v: &bool| *v,
+        vars { L => &["x", "y", "z"], }
+        inhabit { L => vec![false, true], }
+        ops {
+            Infix "and" "and" (L, L) -> L = and_op;
+            Infix "or"  "or"  (L, L) -> L = or_op;
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum C2 {
+        A,
+        B,
+    }
+    struct Conv;
+    fn cat_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1.max(v[1].1)))
+    }
+    fn glue_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1.max(v[1].1)))
+    }
+    fn esc_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1))
+    }
+    fn unesc_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1))
+    }
+    fn twist_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, -v[0].1))
+    }
+    crate::theory! {
+        Conv : "conv", Value = (u8, i64), Obs = (u8, i64), Sort = C2,
+        sort_of = |v: &(u8, i64)| if v.0 == 0 { C2::A } else { C2::B },
+        observe = |v: &(u8, i64)| *v,
+        vars { C2::A => &["x", "y", "z"], C2::B => &["x", "y", "z"], }
+        inhabit {
+            C2::A => vec![(0, -1), (0, 0), (0, 1)],
+            C2::B => vec![(1, -1), (1, 0), (1, 1)],
+        }
+        ops {
+            Infix  "cat"   "cat"   (C2::A, C2::A) -> C2::A = cat_op;
+            Infix  "glue"  "glue"  (C2::B, C2::B) -> C2::B = glue_op;
+            Prefix "esc"   "esc"   (C2::A) -> C2::B = esc_op;
+            Prefix "unesc" "unesc" (C2::B) -> C2::A = unesc_op;
+            Prefix "twist" "twist" (C2::A) -> C2::A = twist_op;
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum SC {
+        C,
+        P,
+    }
+    struct Score;
+    fn bump_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1 + v[1].1))
+    }
+    fn plus_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1 + v[1].1))
+    }
+    fn unit_op(_: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, 0))
+    }
+    fn cmp_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1 - v[1].1))
+    }
+    crate::theory! {
+        Score : "score", Value = (u8, i64), Obs = (u8, i64), Sort = SC,
+        sort_of = |v: &(u8, i64)| if v.0 == 0 { SC::C } else { SC::P },
+        observe = |v: &(u8, i64)| *v,
+        vars { SC::C => &["x", "y", "z"], SC::P => &["x", "y", "z"], }
+        inhabit {
+            SC::C => vec![(0, 0), (0, 1), (0, 2)],
+            SC::P => vec![(1, 0), (1, 1), (1, 2)],
+        }
+        ops {
+            Infix   "bump" "bump" (SC::C, SC::P) -> SC::C = bump_op;
+            Infix   "plus" "plus" (SC::P, SC::P) -> SC::P = plus_op;
+            Nullary "unit" "unit" () -> SC::P = unit_op;
+            Infix   "cmp"  "cmp"  (SC::C, SC::C) -> SC::P = cmp_op;
+        }
+    }
+
+    /// THE SYNC PIN for the whole declarable vocabulary: declare every law discovery finds
+    /// over a fixture, and the emitted TARGET lock must equal the freeze's live render byte
+    /// for byte — same laws, same prose (the catalog template), same equations (the engine's
+    /// canonical render), same ORDER (the fire-operator emulation). Any drift between
+    /// genesis's renderer and the engine's fails here, per shape, by name.
+    #[test]
+    fn the_target_lock_reproduces_discovery_byte_for_byte() {
+        use crate::discover::engine::{Engine, ShapeCatalog, Theory};
+
+        fn check<T: Theory>(expect_shapes: &[&str]) {
+            let engine = Engine::<T>::new();
+            let sigs = engine.signatures();
+            let symbols: Vec<&'static str> = sigs.iter().map(|(s, _, _)| *s).collect();
+            let inventory = ShapeCatalog::inventory();
+            let mut expects = Vec::new();
+            let mut fired: Vec<&str> = Vec::new();
+            for law in engine.discover().laws {
+                let ops = law.ops(&symbols);
+                let slots = inventory
+                    .iter()
+                    .find(|i| i.name == law.shape)
+                    .expect("ratified shape")
+                    .gate_slots
+                    .slots
+                    .len();
+                assert_eq!(
+                    ops.len(),
+                    slots,
+                    "fixture law `{}` coincides slots — pick a cleaner fixture",
+                    law.prose
+                );
+                fired.push(law.shape);
+                expects.push(Expectation {
+                    shape: law.shape,
+                    ops: ops.into_iter().map(String::from).collect(),
+                });
+            }
+            for shape in expect_shapes {
+                assert!(
+                    fired.contains(shape),
+                    "fixture `{}` was chosen to fire `{shape}`, but it did not",
+                    T::name()
+                );
+            }
+            let module = ModuleDecl {
+                name: T::name().to_string(),
+                ops: sigs
+                    .iter()
+                    .map(|(symbol, inputs, output)| OpDecl {
+                        name: symbol.to_string(),
+                        inputs: inputs.iter().map(|s| format!("{s:?}")).collect(),
+                        output: format!("{output:?}"),
+                    })
+                    .collect(),
+                expects,
+            };
+            assert_eq!(
+                emit_target_lock(&module),
+                crate::discover::Spec::of::<T>()
+                    .lock_in(Path::new("spec"))
+                    .live,
+                "genesis's declared-law render diverged from the freeze for `{}`",
+                T::name()
+            );
+        }
+
+        check::<Latt>(&["distributivity", "absorption"]);
+        check::<Conv>(&["involution", "round-trip", "homomorphism"]);
+        check::<Score>(&["action identity", "monoid action", "self-application"]);
+    }
+
     /// The dependency flag switches the manifest between a path-parameterised checkout and
     /// registry versions — the two consumer stories.
     #[test]
@@ -2172,7 +2395,15 @@ seams (each edge: its obligation, then the verdict its checker returned):
                     "values { V = i64 where \"any\"; } modules { m { ops { f(V, V) -> V; } \
                      expects { identity(f, zero); } } }",
                 ),
-                "nullary operator",
+                "which module `m` does not declare",
+            ),
+            (
+                wrap(
+                    "values { V = i64 where \"any\"; W = i64 where \"any\"; } modules { m { \
+                     ops { f(V, V) -> V; wrong(W, W) -> W; unit() -> W; } \
+                     expects { identity(f, unit); } } }",
+                ),
+                "`unit` must be a nullary constant of the matching sort",
             ),
             (
                 wrap(

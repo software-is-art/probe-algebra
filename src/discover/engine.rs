@@ -432,9 +432,9 @@ impl<T: Theory> Engine<T> {
 // ================================================================================================
 
 /// One universal algebraic shape, as a ratifiable datum: its name, its schematic equation, the
-/// applicability GATE that decides which operators it is tried on, and the prose TEMPLATE a
-/// discovered instance renders with (`{op}`/`{other}`/`{via}` are operator names, `{const}` a
-/// constant's symbol).
+/// applicability GATE that decides which operators it is tried on (as prose for the lock AND as
+/// checkable data), and the prose TEMPLATE a discovered instance renders with
+/// (`{op}`/`{other}`/`{via}` are operator names, `{const}` a constant's symbol).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ShapeInfo {
     /// The shape's name ("commutativity", "bias (right-regular)").
@@ -443,9 +443,140 @@ pub struct ShapeInfo {
     pub schema: &'static str,
     /// When the shape is tried, in prose ("homogeneous binary; skipped when commutative").
     pub gate: &'static str,
+    /// The same gate as DATA — the signature pattern a declaration is validated against
+    /// (`ShapeGate::admit`), so "what may be declared" and "what discovery tries" are one
+    /// artifact. Purely-behavioural conditions (bias's skipped-when-commutative) stay out:
+    /// they are discovery's verdict, not a signature's shape.
+    pub gate_slots: ShapeGate,
     /// The prose template a discovered instance renders with — the exact `format!` skeleton in
     /// `templates()`, with `{...}` holes where operator/constant names are substituted.
     pub template: &'static str,
+}
+
+/// A shape's applicability gate as data: one [`Slot`] per operator the shape ranges over (in
+/// the declared/fingerprint order), plus the distinctness constraints the code gate imposes.
+/// Sort VARIABLES (the `u8`s inside slots) express how the slots' sorts relate — identity's
+/// constant lives on its operator's sort, a homomorphism's binaries live on the conversion's
+/// two endpoints — by unification, not by naming concrete sorts.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ShapeGate {
+    /// One entry per operator parameter, in declaration order.
+    pub slots: &'static [Slot],
+    /// Sort-variable pairs that must bind to DIFFERENT sorts (an action's parameter is not
+    /// its carrier; a relation's verdict is not its operand).
+    pub distinct_sorts: &'static [(u8, u8)],
+    /// Slot-index pairs that must be DIFFERENT operators (distributivity's two binaries, a
+    /// round trip's two conversions).
+    pub distinct_ops: &'static [(u8, u8)],
+}
+
+/// One operator slot of a gate, over sort variables.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Slot {
+    /// A homogeneous binary on sort `.0` (`s × s → s`).
+    Binary(u8),
+    /// A nullary constant of sort `.0`.
+    Constant(u8),
+    /// A unary conversion from sort `.0` to sort `.1` (equal variables ⇒ an endo).
+    Unary(u8, u8),
+    /// An action of sort `.1` on sort `.0` (`s × t → s`).
+    Action(u8, u8),
+    /// A relation on sort `.0` with verdict sort `.1` (`s × s → r`).
+    Relation(u8, u8),
+}
+
+impl ShapeGate {
+    /// Do these operator signatures satisfy the gate? `sigs[i]` is slot `i`'s
+    /// `(input sorts, output sort)` and `names[i]` its display name; sorts are any comparable
+    /// tokens (the engine checks `T::Sort`s, genesis checks declared value NAMES — one
+    /// checker, so the two sides cannot drift). `Err` names the first violated slot or
+    /// constraint in the caller's vocabulary.
+    pub fn admit<S: PartialEq + Clone>(
+        &self,
+        sigs: &[(Vec<S>, S)],
+        names: &[&str],
+    ) -> Result<(), String> {
+        if sigs.len() != self.slots.len() || names.len() != self.slots.len() {
+            return Err(format!(
+                "the shape ranges over {} operator(s), got {}",
+                self.slots.len(),
+                sigs.len().max(names.len())
+            ));
+        }
+        let mut bound: Vec<Option<S>> = Vec::new();
+        let bind = |bound: &mut Vec<Option<S>>, var: u8, sort: &S| -> bool {
+            let var = var as usize;
+            if bound.len() <= var {
+                bound.resize(var + 1, None);
+            }
+            match &bound[var] {
+                Some(existing) => existing == sort,
+                None => {
+                    bound[var] = Some(sort.clone());
+                    true
+                }
+            }
+        };
+        for (i, slot) in self.slots.iter().enumerate() {
+            let (inputs, output) = &sigs[i];
+            let name = names[i];
+            let ok = match slot {
+                Slot::Binary(s) => {
+                    inputs.len() == 2
+                        && inputs[0] == *output
+                        && inputs[1] == *output
+                        && bind(&mut bound, *s, output)
+                }
+                Slot::Constant(s) => inputs.is_empty() && bind(&mut bound, *s, output),
+                Slot::Unary(from, to) => {
+                    inputs.len() == 1
+                        && bind(&mut bound, *from, &inputs[0])
+                        && bind(&mut bound, *to, output)
+                }
+                Slot::Action(carrier, param) => {
+                    inputs.len() == 2
+                        && inputs[0] == *output
+                        && bind(&mut bound, *carrier, output)
+                        && bind(&mut bound, *param, &inputs[1])
+                }
+                Slot::Relation(operand, verdict) => {
+                    inputs.len() == 2
+                        && inputs[0] == inputs[1]
+                        && bind(&mut bound, *operand, &inputs[0])
+                        && bind(&mut bound, *verdict, output)
+                }
+            };
+            if !ok {
+                let wanted = match slot {
+                    Slot::Binary(_) => "a homogeneous binary operator (s × s → s)",
+                    Slot::Constant(_) => "a nullary constant of the matching sort",
+                    Slot::Unary(..) => "a unary conversion between the matching sorts",
+                    Slot::Action(..) => "an action (s × t → s) on the matching carrier",
+                    Slot::Relation(..) => "a relation (s × s → r) on the matching operand sort",
+                };
+                return Err(format!("`{name}` must be {wanted}"));
+            }
+        }
+        for (a, b) in self.distinct_sorts {
+            let (a, b) = (*a as usize, *b as usize);
+            if bound.get(a).cloned().flatten() == bound.get(b).cloned().flatten() {
+                return Err(format!(
+                    "the sorts bound by `{}` must be distinct (an action's parameter is not \
+                     its carrier; a relation's verdict is not its operand)",
+                    names.join("`, `")
+                ));
+            }
+        }
+        for (a, b) in self.distinct_ops {
+            if names[*a as usize] == names[*b as usize] {
+                return Err(format!(
+                    "`{}` and `{}` must be different operators",
+                    names[*a as usize], names[*b as usize]
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ShapeInfo {
@@ -514,26 +645,46 @@ pub struct ShapeCatalog;
 
 impl ShapeCatalog {
     /// The full inventory, in the order `templates()` tries the shapes. KEEP IN STEP with
-    /// `templates()` — the census tests hold each side against the other, and the lock holds
-    /// both against `spec/shapes.spec`.
+    /// `templates()` — the census tests hold each side against the other (prose AND data
+    /// gates), and the lock holds both against `spec/shapes.spec`.
     pub fn inventory() -> Vec<ShapeInfo> {
+        // the data-gate shorthand (prose gates render into the lock; these validate).
+        const fn open(slots: &'static [Slot]) -> ShapeGate {
+            ShapeGate {
+                slots,
+                distinct_sorts: &[],
+                distinct_ops: &[],
+            }
+        }
+        const BINARY: ShapeGate = open(&[Slot::Binary(0)]);
+        const WITH_CONSTANT: ShapeGate = open(&[Slot::Binary(0), Slot::Constant(0)]);
+        const BINARY_PAIR: ShapeGate = ShapeGate {
+            slots: &[Slot::Binary(0), Slot::Binary(0)],
+            distinct_sorts: &[],
+            distinct_ops: &[(0, 1)],
+        };
+        const HETERO: &[(u8, u8)] = &[(0, 1)];
+
         vec![
             ShapeInfo {
                 name: "commutativity",
                 schema: "(x ⊕ y) = (y ⊕ x)",
                 gate: "homogeneous binary (s × s → s)",
+                gate_slots: BINARY,
                 template: "{op} gives the same result in either order.",
             },
             ShapeInfo {
                 name: "associativity",
                 schema: "((x ⊕ y) ⊕ z) = (x ⊕ (y ⊕ z))",
                 gate: "homogeneous binary (s × s → s)",
+                gate_slots: BINARY,
                 template: "With {op}, the grouping of three values doesn't matter.",
             },
             ShapeInfo {
                 name: "idempotence",
                 schema: "(x ⊕ x) = x",
                 gate: "homogeneous binary (s × s → s)",
+                gate_slots: BINARY,
                 template: "{op} of a value with itself gives that value.",
             },
             ShapeInfo {
@@ -541,6 +692,7 @@ impl ShapeCatalog {
                 schema: "((x ⊕ y) ⊕ x) = (y ⊕ x)",
                 gate: "homogeneous binary; skipped when commutative (a commutative operator \
                        has no bias to state); excludes the left-regular variant on the grid",
+                gate_slots: BINARY,
                 template: "With {op}, the later operand wins where the two disagree — \
                            re-applying an earlier one cannot overwrite it.",
             },
@@ -549,6 +701,7 @@ impl ShapeCatalog {
                 schema: "((x ⊕ y) ⊕ x) = (x ⊕ y)",
                 gate: "homogeneous binary; skipped when commutative (a commutative operator \
                        has no bias to state); excludes the right-regular variant on the grid",
+                gate_slots: BINARY,
                 template: "With {op}, the earlier operand wins where the two disagree — \
                            a later one cannot overwrite it.",
             },
@@ -557,6 +710,7 @@ impl ShapeCatalog {
                 schema: "(e ⊕ x) = x  (or (x ⊕ e) = x)",
                 gate: "homogeneous binary plus a constant of its sort; tried on both sides, \
                        deduplicated by prose",
+                gate_slots: WITH_CONSTANT,
                 template: "{op} with {const} leaves a value unchanged.",
             },
             ShapeInfo {
@@ -564,18 +718,21 @@ impl ShapeCatalog {
                 schema: "(a ⊕ x) = a  (or (x ⊕ a) = a)",
                 gate: "homogeneous binary plus a constant of its sort; tried on both sides, \
                        deduplicated by prose",
+                gate_slots: WITH_CONSTANT,
                 template: "{op} by {const} always gives {const}.",
             },
             ShapeInfo {
                 name: "distributivity",
                 schema: "(x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))",
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
+                gate_slots: BINARY_PAIR,
                 template: "{op} distributes over {other}.",
             },
             ShapeInfo {
                 name: "absorption",
                 schema: "(x ⊕ (x ⊗ y)) = x",
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
+                gate_slots: BINARY_PAIR,
                 template: "{op} absorbs {other}.",
             },
             ShapeInfo {
@@ -583,6 +740,11 @@ impl ShapeCatalog {
                 schema: "act(x, e) = x",
                 gate: "heterogeneous binary s × t → s (an action of t on s) plus a constant \
                        of the parameter sort t",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "{op} with {const} leaves a value unchanged.",
             },
             ShapeInfo {
@@ -590,6 +752,11 @@ impl ShapeCatalog {
                 schema: "act(act(x, p), q) = act(x, (p ⊗ q))",
                 gate: "heterogeneous binary s × t → s plus a homogeneous binary on the \
                        parameter sort t",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Binary(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "Repeated {op} combines its parameters with {other}.",
             },
             ShapeInfo {
@@ -597,30 +764,47 @@ impl ShapeCatalog {
                 schema: "rel(x, x) = false",
                 gate: "relation s × s → r (r ≠ s) whose output sort carries a constant \
                        rendering as `false`",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "A value is never {op} itself.",
             },
             ShapeInfo {
                 name: "self-application",
                 schema: "rel(x, x) = c",
                 gate: "relation s × s → r (r ≠ s) plus any other constant of the output sort",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "{op} of a value with itself gives {const}.",
             },
             ShapeInfo {
                 name: "involution",
                 schema: "u(u(x)) = x",
                 gate: "unary s → s",
+                gate_slots: open(&[Slot::Unary(0, 0)]),
                 template: "{op} twice returns the original value.",
             },
             ShapeInfo {
                 name: "round-trip",
                 schema: "g(f(x)) = x",
                 gate: "a pair of distinct unaries f : s → t and g : t → s",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 1), Slot::Unary(1, 0)],
+                    distinct_sorts: &[],
+                    distinct_ops: &[(0, 1)],
+                },
                 template: "{op} undoes {other} — the round trip is the identity.",
             },
             ShapeInfo {
                 name: "homomorphism",
                 schema: "h((x ⊕ y)) = (h(x) ⊗ h(y))",
                 gate: "unary h : s → t plus a homogeneous binary on s and one on t",
+                gate_slots: open(&[Slot::Unary(0, 1), Slot::Binary(0), Slot::Binary(1)]),
                 template: "{op} turns {other} into {via}.",
             },
         ]
@@ -2415,6 +2599,96 @@ mod tests {
         assert_eq!(
             annihilation.instantiate(&[("op", "spend")]),
             "spend by {const} always gives {const}."
+        );
+    }
+
+    /// The DATA gate admits every law the CODE gate fires — the two sides of `ShapeInfo`
+    /// cannot drift: across all four registry theories, every discovered law's fingerprint
+    /// signatures satisfy its shape's `gate_slots`. (Fingerprints shorter than the slot list
+    /// — coincident slots, dedup'd, e.g. a self-homomorphism — are exempt: the fingerprint
+    /// cannot say which slots coincided.)
+    #[test]
+    fn every_discovered_law_satisfies_its_shapes_data_gate() {
+        fn check<T: Theory>() {
+            let engine = Engine::<T>::new();
+            let sigs = engine.signatures();
+            let symbols: Vec<&'static str> = sigs.iter().map(|(s, _, _)| *s).collect();
+            let inventory = ShapeCatalog::inventory();
+            for law in engine.discover().laws {
+                let shape = inventory
+                    .iter()
+                    .find(|s| s.name == law.shape)
+                    .expect("every law's shape is ratified");
+                let ops = law.ops(&symbols);
+                if ops.len() != shape.gate_slots.slots.len() {
+                    continue;
+                }
+                let gate_sigs: Vec<(Vec<T::Sort>, T::Sort)> = ops
+                    .iter()
+                    .map(|sym| {
+                        let (_, inputs, output) =
+                            sigs.iter().find(|(s, _, _)| s == sym).expect("known op");
+                        (inputs.clone(), *output)
+                    })
+                    .collect();
+                if let Err(why) = shape.gate_slots.admit(&gate_sigs, &ops) {
+                    panic!(
+                        "law `{}` ({}) violates its shape's data gate: {why} — \
+                         templates() and gate_slots have come apart",
+                        law.prose, law.shape
+                    );
+                }
+            }
+        }
+        check::<crate::discover::arithmetic::Arithmetic>();
+        check::<crate::discover::router::Router>();
+        check::<crate::discover::date::Calendar>();
+        check::<crate::kvstore::theory::TtlStore>();
+    }
+
+    /// The gate REFUSES what its shape cannot range over, naming the fault — the checker's
+    /// own kill power: wrong slot kind, unbound-sort mismatch, a required distinction
+    /// collapsed (same operator twice; an action whose parameter is its carrier).
+    #[test]
+    fn the_data_gate_refuses_misdeclarations_by_name() {
+        let inv = ShapeCatalog::inventory();
+        let gate = |n: &str| inv.iter().find(|s| s.name == n).expect("shape").gate_slots;
+        // sorts as plain tokens — the checker is generic over them.
+        let binary = (vec!["s", "s"], "s");
+        let unary_st = (vec!["s"], "t");
+        let constant_t = (Vec::<&str>::new(), "t");
+
+        let err = gate("commutativity")
+            .admit(std::slice::from_ref(&unary_st), &["esc"])
+            .expect_err("a unary is not a binary");
+        assert!(err.contains("`esc` must be a homogeneous binary"));
+
+        let err = gate("identity")
+            .admit(&[binary.clone(), constant_t.clone()], &["pool", "unit"])
+            .expect_err("the constant's sort must match the binary's");
+        assert!(err.contains("`unit` must be a nullary constant"));
+
+        let err = gate("distributivity")
+            .admit(&[binary.clone(), binary.clone()], &["pool", "pool"])
+            .expect_err("distributivity needs two DIFFERENT binaries");
+        assert!(err.contains("must be different operators"));
+
+        let err = gate("action identity")
+            .admit(&[(vec!["s", "s"], "s"), (vec![], "s")], &["bump", "unit"])
+            .expect_err("an action's parameter sort must differ from its carrier");
+        assert!(err.contains("must be distinct"));
+
+        // and the happy paths admit.
+        assert_eq!(
+            gate("homomorphism").admit(
+                &[unary_st, (vec!["s", "s"], "s"), (vec!["t", "t"], "t")],
+                &["esc", "cat", "glue"],
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            gate("round-trip").admit(&[(vec!["t"], "s"), (vec!["s"], "t")], &["unesc", "esc"],),
+            Ok(())
         );
     }
 
