@@ -64,3 +64,10 @@ it). Individually: `cargo fmt --all --check`, `cargo clippy --workspace --all-ta
 
 Discovery refutes, it never proves: grids are bounded, batteries are samples. Reports
 (distance, cohesion) SUGGEST; locks GATE. Keep that distinction when adding anything.
+
+## Open invitation
+
+This project advances by thrown bricks. If while working here you see an idea the method
+is missing — a new lock, a new shape, a place the declaration discipline hasn't reached,
+a friction worth dissolving — say so unprompted. Wrong ideas are cheap; the roadmap and
+`docs/experience.md` exist to catch the good ones.
