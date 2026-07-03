@@ -612,7 +612,8 @@ mod tests {
                 "interpreter arithmetic",
                 "router",
                 "date calculus",
-                "ttl store"
+                "ttl store",
+                "store protocol"
             ]
         );
         assert!(report.seams.is_empty());

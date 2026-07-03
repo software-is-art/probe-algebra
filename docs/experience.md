@@ -129,6 +129,20 @@ artifact for an external dependency. Every ingredient exists in this repo today 
 engine, `Shaped`, `spec-lock`, the capability lattice, the kvstore precedent. The brick is
 the composition.
 
+*Status: FIRST COMPOSITION BUILT* (`discover::world`). `Command`/`Trace` are the effect
+values; the pure `StoreModel` interpreter is the observation, and the UNCHANGED engine
+discovers the protocol laws — `idempotent(++)` (replay/retry safety), `bias_later(++)`
+(last-write-wins), associativity, and the harmless empty batch — declared, met exactly, and
+frozen in `spec/store-protocol.spec` like any module's algebra (the theory sits in the
+`BoundarySpec` registry). The new artifact is committed too: `spec/store-model.world.spec`
+records the model's predicted observation for every trace in the `Shaped`-derived battery,
+drift-gated; the conformance gate replays the same battery against a deliberately
+INDEPENDENT event-sourced `FakeRemoteStore` (the stand-in vendor) with zero disagreements,
+and a first-write-wins vendor (the classic "insert where the contract says upsert" bug) is
+refused with the exact diverging trace and both observations NAMED. Remaining research:
+point the replay at a genuinely remote dependency behind a bless flag in integration CI,
+and grow the trace vocabulary (reads, timeouts, retries as commands).
+
 ## Order of attack
 
 Pillar 2 first (it deletes the most per-crate friction and is self-contained), then

@@ -126,7 +126,8 @@ mod tests {
                     "interpreter arithmetic",
                     "router",
                     "date calculus",
-                    "ttl store"
+                    "ttl store",
+                    "store protocol"
                 ]
             ),
             Err(stale) => panic!(

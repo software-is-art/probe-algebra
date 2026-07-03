@@ -15,18 +15,25 @@
 //! Run `cargo run --example freeze_spec`.
 
 use boundary_spec::discover::system::SystemReport;
+use boundary_spec::discover::world::StoreModel;
 use boundary_spec::discover::{all_specs, BoundarySpec, Spec};
 
 fn main() {
     let specs = all_specs();
     let mut locks: Vec<spec_lock::Lock> = specs.iter().map(Spec::lock).collect();
     locks.push(SystemReport::of::<BoundarySpec>().lock());
+    // the WORLD lock: the model's ratified beliefs about the demonstration dependency
+    // (see `discover::world` — the freeze discipline pointed outward).
+    locks.push(StoreModel::beliefs().lock());
     spec_lock::bless(&locks).expect("write spec locks");
     for (lock, spec) in locks.iter().zip(&specs) {
         println!("froze {} ({} laws)", lock.path.display(), spec.laws.len());
     }
-    println!(
-        "froze {} (the seam graph)",
-        locks.last().expect("system lock").path.display()
-    );
+    for (lock, label) in locks
+        .iter()
+        .skip(specs.len())
+        .zip(["the seam graph", "the world lock"])
+    {
+        println!("froze {} ({label})", lock.path.display());
+    }
 }
