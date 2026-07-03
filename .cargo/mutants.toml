@@ -67,3 +67,11 @@ exclude_re = [
 # also excluded because trybuild's `.stderr` matching is sensitive to the build
 # environment and is unstable inside cargo-mutants' copied tree.
 additional_cargo_test_args = ["--lib"]
+
+# Run each mutant's suite through nextest: its default is FAIL-FAST, so a killed mutant
+# stops at its first failing probe instead of running out the whole suite — most mutants
+# die early (that is what a good suite means), so this is the cheap majority of the sweep's
+# per-mutant time. The `--lib` scope above applies unchanged (nextest accepts cargo's
+# target filters). CI installs cargo-nextest alongside cargo-mutants in every mutation job
+# (a census test holds the two install lists together).
+test_tool = "nextest"

@@ -13,7 +13,8 @@
 //! RATIFIED artifact:
 //!
 //!   - [`GateRegistry::declared`] is the single source: every gate, with what it verifies,
-//!     the exact command, its CADENCE (every change / per PR diff / default branch + weekly),
+//!     the exact command, its CADENCE (every change / per PR diff / default-branch drift
+//!     since the certified tree / weekly sharded whole-tree sweep),
 //!     and its capability (all current gates are `Pure` in the load-bearing sense: a
 //!     deterministic function of the tree — executable on any machine, re-executable by CI,
 //!     countersignable; an eventual deploy or live world-replay gate would be `Effectful`,
@@ -27,10 +28,12 @@
 //!     declaration — CI stops being where verification is defined and becomes one more
 //!     machine that executes it.
 //!
-//! What CI irreducibly keeps: countersigning (a green run the author didn't produce),
-//! effects (edges the tree cannot contain), and economics (the full mutation sweep is too
-//! expensive per keystroke, so it runs on the default branch and a weekly clock). All three
-//! are now VISIBLE as registry data instead of implicit in YAML.
+//! What CI irreducibly keeps: countersigning (a green run the author didn't produce — the
+//! `mutants-green` tag is that signature made durable), effects (edges the tree cannot
+//! contain), and economics (the whole-tree mutation sweep is too expensive per keystroke,
+//! so merges pay only for their drift since the certified tree and the weekly clock pays
+//! for everything, split across `FULL_SWEEP_SHARDS` parallel shards). All three are now
+//! VISIBLE as registry data instead of implicit in YAML.
 
 use std::path::PathBuf;
 
@@ -47,6 +50,20 @@ pub const TOOLCHAIN: &str = "1.94.1";
 /// The weekly full-sweep schedule (Mondays 04:00 UTC) — the periodic whole-crate guarantee.
 pub const FULL_SWEEP_CRON: &str = "0 4 * * 1";
 
+/// How many parallel shards the weekly full sweep splits into. The whole workspace is
+/// ~1,300 mutants; serially that is ~5½ hours — past what a single hosted runner reliably
+/// survives (the sweep on PR #26's merge died at 5h16m with the gate step still running).
+/// `cargo mutants --shard k/n` partitions the mutant list deterministically, so `n` jobs
+/// in a matrix give the same total verdict in `1/n` the wall clock.
+pub const FULL_SWEEP_SHARDS: u8 = 8;
+
+/// The tag that marks the last tree the mutation gates have FULLY certified — the
+/// incremental sweep on the default branch mutates only the diff since this tag and
+/// advances it on green (CI's countersignature, the one effect in the pipeline). The
+/// weekly sharded sweep re-certifies the whole tree from scratch, backstopping the one
+/// gap incrementality has: a test edit weakening kills for UNCHANGED code.
+pub const GREEN_TAG: &str = "mutants-green";
+
 /// When a gate runs — the ECONOMIC axis of the pipeline, explicit instead of implied by
 /// which YAML job a step happens to sit in.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -56,8 +73,13 @@ pub enum Cadence {
     /// PRs only, scoped to the changed lines (mutation is expensive; the diff is the
     /// blast radius).
     PerDiff,
-    /// The default branch, a weekly clock, and manual dispatch — the exhaustive sweep.
-    DefaultBranchAndWeekly,
+    /// Default-branch pushes, scoped to the diff since the last fully-certified tree
+    /// (`GREEN_TAG`) — a green sweep is a lock over the tree at that sha, so a merge
+    /// re-verifies only what drifted, and the tag advances as the countersignature.
+    DefaultBranch,
+    /// The weekly clock and manual dispatch — the exhaustive whole-tree sweep, sharded
+    /// `FULL_SWEEP_SHARDS` ways.
+    Weekly,
 }
 
 /// One declared gate of the pipeline.
@@ -138,11 +160,22 @@ impl GateRegistry {
                 effect: Capability::Pure,
             },
             Gate {
+                name: "mutation (since green)",
+                verifies: "no mutant of anything changed since the last fully-certified \
+                           tree (the mutants-green tag) survives — a merge re-verifies \
+                           its drift, not the whole tree, and advances the tag on green",
+                command: &[".github/mutants-gate.sh", "--in-diff", "since-green.diff"],
+                cadence: Cadence::DefaultBranch,
+                effect: Capability::Pure,
+            },
+            Gate {
                 name: "mutation (full sweep)",
                 verifies: "no mutant of the whole crate survives — the method's own \"the \
-                           real test\", amortised to the default branch and a weekly clock",
+                           real test\", re-certifying the tree from scratch on a weekly \
+                           clock (backstops incrementality's one gap: a test edit \
+                           weakening kills for unchanged code)",
                 command: &[".github/mutants-gate.sh"],
-                cadence: Cadence::DefaultBranchAndWeekly,
+                cadence: Cadence::Weekly,
                 effect: Capability::Pure,
             },
         ]
@@ -166,7 +199,8 @@ impl GateRegistry {
             let cadence = match gate.cadence {
                 Cadence::EveryChange => "every change",
                 Cadence::PerDiff => "per PR diff",
-                Cadence::DefaultBranchAndWeekly => "default branch + weekly",
+                Cadence::DefaultBranch => "default branch, diff since mutants-green",
+                Cadence::Weekly => "weekly + manual, sharded",
             };
             let effect = match gate.effect {
                 Capability::Pure => "pure",
@@ -198,9 +232,13 @@ impl GateRegistry {
             .iter()
             .filter(|g| g.cadence == Cadence::PerDiff)
             .collect();
-        let sweep: Vec<&Gate> = gates
+        let default_branch: Vec<&Gate> = gates
             .iter()
-            .filter(|g| g.cadence == Cadence::DefaultBranchAndWeekly)
+            .filter(|g| g.cadence == Cadence::DefaultBranch)
+            .collect();
+        let weekly: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::Weekly)
             .collect();
 
         let mut out = format!(
@@ -212,8 +250,9 @@ impl GateRegistry {
              \n\
              # Dogfood everywhere, all the time. The fast gates run on every push and PR; the\n\
              # mutation gate — the method's own \"the real test\" — runs per-change on PRs (only\n\
-             # the changed lines, since mutation is expensive) and as a full-crate sweep on the\n\
-             # default branch and a weekly schedule.\n\
+             # the changed lines), incrementally on the default branch (only the diff since the\n\
+             # last fully-certified tree, marked by the `mutants-green` tag, advanced on green),\n\
+             # and as a sharded whole-crate sweep on the weekly clock.\n\
              #\n\
              # The Rust toolchain is PINNED (not `@stable`): the `tests/compile_fail` trybuild\n\
              # suites match saved `.stderr` files, and rustc's diagnostic rendering changes\n\
@@ -270,7 +309,7 @@ impl GateRegistry {
                  \x20     - uses: Swatinem/rust-cache@v2\n\
                  \x20     - uses: taiki-e/install-action@v2\n\
                  \x20       with:\n\
-                 \x20         tool: cargo-mutants\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
                  \x20     - name: mutate the diff\n\
                  \x20       run: |\n\
                  \x20         git diff \"origin/${{{{ github.base_ref }}}}...HEAD\" > pr.diff\n\
@@ -278,25 +317,66 @@ impl GateRegistry {
                 gate.command_line()
             ));
         }
-        for gate in &sweep {
+        for gate in &default_branch {
+            out.push_str(&format!(
+                "\n  # Incremental dogfood on the default branch: a green sweep is a lock over the\n\
+                 \x20 # tree at that sha (the `{GREEN_TAG}` tag), so a merge mutates only the diff\n\
+                 \x20 # since it. On green the tag advances — CI's countersignature, the pipeline's\n\
+                 \x20 # one effect. A red gate leaves the tag put, so the next merge re-verifies the\n\
+                 \x20 # accumulated drift. The weekly sharded sweep re-certifies from scratch.\n\
+                 \x20 mutants-incremental:\n\
+                 \x20   name: dogfood (since green)\n\
+                 \x20   if: github.event_name == 'push'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   permissions:\n\
+                 \x20     contents: write\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20       with:\n\
+                 \x20         fetch-depth: 0\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - name: mutate the drift since the certified tree\n\
+                 \x20       run: |\n\
+                 \x20         git rev-parse -q --verify refs/tags/{GREEN_TAG} >/dev/null || {{ echo \"::error::no {GREEN_TAG} tag - seed it at a fully-swept sha, then: git push origin {GREEN_TAG}\"; exit 1; }}\n\
+                 \x20         git diff \"{GREEN_TAG}...HEAD\" > since-green.diff\n\
+                 \x20         {}\n\
+                 \x20     - name: countersign — advance the certified-tree tag\n\
+                 \x20       run: |\n\
+                 \x20         git tag -f {GREEN_TAG}\n\
+                 \x20         git push -f origin {GREEN_TAG}\n",
+                gate.command_line()
+            ));
+        }
+        for gate in &weekly {
+            let shards: Vec<String> = (0..FULL_SWEEP_SHARDS).map(|s| s.to_string()).collect();
             out.push_str(&format!(
                 "\n  # Whole-crate dogfood: the green gate is \"0 MISSED\". Timeouts (non-termination\n\
                  \x20 # mutants) are DETECTIONS, not survivors — `.github/mutants-gate.sh` distinguishes\n\
                  \x20 # a timeout-only exit (pass) from a real survivor in `missed.txt` (fail). The\n\
-                 \x20 # ratified equivalents are carved out by `.cargo/mutants.toml`.\n\
+                 \x20 # ratified equivalents are carved out by `.cargo/mutants.toml`. Sharded: the\n\
+                 \x20 # ~1,300-mutant sweep is ~5½ serial hours, past a hosted runner's patience.\n\
                  \x20 mutants-full:\n\
                  \x20   name: dogfood (full sweep)\n\
-                 \x20   if: github.event_name != 'pull_request'\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
                  \x20   runs-on: ubuntu-latest\n\
+                 \x20   strategy:\n\
+                 \x20     fail-fast: false\n\
+                 \x20     matrix:\n\
+                 \x20       shard: [{shard_list}]\n\
                  \x20   steps:\n\
                  \x20     - uses: actions/checkout@v4\n\
                  \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
                  \x20     - uses: Swatinem/rust-cache@v2\n\
                  \x20     - uses: taiki-e/install-action@v2\n\
                  \x20       with:\n\
-                 \x20         tool: cargo-mutants\n\
-                 \x20     - run: {}\n",
-                gate.command_line()
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - run: {} --shard ${{{{ matrix.shard }}}}/{FULL_SWEEP_SHARDS}\n",
+                gate.command_line(),
+                shard_list = shards.join(", ")
             ));
         }
         out
@@ -373,13 +453,14 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: five gates — three every-change (all pure), one
-    /// per-diff, one scheduled sweep — and every declared command reappears verbatim in
-    /// the rendered workflow (nothing declared can fall out of execution).
+    /// The registry's SHAPE is pinned: six gates — three every-change (all pure), one
+    /// per-diff, one default-branch incremental, one weekly sharded sweep — and every
+    /// declared command reappears verbatim in the rendered workflow (nothing declared can
+    /// fall out of execution).
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 5);
+        assert_eq!(gates.len(), 6);
         assert_eq!(
             gates
                 .iter()
@@ -402,6 +483,54 @@ mod tests {
         assert!(workflow.contains("GENERATED from the gate registry"));
     }
 
+    /// The SWEEP ECONOMICS are executed as declared: the weekly job fans out over exactly
+    /// `FULL_SWEEP_SHARDS` matrix shards (and passes its shard to cargo-mutants), and the
+    /// incremental job diffs against `GREEN_TAG` and advances it on green — the
+    /// countersignature step exists and pushes the tag.
+    #[test]
+    fn the_sweep_economics_are_rendered() {
+        let workflow = GateRegistry::render_workflow();
+        let shard_list: Vec<String> = (0..FULL_SWEEP_SHARDS).map(|s| s.to_string()).collect();
+        assert!(workflow.contains(&format!("shard: [{}]", shard_list.join(", "))));
+        assert!(workflow.contains(&format!(
+            "--shard ${{{{ matrix.shard }}}}/{FULL_SWEEP_SHARDS}"
+        )));
+        assert!(workflow.contains(&format!(
+            "git diff \"{GREEN_TAG}...HEAD\" > since-green.diff"
+        )));
+        assert!(workflow.contains(&format!("git push -f origin {GREEN_TAG}")));
+        // the full sweep runs on the clock and the button, never per-merge (that is the
+        // incremental job's cadence — the whole point of the split).
+        assert!(workflow.contains(
+            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        ));
+    }
+
+    /// Everywhere cargo-mutants is installed, cargo-nextest rides along: the mutation
+    /// gates run their per-mutant suites through nextest's fail-fast runner
+    /// (`test_tool = "nextest"` in .cargo/mutants.toml), so a killed mutant stops at its
+    /// first failing probe instead of running out the whole suite.
+    #[test]
+    fn every_mutation_job_installs_the_fail_fast_runner() {
+        let workflow = GateRegistry::render_workflow();
+        let installs: Vec<&str> = workflow
+            .lines()
+            .filter(|l| l.trim_start().starts_with("tool: ") && l.contains("cargo-mutants"))
+            .collect();
+        assert!(!installs.is_empty());
+        for line in installs {
+            assert!(
+                line.contains("cargo-nextest"),
+                "a mutation job installs cargo-mutants without its test runner: {line}"
+            );
+        }
+        let config = include_str!("../../.cargo/mutants.toml");
+        assert!(
+            config.contains("test_tool = \"nextest\""),
+            "the mutants config no longer selects nextest — the fail-fast speedup is gone"
+        );
+    }
+
     /// The inventory render is pinned at its load-bearing points: the header names the
     /// regeneration path, and a stanza carries cadence, capability, command, and promise.
     #[test]
@@ -413,6 +542,9 @@ mod tests {
         assert!(text.contains(
             "\n- test (every change; pure)\n      cargo test --workspace --all-targets\n"
         ));
-        assert!(text.contains("\n- mutation (full sweep) (default branch + weekly; pure)\n"));
+        assert!(text.contains(
+            "\n- mutation (since green) (default branch, diff since mutants-green; pure)\n"
+        ));
+        assert!(text.contains("\n- mutation (full sweep) (weekly + manual, sharded; pure)\n"));
     }
 }

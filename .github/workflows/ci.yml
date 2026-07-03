@@ -6,8 +6,9 @@ name: ci
 
 # Dogfood everywhere, all the time. The fast gates run on every push and PR; the
 # mutation gate — the method's own "the real test" — runs per-change on PRs (only
-# the changed lines, since mutation is expensive) and as a full-crate sweep on the
-# default branch and a weekly schedule.
+# the changed lines), incrementally on the default branch (only the diff since the
+# last fully-certified tree, marked by the `mutants-green` tag, advanced on green),
+# and as a sharded whole-crate sweep on the weekly clock.
 #
 # The Rust toolchain is PINNED (not `@stable`): the `tests/compile_fail` trybuild
 # suites match saved `.stderr` files, and rustc's diagnostic rendering changes
@@ -55,25 +56,60 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-mutants
+          tool: cargo-mutants,cargo-nextest
       - name: mutate the diff
         run: |
           git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
           .github/mutants-gate.sh --in-diff pr.diff
 
+  # Incremental dogfood on the default branch: a green sweep is a lock over the
+  # tree at that sha (the `mutants-green` tag), so a merge mutates only the diff
+  # since it. On green the tag advances — CI's countersignature, the pipeline's
+  # one effect. A red gate leaves the tag put, so the next merge re-verifies the
+  # accumulated drift. The weekly sharded sweep re-certifies from scratch.
+  mutants-incremental:
+    name: dogfood (since green)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants,cargo-nextest
+      - name: mutate the drift since the certified tree
+        run: |
+          git rev-parse -q --verify refs/tags/mutants-green >/dev/null || { echo "::error::no mutants-green tag - seed it at a fully-swept sha, then: git push origin mutants-green"; exit 1; }
+          git diff "mutants-green...HEAD" > since-green.diff
+          .github/mutants-gate.sh --in-diff since-green.diff
+      - name: countersign — advance the certified-tree tag
+        run: |
+          git tag -f mutants-green
+          git push -f origin mutants-green
+
   # Whole-crate dogfood: the green gate is "0 MISSED". Timeouts (non-termination
   # mutants) are DETECTIONS, not survivors — `.github/mutants-gate.sh` distinguishes
   # a timeout-only exit (pass) from a real survivor in `missed.txt` (fail). The
-  # ratified equivalents are carved out by `.cargo/mutants.toml`.
+  # ratified equivalents are carved out by `.cargo/mutants.toml`. Sharded: the
+  # ~1,300-mutant sweep is ~5½ serial hours, past a hosted runner's patience.
   mutants-full:
     name: dogfood (full sweep)
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.94.1
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-mutants
-      - run: .github/mutants-gate.sh
+          tool: cargo-mutants,cargo-nextest
+      - run: .github/mutants-gate.sh --shard ${{ matrix.shard }}/8
