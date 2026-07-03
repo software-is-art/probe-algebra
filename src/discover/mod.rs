@@ -28,6 +28,7 @@ pub mod derived;
 pub mod engine;
 pub mod expect;
 pub mod freeze;
+pub mod gates;
 pub mod genesis;
 pub mod layering;
 pub mod modularize;
@@ -35,6 +36,7 @@ pub mod residue;
 pub mod router;
 pub mod scaffold;
 pub mod system;
+pub mod world;
 
 /// Generate a whole `engine::Theory` impl from a concise declaration — so a discovery domain is
 /// "just module definition": the value-object types, the operator functions, and this block. The
@@ -345,6 +347,7 @@ crate::system! {
         router::Router;
         date::Calendar;
         crate::kvstore::theory::TtlStore;
+        world::StoreProtocol;
     }
 }
 

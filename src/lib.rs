@@ -76,6 +76,12 @@ pub use boundary_spec_macros::Shaped;
 /// the value object and the operator functions. See `discover::derived`.
 pub use boundary_spec_macros::algebra;
 
+/// Hidden re-export for the `system!` macro's full-grammar arm: paste's ident derivation
+/// (`meter` → `meter_ops` / `Meter`) is what lets the ORIGINAL declaration tokens compile.
+/// Never name this directly — it exists so downstream crates need no `paste` dependency.
+#[doc(hidden)]
+pub use paste::paste as __paste;
+
 #[cfg(test)]
 mod harness;
 #[cfg(test)]

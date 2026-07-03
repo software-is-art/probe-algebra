@@ -5,5 +5,6 @@ modules (the ratified registry — one committed module lock each):
 - router
 - date calculus
 - ttl store
+- store protocol
 
 seams: none — no module pair declares a shared-value obligation.

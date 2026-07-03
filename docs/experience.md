@@ -23,6 +23,20 @@ declaration (or vice versa) then fails to COMPILE, with the declaration as the n
 of truth. The registry story ("the graph IS the registry") becomes literal: one block of
 tokens is the application's spec at every point in its life.
 
+*Status: BUILT.* The `system!` macro grew a FULL-GRAMMAR arm (`Marker:` followed by the
+genesis declaration verbatim): module names resolve to their genesis-conventional theories
+via `paste` ident derivation, every declared operator signature compiles into a
+`const _: () = { let _: fn(…) -> … = path; }` witness, `transport on V;` discharges by
+construction, `transform on V via h;` checks in the genesis-named spanning theory, and ops
+modules PUB-re-export their sorts so the declaration can name every type it mentions.
+Genesis now emits `src/system.rs` as the ORIGINAL declaration text, spliced verbatim (span
+offsets preserve the author's formatting) — `relay-demo/` was regenerated in this form and
+converged identically (locks byte-for-byte unchanged), which is the compile-level proof.
+Residual v1 honesty: `values` rules and `expects` clauses are carried but not re-checked by
+the macro (the rules already generated their artifacts; expectations stay gated by
+`Distance` through the `#[algebra]` attribute), and raw-representation drift is caught at
+`get()`'s call sites rather than by a declaration witness.
+
 ## Pillar 2 — executable validity rules (shrink the holes to pure meaning)
 
 Converging the demo, the holes split cleanly in two:
@@ -114,6 +128,20 @@ What makes this a research effort rather than a feature: nobody has committed a
 artifact for an external dependency. Every ingredient exists in this repo today — the
 engine, `Shaped`, `spec-lock`, the capability lattice, the kvstore precedent. The brick is
 the composition.
+
+*Status: FIRST COMPOSITION BUILT* (`discover::world`). `Command`/`Trace` are the effect
+values; the pure `StoreModel` interpreter is the observation, and the UNCHANGED engine
+discovers the protocol laws — `idempotent(++)` (replay/retry safety), `bias_later(++)`
+(last-write-wins), associativity, and the harmless empty batch — declared, met exactly, and
+frozen in `spec/store-protocol.spec` like any module's algebra (the theory sits in the
+`BoundarySpec` registry). The new artifact is committed too: `spec/store-model.world.spec`
+records the model's predicted observation for every trace in the `Shaped`-derived battery,
+drift-gated; the conformance gate replays the same battery against a deliberately
+INDEPENDENT event-sourced `FakeRemoteStore` (the stand-in vendor) with zero disagreements,
+and a first-write-wins vendor (the classic "insert where the contract says upsert" bug) is
+refused with the exact diverging trace and both observations NAMED. Remaining research:
+point the replay at a genuinely remote dependency behind a bless flag in integration CI,
+and grow the trace vocabulary (reads, timeouts, retries as commands).
 
 ## Order of attack
 

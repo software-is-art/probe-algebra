@@ -44,12 +44,22 @@ the audit that a grid's structural closure completed — was promoted from the t
 the library (`boundary::grid_gaps`), so downstream grids hold it as an invariant instead of
 a convention.
 
+**The pipeline is a lock** (the shift-left brick): CI/CD is subsumed into the declaration
+discipline. `discover::gates` declares every gate (command, cadence, capability, promise);
+`spec/gates.spec` locks the inventory and `.github/workflows/ci.yml` is ITSELF a derived,
+drift-gated lock (`cargo run --example freeze_gates` regenerates; never hand-edit), so the
+pipeline can no longer drift the way it did (the `--workspace` gap is now a census test
+over registry DATA). `cargo run --example gate` executes the every-change gates locally
+from the same declaration — CI stops being where verification is defined and keeps only
+what cannot shift left: countersigning, effects, and the economics of the expensive
+sweeps, all three visible as cadence/capability data.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research
 program (effects as theories, the world lock) — are inventoried with their bricks in
-[experience.md](experience.md); its pillar 2 (executable validity rules) is in progress.
-The items below predate that inventory and remain live:
+[experience.md](experience.md) — all four pillars now carry BUILT status there, each with
+its recorded residuals. The items below predate that inventory:
 
 1. **Transform seams end to end in genesis — DONE.** A declared
    `a -- b : transform on V via h;` (the conversion is a regular declared unary operator, so
@@ -64,11 +74,15 @@ The items below predate that inventory and remain live:
    artifact), and it converged green at both levels — with the system lock fresh on the
    FIRST freeze, the preserved transform stanza matching its target byte for byte.
 
-2. **The system-level distance.** `Distance` reports declared-vs-discovered per module;
-   the analogous report for the graph would compare the DECLARED seams against what
-   `CohesionReport` finds latent in the composed operator tables — "you declared one system
-   but the algebra decomposes into two", or "these two modules share laws no seam names".
-   The pieces (cohesion, coherence, the compiled graph) all exist; the brick is the report.
+2. **The system-level distance — DONE.** `System::cohesions()` (macro-generated for both
+   `system!` forms) runs every registry module through the cohesion analysis, and
+   `SystemDistance::of::<S>()` renders the verdict in the distance voice — a REPORT, not a
+   gate, because cohesion is a suggestion. It earns its keep immediately: run on this
+   repo's own graph it names three declared modules that are secretly several (the
+   interpreter splits arithmetic from comparison, the calendar splits duration arithmetic
+   from epoch conversion, the TTL store splits the merge monoid from the clock action),
+   each with its suggested seam kind — byte-pinned as a deliberate keep-whole decision.
+   Follow-up: genesis could emit a distance report example per generated crate.
 
 3. **Equation render unification.** Genesis's target-lock EQUATIONS still restate the
    engine's term-render format by hand (the prose half is unified through the catalog). The
