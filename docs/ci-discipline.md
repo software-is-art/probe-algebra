@@ -6,6 +6,14 @@ API census, a schema dump, a CLI's `--help`, a routing table, a discovered spec 
 the whole discipline. It is four moves; each buys something specific and costs something
 specific.
 
+(The pattern's endpoint, applied here: the pipeline itself is move-1-through-3'd.
+`.github/workflows/ci.yml` is rendered from a declared gate registry (`discover::gates`) and
+drift-gated byte for byte, so CI validates its own definition inside the `cargo test` it runs;
+the mutation economics — changed lines per PR, the diff since the `mutants-green` tag per
+merge, a sharded full sweep weekly — are cadence DATA in that registry, not YAML accidents.
+This document describes the extractable core; [discovery.md](discovery.md#the-pipeline) has
+the pipeline-as-lock specifics.)
+
 ## Move 1 — derive a deterministic spec artifact
 
 Have a tool derive a text artifact from the code: what the code *means*, computed rather than

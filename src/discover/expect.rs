@@ -49,6 +49,8 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("involution", "involution"),
     ("round_trip", "round-trip"),
     ("homomorphism", "homomorphism"),
+    ("nontrivial", "action nontriviality"),
+    ("not_constantly", "non-constancy"),
 ];
 
 /// One declared law: a ratified catalog shape plus the operator symbols it ranges over —

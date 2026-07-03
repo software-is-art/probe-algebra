@@ -23,6 +23,10 @@
       .github/mutants-gate.sh --in-diff pr.diff
       promises: no mutant of the PR's changed lines survives the probe suite (timeouts are detections; ratified equivalents live in .cargo/mutants.toml)
 
-- mutation (full sweep) (default branch + weekly; pure)
+- mutation (since green) (default branch, diff since mutants-green; pure)
+      .github/mutants-gate.sh --in-diff since-green.diff
+      promises: no mutant of anything changed since the last fully-certified tree (the mutants-green tag) survives — a merge re-verifies its drift, not the whole tree, and advances the tag on green
+
+- mutation (full sweep) (weekly + manual, sharded; pure)
       .github/mutants-gate.sh
-      promises: no mutant of the whole crate survives — the method's own "the real test", amortised to the default branch and a weekly clock
+      promises: no mutant of the whole crate survives — the method's own "the real test", re-certifying the tree from scratch on a weekly clock (backstops incrementality's one gap: a test edit weakening kills for unchanged code)

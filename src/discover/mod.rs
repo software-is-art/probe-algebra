@@ -32,6 +32,7 @@ pub mod gates;
 pub mod genesis;
 pub mod layering;
 pub mod modularize;
+pub mod mutation;
 pub mod residue;
 pub mod router;
 pub mod scaffold;
@@ -417,7 +418,7 @@ mod tests {
     fn the_interpreter_spec_is_exact() {
         let spec = interpreter_spec();
         assert_eq!(spec.theory, "interpreter arithmetic");
-        assert_eq!(discover_laws().len(), 10, "law count changed");
+        assert_eq!(discover_laws().len(), 11, "law count changed");
         let got: Vec<(String, String)> = spec
             .laws
             .iter()
@@ -441,16 +442,19 @@ mod tests {
                 "With Multiplication, the grouping of three values doesn't matter.",
                 "((x * y) * z) = (x * (y * z))",
             ),
-            ("Multiplication by 0 always gives 0.", "(0 * x) = 0"),
             (
                 "Multiplication with 1 leaves a value unchanged.",
                 "(1 * x) = x",
             ),
+            ("Multiplication by 0 always gives 0.", "(0 * x) = 0"),
             (
                 "Multiplication distributes over Addition.",
                 "(x * (y + z)) = ((x * y) + (x * z))",
             ),
             ("A value is never less than itself.", "(x < x) = false"),
+            // the WITNESS law — the inequation that closes the never-true-relation
+            // survivor: a `<` pinned to constant false now contradicts the spec.
+            ("less than is not constantly false.", "(x < y) ≠ false"),
             (
                 "No two distinct programs look the same — the faithful rendering distinguishes \
                  every structural and semantic difference.",
@@ -469,7 +473,7 @@ mod tests {
             spec.uncovered_ops
         );
         // the count of further (consequence) equalities — pins enumeration depth and dedup.
-        assert_eq!(spec.consequences, 333, "consequence count changed");
+        assert_eq!(spec.consequences, 332, "consequence count changed");
     }
 
     /// Enumeration over the (richer) arithmetic theory emits no reflexive `t = t` equality — every

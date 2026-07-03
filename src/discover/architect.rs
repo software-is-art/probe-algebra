@@ -513,12 +513,12 @@ mod tests {
                 "((a ++ b) ++ c) = (a ++ (b ++ c))",
             ),
             (
-                "unesc undoes esc — the round trip is the identity.",
-                "unesc(esc(a)) = a",
-            ),
-            (
                 "esc turns concat into concat.",
                 "esc((a ++ b)) = (esc(a) ++ esc(b))",
+            ),
+            (
+                "unesc undoes esc — the round trip is the identity.",
+                "unesc(esc(a)) = a",
             ),
         ];
         let expected: Vec<(String, String)> = expected

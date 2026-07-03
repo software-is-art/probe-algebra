@@ -12,9 +12,13 @@
       add(add(s, p), q) = add(s, (p + q))
 - Diff of a value with itself gives zero.
       diff(s, s) = zero
-- at undoes since — the round trip is the identity.
-      at(since(s)) = s
 - since undoes at — the round trip is the identity.
       since(at(p)) = p
+- at undoes since — the round trip is the identity.
+      at(since(s)) = s
+- Add actually acts — some parameter moves some value.
+      add(s, p) ≠ s
+- Diff is not constantly zero.
+      diff(s, t) ≠ zero
 
 # operators in no law (where the spec is silent): none — every operator participates in a law

@@ -54,6 +54,63 @@ from the same declaration — CI stops being where verification is defined and k
 what cannot shift left: countersigning, effects, and the economics of the expensive
 sweeps, all three visible as cadence/capability data.
 
+**The sweep economics** (the brick after that): mutation cost became declared data. The
+weekly full sweep is SHARDED (`FULL_SWEEP_SHARDS` matrix jobs — ~1,300 mutants is ~5½
+serial hours, past a hosted runner's patience, as the sweep on PR #26's merge proved by
+dying at 5h16m); every mutation gate runs its per-mutant suites through nextest's
+fail-fast runner (`test_tool = "nextest"`, a census test holds the install lists to it);
+and the default branch went INCREMENTAL — a green sweep is a lock over the tree at that
+sha (the `mutants-green` tag), so a merge mutates only the diff since it and advances the
+tag as CI's countersignature, with the weekly sharded sweep re-certifying from scratch to
+backstop the one gap (a test edit weakening kills for unchanged code).
+
+**Mutation at the algebra level** (`discover::mutation`, the research brick): for anything
+that is a THEORY, a mutant does not have to be a build — it is a VALUE, a perturbed
+operator table (confusion, projection, partiality), judged by re-running discovery: killed
+iff the named-law set changes, the freshness gate's own lock-drift semantics applied to a
+hypothetical implementation. Milliseconds per mutant, so the whole verdict lives in `cargo
+test` on every change. It earned its keep on first contact: four survivors across the five
+registry theories, all of one deep kind — equational laws cannot state INEQUATIONS. The
+trivial action (`add`/`tick` returning the carrier unchanged satisfies every action law),
+the never-true relation (`<` pinned to constant-false satisfies irreflexivity), and the
+unpinned operator (`diff` as constant-zero appears in no named law). Each is ratified in
+`spec/<theory>.mutation.spec` under the standard lock discipline — the bias-blindness hunt,
+industrialised. Source-level mutation keeps the plumbing (genesis, architect, renderers);
+the theory-carrying core is now judged in-process.
+
+**Witness shapes** (the brick that closed the loop): the catalog gained its INEQUATION half.
+Laws now carry a [`Polarity`] — the classic shapes state `∀: lhs = rhs`, the two new WITNESS
+shapes state `∃: lhs ≠ rhs`: "action nontriviality" (`act(x, p) ≠ x` somewhere — the action
+actually acts) and "non-constancy" (`rel(x, y) ≠ c` somewhere — the relation escapes the
+constant). Discovery emits them in a second pass (equations first, witnesses last), `check`
+re-probes them as exists-a-witness, both are declarable (`nontrivial(tick)`,
+`not_constantly("<", false)`), and genesis derives their target-lock lines from the same
+catalog terms. The payoff proved the "autogenerate the fixes" conjecture: no per-theory work
+was done — the vocabulary was extended, discovery found the closing inequations itself on the
+next freeze (`add(s, p) ≠ s`, `tick(s, p) ≠ s`, `(x < y) ≠ false`, `diff(s, t) ≠ zero`), and
+all four algebra-mutation survivors died, pinned by a zero-survivors census. The flagship
+demo's `billing` module told the same story unprompted: `charge` sat in "operators in no law"
+— the spec's own silence line — and the witness pass replaced that silence with
+`(x charge x) ≠ x`. Honest frame inverted but intact: a witness refutes triviality on the
+grid; it never proves richness.
+
+**The catalog IS the engine** (the de-restatement brick): the last code/data duality in the
+kernel is gone. `Engine::templates()` was the battery stated as CODE while
+`ShapeCatalog::inventory()` stated it as DATA, census-guarded to move together; now
+`templates()` is a ~150-line generic interpreter over the inventory — a shape's `gate_slots`
+decide where it fires (and bind its sort variables, via `ShapeGate::bind`, so admission and
+instantiation are one computation), its canonical `SchemaTerm`s are what discovery runs, its
+`template`/`holes` render the prose, its `polarity` is the judgment, and the three residues
+that were only code are now fields (`mirrored` for two-sided identity/annihilation, `guard`
+for bias's skipped-when-commutative, `const_rule` for irreflexivity vs self-application).
+Adding a shape is adding a STANZA OF DATA; `spec/shapes.spec` is executable the moment it
+lands. Genesis's fire model simplified with it (fire is uniformly slot 0 — the round-trip
+special case dissolved). The byte pins earned their keep on the way: they caught a real
+sort-variable inversion in round-trip's slot descriptors that the display census could not
+see. The canonical emission order (band → fire op → catalog rank → partner order) moved
+exactly two committed lock lines in the whole workspace — both pure reorders, ratified — and
+the demos did not change at all. Net −109 lines.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research
@@ -84,10 +141,16 @@ its recorded residuals. The items below predate that inventory:
    each with its suggested seam kind — byte-pinned as a deliberate keep-whole decision.
    Follow-up: genesis could emit a distance report example per generated crate.
 
-3. **Equation render unification.** Genesis's target-lock EQUATIONS still restate the
-   engine's term-render format by hand (the prose half is unified through the catalog). The
-   byte-exact render pin forces sync, but deriving the equation from the shape's canonical
-   terms would remove the last restatement.
+3. **Equation render unification — DONE.** Every shape's canonical equation is now catalog
+   DATA: `ShapeInfo` carries schematic lhs/rhs terms (`SchemaTerm`, over slot indices and
+   sort-variable ordinals) plus the placeholder symbols its display `schema` string renders
+   with, and `ShapeInfo::equation` renders a concrete equation exactly the way the engine
+   renders a discovered law's terms. Genesis's `law()` derives its equation there — the
+   16-arm hand-written `format!` match is gone — and a census test holds the displayed
+   schema string to the same term data, so `spec/shapes.spec`'s schemas, genesis's
+   target-lock equations, and the engine's render conventions cannot drift apart. The
+   dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
+   end-to-end net over the freeze's actual render.
 
 ## Standing follow-ups
 

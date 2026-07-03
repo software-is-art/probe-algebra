@@ -84,3 +84,13 @@
       schema:   h((x ⊕ y)) = (h(x) ⊗ h(y))
       gate:     unary h : s → t plus a homogeneous binary on s and one on t
       template: {op} turns {other} into {via}.
+
+- action nontriviality
+      schema:   act(x, p) ≠ x  (for some x, p)
+      gate:     heterogeneous binary s × t → s (an action of t on s); a witness shape — holds when some parameter moves some value
+      template: {op} actually acts — some parameter moves some value.
+
+- non-constancy
+      schema:   rel(x, y) ≠ c  (for some x, y)
+      gate:     relation s × s → r (r ≠ s) plus a constant of the output sort; a witness shape — holds when the relation escapes the constant somewhere
+      template: {op} is not constantly {const}.

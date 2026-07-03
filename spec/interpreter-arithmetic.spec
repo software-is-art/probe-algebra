@@ -10,14 +10,16 @@
       (x * y) = (y * x)
 - With Multiplication, the grouping of three values doesn't matter.
       ((x * y) * z) = (x * (y * z))
-- Multiplication by 0 always gives 0.
-      (0 * x) = 0
 - Multiplication with 1 leaves a value unchanged.
       (1 * x) = x
+- Multiplication by 0 always gives 0.
+      (0 * x) = 0
 - Multiplication distributes over Addition.
       (x * (y + z)) = ((x * y) + (x * z))
 - A value is never less than itself.
       (x < x) = false
+- less than is not constantly false.
+      (x < y) ≠ false
 - No two distinct programs look the same — the faithful rendering distinguishes every structural and semantic difference.
       U(p) = U(q)  ⟹  p = q   (U = faithful render)
 

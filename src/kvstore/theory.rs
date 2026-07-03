@@ -212,13 +212,20 @@ mod tests {
                 "((p + q) + r) = (p + (q + r))",
             ),
             ("Plus with zero leaves a value unchanged.", "(zero + p) = p"),
+            // the WITNESS law — the inequation that closes the trivial-action survivor:
+            // a clock that never advances now contradicts the spec instead of
+            // satisfying every action equation vacuously.
+            (
+                "Tick actually acts — some parameter moves some value.",
+                "tick(s, p) ≠ s",
+            ),
         ];
         let expected: Vec<(String, String)> = expected
             .into_iter()
             .map(|(p, q)| (p.to_string(), q.to_string()))
             .collect();
         assert_eq!(got, expected, "the discovered ttl-store algebra changed");
-        assert_eq!(d.consequences, 149, "consequence count changed");
+        assert_eq!(d.consequences, 148, "consequence count changed");
         // put was curried out of the signature, so coverage is total by construction.
         assert!(
             d.uncovered_ops.is_empty(),

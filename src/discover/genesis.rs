@@ -109,7 +109,7 @@ use syn::punctuated::Punctuated;
 use syn::{braced, parenthesized, Ident, LitStr, Token};
 
 use crate::discover::architect::{Architect, CodeAction, FileEdit};
-use crate::discover::engine::{ShapeCatalog, ShapeInfo};
+use crate::discover::engine::{Fixity, Polarity, ShapeCatalog, ShapeInfo, Slot};
 use crate::discover::expect::Expectation;
 
 // ===== the parse-side representation ========================================================
@@ -226,17 +226,19 @@ fn shape_rank(e: &Expectation) -> usize {
         .expect("an Expectation's shape is always a ratified catalog name")
 }
 
-/// The declared law as the lock will state it: `(prose, equation)`. The PROSE is the ratified
-/// shape catalog's own template (`ShapeInfo::instantiate`) — one source, never restated — over
-/// the declared names; the EQUATION is the canonical form the engine renders for the shape's
-/// discovered instance over an `#[algebra]` theory: default variable names (`x`, `y`, `z` per
-/// sort), binaries infix under their own names, unaries prefix. The dynamic sync test
-/// (`the_target_lock_reproduces_discovery_byte_for_byte`) holds every arm to the freeze's
-/// actual render.
+/// The declared law as the lock will state it: `(prose, equation)`. BOTH halves come from the
+/// ratified shape catalog — the PROSE via `ShapeInfo::instantiate` over the declared names,
+/// the EQUATION via `ShapeInfo::equation` over the shape's canonical terms — one source,
+/// never restated. The fixities are the `#[algebra]` render conventions for a generated
+/// theory's operators (binaries, actions, and relations infix under their own names, unaries
+/// prefix, constants bare) and every sort's variables are `x`, `y`, `z` — so the derived
+/// equation is byte-for-byte what the engine renders for the shape's discovered instance.
+/// The dynamic sync test (`the_target_lock_reproduces_discovery_byte_for_byte`) holds this
+/// to the freeze's actual render.
 fn law(e: &Expectation) -> (String, String) {
     let op = e.ops[0].as_str();
     let subs: Vec<(&str, &str)> = match e.shape {
-        "identity" | "annihilation" | "action identity" | "self-application" => {
+        "identity" | "annihilation" | "action identity" | "self-application" | "non-constancy" => {
             vec![("op", op), ("const", e.ops[1].as_str())]
         }
         "distributivity" | "absorption" | "monoid action" | "round-trip" => {
@@ -249,39 +251,24 @@ fn law(e: &Expectation) -> (String, String) {
         ],
         _ => vec![("op", op)],
     };
-    let prose = shape_info(e).instantiate(&subs);
-    let equation = match e.shape {
-        "commutativity" => format!("(x {op} y) = (y {op} x)"),
-        "associativity" => format!("((x {op} y) {op} z) = (x {op} (y {op} z))"),
-        "idempotence" => format!("(x {op} x) = x"),
-        "bias (right-regular)" => format!("((x {op} y) {op} x) = (y {op} x)"),
-        "bias (left-regular)" => format!("((x {op} y) {op} x) = (x {op} y)"),
-        "identity" => format!("({} {op} x) = x", e.ops[1]),
-        "annihilation" => format!("({konst} {op} x) = {konst}", konst = e.ops[1]),
-        "distributivity" => {
-            format!(
-                "(x {op} (y {g} z)) = ((x {op} y) {g} (x {op} z))",
-                g = e.ops[1]
-            )
-        }
-        "absorption" => format!("(x {op} (x {g} y)) = x", g = e.ops[1]),
-        "action identity" => format!("(x {op} {e}) = x", e = e.ops[1]),
-        "monoid action" => {
-            format!("((x {op} x) {op} y) = (x {op} (x {g} y))", g = e.ops[1])
-        }
-        "self-application" => format!("(x {op} x) = {c}", c = e.ops[1]),
-        "involution" => format!("{op}({op}(x)) = x"),
-        "round-trip" => format!("{op}({f}(x)) = x", f = e.ops[1]),
-        "homomorphism" => {
-            format!(
-                "{op}((x {p} y)) = ({op}(x) {q} {op}(y))",
-                p = e.ops[1],
-                q = e.ops[2]
-            )
-        }
-        other => unreachable!("genesis refuses `{other}` at parse time"),
-    };
-    (prose, equation)
+    let info = shape_info(e);
+    let prose = info.instantiate(&subs);
+    let ops: Vec<(&str, Fixity)> = info
+        .gate_slots
+        .slots
+        .iter()
+        .zip(&e.ops)
+        .map(|(slot, name)| {
+            let fixity = match slot {
+                Slot::Constant(_) => Fixity::Nullary,
+                Slot::Unary(..) => Fixity::Prefix,
+                Slot::Binary(_) | Slot::Action(..) | Slot::Relation(..) => Fixity::Infix,
+            };
+            (name.as_str(), fixity)
+        })
+        .collect();
+    let vars: &[&[&str]] = &[&["x", "y", "z"], &["x", "y", "z"]];
+    (prose, info.equation(&ops, vars))
 }
 
 /// Where the generated crate's dependencies point — the flag `cargo run --example genesis`
@@ -1526,23 +1513,24 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
         "# discovered spec: {} — a behaviour lock; regenerate via this repo's freeze path and ratify the diff.\n\n",
         m.name
     );
-    // laws in the order a confirming discovery renders them: grouped by the operator the
-    // engine FIRES the shape on (the first declared op — except a round trip, which fires on
-    // its INNER conversion), then in catalog order, declaration order breaking ties. The
-    // dynamic sync test holds this to the freeze's actual render.
+    // laws in the order a confirming discovery renders them: EQUATIONS first, WITNESS laws
+    // last (the engine emits its inequation band after the whole equational one), each band
+    // grouped by the operator the engine FIRES the shape on — uniformly the first declared
+    // op, the shape's slot 0, since the generic driver replaced the hand-written battery —
+    // then in catalog order, declaration order breaking ties. The dynamic sync test holds
+    // this to the freeze's actual render.
     let fire_index = |e: &Expectation| {
-        let fire_op = if e.shape == "round-trip" {
-            &e.ops[1]
-        } else {
-            &e.ops[0]
-        };
         m.ops
             .iter()
-            .position(|o| o.name == *fire_op)
+            .position(|o| o.name == e.ops[0])
             .expect("validated: every named operator is declared")
     };
+    let band = |e: &Expectation| match shape_info(e).polarity {
+        Polarity::Equal => 0,
+        Polarity::Differs => 1,
+    };
     let mut declared: Vec<&Expectation> = m.expects.iter().collect();
-    declared.sort_by_key(|e| (fire_index(e), shape_rank(e)));
+    declared.sort_by_key(|e| (band(e), fire_index(e), shape_rank(e)));
     for e in declared {
         let (prose, equation) = law(e);
         out.push_str(&format!("- {prose}\n      {equation}\n"));
