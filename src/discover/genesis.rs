@@ -2214,6 +2214,33 @@ mod tests {
         );
     }
 
+    /// The captured declaration text is trimmed EDGE TO EDGE: exactly the author's tokens,
+    /// with the newlines hugging the braces stripped and nothing else — so the splice sits
+    /// flush under the marker line with the author's own indentation. Pinned at both edges
+    /// (a trim that under- or over-strips changes the emitted block's first line).
+    #[test]
+    fn the_declaration_text_is_captured_edge_to_edge() {
+        let plan = sample_plan();
+        assert!(
+            plan.declaration.starts_with("    name: \"credit-app\","),
+            "no leading newline, indentation intact: {:?}",
+            &plan.declaration[..40.min(plan.declaration.len())]
+        );
+        assert!(
+            plan.declaration.ends_with('}'),
+            "no trailing newline: {:?}",
+            &plan.declaration[plan.declaration.len().saturating_sub(20)..]
+        );
+        // and therefore the splice sits flush under the marker line.
+        let system = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/system.rs")
+            .expect("system module")
+            .contents;
+        assert!(system.contains("    CreditApp:\n    name: \"credit-app\","));
+    }
+
     /// The COMPILED `system!` stage is the ORIGINAL declaration, spliced VERBATIM after the
     /// marker — one artifact, two lifecycle stages: the sample's own tokens (its name line,
     /// its lowercase module names, its seam line) appear unchanged, and the ops modules
