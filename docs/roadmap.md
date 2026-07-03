@@ -54,6 +54,30 @@ from the same declaration — CI stops being where verification is defined and k
 what cannot shift left: countersigning, effects, and the economics of the expensive
 sweeps, all three visible as cadence/capability data.
 
+**The sweep economics** (the brick after that): mutation cost became declared data. The
+weekly full sweep is SHARDED (`FULL_SWEEP_SHARDS` matrix jobs — ~1,300 mutants is ~5½
+serial hours, past a hosted runner's patience, as the sweep on PR #26's merge proved by
+dying at 5h16m); every mutation gate runs its per-mutant suites through nextest's
+fail-fast runner (`test_tool = "nextest"`, a census test holds the install lists to it);
+and the default branch went INCREMENTAL — a green sweep is a lock over the tree at that
+sha (the `mutants-green` tag), so a merge mutates only the diff since it and advances the
+tag as CI's countersignature, with the weekly sharded sweep re-certifying from scratch to
+backstop the one gap (a test edit weakening kills for unchanged code).
+
+**Mutation at the algebra level** (`discover::mutation`, the research brick): for anything
+that is a THEORY, a mutant does not have to be a build — it is a VALUE, a perturbed
+operator table (confusion, projection, partiality), judged by re-running discovery: killed
+iff the named-law set changes, the freshness gate's own lock-drift semantics applied to a
+hypothetical implementation. Milliseconds per mutant, so the whole verdict lives in `cargo
+test` on every change. It earned its keep on first contact: four survivors across the five
+registry theories, all of one deep kind — equational laws cannot state INEQUATIONS. The
+trivial action (`add`/`tick` returning the carrier unchanged satisfies every action law),
+the never-true relation (`<` pinned to constant-false satisfies irreflexivity), and the
+unpinned operator (`diff` as constant-zero appears in no named law). Each is ratified in
+`spec/<theory>.mutation.spec` under the standard lock discipline — the bias-blindness hunt,
+industrialised. Source-level mutation keeps the plumbing (genesis, architect, renderers);
+the theory-carrying core is now judged in-process.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research

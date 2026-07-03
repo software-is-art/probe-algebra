@@ -179,6 +179,10 @@ fn gcd(a: u128, b: u128) -> u128 {
     }
 }
 
+/// An operator's evaluator, as the bare `fn` pointer the signature table stores — also the
+/// exact granule the algebra-mutation harness (`discover::mutation`) swaps out.
+pub(crate) type EvalFn<T> = fn(&[<T as Theory>::Value]) -> Option<<T as Theory>::Value>;
+
 /// An operator's signature, by index: `(symbol, input sorts, output sort)`.
 pub type OpSignature<S> = (&'static str, Vec<S>, S);
 
@@ -1413,6 +1417,35 @@ impl<T: Theory> Engine<T> {
             .iter()
             .map(|o| (o.name, o.symbol, o.fixity, o.inputs.clone(), o.output))
             .collect()
+    }
+
+    /// The operator evaluators, in operator-index order — the surface the algebra-mutation
+    /// harness (`discover::mutation`) perturbs.
+    pub(crate) fn evals(&self) -> Vec<EvalFn<T>> {
+        self.ops.iter().map(|o| o.eval).collect()
+    }
+
+    /// This engine with its evaluators REPLACED — same signature table, same variables, same
+    /// grid: an operator-table mutant, ready to re-run discovery. The mutation harness's one
+    /// hook into the engine.
+    pub(crate) fn with_evals(&self, evals: &[EvalFn<T>]) -> Engine<T> {
+        Engine {
+            ops: self
+                .ops
+                .iter()
+                .zip(evals)
+                .map(|(o, &eval)| Operator {
+                    name: o.name,
+                    symbol: o.symbol,
+                    fixity: o.fixity,
+                    inputs: o.inputs.clone(),
+                    output: o.output,
+                    eval,
+                })
+                .collect(),
+            vars: self.vars.clone(),
+            grid: self.grid.clone(),
+        }
     }
 }
 

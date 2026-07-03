@@ -32,6 +32,7 @@ pub mod gates;
 pub mod genesis;
 pub mod layering;
 pub mod modularize;
+pub mod mutation;
 pub mod residue;
 pub mod router;
 pub mod scaffold;
