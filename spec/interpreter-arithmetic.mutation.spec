@@ -1,4 +1,4 @@
-# algebra mutation: interpreter arithmetic — 19 operator-table mutants, 1 SURVIVED — regenerate via `cargo run --example freeze_spec`; ratify the diff.
+# algebra mutation: interpreter arithmetic — 19 operator-table mutants, all killed — regenerate via `cargo run --example freeze_spec`; ratify the diff.
 #
 # Every mutant is a perturbed operator table (a VALUE, not a build), judged by
 # re-running discovery: KILLED means the named-law set changed — the committed
@@ -15,7 +15,7 @@
 - killed    `*` evaluates as `0`
 - killed    `*` evaluates as `1`
 - killed    `*` evaluates as `+`
-- SURVIVED  `<` evaluates as `false`
+- killed    `<` evaluates as `false`
 - killed    `+` returns its first argument unchanged
 - killed    `+` returns its second argument unchanged
 - killed    `*` returns its first argument unchanged

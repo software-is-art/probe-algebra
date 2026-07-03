@@ -18,5 +18,7 @@
       ((p + q) + r) = (p + (q + r))
 - Plus with zero leaves a value unchanged.
       (zero + p) = p
+- Tick actually acts — some parameter moves some value.
+      tick(s, p) ≠ s
 
 # operators in no law (where the spec is silent): none — every operator participates in a law

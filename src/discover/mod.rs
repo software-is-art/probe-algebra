@@ -418,7 +418,7 @@ mod tests {
     fn the_interpreter_spec_is_exact() {
         let spec = interpreter_spec();
         assert_eq!(spec.theory, "interpreter arithmetic");
-        assert_eq!(discover_laws().len(), 10, "law count changed");
+        assert_eq!(discover_laws().len(), 11, "law count changed");
         let got: Vec<(String, String)> = spec
             .laws
             .iter()
@@ -452,6 +452,9 @@ mod tests {
                 "(x * (y + z)) = ((x * y) + (x * z))",
             ),
             ("A value is never less than itself.", "(x < x) = false"),
+            // the WITNESS law — the inequation that closes the never-true-relation
+            // survivor: a `<` pinned to constant false now contradicts the spec.
+            ("less than is not constantly false.", "(x < y) ≠ false"),
             (
                 "No two distinct programs look the same — the faithful rendering distinguishes \
                  every structural and semantic difference.",
@@ -470,7 +473,7 @@ mod tests {
             spec.uncovered_ops
         );
         // the count of further (consequence) equalities — pins enumeration depth and dedup.
-        assert_eq!(spec.consequences, 333, "consequence count changed");
+        assert_eq!(spec.consequences, 332, "consequence count changed");
     }
 
     /// Enumeration over the (richer) arithmetic theory emits no reflexive `t = t` equality — every

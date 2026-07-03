@@ -1,4 +1,4 @@
-# algebra mutation: ttl store — 13 operator-table mutants, 1 SURVIVED — regenerate via `cargo run --example freeze_spec`; ratify the diff.
+# algebra mutation: ttl store — 13 operator-table mutants, all killed — regenerate via `cargo run --example freeze_spec`; ratify the diff.
 #
 # Every mutant is a perturbed operator table (a VALUE, not a build), judged by
 # re-running discovery: KILLED means the named-law set changed — the committed
@@ -12,7 +12,7 @@
 - killed    `+` evaluates as `zero`
 - killed    `<+` returns its first argument unchanged
 - killed    `<+` returns its second argument unchanged
-- SURVIVED  `tick` returns its first argument unchanged
+- killed    `tick` returns its first argument unchanged
 - killed    `+` returns its first argument unchanged
 - killed    `+` returns its second argument unchanged
 - killed    `empty` becomes undefined everywhere

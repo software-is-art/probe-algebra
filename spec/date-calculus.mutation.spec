@@ -1,4 +1,4 @@
-# algebra mutation: date calculus — 13 operator-table mutants, 2 SURVIVED — regenerate via `cargo run --example freeze_spec`; ratify the diff.
+# algebra mutation: date calculus — 13 operator-table mutants, all killed — regenerate via `cargo run --example freeze_spec`; ratify the diff.
 #
 # Every mutant is a perturbed operator table (a VALUE, not a build), judged by
 # re-running discovery: KILLED means the named-law set changed — the committed
@@ -8,12 +8,12 @@
 # by a sharper shape or expectation, or ratified here as a free choice.
 
 - killed    `+` evaluates as `zero`
-- SURVIVED  `diff` evaluates as `zero`
+- killed    `diff` evaluates as `zero`
 - killed    `diff` evaluates as `since`
 - killed    `since` evaluates as `zero`
 - killed    `+` returns its first argument unchanged
 - killed    `+` returns its second argument unchanged
-- SURVIVED  `add` returns its first argument unchanged
+- killed    `add` returns its first argument unchanged
 - killed    `zero` becomes undefined everywhere
 - killed    `+` becomes undefined everywhere
 - killed    `add` becomes undefined everywhere

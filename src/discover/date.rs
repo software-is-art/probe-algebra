@@ -133,13 +133,21 @@ mod tests {
                 "since undoes at — the round trip is the identity.",
                 "since(at(p)) = p",
             ),
+            // the WITNESS laws — the inequations that close the algebra-mutation
+            // survivors: the trivial action and the constantly-zero measure now
+            // contradict the spec instead of satisfying it vacuously.
+            (
+                "Add actually acts — some parameter moves some value.",
+                "add(s, p) ≠ s",
+            ),
+            ("Diff is not constantly zero.", "diff(s, t) ≠ zero"),
         ];
         let expected: Vec<(String, String)> = expected
             .into_iter()
             .map(|(p, q)| (p.to_string(), q.to_string()))
             .collect();
         assert_eq!(got, expected, "the discovered calendar algebra changed");
-        assert_eq!(d.consequences, 250);
+        assert_eq!(d.consequences, 248);
         // every operator now participates in a law (the action templates cover `add`).
         assert!(
             d.uncovered_ops.is_empty(),

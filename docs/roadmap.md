@@ -78,6 +78,22 @@ unpinned operator (`diff` as constant-zero appears in no named law). Each is rat
 industrialised. Source-level mutation keeps the plumbing (genesis, architect, renderers);
 the theory-carrying core is now judged in-process.
 
+**Witness shapes** (the brick that closed the loop): the catalog gained its INEQUATION half.
+Laws now carry a [`Polarity`] — the classic shapes state `∀: lhs = rhs`, the two new WITNESS
+shapes state `∃: lhs ≠ rhs`: "action nontriviality" (`act(x, p) ≠ x` somewhere — the action
+actually acts) and "non-constancy" (`rel(x, y) ≠ c` somewhere — the relation escapes the
+constant). Discovery emits them in a second pass (equations first, witnesses last), `check`
+re-probes them as exists-a-witness, both are declarable (`nontrivial(tick)`,
+`not_constantly("<", false)`), and genesis derives their target-lock lines from the same
+catalog terms. The payoff proved the "autogenerate the fixes" conjecture: no per-theory work
+was done — the vocabulary was extended, discovery found the closing inequations itself on the
+next freeze (`add(s, p) ≠ s`, `tick(s, p) ≠ s`, `(x < y) ≠ false`, `diff(s, t) ≠ zero`), and
+all four algebra-mutation survivors died, pinned by a zero-survivors census. The flagship
+demo's `billing` module told the same story unprompted: `charge` sat in "operators in no law"
+— the spec's own silence line — and the witness pass replaced that silence with
+`(x charge x) ≠ x`. Honest frame inverted but intact: a witness refutes triviality on the
+grid; it never proves richness.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research

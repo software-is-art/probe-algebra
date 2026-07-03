@@ -94,6 +94,21 @@ pub enum Term {
     App(usize, Vec<Term>),
 }
 
+/// Which way a law relates its two terms. Equational shapes state a universal EQUALITY
+/// (`∀: lhs = rhs`); witness shapes state an INEQUATION (`∃: lhs ≠ rhs`) — the polarity the
+/// catalog was missing, found by the algebra-mutation harness: the trivial action satisfies
+/// every action EQUATION, the never-true relation satisfies irreflexivity, the unpinned
+/// operator satisfies nothing and nobody notices. "This thing actually does something" is
+/// only sayable as an inequation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Polarity {
+    /// `lhs = rhs` on EVERY grid assignment — the universal equality every classic shape states.
+    Equal,
+    /// `lhs ≠ rhs` on SOME grid assignment — a witnessed inequation (grid-bounded like
+    /// everything here: the witness refutes triviality, it never proves richness).
+    Differs,
+}
+
 /// A discovered law: its plain-language and symbolic renderings, plus the two terms it equates
 /// (so the spec can be re-probed over a fresh grid, where mutation judges its kill power).
 pub struct DiscoveredLaw {
@@ -106,6 +121,8 @@ pub struct DiscoveredLaw {
     pub equation: String,
     pub lhs: Term,
     pub rhs: Term,
+    /// Equality (`=`, holds everywhere) or witnessed inequation (`≠`, differs somewhere).
+    pub polarity: Polarity,
 }
 
 impl DiscoveredLaw {
@@ -466,6 +483,9 @@ pub struct ShapeInfo {
     /// `e`) — the census test holds `schema` against `lhs`/`rhs` rendered through these, so
     /// the displayed string and the term data cannot drift apart.
     pub placeholders: &'static [&'static str],
+    /// Equational (`=`, holds on every assignment) or WITNESS (`≠`, differs on some) — see
+    /// [`Polarity`]. The witness shapes are the catalog's inequation half.
+    pub polarity: Polarity,
 }
 
 /// A schematic term: the shape's canonical equation halves as data, over SLOT indices (into
@@ -683,12 +703,17 @@ impl ShapeInfo {
 
     /// The shape's canonical symbolic equation over concrete operators — `lhs`/`rhs` rendered
     /// through `ops` (one `(symbol, fixity)` per slot, in slot order) and `vars` (variable
-    /// letters per sort variable). The catalog is thereby the SINGLE source of a law's
+    /// letters per sort variable), joined by the polarity's connective (`=` for equations,
+    /// `≠` for witness shapes). The catalog is thereby the SINGLE source of a law's
     /// equation, exactly as `instantiate` makes it the single source of the prose — genesis's
     /// target locks derive their equations here instead of restating the render format.
     pub fn equation(&self, ops: &[(&str, Fixity)], vars: &[&[&str]]) -> String {
+        let connective = match self.polarity {
+            Polarity::Equal => "=",
+            Polarity::Differs => "≠",
+        };
         format!(
-            "{} = {}",
+            "{} {connective} {}",
             self.lhs.render(ops, vars),
             self.rhs.render(ops, vars)
         )
@@ -753,6 +778,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[X, Y]),
                 rhs: App(0, &[Y, X]),
                 placeholders: &["⊕"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "associativity",
@@ -763,6 +789,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[App(0, &[X, Y]), Z]),
                 rhs: App(0, &[X, App(0, &[Y, Z])]),
                 placeholders: &["⊕"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "idempotence",
@@ -773,6 +800,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[X, X]),
                 rhs: X,
                 placeholders: &["⊕"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "bias (right-regular)",
@@ -785,6 +813,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[App(0, &[X, Y]), X]),
                 rhs: App(0, &[Y, X]),
                 placeholders: &["⊕"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "bias (left-regular)",
@@ -797,6 +826,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[App(0, &[X, Y]), X]),
                 rhs: App(0, &[X, Y]),
                 placeholders: &["⊕"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "identity",
@@ -808,6 +838,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[C, X]),
                 rhs: X,
                 placeholders: &["⊕", "e"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "annihilation",
@@ -819,6 +850,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[C, X]),
                 rhs: C,
                 placeholders: &["⊕", "a"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "distributivity",
@@ -829,6 +861,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[X, App(1, &[Y, Z])]),
                 rhs: App(1, &[App(0, &[X, Y]), App(0, &[X, Z])]),
                 placeholders: &["⊕", "⊗"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "absorption",
@@ -839,6 +872,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[X, App(1, &[X, Y])]),
                 rhs: X,
                 placeholders: &["⊕", "⊗"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "action identity",
@@ -854,6 +888,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[X, C]),
                 rhs: X,
                 placeholders: &["act", "e"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "monoid action",
@@ -869,6 +904,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[App(0, &[X, P]), Q]),
                 rhs: App(0, &[X, App(1, &[P, Q])]),
                 placeholders: &["act", "⊗"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "irreflexivity",
@@ -884,6 +920,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[X, X]),
                 rhs: C,
                 placeholders: &["rel", "false"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "self-application",
@@ -898,6 +935,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[X, X]),
                 rhs: C,
                 placeholders: &["rel", "c"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "involution",
@@ -908,6 +946,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[App(0, &[X])]),
                 rhs: X,
                 placeholders: &["u"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "round-trip",
@@ -922,6 +961,7 @@ impl ShapeCatalog {
                 lhs: App(0, &[App(1, &[X])]),
                 rhs: X,
                 placeholders: &["g", "f"],
+                polarity: Polarity::Equal,
             },
             ShapeInfo {
                 name: "homomorphism",
@@ -932,6 +972,45 @@ impl ShapeCatalog {
                 lhs: App(0, &[App(1, &[X, Y])]),
                 rhs: App(2, &[App(0, &[X]), App(0, &[Y])]),
                 placeholders: &["h", "⊕", "⊗"],
+                polarity: Polarity::Equal,
+            },
+            // -- the WITNESS shapes: the catalog's inequation half (∃, not ∀). Found by
+            // the algebra-mutation harness: its four survivors were all statements no
+            // equation can make — the trivial action, the never-true relation, the
+            // unpinned operator. Same honest frame inverted: a witness REFUTES
+            // triviality on the grid, it never proves richness.
+            ShapeInfo {
+                name: "action nontriviality",
+                schema: "act(x, p) ≠ x  (for some x, p)",
+                gate: "heterogeneous binary s × t → s (an action of t on s); a witness \
+                       shape — holds when some parameter moves some value",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} actually acts — some parameter moves some value.",
+                lhs: App(0, &[X, P]),
+                rhs: X,
+                placeholders: &["act"],
+                polarity: Polarity::Differs,
+            },
+            ShapeInfo {
+                name: "non-constancy",
+                schema: "rel(x, y) ≠ c  (for some x, y)",
+                gate: "relation s × s → r (r ≠ s) plus a constant of the output sort; a \
+                       witness shape — holds when the relation escapes the constant \
+                       somewhere",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is not constantly {const}.",
+                lhs: App(0, &[X, Y]),
+                rhs: C,
+                placeholders: &["rel", "c"],
+                polarity: Polarity::Differs,
             },
         ]
     }
@@ -1020,6 +1099,7 @@ impl<T: Theory> Engine<T> {
                     equation,
                     lhs,
                     rhs,
+                    polarity: Polarity::Equal,
                 });
             }
         };
@@ -1334,6 +1414,73 @@ impl<T: Theory> Engine<T> {
             }
         }
 
+        // -- the WITNESS pass: the catalog's inequation half (`Polarity::Differs`) -----------
+        //
+        // A witness law holds when the two terms DIFFER on some assignment (both meaningfully
+        // defined somewhere) — the ∃ the equational battery cannot state. Emitted after the
+        // equations so a spec reads universals first, witnesses last.
+        let mut refute = |this: &Self, shape: &'static str, prose: String, lhs: Term, rhs: Term| {
+            let (a, b) = (this.signature(&lhs), this.signature(&rhs));
+            if Self::meaningful(&a)
+                && Self::meaningful(&b)
+                && a != b
+                && !seen_prose.contains(&prose)
+            {
+                seen_prose.push(prose.clone());
+                let equation = format!("{} ≠ {}", this.render(&lhs), this.render(&rhs));
+                out.push(DiscoveredLaw {
+                    shape,
+                    prose,
+                    equation,
+                    lhs,
+                    rhs,
+                    polarity: Polarity::Differs,
+                });
+            }
+        };
+        for (fid, f) in ops.iter().enumerate() {
+            // action nontriviality: some parameter moves some value — `act(x, p) ≠ x`
+            // somewhere. Without it the TRIVIAL action (never moving anything) satisfies
+            // action identity and the monoid-action law vacuously — the algebra-mutation
+            // harness's founding survivor.
+            if f.inputs.len() == 2 && f.inputs[0] == f.output && f.inputs[1] != f.output {
+                if let (Some(x), Some(p)) = (self.var(f.output, 0), self.var(f.inputs[1], 0)) {
+                    refute(
+                        self,
+                        "action nontriviality",
+                        format!(
+                            "{} actually acts — some parameter moves some value.",
+                            f.name
+                        ),
+                        Self::app(fid, vec![x.clone(), p]),
+                        x,
+                    );
+                }
+            }
+            // non-constancy: a relation escapes each constant of its output sort somewhere —
+            // `rel(x, y) ≠ c`. Without it the never-true relation satisfies irreflexivity
+            // (its only equational law), and an operator no equation names is pinned by
+            // nothing at all.
+            if f.inputs.len() == 2 && f.inputs[0] == f.inputs[1] && f.output != f.inputs[0] {
+                if let (Some(x), Some(y)) = (self.var(f.inputs[0], 0), self.var(f.inputs[0], 1)) {
+                    for (_, c) in self
+                        .constants()
+                        .into_iter()
+                        .filter(|(cid, _)| ops[*cid].output == f.output)
+                    {
+                        let cs = self.render(&c);
+                        refute(
+                            self,
+                            "non-constancy",
+                            format!("{} is not constantly {}.", f.name, cs),
+                            Self::app(fid, vec![x.clone(), y.clone()]),
+                            c,
+                        );
+                    }
+                }
+            }
+        }
+
         out
     }
 
@@ -1386,16 +1533,32 @@ impl<T: Theory> Engine<T> {
     }
 
     /// Check that the GIVEN laws hold when evaluated over the grid against the current operators,
-    /// returning the first failure. Unlike re-deriving (which is tautological), feeding FROZEN laws
-    /// here is the mutation-judged probe: a mutant that breaks a frozen law is caught.
+    /// returning the first failure — each per its polarity: an equation must hold on EVERY
+    /// assignment, a witness law must find SOME assignment where the terms differ. Unlike
+    /// re-deriving (which is tautological), feeding FROZEN laws here is the mutation-judged
+    /// probe: a mutant that breaks a frozen law is caught.
     pub fn check(&self, laws: &[DiscoveredLaw]) -> Result<(), String> {
         for l in laws {
+            let mut witnessed = false;
             for asn in &self.grid {
                 let lhs = self.eval(&l.lhs, asn).map(|v| T::observe(&v));
                 let rhs = self.eval(&l.rhs, asn).map(|v| T::observe(&v));
-                if lhs != rhs {
-                    return Err(format!("discovered law failed: {}", l.equation));
+                match l.polarity {
+                    Polarity::Equal => {
+                        if lhs != rhs {
+                            return Err(format!("discovered law failed: {}", l.equation));
+                        }
+                    }
+                    Polarity::Differs => {
+                        if lhs != rhs {
+                            witnessed = true;
+                            break;
+                        }
+                    }
                 }
+            }
+            if l.polarity == Polarity::Differs && !witnessed {
+                return Err(format!("witness law lost its witness: {}", l.equation));
             }
         }
         Ok(())
@@ -1718,6 +1881,7 @@ mod tests {
             equation: "(x & y) = (x | y)".into(),
             lhs: Term::App(2, vec![Term::Var(0), Term::Var(1)]),
             rhs: Term::App(3, vec![Term::Var(0), Term::Var(1)]),
+            polarity: Polarity::Equal,
         };
         assert!(e.check(&[bogus]).is_err(), "check must reject a false law");
     }
@@ -2170,6 +2334,7 @@ mod tests {
             equation: "(x >< y) = (y >< x)".into(),
             lhs: Term::App(0, vec![Term::Var(0), Term::Var(1)]),
             rhs: Term::App(0, vec![Term::Var(1), Term::Var(0)]),
+            polarity: Polarity::Equal,
         };
         assert!(
             e.check(&[frozen]).is_err(),
@@ -2791,8 +2956,12 @@ mod tests {
             if shape.schema == rendered {
                 continue;
             }
+            // schemas may carry a parenthesised note after the canonical render: the
+            // mirrored variant of a two-sided shape ("(or ...)") or a witness shape's
+            // quantifier ("(for some ...)").
+            let note = shape.schema.strip_prefix(&rendered);
             assert!(
-                shape.schema.starts_with(&rendered) && shape.schema.contains("(or "),
+                note.is_some_and(|n| n.starts_with("  (")),
                 "`{}`: schema {:?} is not its canonical terms rendered ({:?})",
                 shape.name,
                 shape.schema,

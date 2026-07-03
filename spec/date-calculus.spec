@@ -16,5 +16,9 @@
       at(since(s)) = s
 - since undoes at — the round trip is the identity.
       since(at(p)) = p
+- Add actually acts — some parameter moves some value.
+      add(s, p) ≠ s
+- Diff is not constantly zero.
+      diff(s, t) ≠ zero
 
 # operators in no law (where the spec is silent): none — every operator participates in a law

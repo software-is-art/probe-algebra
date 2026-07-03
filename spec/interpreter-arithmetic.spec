@@ -18,6 +18,8 @@
       (x * (y + z)) = ((x * y) + (x * z))
 - A value is never less than itself.
       (x < x) = false
+- less than is not constantly false.
+      (x < y) ≠ false
 - No two distinct programs look the same — the faithful rendering distinguishes every structural and semantic difference.
       U(p) = U(q)  ⟹  p = q   (U = faithful render)
 

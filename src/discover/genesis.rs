@@ -109,7 +109,7 @@ use syn::punctuated::Punctuated;
 use syn::{braced, parenthesized, Ident, LitStr, Token};
 
 use crate::discover::architect::{Architect, CodeAction, FileEdit};
-use crate::discover::engine::{Fixity, ShapeCatalog, ShapeInfo, Slot};
+use crate::discover::engine::{Fixity, Polarity, ShapeCatalog, ShapeInfo, Slot};
 use crate::discover::expect::Expectation;
 
 // ===== the parse-side representation ========================================================
@@ -238,7 +238,7 @@ fn shape_rank(e: &Expectation) -> usize {
 fn law(e: &Expectation) -> (String, String) {
     let op = e.ops[0].as_str();
     let subs: Vec<(&str, &str)> = match e.shape {
-        "identity" | "annihilation" | "action identity" | "self-application" => {
+        "identity" | "annihilation" | "action identity" | "self-application" | "non-constancy" => {
             vec![("op", op), ("const", e.ops[1].as_str())]
         }
         "distributivity" | "absorption" | "monoid action" | "round-trip" => {
@@ -1513,10 +1513,12 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
         "# discovered spec: {} — a behaviour lock; regenerate via this repo's freeze path and ratify the diff.\n\n",
         m.name
     );
-    // laws in the order a confirming discovery renders them: grouped by the operator the
-    // engine FIRES the shape on (the first declared op — except a round trip, which fires on
-    // its INNER conversion), then in catalog order, declaration order breaking ties. The
-    // dynamic sync test holds this to the freeze's actual render.
+    // laws in the order a confirming discovery renders them: EQUATIONS first, WITNESS laws
+    // last (the engine emits its inequation pass after the whole equational battery), each
+    // band grouped by the operator the engine FIRES the shape on (the first declared op —
+    // except a round trip, which fires on its INNER conversion), then in catalog order,
+    // declaration order breaking ties. The dynamic sync test holds this to the freeze's
+    // actual render.
     let fire_index = |e: &Expectation| {
         let fire_op = if e.shape == "round-trip" {
             &e.ops[1]
@@ -1528,8 +1530,12 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
             .position(|o| o.name == *fire_op)
             .expect("validated: every named operator is declared")
     };
+    let band = |e: &Expectation| match shape_info(e).polarity {
+        Polarity::Equal => 0,
+        Polarity::Differs => 1,
+    };
     let mut declared: Vec<&Expectation> = m.expects.iter().collect();
-    declared.sort_by_key(|e| (fire_index(e), shape_rank(e)));
+    declared.sort_by_key(|e| (band(e), fire_index(e), shape_rank(e)));
     for e in declared {
         let (prose, equation) = law(e);
         out.push_str(&format!("- {prose}\n      {equation}\n"));
