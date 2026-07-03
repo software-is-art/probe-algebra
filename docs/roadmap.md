@@ -58,8 +58,11 @@ The items below predate that inventory and remain live:
    the compiled seam in `src/system.rs`, a distance gate in `tests/expectations.rs`, a
    verdict test in `tests/seams.rs` (replacing the hole), and the PRESERVED stanza in the
    system target lock. A via-less transform keeps the old hole, with the fix named. The
-   flagship story now covers both edge kinds; a two-module transform demo (a second
-   genesis-demo-style member) would exercise it in CI end to end.
+   flagship story now covers both edge kinds, and `relay-demo/` is the CI-tested proof:
+   generated from `examples/genesis_relay.rs`, ONLY its three operator interiors and the
+   probes stub were filled (the structured validity rules generated every value-object
+   artifact), and it converged green at both levels — with the system lock fresh on the
+   FIRST freeze, the preserved transform stanza matching its target byte for byte.
 
 2. **The system-level distance.** `Distance` reports declared-vs-discovered per module;
    the analogous report for the graph would compare the DECLARED seams against what
