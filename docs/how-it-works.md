@@ -1,7 +1,9 @@
-# How it works
+# How it works — the edge grammar end to end
 
-The end-to-end mechanism: what you write, what each level validates, and why an
-under-specified probe is unrepresentable. Read [concepts](concepts.md) for the terminology.
+The mechanism of the compile-time half: what you write at a boundary, what compile time and
+autotest time each validate, and why an under-specified probe is unrepresentable. Read
+[concepts](concepts.md) for the terminology; the discovery half (theories, locks, systems,
+genesis, the pipeline, algebra mutation) is [discovery.md](discovery.md).
 
 ## 1. What you write — the one rigid place
 

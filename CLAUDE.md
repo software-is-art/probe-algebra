@@ -2,9 +2,11 @@
 
 A Rust workspace (root crate `boundary-spec`) exploring one idea: **derive the spec by
 running the thing, freeze it, gate the drift.** Nearly every artifact here is generated
-from a declaration and drift-gated byte for byte. The method docs are
-`docs/roadmap.md` (what's built, what's next) and `docs/experience.md` (the authoring
-program); read those before designing anything new.
+from a declaration and drift-gated byte for byte. Orientation: `README.md` is the front
+door, `docs/discovery.md` the discovery-half reference, `docs/concepts.md` /
+`docs/how-it-works.md` the compile-time edge grammar, `docs/roadmap.md` the brick
+chronicle (what's built, what's next), `docs/experience.md` the authoring program. Read
+the roadmap before designing anything new.
 
 ## The one rule that governs everything
 

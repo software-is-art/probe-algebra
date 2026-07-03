@@ -1,7 +1,10 @@
-# Concepts
+# Concepts — the compile-time edge grammar
 
-The precise model, for readers who want the terminology to check the claims. Every term maps
-to a trait or function in `src/boundary.rs`.
+The precise model of the method's compile-time half: the boundary as a graded category, the
+four edge shapes, the gradings and their self-proofs, and the probe taxonomy. Every term maps
+to a trait or function in `src/boundary.rs`. The discovery half — theories, the law catalog,
+locks, systems, genesis, the pipeline, algebra mutation — is [discovery.md](discovery.md);
+the front door is the [README](../README.md).
 
 ## The boundary is a graded category
 
