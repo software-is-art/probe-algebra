@@ -1040,13 +1040,25 @@ pub trait Shaped: Sized + Clone + PartialEq {
     fn all_perturbations(&self) -> Vec<Self> {
         self.perturbation_classes().into_iter().flatten().collect()
     }
+    /// The STRUCTURAL slice of the perturbation surface: neighbours that change WHICH
+    /// constructor shape the value has (a variant swap, here or in any field), never how a
+    /// leaf quantity is tuned. This is the CHEAP, type-level-finite partition of the space —
+    /// for a non-recursive type its closure is a small finite set — so `shadow_grid` closes
+    /// over it EXHAUSTIVELY before spending any budget on value neighbours. Derived by
+    /// `#[derive(Shaped)]`; the default is empty (a leaf has no structural degree of
+    /// freedom), which hand-written leaf impls inherit.
+    fn structural_perturbations(&self) -> Vec<Self> {
+        Vec::new()
+    }
 }
 
 /// The grid a `Shaped` type GROWS from its own structure (the inhabitant closed under
-/// perturbation, capped) — re-exported here because it is boundary vocabulary in practice: a
-/// consumer's `Probed` impls and probe tests legitimately want the derived grid, and
-/// `discover::engine::shadow_grid` reads engine-internal for what is really Shaped's closure.
-pub use crate::discover::engine::shadow_grid;
+/// perturbation, structure first, capped) — re-exported here because it is boundary
+/// vocabulary in practice: a consumer's `Probed` impls and probe tests legitimately want the
+/// derived grid, and `discover::engine::` reads engine-internal for what is really Shaped's
+/// closure. `grid_gaps` is its audit: the one-step-reachable constructors a grid failed to
+/// exhibit (empty for any completed closure).
+pub use crate::discover::engine::{grid_gaps, shadow_grid};
 
 /// A boolean varies one way: to its negation.
 impl Shaped for bool {
@@ -1055,6 +1067,11 @@ impl Shaped for bool {
     }
     fn perturbation_classes(&self) -> Vec<Vec<Self>> {
         vec![vec![!*self]]
+    }
+    /// A bool IS a two-variant sum, so its one degree of freedom is the variant choice —
+    /// the negation is structural, not a value tune.
+    fn structural_perturbations(&self) -> Vec<Self> {
+        vec![!*self]
     }
 }
 
@@ -1068,6 +1085,13 @@ impl<T: Shaped> Shaped for Box<T> {
             .perturbation_classes()
             .into_iter()
             .map(|group| group.into_iter().map(Box::new).collect())
+            .collect()
+    }
+    fn structural_perturbations(&self) -> Vec<Self> {
+        (**self)
+            .structural_perturbations()
+            .into_iter()
+            .map(Box::new)
             .collect()
     }
 }

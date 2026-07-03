@@ -34,6 +34,16 @@ owned strings); genesis's target-lock prose comes from `ShapeCatalog`'s own temp
 (`ShapeInfo::instantiate` — one source, no restatement); `shadow_grid` is re-exported from
 `boundary`, where its consumers live.
 
+**The partitioned grid** (a small brick laid right after): the perturbation surface is now
+split by price. `Shaped::structural_perturbations` (derived: variant swaps, threaded up
+through fields) is the type-level-finite half, and `shadow_grid` closes over it EXHAUSTIVELY
+before spending any remaining budget on value neighbours — so a cap can starve value
+density, never constructor coverage (for recursive types the honest frame returns: phase 1
+is exhaustive up to the cap, the bound term enumeration already lives with). `grid_gaps` —
+the audit that a grid's structural closure completed — was promoted from the test harness to
+the library (`boundary::grid_gaps`), so downstream grids hold it as an invariant instead of
+a convention.
+
 ## The next brick: candidates
 
 1. **Transform seams end to end in genesis.** The compiled `system!` grammar can already

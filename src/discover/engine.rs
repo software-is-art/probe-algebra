@@ -1124,16 +1124,37 @@ impl<T: Theory> Default for Engine<T> {
 /// bootstrap a grid at all. So the grid is grown not from the boundary operators but from the value
 /// type's OWN `Shaped` surface — a shadow algebra of synthetic generators the user never writes and
 /// that never enter the discovered spec: start at the canonical `inhabitant`, close under its
-/// structural PERTURBATIONS (variant swaps, field neighbours), bounded by `cap`. Deterministic — the
-/// derived perturbation order is fixed. This is `#[derive(Shaped)]` (already minting the probe
-/// surface for edges) reused to fatten the discovery grid.
+/// PERTURBATIONS, bounded by `cap`. Deterministic — the derived perturbation order is fixed. This
+/// is `#[derive(Shaped)]` (already minting the probe surface for edges) reused to fatten the
+/// discovery grid.
+///
+/// The closure is PARTITIONED, because the perturbation surface has two differently-priced
+/// halves. STRUCTURE (which constructor shapes exist — variant swaps, here or threaded up from
+/// any field) is type-level-finite for a non-recursive type, so it is closed over FIRST and
+/// exhaustively: the cap can starve value density, never constructor coverage. VALUES (leaf
+/// quantities tuned toward a validity rule's edges) are open-ended, so they get whatever budget
+/// remains. For a RECURSIVE type the structural space is itself unbounded and the honest frame
+/// returns — phase 1 is then exhaustive only up to the cap (depth-bounded structure), the same
+/// bound term enumeration already lives with. `grid_gaps` is the audit that a grid's structural
+/// closure actually completed.
 pub fn shadow_grid<V: crate::boundary::Shaped>(cap: usize) -> Vec<V> {
     let mut grid: Vec<V> = ::std::vec![V::inhabitant()];
+    // PHASE 1 — structure, exhaustively: close under structural perturbations alone, so every
+    // reachable constructor shape is in the grid before any budget is spent on value tuning.
+    close(&mut grid, cap, V::structural_perturbations);
+    // PHASE 2 — values, with the remainder: continue the closure under the FULL surface (value
+    // neighbours of every phase-1 member included; re-walking members is cheap dedup).
+    close(&mut grid, cap, V::all_perturbations);
+    grid
+}
+
+/// One closure pass: walk the frontier, admitting unseen `neighbours` until `cap`. The `cap`
+/// bound lives in the inner break (the only place new values are added); the outer loop just
+/// walks the frontier. `i` indexes into `grid`, so `i <= grid.len()` would read past the end.
+fn close<V: PartialEq>(grid: &mut Vec<V>, cap: usize, neighbours: impl Fn(&V) -> Vec<V>) {
     let mut i = 0;
-    // the `cap` bound lives in the inner break (the only place new values are added); the outer loop
-    // just walks the frontier. `i` indexes into `grid`, so `i <= grid.len()` would read past the end.
     while i < grid.len() {
-        for n in grid[i].all_perturbations() {
+        for n in neighbours(&grid[i]) {
             if grid.len() >= cap {
                 break;
             }
@@ -1143,7 +1164,27 @@ pub fn shadow_grid<V: crate::boundary::Shaped>(cap: usize) -> Vec<V> {
         }
         i += 1;
     }
-    grid
+}
+
+/// The grid's structural AUDIT: every constructor reachable in ONE perturbation step from the
+/// grid that the grid itself fails to exhibit, by discriminant. Empty iff the closure completed
+/// (the cap was generous enough) — which `shadow_grid`'s structure-first partition guarantees
+/// whenever the structural space fits the cap at all. Promoted from this repo's test harness to
+/// the library so every downstream `#[derive(Shaped)]` grid can be held to it as an invariant
+/// (`assert!(grid_gaps(&grid).is_empty())`) instead of by convention. Discriminants, never a
+/// hand-written variant list — a hand list would just move the gap.
+pub fn grid_gaps<V: crate::boundary::Shaped>(grid: &[V]) -> Vec<core::mem::Discriminant<V>> {
+    let exhibited: Vec<_> = grid.iter().map(core::mem::discriminant).collect();
+    let mut gaps = Vec::new();
+    for v in grid {
+        for n in v.all_perturbations() {
+            let d = core::mem::discriminant(&n);
+            if !exhibited.contains(&d) && !gaps.contains(&d) {
+                gaps.push(d);
+            }
+        }
+    }
+    gaps
 }
 
 #[cfg(test)]
@@ -1456,6 +1497,123 @@ mod tests {
             "bool's shadow grid is its two inhabitants, from the type alone"
         );
         assert_eq!(shadow_grid::<bool>(1).len(), 1, "cap bounds the grid");
+    }
+
+    // -- the PARTITIONED closure: structure exhaustively first, values with the remainder --------
+    //
+    // `Fat` is a value-rich leaf (four value neighbours per step, no structural degree of
+    // freedom); `Choice` is a two-variant enum; `Gauge` composes them. Under the OLD single-pass
+    // closure a tight cap spends the whole budget on `Fat`'s value chain and `Choice::Off` never
+    // appears — the over-fit hazard the partition exists to kill.
+
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+    struct Fat(u8);
+    impl crate::boundary::Shaped for Fat {
+        fn inhabitant() -> Self {
+            Fat(0)
+        }
+        fn perturbation_classes(&self) -> Vec<Vec<Self>> {
+            vec![(1..=4).map(|step| Fat(self.0.wrapping_add(step))).collect()]
+        }
+    }
+
+    #[derive(Clone, PartialEq, Eq, Hash, Debug, crate::Shaped)]
+    enum Choice {
+        On,
+        Off,
+    }
+
+    #[derive(Clone, PartialEq, Eq, Hash, Debug, crate::Shaped)]
+    struct Gauge {
+        fat: Fat,
+        choice: Choice,
+    }
+
+    /// STRUCTURE CANNOT BE STARVED: with a cap of 3, the grid admits the `choice` variant swap
+    /// (phase 1, structural, threaded up through the struct field) BEFORE any of `Fat`'s value
+    /// neighbours — pinned exactly, so removing either phase, swapping their order, or breaking
+    /// the derive's field threading all fail here. The old single-pass closure yields
+    /// `[{0,On}, {1,On}, {2,On}]` under the same cap: `Off` never appears.
+    #[test]
+    fn shadow_grid_closes_structure_before_spending_on_values() {
+        let gauge = |fat: u8, choice: Choice| Gauge {
+            fat: Fat(fat),
+            choice,
+        };
+        assert_eq!(
+            shadow_grid::<Gauge>(3),
+            vec![
+                gauge(0, Choice::On),
+                gauge(0, Choice::Off),
+                gauge(1, Choice::On)
+            ],
+            "phase 1 admits the variant swap; phase 2 spends the remaining budget on values"
+        );
+        // with a generous cap the value half fills in behind the (already complete) structure.
+        let full = shadow_grid::<Gauge>(12);
+        assert!(full
+            .iter()
+            .any(|g| g.fat == Fat(2) && g.choice == Choice::Off));
+        assert!(
+            grid_gaps(&full).is_empty(),
+            "the closure is constructor-complete"
+        );
+    }
+
+    /// The structural surface itself, pinned per shape: an enum's own variant swap, the swap
+    /// THREADED through an enum's field and a struct's field, the leaf default (none), bool's
+    /// negation (a bool IS a two-variant sum), and `Box` transparency.
+    #[test]
+    fn structural_perturbations_are_the_variant_swaps_threaded_up() {
+        use crate::boundary::Shaped;
+
+        #[derive(Clone, PartialEq, Eq, Hash, Debug, crate::Shaped)]
+        enum Wrap {
+            Carry(Choice),
+            Empty,
+        }
+
+        assert_eq!(Choice::On.structural_perturbations(), vec![Choice::Off]);
+        assert_eq!(
+            Wrap::Carry(Choice::On).structural_perturbations(),
+            vec![Wrap::Empty, Wrap::Carry(Choice::Off)],
+            "the swap at this level, then the swap below threaded up"
+        );
+        assert_eq!(
+            Gauge {
+                fat: Fat(7),
+                choice: Choice::On
+            }
+            .structural_perturbations(),
+            vec![Gauge {
+                fat: Fat(7),
+                choice: Choice::Off
+            }],
+            "a struct threads its fields' swaps; the value-only field contributes none"
+        );
+        assert_eq!(
+            Fat(0).structural_perturbations(),
+            vec![],
+            "a leaf defaults to none"
+        );
+        assert_eq!(false.structural_perturbations(), vec![true]);
+        assert_eq!(true.structural_perturbations(), vec![false]);
+        let boxed: Box<Choice> = Box::new(Choice::On);
+        assert_eq!(
+            boxed.structural_perturbations(),
+            vec![Box::new(Choice::Off)],
+            "a box is transparent to the structural surface too"
+        );
+    }
+
+    /// `grid_gaps` (promoted from the harness to the library) has kill power of its own: a grid
+    /// missing a one-step-reachable constructor is reported by discriminant, and a completed
+    /// closure is gap-free.
+    #[test]
+    fn grid_gaps_reports_the_missing_constructor() {
+        let gaps = grid_gaps(&[Choice::On]);
+        assert_eq!(gaps, vec![core::mem::discriminant(&Choice::Off)]);
+        assert!(grid_gaps(&shadow_grid::<Choice>(8)).is_empty());
     }
 
     // -- adversarial self-tests: the grid on trial ------------------------------------------------
