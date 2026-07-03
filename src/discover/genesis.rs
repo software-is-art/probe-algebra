@@ -20,11 +20,18 @@
 //! ```text
 //! system   := "name" ":" LitStr ","  values  modules  seams?
 //! values   := "values"  "{" value+ "}"
-//! value    := Ident "=" Path "where" LitStr ";"
-//!             — a value object: its name, its raw representation (a PLAIN path — no generics
-//!               in v1), and its validity rule. The `where` string is a HOLE: prose carried
-//!               verbatim into the generated stubs as a doc'd `todo!()` predicate. Genesis
-//!               never generates meaning.
+//! value    := Ident "=" Type "where" rule ";"
+//! rule     := LitStr
+//!           | Int "..=" Int ("saturating")?
+//!             — a value object: its name, its raw representation (any Rust type), and its
+//!               validity rule. A PROSE rule (the string form) is a HOLE: words carried
+//!               verbatim into the generated stubs as doc'd `todo!()`s — genesis never
+//!               generates meaning. A STRUCTURED rule is tokens, not words, so everything it
+//!               mechanically implies is GENERATED rather than left for the author to
+//!               re-derive by hand: an integer range emits the validity predicate and the
+//!               edge-seeking `Shaped` grid, and naming the `saturating` re-entry policy
+//!               additionally emits the clamping `mint` (the policy is meaning — clamp vs
+//!               reject vs panic — so an unnamed policy leaves `mint` a hole).
 //! modules  := "modules" "{" module+ "}"
 //! module   := Ident "{" ops expects? "}"
 //! ops      := "ops" "{" op+ "}"
@@ -115,12 +122,44 @@ pub struct SystemDecl {
     pub seams: Vec<SeamDecl>,
 }
 
-/// One value object: name, raw representation, and the validity-rule HOLE (prose, carried
-/// verbatim — meaning is never generated).
+/// One value object: name, raw representation (any Rust type, rendered back to text), and
+/// its validity rule.
 pub struct ValueDecl {
     pub name: String,
     pub raw: String,
-    pub validity: String,
+    pub rule: Rule,
+}
+
+/// A declared validity rule. PROSE is a hole (meaning is never generated from words);
+/// a STRUCTURED rule is tokens, so the artifacts it mechanically implies are generated —
+/// re-deriving them by hand would be exactly the transcription genesis exists to delete.
+pub enum Rule {
+    /// Words, carried verbatim into doc'd `todo!()` holes.
+    Prose(String),
+    /// An inclusive integer range `lo..=hi`; `saturating` names the re-entry policy (the
+    /// interior `mint` clamps). Without the policy the predicate and the edge-seeking grid
+    /// are still generated, but `mint` stays a hole — clamp vs reject vs panic is meaning.
+    Range {
+        lo: i128,
+        hi: i128,
+        saturating: bool,
+    },
+}
+
+impl Rule {
+    /// The rule as one doc-safe line — what the generated doc comments and hole messages
+    /// quote (`0..=20 (saturating)`, or the prose itself).
+    fn doc(&self) -> String {
+        match self {
+            Rule::Prose(words) => doc_safe(words),
+            Rule::Range {
+                lo,
+                hi,
+                saturating: true,
+            } => format!("{lo}..={hi} (saturating)"),
+            Rule::Range { lo, hi, .. } => format!("{lo}..={hi}"),
+        }
+    }
 }
 
 /// One module: its operators and its declared law expectations.
@@ -237,33 +276,63 @@ mod kw {
     syn::custom_keyword!(transform);
 }
 
-/// A plain path's text (`std::string::String` → the joined segments). Generic arguments are a
-/// v1 refusal — the raw representation must be a bare named type.
-fn path_text(path: &syn::Path) -> syn::Result<String> {
-    let mut segments = Vec::new();
-    for seg in &path.segments {
-        if !seg.arguments.is_none() {
-            return Err(syn::Error::new_spanned(
-                seg,
-                "v1 raw types are plain paths — no generic arguments",
-            ));
-        }
-        segments.push(seg.ident.to_string());
+/// A raw type's canonical text: `quote`'s token render with its inter-token spacing
+/// collapsed back to source form (`Vec < u8 >` → `Vec<u8>`), so the generated newtypes read
+/// as written.
+fn type_text(ty: &syn::Type) -> String {
+    quote::quote!(#ty)
+        .to_string()
+        .replace(" :: ", "::")
+        .replace("< ", "<")
+        .replace(" <", "<")
+        .replace(" >", ">")
+        .replace("( ", "(")
+        .replace(" )", ")")
+        .replace(" ,", ",")
+}
+
+/// One end of a range rule: an integer literal, optionally negated.
+fn parse_bound(input: ParseStream) -> syn::Result<i128> {
+    let negative = input.peek(Token![-]);
+    if negative {
+        input.parse::<Token![-]>()?;
     }
-    Ok(segments.join("::"))
+    let lit: syn::LitInt = input.parse()?;
+    let magnitude: i128 = lit.base10_parse()?;
+    Ok(if negative { -magnitude } else { magnitude })
 }
 
 fn parse_value(input: ParseStream) -> syn::Result<ValueDecl> {
     let name: Ident = input.parse()?;
     input.parse::<Token![=]>()?;
-    let raw: syn::Path = input.parse()?;
+    let raw: syn::Type = input.parse()?;
     input.parse::<Token![where]>()?;
-    let validity: LitStr = input.parse()?;
+    let rule = if input.peek(LitStr) {
+        Rule::Prose(input.parse::<LitStr>()?.value())
+    } else {
+        let lo = parse_bound(input)?;
+        input.parse::<Token![..=]>()?;
+        let hi = parse_bound(input)?;
+        let saturating = input.peek(syn::Ident) && {
+            let policy: Ident = input.parse()?;
+            if policy != "saturating" {
+                return Err(syn::Error::new(
+                    policy.span(),
+                    format!(
+                        "unknown re-entry policy `{policy}` — the structured vocabulary is \
+                         `saturating` (or omit the policy to leave `mint` a hole)"
+                    ),
+                ));
+            }
+            true
+        };
+        Rule::Range { lo, hi, saturating }
+    };
     input.parse::<Token![;]>()?;
     Ok(ValueDecl {
         name: name.to_string(),
-        raw: path_text(&raw)?,
-        validity: validity.value(),
+        raw: type_text(&raw),
+        rule,
     })
 }
 
@@ -479,6 +548,30 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
     for v in &sys.values {
         if !value_names.insert(v.name.as_str()) {
             return err(format!("value `{}` is declared twice", v.name));
+        }
+        if let Rule::Range { lo, hi, .. } = &v.rule {
+            const SIGNED: &[&str] = &["i8", "i16", "i32", "i64", "i128", "isize"];
+            const UNSIGNED: &[&str] = &["u8", "u16", "u32", "u64", "u128", "usize"];
+            let raw = v.raw.as_str();
+            if !SIGNED.contains(&raw) && !UNSIGNED.contains(&raw) {
+                return err(format!(
+                    "value `{}` declares a range rule, but its raw type `{raw}` is not a \
+                     primitive integer — write the rule as prose (a hole) instead",
+                    v.name
+                ));
+            }
+            if UNSIGNED.contains(&raw) && *lo < 0 {
+                return err(format!(
+                    "value `{}` ranges from {lo}, but `{raw}` is unsigned",
+                    v.name
+                ));
+            }
+            if lo > hi {
+                return err(format!(
+                    "value `{}` declares the empty range {lo}..={hi}",
+                    v.name
+                ));
+            }
         }
     }
 
@@ -838,6 +931,127 @@ fn value_imports(sys: &SystemDecl, m: &ModuleDecl, exclude_own: bool) -> String 
     lines.into_iter().collect()
 }
 
+/// One value object's newtype, constructor discipline, and probe surface. What is
+/// generated vs left as a hole follows the rule's FORM: prose implies nothing mechanically,
+/// so everything stays a `MEANING:` hole; a structured range implies its predicate and its
+/// edge-seeking grid (generated), and the `saturating` policy — when declared — its
+/// clamping `mint`. The policy itself is meaning, so a range WITHOUT one keeps the hole.
+fn emit_value_object(v: &ValueDecl) -> String {
+    let (name, raw) = (&v.name, &v.raw);
+    let rule_doc = v.rule.doc();
+    let indent = "    ";
+
+    let new_body = match &v.rule {
+        Rule::Prose(words) => {
+            let lit = esc_lit(words);
+            format!(
+                "{indent}    // MEANING: the validity predicate for \"{rule_doc}\" — genesis carries the\n\
+                 {indent}    // words, a human/agent supplies the predicate. Admit with `Some({name}(raw))`.\n\
+                 {indent}    todo!(\"MEANING: validity of {name} — \\\"{lit}\\\"\")\n"
+            )
+        }
+        Rule::Range { lo, hi, .. } => format!(
+            "{indent}    // GENERATED from the declared rule `{rule_doc}` — a structured rule is\n\
+             {indent}    // tokens, so its predicate is derived, never re-transcribed by hand.\n\
+             {indent}    ({lo}..={hi}).contains(&raw).then(|| {name}(raw))\n"
+        ),
+    };
+
+    let mint = match &v.rule {
+        Rule::Prose(words) => {
+            let lit = esc_lit(words);
+            format!(
+                "{indent}/// The interior's way back into validity from a raw computation. Choosing the\n\
+                 {indent}/// discipline (clamp? reject? panic?) is domain meaning, not structure.\n\
+                 {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
+                 {indent}    todo!(\"MEANING: interior constructor for {name} (re-enter \\\"{lit}\\\")\")\n\
+                 {indent}}}\n"
+            )
+        }
+        Rule::Range {
+            lo,
+            hi,
+            saturating: true,
+        } => format!(
+            "{indent}/// The interior's way back into validity — the DECLARED re-entry policy:\n\
+             {indent}/// a computation may overshoot either edge of `{rule_doc}`; the value saturates.\n\
+             {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
+             {indent}    {name}(raw.clamp({lo}, {hi}))\n\
+             {indent}}}\n"
+        ),
+        Rule::Range { .. } => format!(
+            "{indent}/// The interior's way back into validity from a raw computation.\n\
+             {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
+             {indent}    // MEANING: the range `{rule_doc}` is declared, but the re-entry DISCIPLINE\n\
+             {indent}    // is not — clamp? reject? panic? Declare `saturating` to generate the clamp.\n\
+             {indent}    todo!(\"MEANING: interior constructor for {name} (re-enter {rule_doc})\")\n\
+             {indent}}}\n"
+        ),
+    };
+
+    let shaped = match &v.rule {
+        Rule::Prose(words) => {
+            let lit = esc_lit(words);
+            format!(
+                "/// The probe/grid surface: discovery can only refute what this grid reaches, so step\n\
+                 /// the perturbations toward the validity rule's load-bearing points.\n\
+                 impl Shaped for {name} {{\n\
+                 {indent}fn inhabitant() -> Self {{\n\
+                 {indent}    todo!(\"MEANING: the canonical valid {name}\")\n\
+                 {indent}}}\n\
+                 {indent}fn perturbation_classes(&self) -> Vec<Vec<Self>> {{\n\
+                 {indent}    todo!(\"MEANING: neighbours of a {name}, stepping toward the edges of \\\"{lit}\\\"\")\n\
+                 {indent}}}\n\
+                 }}\n\n"
+            )
+        }
+        Rule::Range { lo, hi, .. } => format!(
+            "/// The probe/grid surface — GENERATED from the declared range: the grid seeds at the\n\
+             /// lower edge and steps toward BOTH edges, so discovery judges laws at the rule's\n\
+             /// load-bearing points (the closure reaches the entire range, cap permitting).\n\
+             impl Shaped for {name} {{\n\
+             {indent}fn inhabitant() -> Self {{\n\
+             {indent}    {name}({lo})\n\
+             {indent}}}\n\
+             {indent}fn perturbation_classes(&self) -> Vec<Vec<Self>> {{\n\
+             {indent}    vec![\n\
+             {indent}        vec![{name}(self.0.saturating_add(1).clamp({lo}, {hi})), {name}({hi})],\n\
+             {indent}        vec![{name}(self.0.saturating_sub(1).clamp({lo}, {hi})), {name}({lo})],\n\
+             {indent}    ]\n\
+             {indent}}}\n\
+             }}\n\n"
+        ),
+    };
+
+    let rule_kind = match &v.rule {
+        Rule::Prose(_) => "carried verbatim — never generated",
+        Rule::Range { .. } => "structured — the implied artifacts below are generated",
+    };
+    format!(
+        "/// `{name}` — `{raw}` refined by a declared validity rule.\n\
+         ///\n\
+         /// VALIDITY (declared, {rule_kind}): \"{rule_doc}\"\n\
+         #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]\n\
+         pub struct {name}({raw});\n\
+         \n\
+         impl {name} {{\n\
+         {indent}/// Parse, don't validate: `Some` iff `raw` satisfies the declared rule.\n\
+         {indent}pub fn new(raw: {raw}) -> Option<{name}> {{\n\
+         {new_body}\
+         {indent}}}\n\
+         \n\
+         {indent}/// The raw value — the sanctioned exit hatch.\n\
+         {indent}pub fn get(&self) -> {raw} {{\n\
+         {indent}    self.0.clone()\n\
+         {indent}}}\n\
+         \n\
+         {mint}\
+         }}\n\
+         \n\
+         {shaped}"
+    )
+}
+
 fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
     let owned: Vec<&ValueDecl> = sys
         .values
@@ -865,48 +1079,7 @@ fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
     out.push('\n');
 
     for v in &owned {
-        let (name, raw) = (&v.name, &v.raw);
-        let validity_doc = doc_safe(&v.validity);
-        let validity_lit = esc_lit(&v.validity);
-        out.push_str(&format!(
-            "/// `{name}` — `{raw}` refined by a declared validity rule.\n\
-             ///\n\
-             /// VALIDITY (declared, carried verbatim — never generated): \"{validity_doc}\"\n\
-             #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]\n\
-             pub struct {name}({raw});\n\
-             \n\
-             impl {name} {{\n\
-             {indent}/// Parse, don't validate: `Some` iff `raw` satisfies the declared rule.\n\
-             {indent}pub fn new(raw: {raw}) -> Option<{name}> {{\n\
-             {indent}    // MEANING: the validity predicate for \"{validity_doc}\" — genesis carries the\n\
-             {indent}    // words, a human/agent supplies the predicate. Admit with `Some({name}(raw))`.\n\
-             {indent}    todo!(\"MEANING: validity of {name} — \\\"{validity_lit}\\\"\")\n\
-             {indent}}}\n\
-             \n\
-             {indent}/// The raw value — the sanctioned exit hatch.\n\
-             {indent}pub fn get(&self) -> {raw} {{\n\
-             {indent}    self.0.clone()\n\
-             {indent}}}\n\
-             \n\
-             {indent}/// The interior's way back into validity from a raw computation. Choosing the\n\
-             {indent}/// discipline (clamp? reject? panic?) is domain meaning, not structure.\n\
-             {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
-             {indent}    todo!(\"MEANING: interior constructor for {name} (re-enter \\\"{validity_lit}\\\")\")\n\
-             {indent}}}\n\
-             }}\n\
-             \n\
-             /// The probe/grid surface: discovery can only refute what this grid reaches, so step\n\
-             /// the perturbations toward the validity rule's load-bearing points.\n\
-             impl Shaped for {name} {{\n\
-             {indent}fn inhabitant() -> Self {{\n\
-             {indent}    todo!(\"MEANING: the canonical valid {name}\")\n\
-             {indent}}}\n\
-             {indent}fn perturbation_classes(&self) -> Vec<Vec<Self>> {{\n\
-             {indent}    todo!(\"MEANING: neighbours of a {name}, stepping toward the edges of \\\"{validity_lit}\\\"\")\n\
-             {indent}}}\n\
-             }}\n\n",
-            indent = "    ",
-        ));
+        out.push_str(&emit_value_object(v));
     }
 
     if !owned.is_empty() {
@@ -1820,6 +1993,144 @@ seams (each edge: its obligation, then the verdict its checker returned):
             holes >= 10,
             "the sample should carry many holes, got {holes}"
         );
+    }
+
+    /// A STRUCTURED rule generates the transcription prose leaves as holes: the range
+    /// yields the predicate and the edge-seeking grid, and the declared `saturating` policy
+    /// yields the clamping `mint` — so the value object carries NO meaning holes at all,
+    /// while the operator interiors (genuine meaning) still do. The emitted file stays
+    /// syn-clean.
+    #[test]
+    fn a_structured_rule_generates_what_prose_leaves_as_holes() {
+        let decl = "system! { name: \"cap\", \
+                    values { C = i64 where 0..=20 saturating; } \
+                    modules { m { ops { zero() -> C; pool(C, C) -> C; } \
+                    expects { commutative(pool); identity(pool, zero); } } } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .expect("boundary")
+            .contents;
+
+        assert!(boundary.contains("(0..=20).contains(&raw).then(|| C(raw))"));
+        assert!(boundary.contains("C(raw.clamp(0, 20))"));
+        assert!(
+            boundary.contains("C(0)"),
+            "the grid seeds at the lower edge"
+        );
+        assert!(boundary.contains("vec![C(self.0.saturating_add(1).clamp(0, 20)), C(20)],"));
+        assert!(boundary.contains("vec![C(self.0.saturating_sub(1).clamp(0, 20)), C(0)],"));
+        // no holes in CODE lines — the banner's prose legitimately quotes the marker.
+        let code_holes = boundary
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .filter(|line| line.contains("todo!"))
+            .count();
+        assert_eq!(
+            code_holes, 0,
+            "a fully-structured value object owes nothing: {boundary}"
+        );
+        syn::parse_file(boundary).expect("the generated boundary parses");
+
+        // the genuine meaning is still owed: the operator interiors and the constant.
+        let interior = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m_internal.rs")
+            .expect("interior")
+            .contents;
+        assert!(interior.contains("todo!(\"MEANING: body of pool(C, C) -> C\")"));
+
+        // negative bounds render as declared (signed raw).
+        let signed = "system! { name: \"deg\", values { T = i64 where -5..=5 saturating; } \
+                      modules { m { ops { f(T, T) -> T; } } } }";
+        let plan = Genesis::plan(signed, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .unwrap()
+            .contents;
+        assert!(boundary.contains("(-5..=5).contains(&raw)"));
+        assert!(boundary.contains("T(raw.clamp(-5, 5))"));
+    }
+
+    /// A range WITHOUT a policy generates the predicate and grid but keeps `mint` a hole —
+    /// the range is declared; the re-entry discipline (clamp vs reject vs panic) is meaning.
+    #[test]
+    fn an_unpoliced_range_keeps_the_reentry_hole() {
+        let decl = "system! { name: \"cap\", values { C = i64 where 0..=20; } \
+                    modules { m { ops { pool(C, C) -> C; } } } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .unwrap()
+            .contents;
+        assert!(
+            boundary.contains("(0..=20).contains(&raw)"),
+            "predicate generated"
+        );
+        assert!(
+            boundary.contains("todo!(\"MEANING: interior constructor for C (re-enter 0..=20)\")"),
+            "mint stays a hole"
+        );
+        assert!(boundary.contains("Declare `saturating` to generate the clamp"));
+        assert!(
+            boundary.contains("C(self.0.saturating_add(1)"),
+            "grid still generated"
+        );
+    }
+
+    /// The raw representation is any Rust TYPE, rendered back as written — the v1
+    /// plain-path restriction is gone.
+    #[test]
+    fn raw_types_are_arbitrary_types() {
+        let decl = "system! { name: \"blob\", \
+                    values { R = Vec<u8> where \"non-empty\"; P = (i64, u8) where \"any\"; } \
+                    modules { m { ops { join(R, R) -> R; tag(R, P) -> R; } } } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .unwrap()
+            .contents;
+        assert!(boundary.contains("pub struct R(Vec<u8>);"));
+        assert!(boundary.contains("pub struct P((i64, u8));"));
+        assert!(boundary.contains("pub fn new(raw: Vec<u8>) -> Option<R>"));
+        syn::parse_file(boundary).expect("generic raws still emit parseable Rust");
+    }
+
+    /// Structured rules are validated at plan time, each refusal naming the fault: a range
+    /// on a non-integer raw, an empty range, a negative bound on an unsigned raw, and an
+    /// unknown re-entry policy.
+    #[test]
+    fn malformed_structured_rules_are_refused_by_name() {
+        let wrap = |values: &str| {
+            format!("system! {{ name: \"app\", values {{ {values} }} modules {{ m {{ ops {{ f(V, V) -> V; }} }} }} }}")
+        };
+        let cases: Vec<(String, &str)> = vec![
+            (wrap("V = String where 0..=20;"), "not a primitive integer"),
+            (wrap("V = i64 where 5..=1;"), "empty range"),
+            (wrap("V = u8 where -1..=5;"), "unsigned"),
+            (
+                wrap("V = i64 where 0..=20 clamping;"),
+                "unknown re-entry policy",
+            ),
+        ];
+        for (decl, expected) in cases {
+            let err = Genesis::plan(&decl, &Deps::Version("0".to_string()))
+                .err()
+                .unwrap_or_else(|| panic!("should refuse: {decl}"));
+            assert!(
+                err.contains(expected),
+                "expected `{expected}` in the refusal, got: {err}"
+            );
+        }
     }
 
     /// The dependency flag switches the manifest between a path-parameterised checkout and

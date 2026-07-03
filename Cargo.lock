@@ -43,6 +43,7 @@ dependencies = [
  "boundary-enforce",
  "boundary-spec-macros",
  "proptest",
+ "quote",
  "serde_json",
  "spec-lock",
  "syn",

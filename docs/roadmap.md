@@ -46,6 +46,11 @@ a convention.
 
 ## The next brick: candidates
 
+The authoring-experience frictions found while converging the demo — and the I/O research
+program (effects as theories, the world lock) — are inventoried with their bricks in
+[experience.md](experience.md); its pillar 2 (executable validity rules) is in progress.
+The items below predate that inventory and remain live:
+
 1. **Transform seams end to end in genesis.** The compiled `system!` grammar can already
    discharge a transform seam (`A -- B : transform on V via h in Span;`), but genesis still
    leaves declared transform seams as `tests/seams.rs` meaning holes — it cannot name the

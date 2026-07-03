@@ -40,6 +40,9 @@ typewit = "1"
 # from its token stream — the declaration is Rust surface syntax, never a bespoke DSL — and the
 # generator's tests hold every emitted `.rs` body to `syn::parse_file` (syn-clean output).
 syn = { version = "2", features = ["full"] }
+# Genesis renders a declared raw TYPE (any `syn::Type`, not just a plain path) back to text
+# for the generated newtypes. Already transitive via syn; named so the render is first-class.
+quote = "1"
 
 [dev-dependencies]
 proptest = "1"
