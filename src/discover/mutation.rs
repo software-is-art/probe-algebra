@@ -285,6 +285,60 @@ mod tests {
     use crate::discover::world::StoreProtocol;
     use crate::kvstore::theory::TtlStore;
 
+    // A deliberately WEAK theory: two distinguishable constants and not one law — no
+    // binary, no unary, no action, no relation, so the whole catalog is silent about it.
+    // Its survivors are therefore REAL, which the registry theories (all survivors closed)
+    // can no longer supply: the fixture that keeps `survivors()` and the SURVIVED render
+    // honest (a report that lies "no survivors" was invisible to every green theory — a
+    // mutant caught by the changed-lines dogfood sweep).
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    struct M;
+    #[derive(Clone)]
+    struct MV(u8);
+    struct Mute;
+    fn one_op(_: &[MV]) -> Option<MV> {
+        Some(MV(1))
+    }
+    fn two_op(_: &[MV]) -> Option<MV> {
+        Some(MV(2))
+    }
+
+    crate::theory! {
+        Mute : "mute",
+        Value = MV,
+        Obs = u8,
+        Sort = M,
+        sort_of = |_: &MV| M,
+        observe = |v: &MV| v.0,
+        vars { M => &["x", "y", "z"], }
+        inhabit { M => vec![MV(1), MV(2)], }
+        ops {
+            Nullary "one" "one" () -> M = one_op;
+            Nullary "two" "two" () -> M = two_op;
+        }
+    }
+
+    /// A spec that says nothing kills nothing — and the report SAYS so. The mute theory's
+    /// constants appear in no law, so confusing them (and starving them) survives, the
+    /// survivor list names each planted bug, and the render shouts it. This is the
+    /// negative direction the all-green registry can no longer pin.
+    #[test]
+    fn a_lawless_spec_has_named_survivors() {
+        let report = MutationReport::of::<Mute>();
+        assert_eq!(
+            report.survivors(),
+            vec![
+                "`one` evaluates as `two`",
+                "`two` evaluates as `one`",
+                "`one` becomes undefined everywhere",
+                "`two` becomes undefined everywhere",
+            ]
+        );
+        let render = report.render();
+        assert!(render.contains("4 SURVIVED"));
+        assert!(render.contains("\n- SURVIVED  `one` evaluates as `two`"));
+    }
+
     /// The five committed mutation locks are fresh — the drift gate. A spec change that
     /// alters any theory's kill power (a new survivor, a closed one, a new mutant from a
     /// new operator) fails HERE until the regenerated report is ratified.

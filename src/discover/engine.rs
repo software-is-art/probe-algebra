@@ -2115,6 +2115,50 @@ mod tests {
         }
     }
 
+    /// `check` judges each polarity in BOTH directions — the negative cases the committed
+    /// theories never supply (their witness laws all hold, and all have points of equality,
+    /// so a comparison flipped inside the witness arm was invisible to every existing gate:
+    /// a mutant caught by the changed-lines dogfood sweep). Two constants make the sharpest
+    /// probes: `T ≠ F` differs on EVERY assignment (a mutant demanding equality finds none),
+    /// and `T ≠ T` differs on NONE (a lost witness must be an error, never a vacuous pass).
+    #[test]
+    fn check_judges_witness_laws_in_both_directions() {
+        let e = Engine::<Bits>::new();
+        let op = |sym: &str| {
+            e.signatures()
+                .iter()
+                .position(|(s, _, _)| *s == sym)
+                .expect("a Bits operator")
+        };
+        let witness = |lhs: Term, rhs: Term, equation: &str| DiscoveredLaw {
+            shape: "non-constancy",
+            prose: format!("probe: {equation}"),
+            equation: equation.to_string(),
+            lhs,
+            rhs,
+            polarity: Polarity::Differs,
+        };
+
+        // a witness that holds everywhere: the two constants never agree.
+        let held = witness(
+            Term::App(op("T"), vec![]),
+            Term::App(op("F"), vec![]),
+            "T ≠ F",
+        );
+        assert_eq!(e.check(&[held]), Ok(()));
+
+        // a witness with no witness: identical terms must FAIL the check, by name.
+        let lost = witness(
+            Term::App(op("T"), vec![]),
+            Term::App(op("T"), vec![]),
+            "T ≠ T",
+        );
+        assert_eq!(
+            e.check(&[lost]),
+            Err("witness law lost its witness: T ≠ T".to_string())
+        );
+    }
+
     // The regression sort for the sampler fix: Lo/Mid/Hi with a binary op commutative on every
     // pair INVOLVING Mid but not on (Lo, Hi) — the exact blind spot of a sample that pins the
     // middle variable to Mid.
