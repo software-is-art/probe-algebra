@@ -69,9 +69,23 @@ is the versioning policy:
   called out in the release notes.
 - Engine internals (sampling, enumeration) alone never drift a consumer's lock;
   if a release would, the law set changed and the rule above applies.
+- **A grid-semantics change** (how `shadow_grid` composes a derived grid) is the
+  subtle case of the rule above: it leaves `spec/shapes.spec` untouched but can
+  still change which laws a CONSUMER discovers — a consumer whose value type is
+  a derived enum under a binding cap gets a different grid, so a coincidental
+  law can (correctly) vanish from their re-frozen lock. Losing laws is the
+  major-release row; call the change out in the release notes so the drift a
+  consumer ratifies has a named cause. The structure-first partition of
+  `shadow_grid` (2026-07-03) is such a change; it lands before the first
+  publish, so no shipped consumer drifts, but it sets the precedent: hand-`Shaped`
+  leaf grids and hand-curated `inhabit` grids are provably unaffected by it, and
+  any future release in this class must say which grid class moves.
 
-A diff to `spec/shapes.spec` is therefore the semver signal: additive lines →
-at least minor; changed or removed lines → major.
+A diff to `spec/shapes.spec` is therefore the semver signal for the LAW
+LANGUAGE: additive lines → at least minor; changed or removed lines → major.
+Grid-semantics changes carry the same consequences without touching that file,
+so they are named in release notes by hand — the one semver signal a committed
+artifact does not raise for you.
 
 ## The unpacked-crate smoke test
 

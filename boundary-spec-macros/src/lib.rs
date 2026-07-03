@@ -500,6 +500,14 @@ pub fn derive_shaped(input: TokenStream) -> TokenStream {
                 .into();
         }
     };
+    // The STRUCTURAL slice: variant swaps (here and, threaded through fields, anywhere
+    // below) — the type-level-finite partition `shadow_grid` closes over exhaustively
+    // before spending budget on value neighbours.
+    let structural = match &input.data {
+        Data::Enum(data) => enum_structural(name, data),
+        Data::Struct(data) => struct_structural(name, &data.fields),
+        Data::Union(_) => unreachable!("unions were rejected above"),
+    };
     // The DERIVED degree-of-freedom set: one `Field<Self, I>` per variant (enum) or field
     // (struct), folded into a `DofCons` list. So `HasDofs` is mechanical and `Complete<Self>`
     // covers it by construction — completeness cannot be under-specified.
@@ -522,6 +530,11 @@ pub fn derive_shaped(input: TokenStream) -> TokenStream {
                 let mut __classes: ::std::vec::Vec<::std::vec::Vec<Self>> = ::std::vec::Vec::new();
                 #classes
                 __classes
+            }
+            fn structural_perturbations(&self) -> ::std::vec::Vec<Self> {
+                let mut __structural: ::std::vec::Vec<Self> = ::std::vec::Vec::new();
+                #structural
+                __structural
             }
         }
         impl ::boundary_spec::boundary::HasDofs for #name {
@@ -637,6 +650,65 @@ fn struct_body(name: &Ident, fields: &Fields) -> (TokenStream2, TokenStream2) {
         },
     };
     (inhabitant, classes)
+}
+
+/// The per-field STRUCTURAL pushes: the constructor with one field replaced by each of that
+/// field's own structural perturbations (siblings cloned) — how a variant swap anywhere
+/// BELOW threads back up through this constructor. The value-side sibling of
+/// `field_class_pushes`.
+fn structural_field_pushes(path: &TokenStream2, fields: &Fields, ids: &[Ident]) -> TokenStream2 {
+    let pushes = ids.iter().enumerate().map(|(i, id)| {
+        let rebuilt = rebuild(path, fields, ids, i);
+        quote! {
+            for __n in ::boundary_spec::boundary::Shaped::structural_perturbations(#id) {
+                __structural.push(#rebuilt);
+            }
+        }
+    });
+    quote! { #(#pushes)* }
+}
+
+/// A struct's structural perturbations: no variant of its own to swap, so exactly the
+/// field-threaded swaps from below.
+fn struct_structural(name: &Ident, fields: &Fields) -> TokenStream2 {
+    let path = quote! { #name };
+    let (ids, pat) = binders(fields);
+    let pushes = structural_field_pushes(&path, fields, &ids);
+    match fields {
+        Fields::Unit => quote! {},
+        _ => quote! {
+            let Self #pat = self;
+            #pushes
+        },
+    }
+}
+
+/// An enum's structural perturbations: every OTHER variant's inhabitant (the swap at this
+/// level), plus the current variant rebuilt around each field's own structural
+/// perturbations (swaps below, threaded up).
+fn enum_structural(name: &Ident, data: &DataEnum) -> TokenStream2 {
+    let all_variants = data.variants.iter().map(|v| {
+        let vid = &v.ident;
+        inhabitant_ctor(&quote! { #name::#vid }, &v.fields)
+    });
+    let arms = data.variants.iter().map(|v| {
+        let vid = &v.ident;
+        let path = quote! { #name::#vid };
+        let (ids, pat) = binders(&v.fields);
+        let pushes = structural_field_pushes(&path, &v.fields, &ids);
+        quote! { #name::#vid #pat => { #pushes } }
+    });
+    quote! {
+        let __variants: ::std::vec::Vec<Self> = ::std::vec![ #(#all_variants),* ];
+        for __v in __variants {
+            if &__v != self {
+                __structural.push(__v);
+            }
+        }
+        match self {
+            #(#arms)*
+        }
+    }
 }
 
 /// True iff `ty` mentions `name` anywhere in its tokens — a SYNTACTIC recursion probe. It sees

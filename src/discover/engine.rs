@@ -432,9 +432,9 @@ impl<T: Theory> Engine<T> {
 // ================================================================================================
 
 /// One universal algebraic shape, as a ratifiable datum: its name, its schematic equation, the
-/// applicability GATE that decides which operators it is tried on, and the prose TEMPLATE a
-/// discovered instance renders with (`{op}`/`{other}`/`{via}` are operator names, `{const}` a
-/// constant's symbol).
+/// applicability GATE that decides which operators it is tried on (as prose for the lock AND as
+/// checkable data), and the prose TEMPLATE a discovered instance renders with
+/// (`{op}`/`{other}`/`{via}` are operator names, `{const}` a constant's symbol).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ShapeInfo {
     /// The shape's name ("commutativity", "bias (right-regular)").
@@ -443,9 +443,140 @@ pub struct ShapeInfo {
     pub schema: &'static str,
     /// When the shape is tried, in prose ("homogeneous binary; skipped when commutative").
     pub gate: &'static str,
+    /// The same gate as DATA — the signature pattern a declaration is validated against
+    /// (`ShapeGate::admit`), so "what may be declared" and "what discovery tries" are one
+    /// artifact. Purely-behavioural conditions (bias's skipped-when-commutative) stay out:
+    /// they are discovery's verdict, not a signature's shape.
+    pub gate_slots: ShapeGate,
     /// The prose template a discovered instance renders with — the exact `format!` skeleton in
     /// `templates()`, with `{...}` holes where operator/constant names are substituted.
     pub template: &'static str,
+}
+
+/// A shape's applicability gate as data: one [`Slot`] per operator the shape ranges over (in
+/// the declared/fingerprint order), plus the distinctness constraints the code gate imposes.
+/// Sort VARIABLES (the `u8`s inside slots) express how the slots' sorts relate — identity's
+/// constant lives on its operator's sort, a homomorphism's binaries live on the conversion's
+/// two endpoints — by unification, not by naming concrete sorts.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ShapeGate {
+    /// One entry per operator parameter, in declaration order.
+    pub slots: &'static [Slot],
+    /// Sort-variable pairs that must bind to DIFFERENT sorts (an action's parameter is not
+    /// its carrier; a relation's verdict is not its operand).
+    pub distinct_sorts: &'static [(u8, u8)],
+    /// Slot-index pairs that must be DIFFERENT operators (distributivity's two binaries, a
+    /// round trip's two conversions).
+    pub distinct_ops: &'static [(u8, u8)],
+}
+
+/// One operator slot of a gate, over sort variables.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Slot {
+    /// A homogeneous binary on sort `.0` (`s × s → s`).
+    Binary(u8),
+    /// A nullary constant of sort `.0`.
+    Constant(u8),
+    /// A unary conversion from sort `.0` to sort `.1` (equal variables ⇒ an endo).
+    Unary(u8, u8),
+    /// An action of sort `.1` on sort `.0` (`s × t → s`).
+    Action(u8, u8),
+    /// A relation on sort `.0` with verdict sort `.1` (`s × s → r`).
+    Relation(u8, u8),
+}
+
+impl ShapeGate {
+    /// Do these operator signatures satisfy the gate? `sigs[i]` is slot `i`'s
+    /// `(input sorts, output sort)` and `names[i]` its display name; sorts are any comparable
+    /// tokens (the engine checks `T::Sort`s, genesis checks declared value NAMES — one
+    /// checker, so the two sides cannot drift). `Err` names the first violated slot or
+    /// constraint in the caller's vocabulary.
+    pub fn admit<S: PartialEq + Clone>(
+        &self,
+        sigs: &[(Vec<S>, S)],
+        names: &[&str],
+    ) -> Result<(), String> {
+        if sigs.len() != self.slots.len() || names.len() != self.slots.len() {
+            return Err(format!(
+                "the shape ranges over {} operator(s), got {}",
+                self.slots.len(),
+                sigs.len().max(names.len())
+            ));
+        }
+        let mut bound: Vec<Option<S>> = Vec::new();
+        let bind = |bound: &mut Vec<Option<S>>, var: u8, sort: &S| -> bool {
+            let var = var as usize;
+            if bound.len() <= var {
+                bound.resize(var + 1, None);
+            }
+            match &bound[var] {
+                Some(existing) => existing == sort,
+                None => {
+                    bound[var] = Some(sort.clone());
+                    true
+                }
+            }
+        };
+        for (i, slot) in self.slots.iter().enumerate() {
+            let (inputs, output) = &sigs[i];
+            let name = names[i];
+            let ok = match slot {
+                Slot::Binary(s) => {
+                    inputs.len() == 2
+                        && inputs[0] == *output
+                        && inputs[1] == *output
+                        && bind(&mut bound, *s, output)
+                }
+                Slot::Constant(s) => inputs.is_empty() && bind(&mut bound, *s, output),
+                Slot::Unary(from, to) => {
+                    inputs.len() == 1
+                        && bind(&mut bound, *from, &inputs[0])
+                        && bind(&mut bound, *to, output)
+                }
+                Slot::Action(carrier, param) => {
+                    inputs.len() == 2
+                        && inputs[0] == *output
+                        && bind(&mut bound, *carrier, output)
+                        && bind(&mut bound, *param, &inputs[1])
+                }
+                Slot::Relation(operand, verdict) => {
+                    inputs.len() == 2
+                        && inputs[0] == inputs[1]
+                        && bind(&mut bound, *operand, &inputs[0])
+                        && bind(&mut bound, *verdict, output)
+                }
+            };
+            if !ok {
+                let wanted = match slot {
+                    Slot::Binary(_) => "a homogeneous binary operator (s × s → s)",
+                    Slot::Constant(_) => "a nullary constant of the matching sort",
+                    Slot::Unary(..) => "a unary conversion between the matching sorts",
+                    Slot::Action(..) => "an action (s × t → s) on the matching carrier",
+                    Slot::Relation(..) => "a relation (s × s → r) on the matching operand sort",
+                };
+                return Err(format!("`{name}` must be {wanted}"));
+            }
+        }
+        for (a, b) in self.distinct_sorts {
+            let (a, b) = (*a as usize, *b as usize);
+            if bound.get(a).cloned().flatten() == bound.get(b).cloned().flatten() {
+                return Err(format!(
+                    "the sorts bound by `{}` must be distinct (an action's parameter is not \
+                     its carrier; a relation's verdict is not its operand)",
+                    names.join("`, `")
+                ));
+            }
+        }
+        for (a, b) in self.distinct_ops {
+            if names[*a as usize] == names[*b as usize] {
+                return Err(format!(
+                    "`{}` and `{}` must be different operators",
+                    names[*a as usize], names[*b as usize]
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ShapeInfo {
@@ -483,6 +614,18 @@ impl ShapeInfo {
         }
         cursor.ends_with(last)
     }
+
+    /// Instantiate the prose template over concrete names: fill each `{hole}` from `subs`
+    /// (`[("op", "grant"), ("const", "zero")]`). The catalog is thereby the SINGLE source of
+    /// a law's prose — genesis renders its target locks through this, so a declared law's
+    /// lock line and a confirming discovery's render cannot drift apart.
+    pub fn instantiate(&self, subs: &[(&str, &str)]) -> String {
+        let mut out = self.template.to_string();
+        for (hole, name) in subs {
+            out = out.replace(&format!("{{{hole}}}"), name);
+        }
+        out
+    }
 }
 
 /// The engine's shape catalog — the library's LAW-LANGUAGE surface, as a value object.
@@ -502,26 +645,46 @@ pub struct ShapeCatalog;
 
 impl ShapeCatalog {
     /// The full inventory, in the order `templates()` tries the shapes. KEEP IN STEP with
-    /// `templates()` — the census tests hold each side against the other, and the lock holds
-    /// both against `spec/shapes.spec`.
+    /// `templates()` — the census tests hold each side against the other (prose AND data
+    /// gates), and the lock holds both against `spec/shapes.spec`.
     pub fn inventory() -> Vec<ShapeInfo> {
+        // the data-gate shorthand (prose gates render into the lock; these validate).
+        const fn open(slots: &'static [Slot]) -> ShapeGate {
+            ShapeGate {
+                slots,
+                distinct_sorts: &[],
+                distinct_ops: &[],
+            }
+        }
+        const BINARY: ShapeGate = open(&[Slot::Binary(0)]);
+        const WITH_CONSTANT: ShapeGate = open(&[Slot::Binary(0), Slot::Constant(0)]);
+        const BINARY_PAIR: ShapeGate = ShapeGate {
+            slots: &[Slot::Binary(0), Slot::Binary(0)],
+            distinct_sorts: &[],
+            distinct_ops: &[(0, 1)],
+        };
+        const HETERO: &[(u8, u8)] = &[(0, 1)];
+
         vec![
             ShapeInfo {
                 name: "commutativity",
                 schema: "(x ⊕ y) = (y ⊕ x)",
                 gate: "homogeneous binary (s × s → s)",
+                gate_slots: BINARY,
                 template: "{op} gives the same result in either order.",
             },
             ShapeInfo {
                 name: "associativity",
                 schema: "((x ⊕ y) ⊕ z) = (x ⊕ (y ⊕ z))",
                 gate: "homogeneous binary (s × s → s)",
+                gate_slots: BINARY,
                 template: "With {op}, the grouping of three values doesn't matter.",
             },
             ShapeInfo {
                 name: "idempotence",
                 schema: "(x ⊕ x) = x",
                 gate: "homogeneous binary (s × s → s)",
+                gate_slots: BINARY,
                 template: "{op} of a value with itself gives that value.",
             },
             ShapeInfo {
@@ -529,6 +692,7 @@ impl ShapeCatalog {
                 schema: "((x ⊕ y) ⊕ x) = (y ⊕ x)",
                 gate: "homogeneous binary; skipped when commutative (a commutative operator \
                        has no bias to state); excludes the left-regular variant on the grid",
+                gate_slots: BINARY,
                 template: "With {op}, the later operand wins where the two disagree — \
                            re-applying an earlier one cannot overwrite it.",
             },
@@ -537,6 +701,7 @@ impl ShapeCatalog {
                 schema: "((x ⊕ y) ⊕ x) = (x ⊕ y)",
                 gate: "homogeneous binary; skipped when commutative (a commutative operator \
                        has no bias to state); excludes the right-regular variant on the grid",
+                gate_slots: BINARY,
                 template: "With {op}, the earlier operand wins where the two disagree — \
                            a later one cannot overwrite it.",
             },
@@ -545,6 +710,7 @@ impl ShapeCatalog {
                 schema: "(e ⊕ x) = x  (or (x ⊕ e) = x)",
                 gate: "homogeneous binary plus a constant of its sort; tried on both sides, \
                        deduplicated by prose",
+                gate_slots: WITH_CONSTANT,
                 template: "{op} with {const} leaves a value unchanged.",
             },
             ShapeInfo {
@@ -552,18 +718,21 @@ impl ShapeCatalog {
                 schema: "(a ⊕ x) = a  (or (x ⊕ a) = a)",
                 gate: "homogeneous binary plus a constant of its sort; tried on both sides, \
                        deduplicated by prose",
+                gate_slots: WITH_CONSTANT,
                 template: "{op} by {const} always gives {const}.",
             },
             ShapeInfo {
                 name: "distributivity",
                 schema: "(x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))",
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
+                gate_slots: BINARY_PAIR,
                 template: "{op} distributes over {other}.",
             },
             ShapeInfo {
                 name: "absorption",
                 schema: "(x ⊕ (x ⊗ y)) = x",
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
+                gate_slots: BINARY_PAIR,
                 template: "{op} absorbs {other}.",
             },
             ShapeInfo {
@@ -571,6 +740,11 @@ impl ShapeCatalog {
                 schema: "act(x, e) = x",
                 gate: "heterogeneous binary s × t → s (an action of t on s) plus a constant \
                        of the parameter sort t",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "{op} with {const} leaves a value unchanged.",
             },
             ShapeInfo {
@@ -578,6 +752,11 @@ impl ShapeCatalog {
                 schema: "act(act(x, p), q) = act(x, (p ⊗ q))",
                 gate: "heterogeneous binary s × t → s plus a homogeneous binary on the \
                        parameter sort t",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Binary(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "Repeated {op} combines its parameters with {other}.",
             },
             ShapeInfo {
@@ -585,30 +764,47 @@ impl ShapeCatalog {
                 schema: "rel(x, x) = false",
                 gate: "relation s × s → r (r ≠ s) whose output sort carries a constant \
                        rendering as `false`",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "A value is never {op} itself.",
             },
             ShapeInfo {
                 name: "self-application",
                 schema: "rel(x, x) = c",
                 gate: "relation s × s → r (r ≠ s) plus any other constant of the output sort",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
                 template: "{op} of a value with itself gives {const}.",
             },
             ShapeInfo {
                 name: "involution",
                 schema: "u(u(x)) = x",
                 gate: "unary s → s",
+                gate_slots: open(&[Slot::Unary(0, 0)]),
                 template: "{op} twice returns the original value.",
             },
             ShapeInfo {
                 name: "round-trip",
                 schema: "g(f(x)) = x",
                 gate: "a pair of distinct unaries f : s → t and g : t → s",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 1), Slot::Unary(1, 0)],
+                    distinct_sorts: &[],
+                    distinct_ops: &[(0, 1)],
+                },
                 template: "{op} undoes {other} — the round trip is the identity.",
             },
             ShapeInfo {
                 name: "homomorphism",
                 schema: "h((x ⊕ y)) = (h(x) ⊗ h(y))",
                 gate: "unary h : s → t plus a homogeneous binary on s and one on t",
+                gate_slots: open(&[Slot::Unary(0, 1), Slot::Binary(0), Slot::Binary(1)]),
                 template: "{op} turns {other} into {via}.",
             },
         ]
@@ -1112,16 +1308,37 @@ impl<T: Theory> Default for Engine<T> {
 /// bootstrap a grid at all. So the grid is grown not from the boundary operators but from the value
 /// type's OWN `Shaped` surface — a shadow algebra of synthetic generators the user never writes and
 /// that never enter the discovered spec: start at the canonical `inhabitant`, close under its
-/// structural PERTURBATIONS (variant swaps, field neighbours), bounded by `cap`. Deterministic — the
-/// derived perturbation order is fixed. This is `#[derive(Shaped)]` (already minting the probe
-/// surface for edges) reused to fatten the discovery grid.
+/// PERTURBATIONS, bounded by `cap`. Deterministic — the derived perturbation order is fixed. This
+/// is `#[derive(Shaped)]` (already minting the probe surface for edges) reused to fatten the
+/// discovery grid.
+///
+/// The closure is PARTITIONED, because the perturbation surface has two differently-priced
+/// halves. STRUCTURE (which constructor shapes exist — variant swaps, here or threaded up from
+/// any field) is type-level-finite for a non-recursive type, so it is closed over FIRST and
+/// exhaustively: the cap can starve value density, never constructor coverage. VALUES (leaf
+/// quantities tuned toward a validity rule's edges) are open-ended, so they get whatever budget
+/// remains. For a RECURSIVE type the structural space is itself unbounded and the honest frame
+/// returns — phase 1 is then exhaustive only up to the cap (depth-bounded structure), the same
+/// bound term enumeration already lives with. `grid_gaps` is the audit that a grid's structural
+/// closure actually completed.
 pub fn shadow_grid<V: crate::boundary::Shaped>(cap: usize) -> Vec<V> {
     let mut grid: Vec<V> = ::std::vec![V::inhabitant()];
+    // PHASE 1 — structure, exhaustively: close under structural perturbations alone, so every
+    // reachable constructor shape is in the grid before any budget is spent on value tuning.
+    close(&mut grid, cap, V::structural_perturbations);
+    // PHASE 2 — values, with the remainder: continue the closure under the FULL surface (value
+    // neighbours of every phase-1 member included; re-walking members is cheap dedup).
+    close(&mut grid, cap, V::all_perturbations);
+    grid
+}
+
+/// One closure pass: walk the frontier, admitting unseen `neighbours` until `cap`. The `cap`
+/// bound lives in the inner break (the only place new values are added); the outer loop just
+/// walks the frontier. `i` indexes into `grid`, so `i <= grid.len()` would read past the end.
+fn close<V: PartialEq>(grid: &mut Vec<V>, cap: usize, neighbours: impl Fn(&V) -> Vec<V>) {
     let mut i = 0;
-    // the `cap` bound lives in the inner break (the only place new values are added); the outer loop
-    // just walks the frontier. `i` indexes into `grid`, so `i <= grid.len()` would read past the end.
     while i < grid.len() {
-        for n in grid[i].all_perturbations() {
+        for n in neighbours(&grid[i]) {
             if grid.len() >= cap {
                 break;
             }
@@ -1131,7 +1348,27 @@ pub fn shadow_grid<V: crate::boundary::Shaped>(cap: usize) -> Vec<V> {
         }
         i += 1;
     }
-    grid
+}
+
+/// The grid's structural AUDIT: every constructor reachable in ONE perturbation step from the
+/// grid that the grid itself fails to exhibit, by discriminant. Empty iff the closure completed
+/// (the cap was generous enough) — which `shadow_grid`'s structure-first partition guarantees
+/// whenever the structural space fits the cap at all. Promoted from this repo's test harness to
+/// the library so every downstream `#[derive(Shaped)]` grid can be held to it as an invariant
+/// (`assert!(grid_gaps(&grid).is_empty())`) instead of by convention. Discriminants, never a
+/// hand-written variant list — a hand list would just move the gap.
+pub fn grid_gaps<V: crate::boundary::Shaped>(grid: &[V]) -> Vec<core::mem::Discriminant<V>> {
+    let exhibited: Vec<_> = grid.iter().map(core::mem::discriminant).collect();
+    let mut gaps = Vec::new();
+    for v in grid {
+        for n in v.all_perturbations() {
+            let d = core::mem::discriminant(&n);
+            if !exhibited.contains(&d) && !gaps.contains(&d) {
+                gaps.push(d);
+            }
+        }
+    }
+    gaps
 }
 
 #[cfg(test)]
@@ -1444,6 +1681,123 @@ mod tests {
             "bool's shadow grid is its two inhabitants, from the type alone"
         );
         assert_eq!(shadow_grid::<bool>(1).len(), 1, "cap bounds the grid");
+    }
+
+    // -- the PARTITIONED closure: structure exhaustively first, values with the remainder --------
+    //
+    // `Fat` is a value-rich leaf (four value neighbours per step, no structural degree of
+    // freedom); `Choice` is a two-variant enum; `Gauge` composes them. Under the OLD single-pass
+    // closure a tight cap spends the whole budget on `Fat`'s value chain and `Choice::Off` never
+    // appears — the over-fit hazard the partition exists to kill.
+
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+    struct Fat(u8);
+    impl crate::boundary::Shaped for Fat {
+        fn inhabitant() -> Self {
+            Fat(0)
+        }
+        fn perturbation_classes(&self) -> Vec<Vec<Self>> {
+            vec![(1..=4).map(|step| Fat(self.0.wrapping_add(step))).collect()]
+        }
+    }
+
+    #[derive(Clone, PartialEq, Eq, Hash, Debug, crate::Shaped)]
+    enum Choice {
+        On,
+        Off,
+    }
+
+    #[derive(Clone, PartialEq, Eq, Hash, Debug, crate::Shaped)]
+    struct Gauge {
+        fat: Fat,
+        choice: Choice,
+    }
+
+    /// STRUCTURE CANNOT BE STARVED: with a cap of 3, the grid admits the `choice` variant swap
+    /// (phase 1, structural, threaded up through the struct field) BEFORE any of `Fat`'s value
+    /// neighbours — pinned exactly, so removing either phase, swapping their order, or breaking
+    /// the derive's field threading all fail here. The old single-pass closure yields
+    /// `[{0,On}, {1,On}, {2,On}]` under the same cap: `Off` never appears.
+    #[test]
+    fn shadow_grid_closes_structure_before_spending_on_values() {
+        let gauge = |fat: u8, choice: Choice| Gauge {
+            fat: Fat(fat),
+            choice,
+        };
+        assert_eq!(
+            shadow_grid::<Gauge>(3),
+            vec![
+                gauge(0, Choice::On),
+                gauge(0, Choice::Off),
+                gauge(1, Choice::On)
+            ],
+            "phase 1 admits the variant swap; phase 2 spends the remaining budget on values"
+        );
+        // with a generous cap the value half fills in behind the (already complete) structure.
+        let full = shadow_grid::<Gauge>(12);
+        assert!(full
+            .iter()
+            .any(|g| g.fat == Fat(2) && g.choice == Choice::Off));
+        assert!(
+            grid_gaps(&full).is_empty(),
+            "the closure is constructor-complete"
+        );
+    }
+
+    /// The structural surface itself, pinned per shape: an enum's own variant swap, the swap
+    /// THREADED through an enum's field and a struct's field, the leaf default (none), bool's
+    /// negation (a bool IS a two-variant sum), and `Box` transparency.
+    #[test]
+    fn structural_perturbations_are_the_variant_swaps_threaded_up() {
+        use crate::boundary::Shaped;
+
+        #[derive(Clone, PartialEq, Eq, Hash, Debug, crate::Shaped)]
+        enum Wrap {
+            Carry(Choice),
+            Empty,
+        }
+
+        assert_eq!(Choice::On.structural_perturbations(), vec![Choice::Off]);
+        assert_eq!(
+            Wrap::Carry(Choice::On).structural_perturbations(),
+            vec![Wrap::Empty, Wrap::Carry(Choice::Off)],
+            "the swap at this level, then the swap below threaded up"
+        );
+        assert_eq!(
+            Gauge {
+                fat: Fat(7),
+                choice: Choice::On
+            }
+            .structural_perturbations(),
+            vec![Gauge {
+                fat: Fat(7),
+                choice: Choice::Off
+            }],
+            "a struct threads its fields' swaps; the value-only field contributes none"
+        );
+        assert_eq!(
+            Fat(0).structural_perturbations(),
+            vec![],
+            "a leaf defaults to none"
+        );
+        assert_eq!(false.structural_perturbations(), vec![true]);
+        assert_eq!(true.structural_perturbations(), vec![false]);
+        let boxed: Box<Choice> = Box::new(Choice::On);
+        assert_eq!(
+            boxed.structural_perturbations(),
+            vec![Box::new(Choice::Off)],
+            "a box is transparent to the structural surface too"
+        );
+    }
+
+    /// `grid_gaps` (promoted from the harness to the library) has kill power of its own: a grid
+    /// missing a one-step-reachable constructor is reported by discriminant, and a completed
+    /// closure is gap-free.
+    #[test]
+    fn grid_gaps_reports_the_missing_constructor() {
+        let gaps = grid_gaps(&[Choice::On]);
+        assert_eq!(gaps, vec![core::mem::discriminant(&Choice::Off)]);
+        assert!(grid_gaps(&shadow_grid::<Choice>(8)).is_empty());
     }
 
     // -- adversarial self-tests: the grid on trial ------------------------------------------------
@@ -2217,6 +2571,125 @@ mod tests {
         // a hole spans multi-word operator names, so the census is robust to naming.
         let irrefl = shape("irreflexivity");
         assert!(irrefl.matches("A value is never less than itself."));
+    }
+
+    /// `instantiate` round-trips through `matches`: filling a template's holes yields prose
+    /// the same shape recognises as its own instance — exactly the guarantee genesis's target
+    /// locks lean on (a declared law's line IS what a confirming discovery renders).
+    #[test]
+    fn instantiate_yields_prose_the_shape_recognises() {
+        let inv = ShapeCatalog::inventory();
+        let shape = |n: &str| *inv.iter().find(|s| s.name == n).expect("shape by name");
+
+        let comm = shape("commutativity");
+        assert_eq!(
+            comm.instantiate(&[("op", "grant")]),
+            "grant gives the same result in either order."
+        );
+        assert!(comm.matches(&comm.instantiate(&[("op", "grant")])));
+
+        // a two-hole template fills BOTH holes (and `{const}` everywhere it appears).
+        let annihilation = shape("annihilation");
+        assert_eq!(
+            annihilation.instantiate(&[("op", "Multiplication"), ("const", "0")]),
+            "Multiplication by 0 always gives 0."
+        );
+
+        // an unnamed hole is left intact — instantiate substitutes, it never invents.
+        assert_eq!(
+            annihilation.instantiate(&[("op", "spend")]),
+            "spend by {const} always gives {const}."
+        );
+    }
+
+    /// The DATA gate admits every law the CODE gate fires — the two sides of `ShapeInfo`
+    /// cannot drift: across all four registry theories, every discovered law's fingerprint
+    /// signatures satisfy its shape's `gate_slots`. (Fingerprints shorter than the slot list
+    /// — coincident slots, dedup'd, e.g. a self-homomorphism — are exempt: the fingerprint
+    /// cannot say which slots coincided.)
+    #[test]
+    fn every_discovered_law_satisfies_its_shapes_data_gate() {
+        fn check<T: Theory>() {
+            let engine = Engine::<T>::new();
+            let sigs = engine.signatures();
+            let symbols: Vec<&'static str> = sigs.iter().map(|(s, _, _)| *s).collect();
+            let inventory = ShapeCatalog::inventory();
+            for law in engine.discover().laws {
+                let shape = inventory
+                    .iter()
+                    .find(|s| s.name == law.shape)
+                    .expect("every law's shape is ratified");
+                let ops = law.ops(&symbols);
+                if ops.len() != shape.gate_slots.slots.len() {
+                    continue;
+                }
+                let gate_sigs: Vec<(Vec<T::Sort>, T::Sort)> = ops
+                    .iter()
+                    .map(|sym| {
+                        let (_, inputs, output) =
+                            sigs.iter().find(|(s, _, _)| s == sym).expect("known op");
+                        (inputs.clone(), *output)
+                    })
+                    .collect();
+                if let Err(why) = shape.gate_slots.admit(&gate_sigs, &ops) {
+                    panic!(
+                        "law `{}` ({}) violates its shape's data gate: {why} — \
+                         templates() and gate_slots have come apart",
+                        law.prose, law.shape
+                    );
+                }
+            }
+        }
+        check::<crate::discover::arithmetic::Arithmetic>();
+        check::<crate::discover::router::Router>();
+        check::<crate::discover::date::Calendar>();
+        check::<crate::kvstore::theory::TtlStore>();
+    }
+
+    /// The gate REFUSES what its shape cannot range over, naming the fault — the checker's
+    /// own kill power: wrong slot kind, unbound-sort mismatch, a required distinction
+    /// collapsed (same operator twice; an action whose parameter is its carrier).
+    #[test]
+    fn the_data_gate_refuses_misdeclarations_by_name() {
+        let inv = ShapeCatalog::inventory();
+        let gate = |n: &str| inv.iter().find(|s| s.name == n).expect("shape").gate_slots;
+        // sorts as plain tokens — the checker is generic over them.
+        let binary = (vec!["s", "s"], "s");
+        let unary_st = (vec!["s"], "t");
+        let constant_t = (Vec::<&str>::new(), "t");
+
+        let err = gate("commutativity")
+            .admit(std::slice::from_ref(&unary_st), &["esc"])
+            .expect_err("a unary is not a binary");
+        assert!(err.contains("`esc` must be a homogeneous binary"));
+
+        let err = gate("identity")
+            .admit(&[binary.clone(), constant_t.clone()], &["pool", "unit"])
+            .expect_err("the constant's sort must match the binary's");
+        assert!(err.contains("`unit` must be a nullary constant"));
+
+        let err = gate("distributivity")
+            .admit(&[binary.clone(), binary.clone()], &["pool", "pool"])
+            .expect_err("distributivity needs two DIFFERENT binaries");
+        assert!(err.contains("must be different operators"));
+
+        let err = gate("action identity")
+            .admit(&[(vec!["s", "s"], "s"), (vec![], "s")], &["bump", "unit"])
+            .expect_err("an action's parameter sort must differ from its carrier");
+        assert!(err.contains("must be distinct"));
+
+        // and the happy paths admit.
+        assert_eq!(
+            gate("homomorphism").admit(
+                &[unary_st, (vec!["s", "s"], "s"), (vec!["t", "t"], "t")],
+                &["esc", "cat", "glue"],
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            gate("round-trip").admit(&[(vec!["t"], "s"), (vec!["s"], "t")], &["unesc", "esc"],),
+            Ok(())
+        );
     }
 
     /// THE LOCK: the catalog's deterministic rendering matches the committed, ratified

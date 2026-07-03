@@ -20,11 +20,18 @@
 //! ```text
 //! system   := "name" ":" LitStr ","  values  modules  seams?
 //! values   := "values"  "{" value+ "}"
-//! value    := Ident "=" Path "where" LitStr ";"
-//!             — a value object: its name, its raw representation (a PLAIN path — no generics
-//!               in v1), and its validity rule. The `where` string is a HOLE: prose carried
-//!               verbatim into the generated stubs as a doc'd `todo!()` predicate. Genesis
-//!               never generates meaning.
+//! value    := Ident "=" Type "where" rule ";"
+//! rule     := LitStr
+//!           | Int "..=" Int ("saturating")?
+//!             — a value object: its name, its raw representation (any Rust type), and its
+//!               validity rule. A PROSE rule (the string form) is a HOLE: words carried
+//!               verbatim into the generated stubs as doc'd `todo!()`s — genesis never
+//!               generates meaning. A STRUCTURED rule is tokens, not words, so everything it
+//!               mechanically implies is GENERATED rather than left for the author to
+//!               re-derive by hand: an integer range emits the validity predicate and the
+//!               edge-seeking `Shaped` grid, and naming the `saturating` re-entry policy
+//!               additionally emits the clamping `mint` (the policy is meaning — clamp vs
+//!               reject vs panic — so an unnamed policy leaves `mint` a hole).
 //! modules  := "modules" "{" module+ "}"
 //! module   := Ident "{" ops expects? "}"
 //! ops      := "ops" "{" op+ "}"
@@ -32,20 +39,31 @@
 //!             — an operator signature over declared value names. Zero inputs declares a
 //!               CONSTANT (a nullary operator, e.g. `zero() -> Credits`).
 //! expects  := "expects" "{" expect+ "}"
-//! expect   := shape "(" Ident ("," Ident)? ")" ";"
-//! shape    := "commutative" | "associative" | "idempotent" | "bias_later" | "bias_earlier"
-//!           | "identity" | "annihilation"
-//!             — the declared LAW EXPECTATIONS, a subset of the engine's shape catalog
-//!               (`ShapeCatalog::inventory`) restricted to homogeneous binary operators:
-//!               one-argument shapes take the operator; `identity`/`annihilation` take the
-//!               operator and a declared nullary constant of its sort. The keys are the same
-//!               ones `discover::expect` and the `#[algebra]` macro's `expects(...)` speak.
+//! expect   := shape "(" Ident ("," Ident)* ")" ";"
+//! shape    := any `discover::expect` declaration key except "irreflexive"
+//!             — the declared LAW EXPECTATIONS: the engine's WHOLE ratified shape catalog
+//!               (`ShapeCatalog::inventory`), each line validated against the shape's DATA
+//!               gate (`ShapeGate::admit`) — the same gate discovery tries operators
+//!               against, so declarable and discoverable are one vocabulary. Arities and
+//!               sort relations come from the gate: `commutative(op)`,
+//!               `identity(op, constant)`, `monoid_action(action, combiner)`,
+//!               `round_trip(outer, inner)`, `homomorphism(conversion, from_op, to_op)`, …
+//!               (`irreflexive` alone is refused here: its witness constant must render as
+//!               `false`, which no operator identifier can spell — declare
+//!               `self_application` or leave it to discovery.) The keys are the same ones
+//!               `discover::expect` and the `#[algebra]` macro's `expects(...)` speak.
 //! seams    := "seams" "{" seam* "}"
-//! seam     := Ident "--" Ident ":" ("transport" | "transform") "on" Ident ";"
+//! seam     := Ident "--" Ident ":" ("transport" | "transform") "on" Ident ("via" Ident)? ";"
 //!             — a declared seam between two modules on a shared value: `transport` promises
 //!               the sort is the SAME type on both sides (discharged by construction — genesis
 //!               defines each value once); `transform` promises a conversion that must be a
-//!               HOMOMORPHISM, emitted as a test obligation.
+//!               HOMOMORPHISM. Naming the conversion (`via h`, a declared unary operator from
+//!               the seam's value into the other side's) turns the whole obligation into
+//!               STRUCTURE: genesis emits the seam's SPANNING theory (source operator,
+//!               conversion, target operator, with the homomorphism expectation riding the
+//!               attribute), compiles the seam into the `system!` graph, gates the declared
+//!               law in `tests/expectations.rs`, and renders the preserved stanza into the
+//!               system target lock. Unnamed, the obligation stays a `tests/seams.rs` hole.
 //! ```
 //!
 //! # The output is the fixture's shape
@@ -91,14 +109,17 @@ use syn::punctuated::Punctuated;
 use syn::{braced, parenthesized, Ident, LitStr, Token};
 
 use crate::discover::architect::{Architect, CodeAction, FileEdit};
+use crate::discover::engine::{ShapeCatalog, ShapeInfo};
+use crate::discover::expect::Expectation;
 
 // ===== the parse-side representation ========================================================
 //
-// Deliberately OURS and minimal: the runtime expectations vocabulary (`discover::expect` + the
-// `#[algebra]` macro's `expects(...)`) grew concurrently with this module, so genesis keeps its
-// own parse-side `Expect` rather than coupling to those types mid-flight. The declaration KEYS
-// (`commutative`, ..., `identity`, `annihilation`) and the emitted attribute syntax are kept
-// identical to that vocabulary; unifying the two representations is a deliberate follow-up.
+// Declared law expectations are NOT genesis's own vocabulary: a parsed `expects { ... }` line
+// becomes a `discover::expect::Expectation` — the same value the `theory!` macro's clause and
+// `#[algebra(..., expects(...))]` construct, and the same identity a discovered law carries.
+// Genesis only restricts WHICH shapes v1 admits (`V1_EXPECT_KEYS`: the catalog's homogeneous
+// binary rows) and renders the target-lock law lines through the catalog's own prose
+// templates (`ShapeInfo::instantiate`), so declared and discovered cannot drift apart.
 
 /// The whole parsed declaration — everything `system! { ... }` states.
 pub struct SystemDecl {
@@ -112,19 +133,51 @@ pub struct SystemDecl {
     pub seams: Vec<SeamDecl>,
 }
 
-/// One value object: name, raw representation, and the validity-rule HOLE (prose, carried
-/// verbatim — meaning is never generated).
+/// One value object: name, raw representation (any Rust type, rendered back to text), and
+/// its validity rule.
 pub struct ValueDecl {
     pub name: String,
     pub raw: String,
-    pub validity: String,
+    pub rule: Rule,
+}
+
+/// A declared validity rule. PROSE is a hole (meaning is never generated from words);
+/// a STRUCTURED rule is tokens, so the artifacts it mechanically implies are generated —
+/// re-deriving them by hand would be exactly the transcription genesis exists to delete.
+pub enum Rule {
+    /// Words, carried verbatim into doc'd `todo!()` holes.
+    Prose(String),
+    /// An inclusive integer range `lo..=hi`; `saturating` names the re-entry policy (the
+    /// interior `mint` clamps). Without the policy the predicate and the edge-seeking grid
+    /// are still generated, but `mint` stays a hole — clamp vs reject vs panic is meaning.
+    Range {
+        lo: i128,
+        hi: i128,
+        saturating: bool,
+    },
+}
+
+impl Rule {
+    /// The rule as one doc-safe line — what the generated doc comments and hole messages
+    /// quote (`0..=20 (saturating)`, or the prose itself).
+    fn doc(&self) -> String {
+        match self {
+            Rule::Prose(words) => doc_safe(words),
+            Rule::Range {
+                lo,
+                hi,
+                saturating: true,
+            } => format!("{lo}..={hi} (saturating)"),
+            Rule::Range { lo, hi, .. } => format!("{lo}..={hi}"),
+        }
+    }
 }
 
 /// One module: its operators and its declared law expectations.
 pub struct ModuleDecl {
     pub name: String,
     pub ops: Vec<OpDecl>,
-    pub expects: Vec<Expect>,
+    pub expects: Vec<Expectation>,
 }
 
 /// One operator signature over declared value names. Zero inputs is a constant.
@@ -134,25 +187,17 @@ pub struct OpDecl {
     pub output: String,
 }
 
-/// A declared law expectation — genesis's own minimal parse-side vocabulary: the homogeneous
-/// binary rows of the engine's `ShapeCatalog`, under the same keys `discover::expect` speaks
-/// (a follow-up unifies the two representations).
-pub enum Expect {
-    Commutative { op: String },
-    Associative { op: String },
-    Idempotent { op: String },
-    BiasLater { op: String },
-    BiasEarlier { op: String },
-    Identity { op: String, konst: String },
-    Annihilating { op: String, konst: String },
-}
-
-/// A declared seam between two modules on a shared value.
+/// A declared seam between two modules on a shared value. A TRANSFORM seam may name the
+/// conversion that crosses it (`via h`) — with the conversion named, the whole obligation
+/// becomes structure genesis can emit (a spanning theory, a compiled seam, a verdict test);
+/// without it, the obligation stays a meaning hole in `tests/seams.rs`.
 pub struct SeamDecl {
     pub left: String,
     pub right: String,
     pub kind: SeamKindDecl,
     pub on: String,
+    /// The crossing conversion's operator name (transform seams only).
+    pub via: Option<String>,
 }
 
 /// The declared seam kind (parse-side twin of `cohesion::SeamKind`).
@@ -164,101 +209,79 @@ pub enum SeamKindDecl {
     Transform,
 }
 
-impl Expect {
-    /// The operator the expectation is about.
-    pub fn op(&self) -> &str {
-        match self {
-            Expect::Commutative { op }
-            | Expect::Associative { op }
-            | Expect::Idempotent { op }
-            | Expect::BiasLater { op }
-            | Expect::BiasEarlier { op }
-            | Expect::Identity { op, .. }
-            | Expect::Annihilating { op, .. } => op,
-        }
-    }
+/// The catalog row a (validated) expectation instantiates.
+fn shape_info(e: &Expectation) -> ShapeInfo {
+    ShapeCatalog::inventory()
+        .into_iter()
+        .find(|shape| shape.name == e.shape)
+        .expect("an Expectation's shape is always a ratified catalog name")
+}
 
-    /// Every operator name the expectation mentions (the op, plus the constant if any) — what
-    /// the target lock's coverage line counts as "participates in a law".
-    pub fn mentions(&self) -> Vec<&str> {
-        match self {
-            Expect::Identity { op, konst } | Expect::Annihilating { op, konst } => {
-                vec![op, konst]
-            }
-            other => vec![other.op()],
-        }
-    }
+/// The shape-catalog rank — the order the engine tries (and therefore renders) the shapes, so
+/// the target lock's law order matches a discovery that confirms the declaration.
+fn shape_rank(e: &Expectation) -> usize {
+    ShapeCatalog::inventory()
+        .iter()
+        .position(|shape| shape.name == e.shape)
+        .expect("an Expectation's shape is always a ratified catalog name")
+}
 
-    /// The expectation exactly as declared — `commutative(grant)` — for the pass-through into
-    /// the generated `#[algebra(..., expects(...))]` attribute.
-    pub fn as_written(&self) -> String {
-        match self {
-            Expect::Commutative { op } => format!("commutative({op})"),
-            Expect::Associative { op } => format!("associative({op})"),
-            Expect::Idempotent { op } => format!("idempotent({op})"),
-            Expect::BiasLater { op } => format!("bias_later({op})"),
-            Expect::BiasEarlier { op } => format!("bias_earlier({op})"),
-            Expect::Identity { op, konst } => format!("identity({op}, {konst})"),
-            Expect::Annihilating { op, konst } => format!("annihilation({op}, {konst})"),
+/// The declared law as the lock will state it: `(prose, equation)`. The PROSE is the ratified
+/// shape catalog's own template (`ShapeInfo::instantiate`) — one source, never restated — over
+/// the declared names; the EQUATION is the canonical form the engine renders for the shape's
+/// discovered instance over an `#[algebra]` theory: default variable names (`x`, `y`, `z` per
+/// sort), binaries infix under their own names, unaries prefix. The dynamic sync test
+/// (`the_target_lock_reproduces_discovery_byte_for_byte`) holds every arm to the freeze's
+/// actual render.
+fn law(e: &Expectation) -> (String, String) {
+    let op = e.ops[0].as_str();
+    let subs: Vec<(&str, &str)> = match e.shape {
+        "identity" | "annihilation" | "action identity" | "self-application" => {
+            vec![("op", op), ("const", e.ops[1].as_str())]
         }
-    }
-
-    /// The shape-catalog rank — the order the engine tries (and therefore renders) the shapes,
-    /// so the target lock's law order matches a discovery that confirms the declaration.
-    fn rank(&self) -> usize {
-        match self {
-            Expect::Commutative { .. } => 0,
-            Expect::Associative { .. } => 1,
-            Expect::Idempotent { .. } => 2,
-            Expect::BiasLater { .. } => 3,
-            Expect::BiasEarlier { .. } => 4,
-            Expect::Identity { .. } => 5,
-            Expect::Annihilating { .. } => 6,
+        "distributivity" | "absorption" | "monoid action" | "round-trip" => {
+            vec![("op", op), ("other", e.ops[1].as_str())]
         }
-    }
-
-    /// The declared law as the lock will state it: `(prose, equation)`, instantiated from the
-    /// shape catalog's templates over the engine's default variable names (`x`, `y`, `z`) and
-    /// the operator rendered infix under its own name — exactly how a `#[algebra]` theory's
-    /// discovered spec renders.
-    fn law(&self) -> (String, String) {
-        match self {
-            Expect::Commutative { op } => (
-                format!("{op} gives the same result in either order."),
-                format!("(x {op} y) = (y {op} x)"),
-            ),
-            Expect::Associative { op } => (
-                format!("With {op}, the grouping of three values doesn't matter."),
-                format!("((x {op} y) {op} z) = (x {op} (y {op} z))"),
-            ),
-            Expect::Idempotent { op } => (
-                format!("{op} of a value with itself gives that value."),
-                format!("(x {op} x) = x"),
-            ),
-            Expect::BiasLater { op } => (
-                format!(
-                    "With {op}, the later operand wins where the two disagree — re-applying \
-                     an earlier one cannot overwrite it."
-                ),
-                format!("((x {op} y) {op} x) = (y {op} x)"),
-            ),
-            Expect::BiasEarlier { op } => (
-                format!(
-                    "With {op}, the earlier operand wins where the two disagree — a later \
-                     one cannot overwrite it."
-                ),
-                format!("((x {op} y) {op} x) = (x {op} y)"),
-            ),
-            Expect::Identity { op, konst } => (
-                format!("{op} with {konst} leaves a value unchanged."),
-                format!("({konst} {op} x) = x"),
-            ),
-            Expect::Annihilating { op, konst } => (
-                format!("{op} by {konst} always gives {konst}."),
-                format!("({konst} {op} x) = {konst}"),
-            ),
+        "homomorphism" => vec![
+            ("op", op),
+            ("other", e.ops[1].as_str()),
+            ("via", e.ops[2].as_str()),
+        ],
+        _ => vec![("op", op)],
+    };
+    let prose = shape_info(e).instantiate(&subs);
+    let equation = match e.shape {
+        "commutativity" => format!("(x {op} y) = (y {op} x)"),
+        "associativity" => format!("((x {op} y) {op} z) = (x {op} (y {op} z))"),
+        "idempotence" => format!("(x {op} x) = x"),
+        "bias (right-regular)" => format!("((x {op} y) {op} x) = (y {op} x)"),
+        "bias (left-regular)" => format!("((x {op} y) {op} x) = (x {op} y)"),
+        "identity" => format!("({} {op} x) = x", e.ops[1]),
+        "annihilation" => format!("({konst} {op} x) = {konst}", konst = e.ops[1]),
+        "distributivity" => {
+            format!(
+                "(x {op} (y {g} z)) = ((x {op} y) {g} (x {op} z))",
+                g = e.ops[1]
+            )
         }
-    }
+        "absorption" => format!("(x {op} (x {g} y)) = x", g = e.ops[1]),
+        "action identity" => format!("(x {op} {e}) = x", e = e.ops[1]),
+        "monoid action" => {
+            format!("((x {op} x) {op} y) = (x {op} (x {g} y))", g = e.ops[1])
+        }
+        "self-application" => format!("(x {op} x) = {c}", c = e.ops[1]),
+        "involution" => format!("{op}({op}(x)) = x"),
+        "round-trip" => format!("{op}({f}(x)) = x", f = e.ops[1]),
+        "homomorphism" => {
+            format!(
+                "{op}((x {p} y)) = ({op}(x) {q} {op}(y))",
+                p = e.ops[1],
+                q = e.ops[2]
+            )
+        }
+        other => unreachable!("genesis refuses `{other}` at parse time"),
+    };
+    (prose, equation)
 }
 
 /// Where the generated crate's dependencies point — the flag `cargo run --example genesis`
@@ -282,35 +305,66 @@ mod kw {
     syn::custom_keyword!(on);
     syn::custom_keyword!(transport);
     syn::custom_keyword!(transform);
+    syn::custom_keyword!(via);
 }
 
-/// A plain path's text (`std::string::String` → the joined segments). Generic arguments are a
-/// v1 refusal — the raw representation must be a bare named type.
-fn path_text(path: &syn::Path) -> syn::Result<String> {
-    let mut segments = Vec::new();
-    for seg in &path.segments {
-        if !seg.arguments.is_none() {
-            return Err(syn::Error::new_spanned(
-                seg,
-                "v1 raw types are plain paths — no generic arguments",
-            ));
-        }
-        segments.push(seg.ident.to_string());
+/// A raw type's canonical text: `quote`'s token render with its inter-token spacing
+/// collapsed back to source form (`Vec < u8 >` → `Vec<u8>`), so the generated newtypes read
+/// as written.
+fn type_text(ty: &syn::Type) -> String {
+    quote::quote!(#ty)
+        .to_string()
+        .replace(" :: ", "::")
+        .replace("< ", "<")
+        .replace(" <", "<")
+        .replace(" >", ">")
+        .replace("( ", "(")
+        .replace(" )", ")")
+        .replace(" ,", ",")
+}
+
+/// One end of a range rule: an integer literal, optionally negated.
+fn parse_bound(input: ParseStream) -> syn::Result<i128> {
+    let negative = input.peek(Token![-]);
+    if negative {
+        input.parse::<Token![-]>()?;
     }
-    Ok(segments.join("::"))
+    let lit: syn::LitInt = input.parse()?;
+    let magnitude: i128 = lit.base10_parse()?;
+    Ok(if negative { -magnitude } else { magnitude })
 }
 
 fn parse_value(input: ParseStream) -> syn::Result<ValueDecl> {
     let name: Ident = input.parse()?;
     input.parse::<Token![=]>()?;
-    let raw: syn::Path = input.parse()?;
+    let raw: syn::Type = input.parse()?;
     input.parse::<Token![where]>()?;
-    let validity: LitStr = input.parse()?;
+    let rule = if input.peek(LitStr) {
+        Rule::Prose(input.parse::<LitStr>()?.value())
+    } else {
+        let lo = parse_bound(input)?;
+        input.parse::<Token![..=]>()?;
+        let hi = parse_bound(input)?;
+        let saturating = input.peek(syn::Ident) && {
+            let policy: Ident = input.parse()?;
+            if policy != "saturating" {
+                return Err(syn::Error::new(
+                    policy.span(),
+                    format!(
+                        "unknown re-entry policy `{policy}` — the structured vocabulary is \
+                         `saturating` (or omit the policy to leave `mint` a hole)"
+                    ),
+                ));
+            }
+            true
+        };
+        Rule::Range { lo, hi, saturating }
+    };
     input.parse::<Token![;]>()?;
     Ok(ValueDecl {
         name: name.to_string(),
-        raw: path_text(&raw)?,
-        validity: validity.value(),
+        raw: type_text(&raw),
+        rule,
     })
 }
 
@@ -329,40 +383,68 @@ fn parse_op(input: ParseStream) -> syn::Result<OpDecl> {
     })
 }
 
-fn parse_expect(input: ParseStream) -> syn::Result<Expect> {
+fn parse_expect(input: ParseStream) -> syn::Result<Expectation> {
     let shape: Ident = input.parse()?;
     let args;
     parenthesized!(args in input);
     let idents: Punctuated<Ident, Token![,]> = args.parse_terminated(Ident::parse, Token![,])?;
     input.parse::<Token![;]>()?;
     let names: Vec<String> = idents.iter().map(Ident::to_string).collect();
-    let expect = match (shape.to_string().as_str(), names.as_slice()) {
-        ("commutative", [op]) => Expect::Commutative { op: op.clone() },
-        ("associative", [op]) => Expect::Associative { op: op.clone() },
-        ("idempotent", [op]) => Expect::Idempotent { op: op.clone() },
-        ("bias_later", [op]) => Expect::BiasLater { op: op.clone() },
-        ("bias_earlier", [op]) => Expect::BiasEarlier { op: op.clone() },
-        ("identity", [op, konst]) => Expect::Identity {
-            op: op.clone(),
-            konst: konst.clone(),
-        },
-        ("annihilation", [op, konst]) => Expect::Annihilating {
-            op: op.clone(),
-            konst: konst.clone(),
-        },
-        (other, args) => {
-            return Err(syn::Error::new(
-                shape.span(),
-                format!(
-                    "unknown expectation `{other}` with {} argument(s); the v1 vocabulary is \
-                     commutative(op), associative(op), idempotent(op), bias_later(op), \
-                     bias_earlier(op), identity(op, const), annihilation(op, const)",
-                    args.len()
-                ),
-            ))
-        }
+    if shape == "irreflexive" {
+        // Declarable in `#[algebra]` (its witness constant is a string literal there), but
+        // not here: the shape's witness must RENDER as `false`, and no genesis operator
+        // identifier can spell that keyword. Refuse with the alternative named.
+        return Err(syn::Error::new(
+            shape.span(),
+            "`irreflexive` is not declarable in a genesis declaration — its witness constant \
+             must render as `false`, which no operator identifier can spell. Declare \
+             `self_application(op, constant)` instead, or leave the law to discovery",
+        ));
+    }
+    // arity per key, from the catalog's DATA gate — the same source validation checks.
+    let arity_of = |key: &'static str| {
+        let canonical = Expectation::canonical(key).expect("vocabulary key");
+        ShapeCatalog::inventory()
+            .into_iter()
+            .find(|info| info.name == canonical)
+            .map(|info| info.gate_slots.slots.len())
+            .expect("the vocabulary and the catalog move in lockstep")
     };
-    Ok(expect)
+    let key = Expectation::vocabulary_keys()
+        .into_iter()
+        .find(|key| shape == key && arity_of(key) == names.len());
+    let Some(key) = key else {
+        let vocabulary: Vec<String> = Expectation::vocabulary_keys()
+            .into_iter()
+            .filter(|key| *key != "irreflexive")
+            .map(|key| format!("{key}/{}", arity_of(key)))
+            .collect();
+        return Err(syn::Error::new(
+            shape.span(),
+            format!(
+                "unknown expectation `{shape}` with {} argument(s); the declarable vocabulary \
+                 (key/arity) is {}",
+                names.len(),
+                vocabulary.join(", ")
+            ),
+        ));
+    };
+    let mut distinct = names.clone();
+    distinct.sort();
+    distinct.dedup();
+    if distinct.len() != names.len() {
+        // `Expectation` normalises to DISTINCT names (a discovered law's fingerprint does
+        // the same), so a repeated name would silently drop a slot — refuse it.
+        return Err(syn::Error::new(
+            shape.span(),
+            format!(
+                "expectation `{shape}({})` names the same operator twice — each slot needs a \
+                 distinct operator in a genesis declaration",
+                names.join(", ")
+            ),
+        ));
+    }
+    Ok(Expectation::of(key, names))
 }
 
 fn parse_module(input: ParseStream) -> syn::Result<ModuleDecl> {
@@ -414,12 +496,26 @@ fn parse_seam(input: ParseStream) -> syn::Result<SeamDecl> {
     };
     input.parse::<kw::on>()?;
     let on: Ident = input.parse()?;
+    let via = if input.peek(kw::via) {
+        let via_kw = input.parse::<kw::via>()?;
+        if kind == SeamKindDecl::Transport {
+            return Err(syn::Error::new(
+                via_kw.span,
+                "only a transform seam names a conversion — a transport seam shares the one \
+                 type unchanged",
+            ));
+        }
+        Some(input.parse::<Ident>()?.to_string())
+    } else {
+        None
+    };
     input.parse::<Token![;]>()?;
     Ok(SeamDecl {
         left: left.to_string(),
         right: right.to_string(),
         kind,
         on: on.to_string(),
+        via,
     })
 }
 
@@ -527,6 +623,30 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
         if !value_names.insert(v.name.as_str()) {
             return err(format!("value `{}` is declared twice", v.name));
         }
+        if let Rule::Range { lo, hi, .. } = &v.rule {
+            const SIGNED: &[&str] = &["i8", "i16", "i32", "i64", "i128", "isize"];
+            const UNSIGNED: &[&str] = &["u8", "u16", "u32", "u64", "u128", "usize"];
+            let raw = v.raw.as_str();
+            if !SIGNED.contains(&raw) && !UNSIGNED.contains(&raw) {
+                return err(format!(
+                    "value `{}` declares a range rule, but its raw type `{raw}` is not a \
+                     primitive integer — write the rule as prose (a hole) instead",
+                    v.name
+                ));
+            }
+            if UNSIGNED.contains(&raw) && *lo < 0 {
+                return err(format!(
+                    "value `{}` ranges from {lo}, but `{raw}` is unsigned",
+                    v.name
+                ));
+            }
+            if lo > hi {
+                return err(format!(
+                    "value `{}` declares the empty range {lo}..={hi}",
+                    v.name
+                ));
+            }
+        }
     }
 
     let mut module_names = BTreeSet::new();
@@ -567,41 +687,26 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
             }
         }
         for e in &m.expects {
-            let Some(op) = m.ops.iter().find(|o| o.name == e.op()) else {
-                return err(format!(
-                    "expectation `{}` names `{}`, which module `{}` does not declare",
-                    e.as_written(),
-                    e.op(),
-                    m.name
-                ));
-            };
-            let homogeneous_binary =
-                op.inputs.len() == 2 && op.inputs[0] == op.output && op.inputs[1] == op.output;
-            if !homogeneous_binary {
-                return err(format!(
-                    "expectation `{}` needs a homogeneous binary operator (s × s → s); \
-                     `{}` is `{}({}) -> {}`",
-                    e.as_written(),
-                    op.name,
-                    op.name,
-                    op.inputs.join(", "),
-                    op.output
-                ));
-            }
-            if let Expect::Identity { konst, .. } | Expect::Annihilating { konst, .. } = e {
-                let ok = m
-                    .ops
-                    .iter()
-                    .any(|o| o.name == *konst && o.inputs.is_empty() && o.output == op.output);
-                if !ok {
+            // every named operator must be this module's; then the shape's DATA gate — the
+            // same one discovery tries operators against — judges the signatures.
+            let mut sigs: Vec<(Vec<String>, String)> = Vec::new();
+            for op_name in &e.ops {
+                let Some(op) = m.ops.iter().find(|o| o.name == *op_name) else {
                     return err(format!(
-                        "expectation `{}` needs `{konst}` to be a declared constant \
-                         (a nullary operator) of sort `{}` in module `{}`",
-                        e.as_written(),
-                        op.output,
+                        "expectation `{}` names `{op_name}`, which module `{}` does not declare",
+                        e.render(),
                         m.name
                     ));
-                }
+                };
+                sigs.push((op.inputs.clone(), op.output.clone()));
+            }
+            let names: Vec<&str> = e.ops.iter().map(String::as_str).collect();
+            if let Err(why) = shape_info(e).gate_slots.admit(&sigs, &names) {
+                return err(format!(
+                    "expectation `{}` in module `{}`: {why}",
+                    e.render(),
+                    m.name
+                ));
             }
         }
     }
@@ -634,26 +739,133 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
                 s.on
             ));
         }
-        for side in [&s.left, &s.right] {
-            let module = sys
-                .modules
-                .iter()
-                .find(|m| m.name == *side)
-                .expect("checked");
-            let touches = module
-                .ops
-                .iter()
-                .any(|op| op.inputs.iter().any(|t| t == &s.on) || op.output == s.on);
-            if !touches {
+        if let Some(via) = &s.via {
+            // a NAMED conversion: the seam becomes emit-able structure, so its pieces are
+            // validated here — the conversion itself and the one endpoint binary per side
+            // the spanning theory will carry.
+            let module = |name: &String| {
+                sys.modules
+                    .iter()
+                    .find(|m| m.name == *name)
+                    .expect("checked above")
+            };
+            let (left, right) = (module(&s.left), module(&s.right));
+            let Some(h) = left.ops.iter().chain(&right.ops).find(|o| o.name == *via) else {
                 return err(format!(
-                    "seam on `{}` claims module `{side}` shares it, but no operator of \
-                     `{side}` touches it",
+                    "seam `{} -- {}` names conversion `{via}`, which neither module declares",
+                    s.left, s.right
+                ));
+            };
+            if h.inputs.len() != 1 {
+                return err(format!(
+                    "seam conversion `{via}` must be unary — `{via}({}) -> {}` is not a \
+                     conversion",
+                    h.inputs.join(", "),
+                    h.output
+                ));
+            }
+            if h.inputs[0] != s.on {
+                return err(format!(
+                    "seam conversion `{via}` converts from `{}`, but the seam is on `{}`",
+                    h.inputs[0], s.on
+                ));
+            }
+            if h.output == s.on {
+                return err(format!(
+                    "seam conversion `{via}` returns `{}` — a transform must land on a \
+                     DIFFERENT value than it leaves",
                     s.on
                 ));
+            }
+            let from: Vec<&OpDecl> = left
+                .ops
+                .iter()
+                .filter(|o| is_binary_on_value(o, &s.on))
+                .collect();
+            let to: Vec<&OpDecl> = right
+                .ops
+                .iter()
+                .filter(|o| is_binary_on_value(o, &h.output))
+                .collect();
+            for (found, side, sort) in [(&from, &s.left, &s.on), (&to, &s.right, &h.output)] {
+                if found.len() != 1 {
+                    return err(format!(
+                        "the `{} -- {}` seam needs module `{side}` to declare exactly one \
+                         homogeneous binary on `{sort}` for the homomorphism (found {})",
+                        s.left,
+                        s.right,
+                        found.len()
+                    ));
+                }
+            }
+        } else {
+            for side in [&s.left, &s.right] {
+                let module = sys
+                    .modules
+                    .iter()
+                    .find(|m| m.name == *side)
+                    .expect("checked");
+                let touches = module
+                    .ops
+                    .iter()
+                    .any(|op| op.inputs.iter().any(|t| t == &s.on) || op.output == s.on);
+                if !touches {
+                    return err(format!(
+                        "seam on `{}` claims module `{side}` shares it, but no operator of \
+                         `{side}` touches it",
+                        s.on
+                    ));
+                }
             }
         }
     }
     Ok(())
+}
+
+/// Is `op` a homogeneous binary over declared value `v` (`v × v → v`)?
+fn is_binary_on_value(op: &OpDecl, v: &str) -> bool {
+    op.inputs.len() == 2 && op.inputs[0] == v && op.inputs[1] == v && op.output == v
+}
+
+/// The resolved pieces of a `via` transform seam — the conversion and the two endpoint
+/// binaries the spanning theory carries: `(h, from_op, to_op)`. Only callable on a
+/// VALIDATED system (every lookup was checked by `validate`).
+fn via_seam_parts<'a>(sys: &'a SystemDecl, s: &SeamDecl) -> (&'a OpDecl, &'a OpDecl, &'a OpDecl) {
+    let module = |name: &String| {
+        sys.modules
+            .iter()
+            .find(|m| m.name == *name)
+            .expect("validated: seam modules exist")
+    };
+    let (left, right) = (module(&s.left), module(&s.right));
+    let via = s.via.as_deref().expect("a via seam");
+    let h = left
+        .ops
+        .iter()
+        .chain(&right.ops)
+        .find(|o| o.name == via)
+        .expect("validated: the conversion is declared");
+    let from = left
+        .ops
+        .iter()
+        .find(|o| is_binary_on_value(o, &s.on))
+        .expect("validated: exactly one source binary");
+    let to = right
+        .ops
+        .iter()
+        .find(|o| is_binary_on_value(o, &h.output))
+        .expect("validated: exactly one target binary");
+    (h, from, to)
+}
+
+/// A `via` seam's spanning-theory naming: `(ops module, theory marker, display name)` —
+/// `meter`/`billing` → (`meter_billing_seam_ops`, `MeterBillingSeam`, "meter-billing seam").
+fn seam_theory_names(s: &SeamDecl) -> (String, String, String) {
+    (
+        format!("{}_{}_seam_ops", s.left, s.right),
+        format!("{}{}Seam", camel(&s.left), camel(&s.right)),
+        format!("{}-{} seam", s.left, s.right),
+    )
 }
 
 // ===== naming and placement =================================================================
@@ -724,9 +936,9 @@ fn banner(app: &str) -> String {
 
 /// The expectations that name `op` as their operator, in shape-catalog order — for doc lines
 /// and the target lock.
-fn expects_for<'a>(m: &'a ModuleDecl, op: &str) -> Vec<&'a Expect> {
-    let mut found: Vec<&Expect> = m.expects.iter().filter(|e| e.op() == op).collect();
-    found.sort_by_key(|e| e.rank());
+fn expects_for<'a>(m: &'a ModuleDecl, op: &str) -> Vec<&'a Expectation> {
+    let mut found: Vec<&Expectation> = m.expects.iter().filter(|e| e.ops[0] == op).collect();
+    found.sort_by_key(|e| shape_rank(e));
     found
 }
 
@@ -835,8 +1047,11 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
     out.push_str(
         "//! * [`ops`] (ALGEBRA) — each module's operators as an `#[algebra]` theory; the declared\n\
          //!   expectations ride the attribute, and discovery must re-earn them.\n\
-         //! * `spec/` — TARGET locks: the DECLARED laws in the exact lock format, committed RED\n\
-         //!   on purpose. The drift gate stays red until discovery matches the declaration.\n\
+         //! * [`system`] (ALGEBRA) — the COMPILED `system!` graph: the module registry (the graph\n\
+         //!   IS the registry the freeze loop reads) and the declared seams with their checkers.\n\
+         //! * `spec/` — TARGET locks: the DECLARED laws (and the declared seam graph) in the exact\n\
+         //!   lock format, committed RED on purpose. The drift gate stays red until discovery\n\
+         //!   matches the declaration.\n\
          //!\n\
          //! ## The runbook — from generated skeleton to ratified system\n\
          //!\n\
@@ -846,8 +1061,10 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
     out.push_str(&format!(
         "//! 2. First build: `{bless}=1 cargo build` — mints `spec/qualify.spec`, which the\n\
          //!    enforcement shim (`build.rs`) drift-gates from then on.\n\
-         //! 3. `cargo test` — the freeze gate holds the LIVE discovered spec against the TARGET\n\
-         //!    locks; red means the meaning does not yet earn the declaration.\n\
+         //! 3. `cargo test` — the expectations gate names each module's DISTANCE from its\n\
+         //!    declaration, and the freeze gate holds the LIVE discovered spec (module laws and\n\
+         //!    the seam graph) against the TARGET locks; red means the meaning does not yet earn\n\
+         //!    the declaration.\n\
          //! 4. `cargo run --example freeze` — regenerate the locks from discovery and read the\n\
          //!    diff against the targets. That diff IS the review: ratify it, or fix the meaning.\n",
         bless = bless_env(&sys.name)
@@ -856,7 +1073,7 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
     for m in &sys.modules {
         out.push_str(&format!("pub mod {};\n", m.name));
     }
-    out.push_str("pub mod ops;\n\n");
+    out.push_str("pub mod ops;\npub mod system;\n\n");
     for m in &sys.modules {
         out.push_str(&format!("mod {}_internal;\n", m.name));
     }
@@ -877,6 +1094,128 @@ fn value_imports(sys: &SystemDecl, m: &ModuleDecl, exclude_own: bool) -> String 
         }
     }
     lines.into_iter().collect()
+}
+
+/// One value object's newtype, constructor discipline, and probe surface. What is
+/// generated vs left as a hole follows the rule's FORM: prose implies nothing mechanically,
+/// so everything stays a `MEANING:` hole; a structured range implies its predicate and its
+/// edge-seeking grid (generated), and the `saturating` policy — when declared — its
+/// clamping `mint`. The policy itself is meaning, so a range WITHOUT one keeps the hole.
+fn emit_value_object(v: &ValueDecl) -> String {
+    let (name, raw) = (&v.name, &v.raw);
+    let rule_doc = v.rule.doc();
+    let indent = "    ";
+
+    let new_body = match &v.rule {
+        Rule::Prose(words) => {
+            let lit = esc_lit(words);
+            format!(
+                "{indent}    // MEANING: the validity predicate for \"{rule_doc}\" — genesis carries the\n\
+                 {indent}    // words, a human/agent supplies the predicate. Admit with `Some({name}(raw))`.\n\
+                 {indent}    todo!(\"MEANING: validity of {name} — \\\"{lit}\\\"\")\n"
+            )
+        }
+        Rule::Range { lo, hi, .. } => format!(
+            "{indent}    // GENERATED from the declared rule `{rule_doc}` — a structured rule is\n\
+             {indent}    // tokens, so its predicate is derived, never re-transcribed by hand.\n\
+             {indent}    ({lo}..={hi}).contains(&raw).then_some({name}(raw))\n"
+        ),
+    };
+
+    let mint = match &v.rule {
+        Rule::Prose(words) => {
+            let lit = esc_lit(words);
+            format!(
+                "{indent}/// The interior's way back into validity from a raw computation. Choosing the\n\
+                 {indent}/// discipline (clamp? reject? panic?) is domain meaning, not structure.\n\
+                 {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
+                 {indent}    todo!(\"MEANING: interior constructor for {name} (re-enter \\\"{lit}\\\")\")\n\
+                 {indent}}}\n"
+            )
+        }
+        Rule::Range {
+            lo,
+            hi,
+            saturating: true,
+        } => format!(
+            "{indent}/// The interior's way back into validity — the DECLARED re-entry policy:\n\
+             {indent}/// a computation may overshoot either edge of `{rule_doc}`; the value saturates.\n\
+             {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
+             {indent}    {name}(raw.clamp({lo}, {hi}))\n\
+             {indent}}}\n"
+        ),
+        Rule::Range { .. } => format!(
+            "{indent}/// The interior's way back into validity from a raw computation.\n\
+             {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
+             {indent}    // MEANING: the range `{rule_doc}` is declared, but the re-entry DISCIPLINE\n\
+             {indent}    // is not — clamp? reject? panic? Declare `saturating` to generate the clamp.\n\
+             {indent}    todo!(\"MEANING: interior constructor for {name} (re-enter {rule_doc})\")\n\
+             {indent}}}\n"
+        ),
+    };
+
+    let shaped = match &v.rule {
+        Rule::Prose(words) => {
+            let lit = esc_lit(words);
+            format!(
+                "/// The probe/grid surface: discovery can only refute what this grid reaches, so step\n\
+                 /// the perturbations toward the validity rule's load-bearing points.\n\
+                 impl Shaped for {name} {{\n\
+                 {indent}fn inhabitant() -> Self {{\n\
+                 {indent}    todo!(\"MEANING: the canonical valid {name}\")\n\
+                 {indent}}}\n\
+                 {indent}fn perturbation_classes(&self) -> Vec<Vec<Self>> {{\n\
+                 {indent}    todo!(\"MEANING: neighbours of a {name}, stepping toward the edges of \\\"{lit}\\\"\")\n\
+                 {indent}}}\n\
+                 }}\n\n"
+            )
+        }
+        Rule::Range { lo, hi, .. } => format!(
+            "/// The probe/grid surface — GENERATED from the declared range: the grid seeds at the\n\
+             /// lower edge and steps toward BOTH edges, so discovery judges laws at the rule's\n\
+             /// load-bearing points (the closure reaches the entire range, cap permitting).\n\
+             impl Shaped for {name} {{\n\
+             {indent}fn inhabitant() -> Self {{\n\
+             {indent}    {name}({lo})\n\
+             {indent}}}\n\
+             {indent}fn perturbation_classes(&self) -> Vec<Vec<Self>> {{\n\
+             {indent}    vec![\n\
+             {indent}        vec![{name}(self.0.saturating_add(1).clamp({lo}, {hi})), {name}({hi})],\n\
+             {indent}        vec![{name}(self.0.saturating_sub(1).clamp({lo}, {hi})), {name}({lo})],\n\
+             {indent}    ]\n\
+             {indent}}}\n\
+             }}\n\n"
+        ),
+    };
+
+    let rule_kind = match &v.rule {
+        Rule::Prose(_) => "carried verbatim — never generated",
+        Rule::Range { .. } => "structured — the implied artifacts below are generated",
+    };
+    format!(
+        "/// `{name}` — `{raw}` refined by a declared validity rule.\n\
+         ///\n\
+         /// VALIDITY (declared, {rule_kind}): \"{rule_doc}\"\n\
+         #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]\n\
+         pub struct {name}({raw});\n\
+         \n\
+         impl {name} {{\n\
+         {indent}/// Parse, don't validate: `Some` iff `raw` satisfies the declared rule.\n\
+         {indent}pub fn new(raw: {raw}) -> Option<{name}> {{\n\
+         {new_body}\
+         {indent}}}\n\
+         \n\
+         {indent}/// The raw value — the sanctioned exit hatch.\n\
+         {indent}#[allow(clippy::clone_on_copy)] // the generic form: raw may or may not be Copy\n\
+         {indent}pub fn get(&self) -> {raw} {{\n\
+         {indent}    self.0.clone()\n\
+         {indent}}}\n\
+         \n\
+         {mint}\
+         }}\n\
+         \n\
+         {shaped}"
+    )
 }
 
 fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
@@ -906,48 +1245,7 @@ fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
     out.push('\n');
 
     for v in &owned {
-        let (name, raw) = (&v.name, &v.raw);
-        let validity_doc = doc_safe(&v.validity);
-        let validity_lit = esc_lit(&v.validity);
-        out.push_str(&format!(
-            "/// `{name}` — `{raw}` refined by a declared validity rule.\n\
-             ///\n\
-             /// VALIDITY (declared, carried verbatim — never generated): \"{validity_doc}\"\n\
-             #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]\n\
-             pub struct {name}({raw});\n\
-             \n\
-             impl {name} {{\n\
-             {indent}/// Parse, don't validate: `Some` iff `raw` satisfies the declared rule.\n\
-             {indent}pub fn new(raw: {raw}) -> Option<{name}> {{\n\
-             {indent}    // MEANING: the validity predicate for \"{validity_doc}\" — genesis carries the\n\
-             {indent}    // words, a human/agent supplies the predicate. Admit with `Some({name}(raw))`.\n\
-             {indent}    todo!(\"MEANING: validity of {name} — \\\"{validity_lit}\\\"\")\n\
-             {indent}}}\n\
-             \n\
-             {indent}/// The raw value — the sanctioned exit hatch.\n\
-             {indent}pub fn get(&self) -> {raw} {{\n\
-             {indent}    self.0.clone()\n\
-             {indent}}}\n\
-             \n\
-             {indent}/// The interior's way back into validity from a raw computation. Choosing the\n\
-             {indent}/// discipline (clamp? reject? panic?) is domain meaning, not structure.\n\
-             {indent}pub(crate) fn mint(raw: {raw}) -> {name} {{\n\
-             {indent}    todo!(\"MEANING: interior constructor for {name} (re-enter \\\"{validity_lit}\\\")\")\n\
-             {indent}}}\n\
-             }}\n\
-             \n\
-             /// The probe/grid surface: discovery can only refute what this grid reaches, so step\n\
-             /// the perturbations toward the validity rule's load-bearing points.\n\
-             impl Shaped for {name} {{\n\
-             {indent}fn inhabitant() -> Self {{\n\
-             {indent}    todo!(\"MEANING: the canonical valid {name}\")\n\
-             {indent}}}\n\
-             {indent}fn perturbation_classes(&self) -> Vec<Vec<Self>> {{\n\
-             {indent}    todo!(\"MEANING: neighbours of a {name}, stepping toward the edges of \\\"{validity_lit}\\\"\")\n\
-             {indent}}}\n\
-             }}\n\n",
-            indent = "    ",
-        ));
+        out.push_str(&emit_value_object(v));
     }
 
     if !owned.is_empty() {
@@ -992,7 +1290,7 @@ fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
                 let expect_doc = if expected.is_empty() {
                     String::new()
                 } else {
-                    let list: Vec<String> = expected.iter().map(|e| e.as_written()).collect();
+                    let list: Vec<String> = expected.iter().map(|e| e.render()).collect();
                     format!(
                         "    ///\n    /// Declared expectations (the target lock restates \
                          them): {}.\n",
@@ -1045,7 +1343,7 @@ fn emit_internal(sys: &SystemDecl, m: &ModuleDecl) -> String {
         let expect_doc = if expected.is_empty() {
             "/// No laws were declared for it — whatever discovery finds is the spec.\n".to_string()
         } else {
-            let list: Vec<String> = expected.iter().map(|e| e.as_written()).collect();
+            let list: Vec<String> = expected.iter().map(|e| e.render()).collect();
             format!(
                 "/// Declared expectations to honour (discovery must re-earn them): {}.\n",
                 list.join("; ")
@@ -1083,7 +1381,7 @@ fn emit_ops(sys: &SystemDecl) -> String {
         let attr = if m.expects.is_empty() {
             format!("#[algebra({theory}, \"{}\")]", m.name)
         } else {
-            let written: Vec<String> = m.expects.iter().map(Expect::as_written).collect();
+            let written: Vec<String> = m.expects.iter().map(Expectation::render).collect();
             format!(
                 "#[algebra({theory}, \"{}\", expects({}))]",
                 m.name,
@@ -1129,6 +1427,49 @@ fn emit_ops(sys: &SystemDecl) -> String {
         }
         out.push_str("}\n");
     }
+
+    // one SPANNING theory per `via` transform seam: the two endpoint operators and the
+    // crossing conversion in ONE operator table, so discovery can find — and the compiled
+    // seam demand — the homomorphism law. Same mechanical delegation as the module theories.
+    for s in sys.seams.iter().filter(|s| s.via.is_some()) {
+        let (module_name, marker, display) = seam_theory_names(s);
+        let (h, from, to) = via_seam_parts(sys, s);
+        let (source, target) = (&s.on, &h.output);
+        out.push_str(&format!(
+            "\n/// The SPANNING theory for the `{l} -- {r}` transform seam: source operator, \
+             conversion, and\n/// target operator in one table — the homomorphism expectation \
+             rides the attribute, and the\n/// compiled seam (`src/system.rs`) holds discovery \
+             to it.\n#[algebra({marker}, \"{display}\", expects(homomorphism({h}, {from}, \
+             {to})))]\npub mod {module_name} {{\n",
+            l = s.left,
+            r = s.right,
+            h = h.name,
+            from = from.name,
+            to = to.name,
+        ));
+        let mut imports = BTreeSet::new();
+        for value in [source, target] {
+            let owner = owner_of(sys, value).expect("validated: every value has an owner");
+            imports.insert(format!("    use crate::{owner}::{value};\n"));
+        }
+        for line in &imports {
+            out.push_str(line);
+        }
+        out.push_str(&format!(
+            "\n    /// `{from}` — the source-side operator, delegated to the boundary surface.\n    \
+             pub fn {from}(a: {v}, b: {v}) -> {v} {{\n        a.{from}(b)\n    }}\n\n    \
+             /// `{h}` — the crossing conversion, delegated to the boundary surface.\n    \
+             pub fn {h}(a: {v}) -> {w} {{\n        a.{h}()\n    }}\n\n    \
+             /// `{to}` — the target-side operator, delegated to the boundary surface.\n    \
+             pub fn {to}(a: {w}, b: {w}) -> {w} {{\n        a.{to}(b)\n    }}\n",
+            from = from.name,
+            h = h.name,
+            to = to.name,
+            v = source,
+            w = target,
+        ));
+        out.push_str("}\n");
+    }
     out
 }
 
@@ -1140,14 +1481,33 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
         "# discovered spec: {} — a behaviour lock; regenerate via this repo's freeze path and ratify the diff.\n\n",
         m.name
     );
-    for op in &m.ops {
-        for e in expects_for(m, &op.name) {
-            let (prose, equation) = e.law();
-            out.push_str(&format!("- {prose}\n      {equation}\n"));
-        }
+    // laws in the order a confirming discovery renders them: grouped by the operator the
+    // engine FIRES the shape on (the first declared op — except a round trip, which fires on
+    // its INNER conversion), then in catalog order, declaration order breaking ties. The
+    // dynamic sync test holds this to the freeze's actual render.
+    let fire_index = |e: &Expectation| {
+        let fire_op = if e.shape == "round-trip" {
+            &e.ops[1]
+        } else {
+            &e.ops[0]
+        };
+        m.ops
+            .iter()
+            .position(|o| o.name == *fire_op)
+            .expect("validated: every named operator is declared")
+    };
+    let mut declared: Vec<&Expectation> = m.expects.iter().collect();
+    declared.sort_by_key(|e| (fire_index(e), shape_rank(e)));
+    for e in declared {
+        let (prose, equation) = law(e);
+        out.push_str(&format!("- {prose}\n      {equation}\n"));
     }
     out.push('\n');
-    let covered: BTreeSet<&str> = m.expects.iter().flat_map(|e| e.mentions()).collect();
+    let covered: BTreeSet<&str> = m
+        .expects
+        .iter()
+        .flat_map(|e| e.ops.iter().map(String::as_str))
+        .collect();
     let uncovered: Vec<&str> = m
         .ops
         .iter()
@@ -1165,42 +1525,257 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
     out
 }
 
-/// The `use <crate>::ops::<m>_ops::<Theory>;` + `Spec::of::<Theory>().lock_in(...)` pairs the
-/// freeze example and the drift gate share.
-fn theory_imports_and_locks(sys: &SystemDecl) -> (String, String) {
-    let krate = crate_ident(&sys.name);
-    let mut imports = String::new();
-    let mut locks = String::new();
-    for m in &sys.modules {
-        let theory = camel(&m.name);
-        imports.push_str(&format!("use {krate}::ops::{}_ops::{theory};\n", m.name));
-        locks.push_str(&format!(
-            "        Spec::of::<{theory}>().lock_in(&spec_dir),\n"
+/// The compiled `system!` twin of the declaration (see `discover::system`): the marker, the
+/// module registry, and every TRANSPORT seam — discharged by construction, because genesis
+/// defines each value object exactly once (the macro's compile-time witness pins it). A
+/// declared TRANSFORM seam is NOT compiled here: its conversion is meaning genesis cannot
+/// name, so it stays a loud hole in `tests/seams.rs` until a spanning theory exists.
+fn emit_system(sys: &SystemDecl) -> String {
+    let marker = camel(&sys.name);
+    // compiled seams: every transport (by construction) and every transform whose conversion
+    // is NAMED (`via h` — checked in the spanning theory). A via-less transform stays a loud
+    // hole in tests/seams.rs, counted below.
+    let compiled: Vec<&SeamDecl> = sys
+        .seams
+        .iter()
+        .filter(|s| s.kind == SeamKindDecl::Transport || s.via.is_some())
+        .collect();
+    let holes = sys.seams.len() - compiled.len();
+
+    let mut out = String::from(
+        "//! Tier: ALGEBRA — the compiled `system!` graph: the application-level spec as a \
+         checked artifact.\n",
+    );
+    out.push_str(&banner(&sys.name));
+    out.push_str(
+        "//!\n\
+         //! The graph IS the registry: `modules()` is the list the freeze loop records and the\n\
+         //! drift gate checks (a module cannot silently fall out of it), and the rendered graph\n\
+         //! — modules, seams, each seam's obligation and status — freezes into the committed\n\
+         //! `spec/*.system.spec` lock. Declared transport seams are discharged BY CONSTRUCTION:\n\
+         //! each shared value object is defined exactly once, and the `system!` macro emits the\n\
+         //! compile-time witness that keeps that true.\n",
+    );
+    if holes > 0 {
+        out.push_str(&format!(
+            "//!\n\
+             //! NOTE: {holes} declared TRANSFORM seam(s) name no conversion (`via h`), so they\n\
+             //! are not compiled into this graph — each remains a loud hole in `tests/seams.rs`.\n\
+             //! Name the conversion in the declaration and regenerate to compile them.\n"
         ));
     }
-    (imports, locks)
+    out.push('\n');
+
+    // imports: every module's theory marker, each transport seam's value (for the witness),
+    // and each via seam's spanning-theory marker.
+    let mut imports = BTreeSet::new();
+    for m in &sys.modules {
+        imports.insert(format!(
+            "use crate::ops::{}_ops::{};\n",
+            m.name,
+            camel(&m.name)
+        ));
+    }
+    for s in &compiled {
+        if s.via.is_some() {
+            let (module_name, seam_marker, _) = seam_theory_names(s);
+            imports.insert(format!("use crate::ops::{module_name}::{seam_marker};\n"));
+        } else {
+            let owner = owner_of(sys, &s.on).expect("validated: seam value has an owner");
+            imports.insert(format!("use crate::{owner}::{};\n", s.on));
+        }
+    }
+    for line in &imports {
+        out.push_str(line);
+    }
+
+    out.push_str(&format!(
+        "\n/// The system marker — `SystemReport::of::<{marker}>()` is the graph the lock \
+         freezes.\npub struct {marker};\n\nboundary_spec::system! {{\n    {marker} : \
+         \"{name}\",\n    modules {{\n",
+        name = sys.name
+    ));
+    for m in &sys.modules {
+        out.push_str(&format!("        {};\n", camel(&m.name)));
+    }
+    out.push_str("    }\n");
+    if !compiled.is_empty() {
+        out.push_str("    seams {\n");
+        for s in &compiled {
+            match &s.via {
+                None => out.push_str(&format!(
+                    "        {} -- {} : transport on {} by construction;\n",
+                    camel(&s.left),
+                    camel(&s.right),
+                    s.on
+                )),
+                Some(via) => {
+                    let (_, seam_marker, _) = seam_theory_names(s);
+                    out.push_str(&format!(
+                        "        {} -- {} : transform on {} via {via} in {seam_marker};\n",
+                        camel(&s.left),
+                        camel(&s.right),
+                        s.on
+                    ));
+                }
+            }
+        }
+        out.push_str("    }\n");
+    }
+    out.push_str("}\n");
+    out
+}
+
+/// The TARGET system lock: the declared graph in the exact committed lock format
+/// (`discover::system::SystemReport::render` — keep the two in step; the render pin in the
+/// tests holds this side). Transport seams are born discharged (by construction), so this
+/// lock goes green the moment the crate compiles and discovery runs.
+fn emit_system_lock(sys: &SystemDecl) -> String {
+    let mut out = format!(
+        "# system spec: {} — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.\n\n",
+        sys.name
+    );
+    out.push_str("modules (the ratified registry — one committed module lock each):\n");
+    for m in &sys.modules {
+        out.push_str(&format!("- {}\n", m.name));
+    }
+    out.push('\n');
+    let compiled: Vec<&SeamDecl> = sys
+        .seams
+        .iter()
+        .filter(|s| s.kind == SeamKindDecl::Transport || s.via.is_some())
+        .collect();
+    if compiled.is_empty() {
+        out.push_str("seams: none — no module pair declares a shared-value obligation.\n");
+        return out;
+    }
+    out.push_str("seams (each edge: its obligation, then the verdict its checker returned):\n");
+    for s in &compiled {
+        match &s.via {
+            None => {
+                out.push_str(&format!(
+                    "- {} -- {} : transport on {}\n",
+                    s.left, s.right, s.on
+                ));
+                out.push_str(
+                    "      obligation: the modules share this value and must agree on its laws\n",
+                );
+                out.push_str(
+                    "      status: discharged by construction — the shared value is one type on both \
+                     sides (the declaration carries the compile-time witness)\n",
+                );
+            }
+            Some(via) => {
+                // the CONVERGED target: once the conversion's meaning earns the declared
+                // homomorphism, the live verdict renders exactly this (no composites — a
+                // discovered chain shows up in the bless diff, which is the ratification).
+                let (_, _, display) = seam_theory_names(s);
+                let (h, from, to) = via_seam_parts(sys, s);
+                let _ = h;
+                out.push_str(&format!(
+                    "- {} -- {} : transform on {}\n",
+                    s.left, s.right, s.on
+                ));
+                out.push_str(
+                    "      obligation: the conversion across the seam must be a homomorphism\n",
+                );
+                out.push_str(&format!(
+                    "      status: preserved — the conversion `{via}` is a discovered homomorphism \
+                     (spanning theory: {display}):\n"
+                ));
+                out.push_str(&format!(
+                    "        * {via} turns {} into {}.\n",
+                    from.name, to.name
+                ));
+            }
+        }
+    }
+    out
+}
+
+/// The DECLARED-LAWS gate: one distance test per module that declares expectations —
+/// `Distance::of` names exactly what is missing, so the gate is red WITH A WORKLIST until
+/// the meaning earns the declaration. Emitted only when some module declares `expects`.
+fn emit_expectations(sys: &SystemDecl) -> String {
+    let krate = crate_ident(&sys.name);
+    let mut out = String::from(
+        "//! expectations — the DECLARED-LAWS gate: each module's DISTANCE from its declared\n\
+         //! algebra (`Distance::of`), red until discovery earns every declared law.\n",
+    );
+    out.push_str(&banner(&sys.name));
+    out.push_str(
+        "//!\n\
+         //! RED BY DESIGN until the meaning holes are filled: the failure message IS the\n\
+         //! worklist (\"MISSING: ...\"). Surprises (discovered, never declared) do not fail —\n\
+         //! ratify them into the declaration or refute the operator that produced them.\n\n\
+         use boundary_spec::discover::expect::Distance;\n\n",
+    );
+    for m in sys.modules.iter().filter(|m| !m.expects.is_empty()) {
+        out.push_str(&format!(
+            "use {krate}::ops::{}_ops::{};\n",
+            m.name,
+            camel(&m.name)
+        ));
+    }
+    for seam in sys.seams.iter().filter(|s| s.via.is_some()) {
+        let (module_name, marker, _) = seam_theory_names(seam);
+        out.push_str(&format!("use {krate}::ops::{module_name}::{marker};\n"));
+    }
+    for m in sys.modules.iter().filter(|m| !m.expects.is_empty()) {
+        out.push_str(&format!(
+            "\n/// `{m}` declares {n} law(s); the distance report names any that discovery has\n\
+             /// not (yet) found true of the meaning.\n\
+             #[test]\n\
+             fn {m}_meets_its_declared_expectations() {{\n    \
+             let distance = Distance::of::<{theory}>();\n    \
+             assert!(distance.is_met(), \"{{}}\", distance.render());\n}}\n",
+            m = m.name,
+            n = m.expects.len(),
+            theory = camel(&m.name),
+        ));
+    }
+    for seam in sys.seams.iter().filter(|s| s.via.is_some()) {
+        let (_, marker, display) = seam_theory_names(seam);
+        out.push_str(&format!(
+            "\n/// The `{display}` spanning theory declares the seam's homomorphism; red names\n\
+             /// exactly the law the conversion has not yet earned.\n\
+             #[test]\n\
+             fn {l}_{r}_seam_meets_its_declared_expectations() {{\n    \
+             let distance = Distance::of::<{marker}>();\n    \
+             assert!(distance.is_met(), \"{{}}\", distance.render());\n}}\n",
+            l = seam.left,
+            r = seam.right,
+        ));
+    }
+    out
 }
 
 fn emit_freeze_example(sys: &SystemDecl) -> String {
-    let (imports, locks) = theory_imports_and_locks(sys);
     let template = r#"//! freeze — the BLESS path: regenerate `spec/*.spec` from the live, discovered algebra.
 //!
 //!     cargo run --example freeze
 //!
 //! This is the ONE sanctioned writer of the lock files. Genesis committed TARGET locks (the
-//! DECLARED laws); the drift gate stays red until discovery matches them. Once the meaning
-//! holes are filled, run this and read the diff against the targets — a clean diff means the
-//! code earned exactly what was declared; any other diff is the conversation to have in review.
-//! Never edit a lock by hand.
+//! DECLARED laws and the declared seam graph); the drift gate stays red until discovery
+//! matches them. Once the meaning holes are filled, run this and read the diff against the
+//! targets — a clean diff means the code earned exactly what was declared; any other diff is
+//! the conversation to have in review. Never edit a lock by hand.
+//!
+//! The lock list is READ OFF THE GRAPH (`@MARKER@::modules()` plus the system lock): the
+//! declaration is the registry, so a module cannot silently fall out of the freeze loop.
 
 use std::path::PathBuf;
 
-use boundary_spec::discover::Spec;
-@IMPORTS@
+use boundary_spec::discover::system::{System, SystemReport};
+use @KRATE@::system::@MARKER@;
+
 fn main() {
     let spec_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
-    let locks = vec![
-@LOCKS@    ];
+    let mut locks: Vec<spec_lock::Lock> = @MARKER@::modules()
+        .iter()
+        .map(|spec| spec.lock_in(&spec_dir))
+        .collect();
+    locks.push(SystemReport::of::<@MARKER@>().lock_in(&spec_dir));
     spec_lock::bless(&locks).expect("write the spec locks");
     for lock in &locks {
         println!("blessed `{}` -> {}", lock.name, lock.path.display());
@@ -1209,35 +1784,39 @@ fn main() {
 }
 "#;
     template
-        .replace("@IMPORTS@", &imports)
-        .replace("@LOCKS@", &locks)
+        .replace("@KRATE@", &crate_ident(&sys.name))
+        .replace("@MARKER@", &camel(&sys.name))
 }
 
 fn emit_freeze_gate(sys: &SystemDecl) -> String {
-    let (imports, locks) = theory_imports_and_locks(sys);
     let template = r#"//! freeze_gate — the DRIFT GATE, as a plain integration test.
 //!
 //! Re-derive the live discovered spec and hold it against the committed locks. Genesis
-//! committed TARGET locks — the DECLARED laws in the exact lock format — so this gate is RED
-//! BY DESIGN until the meaning holes are filled and discovery re-earns the declaration. The
-//! fix is never to hand-edit a lock: fill the meaning, run `cargo run --example freeze`, and
-//! ratify the diff against the targets in review.
+//! committed TARGET locks — the DECLARED laws and the declared seam graph, in the exact lock
+//! format — so this gate is RED BY DESIGN until the meaning holes are filled and discovery
+//! re-earns the declaration. The fix is never to hand-edit a lock: fill the meaning, run
+//! `cargo run --example freeze`, and ratify the diff against the targets in review.
 
 use std::path::PathBuf;
 
-use boundary_spec::discover::Spec;
-@IMPORTS@
+use boundary_spec::discover::system::{System, SystemReport};
+use @KRATE@::system::@MARKER@;
+
 fn spec_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec")
 }
 
-/// The committed locks are FRESH: the live discovered algebra matches what was ratified —
-/// which, until the first bless, is the DECLARED target.
+/// The committed locks are FRESH: the live discovered algebra (every module in the graph's
+/// registry, and the graph itself) matches what was ratified — which, until the first bless,
+/// is the DECLARED target.
 #[test]
 fn the_committed_specs_are_fresh() {
     let spec_dir = spec_dir();
-    let locks = vec![
-@LOCKS@    ];
+    let mut locks: Vec<spec_lock::Lock> = @MARKER@::modules()
+        .iter()
+        .map(|spec| spec.lock_in(&spec_dir))
+        .collect();
+    locks.push(SystemReport::of::<@MARKER@>().lock_in(&spec_dir));
     if let Err(stale) = spec_lock::check(&locks) {
         panic!(
             "discovered spec differs from the committed lock for: {}. If discovery now matches \
@@ -1249,8 +1828,8 @@ fn the_committed_specs_are_fresh() {
 }
 "#;
     template
-        .replace("@IMPORTS@", &imports)
-        .replace("@LOCKS@", &locks)
+        .replace("@KRATE@", &crate_ident(&sys.name))
+        .replace("@MARKER@", &camel(&sys.name))
 }
 
 fn emit_probes_stub(sys: &SystemDecl) -> String {
@@ -1281,9 +1860,18 @@ fn emit_seams(sys: &SystemDecl) -> String {
          //! GENERATED by genesis for `{}`. A seam names what a module split must preserve:\n\
          //! a `transport` seam shares a sort that is the SAME type on both sides (preserved by\n\
          //! construction — genesis defines each value object exactly once); a `transform` seam\n\
-         //! carries a conversion that must be a HOMOMORPHISM, and that check is a meaning hole.\n",
+         //! carries a conversion that must be a HOMOMORPHISM — checked by discovery in the\n\
+         //! seam's spanning theory when the conversion is NAMED (`via h`), a meaning hole when\n\
+         //! it is not.\n",
         sys.name
     );
+    if sys.seams.iter().any(|s| s.via.is_some()) {
+        out.push_str(&format!(
+            "\nuse boundary_spec::discover::system::{{SeamKind, SystemReport}};\n\n\
+             use {krate}::system::{};\n",
+            camel(&sys.name)
+        ));
+    }
     for s in &sys.seams {
         let owner = owner_of(sys, &s.on).expect("validated: seam value has an owner");
         let test = format!(
@@ -1309,17 +1897,38 @@ fn emit_seams(sys: &SystemDecl) -> String {
                 r = s.right,
                 v = s.on,
             )),
-            SeamKindDecl::Transform => out.push_str(&format!(
-                "\n/// TRANSFORM seam `{l} -- {r}` on `{v}`: a conversion crosses it, and the \
-                 conversion must be\n/// a HOMOMORPHISM — `h(a op b) == h(a) op' h(b)` — or \
-                 the cut is bad. Naming `h` and the two\n/// operators is meaning; probing the \
-                 equation over the grid is the discharge.\n#[test]\nfn {test}() {{\n    \
-                 todo!(\"MEANING: name the conversion across `{l} -- {r}` and probe h(a op b) \
-                 == h(a) op'(h(b))\")\n}}\n",
-                l = s.left,
-                r = s.right,
-                v = s.on,
-            )),
+            SeamKindDecl::Transform => match &s.via {
+                Some(via) => out.push_str(&format!(
+                    "\n/// TRANSFORM seam `{l} -- {r}` on `{v}` via `{via}`: the conversion must \
+                     be a HOMOMORPHISM,\n/// checked by DISCOVERY in the seam's spanning theory \
+                     (`ops::{span}`) and verdict-bearing in\n/// the compiled graph — this test \
+                     holds the verdict, and the system lock freezes it.\n#[test]\nfn {test}() \
+                     {{\n    let seam = SystemReport::of::<{marker}>()\n        .seams\n        \
+                     .into_iter()\n        .find(|s| (s.left, s.right, s.kind) == (\"{l}\", \
+                     \"{r}\", SeamKind::Transform))\n        .expect(\"declared in \
+                     src/system.rs\");\n    assert!(\n        seam.status.is_met(),\n        \
+                     \"the conversion `{via}` does not yet preserve the algebra: {{:?}}\",\n        \
+                     seam.status\n    );\n}}\n",
+                    l = s.left,
+                    r = s.right,
+                    v = s.on,
+                    span = seam_theory_names(s).0,
+                    marker = camel(&sys.name),
+                )),
+                None => out.push_str(&format!(
+                    "\n/// TRANSFORM seam `{l} -- {r}` on `{v}`: a conversion crosses it, and the \
+                     conversion must be\n/// a HOMOMORPHISM — `h(a op b) == h(a) op' h(b)` — or \
+                     the cut is bad. Naming `h` and the two\n/// operators is meaning; probing the \
+                     equation over the grid is the discharge (or name the\n/// conversion in the \
+                     declaration — `via h` — and regenerate to compile the check).\n#[test]\nfn \
+                     {test}() {{\n    \
+                     todo!(\"MEANING: name the conversion across `{l} -- {r}` and probe h(a op b) \
+                     == h(a) op'(h(b))\")\n}}\n",
+                    l = s.left,
+                    r = s.right,
+                    v = s.on,
+                )),
+            },
         }
     }
     out
@@ -1388,12 +1997,20 @@ impl Genesis {
             path: "src/ops.rs".to_string(),
             contents: emit_ops(&system),
         });
+        edits.push(FileEdit {
+            path: "src/system.rs".to_string(),
+            contents: emit_system(&system),
+        });
         for m in &system.modules {
             edits.push(FileEdit {
                 path: format!("spec/{}.spec", m.name),
                 contents: emit_target_lock(m),
             });
         }
+        edits.push(FileEdit {
+            path: format!("spec/{}.system.spec", system.name),
+            contents: emit_system_lock(&system),
+        });
         edits.push(FileEdit {
             path: "examples/freeze.rs".to_string(),
             contents: emit_freeze_example(&system),
@@ -1402,6 +2019,14 @@ impl Genesis {
             path: "tests/freeze_gate.rs".to_string(),
             contents: emit_freeze_gate(&system),
         });
+        if system.modules.iter().any(|m| !m.expects.is_empty())
+            || system.seams.iter().any(|s| s.via.is_some())
+        {
+            edits.push(FileEdit {
+                path: "tests/expectations.rs".to_string(),
+                contents: emit_expectations(&system),
+            });
+        }
         edits.push(FileEdit {
             path: "tests/probes.rs".to_string(),
             contents: emit_probes_stub(&system),
@@ -1466,10 +2091,13 @@ mod tests {
                 "src/billing.rs",
                 "src/billing_internal.rs",
                 "src/ops.rs",
+                "src/system.rs",
                 "spec/meter.spec",
                 "spec/billing.spec",
+                "spec/credit-app.system.spec",
                 "examples/freeze.rs",
                 "tests/freeze_gate.rs",
+                "tests/expectations.rs",
                 "tests/probes.rs",
                 "tests/seams.rs",
             ]
@@ -1569,10 +2197,229 @@ mod tests {
         assert!(seams.contains("fn seam_meter_billing_transport_on_credits()"));
         assert!(seams.contains("fn(credit_app::meter::Credits) -> credit_app::meter::Credits"));
 
-        // the lock loop names every theory the declaration derives.
+        // the lock loop is read off the GRAPH — the registry, plus the system lock.
         let gate = body("tests/freeze_gate.rs");
-        assert!(gate.contains("use credit_app::ops::meter_ops::Meter;"));
-        assert!(gate.contains("Spec::of::<Billing>().lock_in(&spec_dir)"));
+        assert!(gate.contains("use credit_app::system::CreditApp;"));
+        assert!(gate.contains("CreditApp::modules()"));
+        assert!(gate.contains("SystemReport::of::<CreditApp>().lock_in(&spec_dir)"));
+        let freeze = body("examples/freeze.rs");
+        assert!(freeze.contains("CreditApp::modules()"));
+        assert!(freeze.contains("SystemReport::of::<CreditApp>().lock_in(&spec_dir)"));
+
+        // the expectations gate covers exactly the modules that declare laws.
+        let expectations = body("tests/expectations.rs");
+        assert!(expectations.contains("fn meter_meets_its_declared_expectations()"));
+        assert!(expectations.contains("Distance::of::<Meter>()"));
+        assert!(
+            !expectations.contains("Billing"),
+            "billing declares no laws — no distance gate for it"
+        );
+    }
+
+    /// The COMPILED `system!` twin: the marker, the module registry, and the transport seam
+    /// as a by-construction declaration (genesis defines each value once); the roster admits
+    /// the module. A transform seam would stay OUT of the compiled graph (meaning, not
+    /// structure) — pinned by the second declaration.
+    #[test]
+    fn the_compiled_system_declaration_is_emitted() {
+        let plan = sample_plan();
+        let system = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/system.rs")
+            .expect("system module")
+            .contents;
+        assert!(system.contains("pub struct CreditApp;"));
+        assert!(system.contains("boundary_spec::system! {"));
+        assert!(system.contains("CreditApp : \"credit-app\","));
+        assert!(system.contains("        Meter;\n        Billing;\n"));
+        assert!(system.contains("Meter -- Billing : transport on Credits by construction;"));
+        assert!(system.contains("use crate::meter::Credits;"));
+
+        let lib = plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/lib.rs")
+            .expect("roster");
+        assert!(lib.contents.contains("pub mod system;\n"));
+
+        // a TRANSFORM seam is not compiled into the graph — it stays a tests/seams.rs hole,
+        // and the emitted module says so.
+        let decl =
+            "system! { name: \"pipey\", values { V = i64 where \"any\"; W = i64 where \"any\"; } \
+                    modules { a { ops { fst(V, V) -> V; } } b { ops { snd(V, W) -> W; } } } \
+                    seams { a -- b : transform on V; } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let system = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/system.rs")
+            .expect("system module")
+            .contents;
+        assert!(system.contains("1 declared TRANSFORM seam(s) name no conversion"));
+        assert!(!system.contains("seams {"), "no compiled seam block");
+        // ... while the seam test hole is still emitted.
+        assert!(plan.listing().contains(&"tests/seams.rs"));
+    }
+
+    /// A transform seam with a NAMED conversion (`via h`) is compiled END TO END: the
+    /// spanning theory (source op, conversion, target op, homomorphism expectation) lands in
+    /// `src/ops.rs`; the compiled seam wires it in `src/system.rs`; the expectations gate
+    /// covers the seam theory; `tests/seams.rs` holds the verdict instead of a hole; and the
+    /// system target lock renders the PRESERVED stanza (kept in step with
+    /// `SystemReport::render` — the byte pin here is the sync point).
+    #[test]
+    fn a_named_conversion_compiles_the_transform_seam_end_to_end() {
+        let decl = "system! { name: \"pipe-app\", \
+                    values { Raw = i64 where \"any\"; Cooked = i64 where \"any\"; } \
+                    modules { \
+                    source { ops { blend(Raw, Raw) -> Raw; cook(Raw) -> Cooked; } } \
+                    sink { ops { fuse(Cooked, Cooked) -> Cooked; } } } \
+                    seams { source -- sink : transform on Raw via cook; } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let body = |path: &str| {
+            &plan
+                .edits
+                .iter()
+                .find(|e| e.path == path)
+                .unwrap_or_else(|| panic!("missing {path}"))
+                .contents
+        };
+
+        let ops = body("src/ops.rs");
+        assert!(ops.contains(
+            "#[algebra(SourceSinkSeam, \"source-sink seam\", \
+             expects(homomorphism(cook, blend, fuse)))]"
+        ));
+        assert!(ops.contains("pub mod source_sink_seam_ops {"));
+        assert!(ops.contains("pub fn cook(a: Raw) -> Cooked {"));
+        assert!(ops.contains("pub fn fuse(a: Cooked, b: Cooked) -> Cooked {"));
+
+        let system = body("src/system.rs");
+        assert!(system.contains("use crate::ops::source_sink_seam_ops::SourceSinkSeam;"));
+        assert!(system.contains("Source -- Sink : transform on Raw via cook in SourceSinkSeam;"));
+        assert!(
+            !system.contains("not compiled"),
+            "no hole note — the seam compiled"
+        );
+
+        let expectations = body("tests/expectations.rs");
+        assert!(expectations.contains("use pipe_app::ops::source_sink_seam_ops::SourceSinkSeam;"));
+        assert!(expectations.contains("fn source_sink_seam_meets_its_declared_expectations()"));
+        assert!(expectations.contains("Distance::of::<SourceSinkSeam>()"));
+
+        let seams = body("tests/seams.rs");
+        assert!(seams.contains("fn seam_source_sink_transform_on_raw()"));
+        assert!(seams
+            .contains("(s.left, s.right, s.kind) == (\"source\", \"sink\", SeamKind::Transform)"));
+        assert!(
+            !seams.contains("todo!"),
+            "the verdict test replaced the hole"
+        );
+
+        let lock = body("spec/pipe-app.system.spec");
+        let expected = "\
+# system spec: pipe-app — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.
+
+modules (the ratified registry — one committed module lock each):
+- source
+- sink
+
+seams (each edge: its obligation, then the verdict its checker returned):
+- source -- sink : transform on Raw
+      obligation: the conversion across the seam must be a homomorphism
+      status: preserved — the conversion `cook` is a discovered homomorphism (spanning theory: source-sink seam):
+        * cook turns blend into fuse.
+";
+        assert_eq!(lock, expected);
+
+        for edit in &plan.edits {
+            if edit.path.ends_with(".rs") {
+                syn::parse_file(&edit.contents)
+                    .unwrap_or_else(|e| panic!("generated `{}` does not parse: {e}", edit.path));
+            }
+        }
+    }
+
+    /// Malformed `via` declarations are refused by name: an undeclared conversion, a
+    /// non-unary one, a wrong source, a transform landing where it left, a missing endpoint
+    /// binary, and a transport claiming a conversion.
+    #[test]
+    fn malformed_via_seams_are_refused_by_name() {
+        let wrap = |seam: &str| {
+            format!(
+                "system! {{ name: \"app\", \
+                 values {{ V = i64 where \"any\"; W = i64 where \"any\"; }} \
+                 modules {{ \
+                 a {{ ops {{ blend(V, V) -> V; cook(V) -> W; mix(V, V) -> V; }} }} \
+                 b {{ ops {{ fuse(W, W) -> W; }} }} }} \
+                 seams {{ {seam} }} }}"
+            )
+        };
+        let cases: Vec<(String, &str)> = vec![
+            (
+                wrap("a -- b : transform on V via boil;"),
+                "neither module declares",
+            ),
+            (wrap("a -- b : transform on V via blend;"), "must be unary"),
+            (
+                wrap("a -- b : transform on W via cook;"),
+                "converts from `V`, but the seam is on `W`",
+            ),
+            (
+                wrap("a -- b : transform on V via cook;"),
+                "exactly one homogeneous binary on `V`",
+            ),
+            (
+                wrap("a -- b : transport on V via cook;"),
+                "only a transform seam names a conversion",
+            ),
+        ];
+        for (decl, expected) in cases {
+            let err = Genesis::plan(&decl, &Deps::Version("0".to_string()))
+                .err()
+                .unwrap_or_else(|| panic!("should refuse: {decl}"));
+            assert!(
+                err.contains(expected),
+                "expected `{expected}` in the refusal, got: {err}"
+            );
+        }
+        // a self-landing conversion is refused too.
+        let decl = "system! { name: \"app\", values { V = i64 where \"any\"; } \
+                    modules { a { ops { blend(V, V) -> V; spin(V) -> V; } } \
+                    b { ops { merge(V, V) -> V; } } } \
+                    seams { a -- b : transform on V via spin; } }";
+        let err = Genesis::plan(decl, &Deps::Version("0".to_string()))
+            .err()
+            .unwrap();
+        assert!(err.contains("must land on a DIFFERENT value"), "got: {err}");
+    }
+
+    /// The TARGET system lock is the declared graph in the EXACT committed lock format —
+    /// byte-for-byte what `SystemReport::render` produces once the crate compiles, so the
+    /// system gate goes green with an empty bless diff. (Keep in step with
+    /// `discover::system::SystemReport::render` — this pin is the sync point.)
+    #[test]
+    fn the_system_target_lock_renders_the_declared_graph_exactly() {
+        let plan = sample_plan();
+        let lock = plan
+            .edits
+            .iter()
+            .find(|e| e.path == "spec/credit-app.system.spec")
+            .expect("system lock");
+        let expected = "\
+# system spec: credit-app — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.
+
+modules (the ratified registry — one committed module lock each):
+- meter
+- billing
+
+seams (each edge: its obligation, then the verdict its checker returned):
+- meter -- billing : transport on Credits
+      obligation: the modules share this value and must agree on its laws
+      status: discharged by construction — the shared value is one type on both sides (the declaration carries the compile-time witness)
+";
+        assert_eq!(lock.contents, expected);
     }
 
     /// HONESTY: every hole is loud and greppable — each `todo!(` in the generated tree opens a
@@ -1600,6 +2447,320 @@ mod tests {
             holes >= 10,
             "the sample should carry many holes, got {holes}"
         );
+    }
+
+    /// A STRUCTURED rule generates the transcription prose leaves as holes: the range
+    /// yields the predicate and the edge-seeking grid, and the declared `saturating` policy
+    /// yields the clamping `mint` — so the value object carries NO meaning holes at all,
+    /// while the operator interiors (genuine meaning) still do. The emitted file stays
+    /// syn-clean.
+    #[test]
+    fn a_structured_rule_generates_what_prose_leaves_as_holes() {
+        let decl = "system! { name: \"cap\", \
+                    values { C = i64 where 0..=20 saturating; } \
+                    modules { m { ops { zero() -> C; pool(C, C) -> C; } \
+                    expects { commutative(pool); identity(pool, zero); } } } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .expect("boundary")
+            .contents;
+
+        assert!(boundary.contains("(0..=20).contains(&raw).then_some(C(raw))"));
+        assert!(boundary.contains("C(raw.clamp(0, 20))"));
+        assert!(
+            boundary.contains("C(0)"),
+            "the grid seeds at the lower edge"
+        );
+        assert!(boundary.contains("vec![C(self.0.saturating_add(1).clamp(0, 20)), C(20)],"));
+        assert!(boundary.contains("vec![C(self.0.saturating_sub(1).clamp(0, 20)), C(0)],"));
+        // no holes in CODE lines — the banner's prose legitimately quotes the marker.
+        let code_holes = boundary
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .filter(|line| line.contains("todo!"))
+            .count();
+        assert_eq!(
+            code_holes, 0,
+            "a fully-structured value object owes nothing: {boundary}"
+        );
+        syn::parse_file(boundary).expect("the generated boundary parses");
+
+        // the genuine meaning is still owed: the operator interiors and the constant.
+        let interior = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m_internal.rs")
+            .expect("interior")
+            .contents;
+        assert!(interior.contains("todo!(\"MEANING: body of pool(C, C) -> C\")"));
+
+        // negative bounds render as declared (signed raw).
+        let signed = "system! { name: \"deg\", values { T = i64 where -5..=5 saturating; } \
+                      modules { m { ops { f(T, T) -> T; } } } }";
+        let plan = Genesis::plan(signed, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .unwrap()
+            .contents;
+        assert!(boundary.contains("(-5..=5).contains(&raw)"));
+        assert!(boundary.contains("T(raw.clamp(-5, 5))"));
+    }
+
+    /// A range WITHOUT a policy generates the predicate and grid but keeps `mint` a hole —
+    /// the range is declared; the re-entry discipline (clamp vs reject vs panic) is meaning.
+    #[test]
+    fn an_unpoliced_range_keeps_the_reentry_hole() {
+        let decl = "system! { name: \"cap\", values { C = i64 where 0..=20; } \
+                    modules { m { ops { pool(C, C) -> C; } } } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .unwrap()
+            .contents;
+        assert!(
+            boundary.contains("(0..=20).contains(&raw)"),
+            "predicate generated"
+        );
+        assert!(
+            boundary.contains("todo!(\"MEANING: interior constructor for C (re-enter 0..=20)\")"),
+            "mint stays a hole"
+        );
+        assert!(boundary.contains("Declare `saturating` to generate the clamp"));
+        assert!(
+            boundary.contains("C(self.0.saturating_add(1)"),
+            "grid still generated"
+        );
+    }
+
+    /// The raw representation is any Rust TYPE, rendered back as written — the v1
+    /// plain-path restriction is gone.
+    #[test]
+    fn raw_types_are_arbitrary_types() {
+        let decl = "system! { name: \"blob\", \
+                    values { R = Vec<u8> where \"non-empty\"; P = (i64, u8) where \"any\"; } \
+                    modules { m { ops { join(R, R) -> R; tag(R, P) -> R; } } } }";
+        let plan = Genesis::plan(decl, &Deps::Version("0".to_string())).expect("plan");
+        let boundary = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/m.rs")
+            .unwrap()
+            .contents;
+        assert!(boundary.contains("pub struct R(Vec<u8>);"));
+        assert!(boundary.contains("pub struct P((i64, u8));"));
+        assert!(boundary.contains("pub fn new(raw: Vec<u8>) -> Option<R>"));
+        syn::parse_file(boundary).expect("generic raws still emit parseable Rust");
+    }
+
+    /// Structured rules are validated at plan time, each refusal naming the fault: a range
+    /// on a non-integer raw, an empty range, a negative bound on an unsigned raw, and an
+    /// unknown re-entry policy.
+    #[test]
+    fn malformed_structured_rules_are_refused_by_name() {
+        let wrap = |values: &str| {
+            format!("system! {{ name: \"app\", values {{ {values} }} modules {{ m {{ ops {{ f(V, V) -> V; }} }} }} }}")
+        };
+        let cases: Vec<(String, &str)> = vec![
+            (wrap("V = String where 0..=20;"), "not a primitive integer"),
+            (wrap("V = i64 where 5..=1;"), "empty range"),
+            (wrap("V = u8 where -1..=5;"), "unsigned"),
+            (
+                wrap("V = i64 where 0..=20 clamping;"),
+                "unknown re-entry policy",
+            ),
+        ];
+        for (decl, expected) in cases {
+            let err = Genesis::plan(&decl, &Deps::Version("0".to_string()))
+                .err()
+                .unwrap_or_else(|| panic!("should refuse: {decl}"));
+            assert!(
+                err.contains(expected),
+                "expected `{expected}` in the refusal, got: {err}"
+            );
+        }
+    }
+
+    // ===== the FULL-VOCABULARY sync: genesis's declared-law render IS the freeze's ==========
+    //
+    // Three fixture theories mirroring what `#[algebra]` emits (operator name == symbol,
+    // default `x`/`y`/`z` variables, binaries infix, unaries prefix), chosen so every
+    // newly-declarable shape fires: a lattice (distributivity, absorption), a two-sort
+    // conversion domain (involution, round-trip, homomorphism), and an action domain
+    // (action identity, monoid action, self-application). The test below declares EVERY law
+    // discovery finds and demands the emitted target lock equal the freeze's render byte
+    // for byte — order, prose, and equations at once.
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    struct L;
+    struct Latt;
+    fn and_op(v: &[bool]) -> Option<bool> {
+        Some(v[0] && v[1])
+    }
+    fn or_op(v: &[bool]) -> Option<bool> {
+        Some(v[0] || v[1])
+    }
+    crate::theory! {
+        Latt : "latt", Value = bool, Obs = bool, Sort = L,
+        sort_of = |_: &bool| L,
+        observe = |v: &bool| *v,
+        vars { L => &["x", "y", "z"], }
+        inhabit { L => vec![false, true], }
+        ops {
+            Infix "and" "and" (L, L) -> L = and_op;
+            Infix "or"  "or"  (L, L) -> L = or_op;
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum C2 {
+        A,
+        B,
+    }
+    struct Conv;
+    fn cat_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1.max(v[1].1)))
+    }
+    fn glue_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1.max(v[1].1)))
+    }
+    fn esc_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1))
+    }
+    fn unesc_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1))
+    }
+    fn twist_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, -v[0].1))
+    }
+    crate::theory! {
+        Conv : "conv", Value = (u8, i64), Obs = (u8, i64), Sort = C2,
+        sort_of = |v: &(u8, i64)| if v.0 == 0 { C2::A } else { C2::B },
+        observe = |v: &(u8, i64)| *v,
+        vars { C2::A => &["x", "y", "z"], C2::B => &["x", "y", "z"], }
+        inhabit {
+            C2::A => vec![(0, -1), (0, 0), (0, 1)],
+            C2::B => vec![(1, -1), (1, 0), (1, 1)],
+        }
+        ops {
+            Infix  "cat"   "cat"   (C2::A, C2::A) -> C2::A = cat_op;
+            Infix  "glue"  "glue"  (C2::B, C2::B) -> C2::B = glue_op;
+            Prefix "esc"   "esc"   (C2::A) -> C2::B = esc_op;
+            Prefix "unesc" "unesc" (C2::B) -> C2::A = unesc_op;
+            Prefix "twist" "twist" (C2::A) -> C2::A = twist_op;
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum SC {
+        C,
+        P,
+    }
+    struct Score;
+    fn bump_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1 + v[1].1))
+    }
+    fn plus_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1 + v[1].1))
+    }
+    fn unit_op(_: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, 0))
+    }
+    fn cmp_op(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1 - v[1].1))
+    }
+    crate::theory! {
+        Score : "score", Value = (u8, i64), Obs = (u8, i64), Sort = SC,
+        sort_of = |v: &(u8, i64)| if v.0 == 0 { SC::C } else { SC::P },
+        observe = |v: &(u8, i64)| *v,
+        vars { SC::C => &["x", "y", "z"], SC::P => &["x", "y", "z"], }
+        inhabit {
+            SC::C => vec![(0, 0), (0, 1), (0, 2)],
+            SC::P => vec![(1, 0), (1, 1), (1, 2)],
+        }
+        ops {
+            Infix   "bump" "bump" (SC::C, SC::P) -> SC::C = bump_op;
+            Infix   "plus" "plus" (SC::P, SC::P) -> SC::P = plus_op;
+            Nullary "unit" "unit" () -> SC::P = unit_op;
+            Infix   "cmp"  "cmp"  (SC::C, SC::C) -> SC::P = cmp_op;
+        }
+    }
+
+    /// THE SYNC PIN for the whole declarable vocabulary: declare every law discovery finds
+    /// over a fixture, and the emitted TARGET lock must equal the freeze's live render byte
+    /// for byte — same laws, same prose (the catalog template), same equations (the engine's
+    /// canonical render), same ORDER (the fire-operator emulation). Any drift between
+    /// genesis's renderer and the engine's fails here, per shape, by name.
+    #[test]
+    fn the_target_lock_reproduces_discovery_byte_for_byte() {
+        use crate::discover::engine::{Engine, ShapeCatalog, Theory};
+
+        fn check<T: Theory>(expect_shapes: &[&str]) {
+            let engine = Engine::<T>::new();
+            let sigs = engine.signatures();
+            let symbols: Vec<&'static str> = sigs.iter().map(|(s, _, _)| *s).collect();
+            let inventory = ShapeCatalog::inventory();
+            let mut expects = Vec::new();
+            let mut fired: Vec<&str> = Vec::new();
+            for law in engine.discover().laws {
+                let ops = law.ops(&symbols);
+                let slots = inventory
+                    .iter()
+                    .find(|i| i.name == law.shape)
+                    .expect("ratified shape")
+                    .gate_slots
+                    .slots
+                    .len();
+                assert_eq!(
+                    ops.len(),
+                    slots,
+                    "fixture law `{}` coincides slots — pick a cleaner fixture",
+                    law.prose
+                );
+                fired.push(law.shape);
+                expects.push(Expectation {
+                    shape: law.shape,
+                    ops: ops.into_iter().map(String::from).collect(),
+                });
+            }
+            for shape in expect_shapes {
+                assert!(
+                    fired.contains(shape),
+                    "fixture `{}` was chosen to fire `{shape}`, but it did not",
+                    T::name()
+                );
+            }
+            let module = ModuleDecl {
+                name: T::name().to_string(),
+                ops: sigs
+                    .iter()
+                    .map(|(symbol, inputs, output)| OpDecl {
+                        name: symbol.to_string(),
+                        inputs: inputs.iter().map(|s| format!("{s:?}")).collect(),
+                        output: format!("{output:?}"),
+                    })
+                    .collect(),
+                expects,
+            };
+            assert_eq!(
+                emit_target_lock(&module),
+                crate::discover::Spec::of::<T>()
+                    .lock_in(Path::new("spec"))
+                    .live,
+                "genesis's declared-law render diverged from the freeze for `{}`",
+                T::name()
+            );
+        }
+
+        check::<Latt>(&["distributivity", "absorption"]);
+        check::<Conv>(&["involution", "round-trip", "homomorphism"]);
+        check::<Score>(&["action identity", "monoid action", "self-application"]);
     }
 
     /// The dependency flag switches the manifest between a path-parameterised checkout and
@@ -1641,7 +2802,15 @@ mod tests {
                     "values { V = i64 where \"any\"; } modules { m { ops { f(V, V) -> V; } \
                      expects { identity(f, zero); } } }",
                 ),
-                "nullary operator",
+                "which module `m` does not declare",
+            ),
+            (
+                wrap(
+                    "values { V = i64 where \"any\"; W = i64 where \"any\"; } modules { m { \
+                     ops { f(V, V) -> V; wrong(W, W) -> W; unit() -> W; } \
+                     expects { identity(f, unit); } } }",
+                ),
+                "`unit` must be a nullary constant of the matching sort",
             ),
             (
                 wrap(

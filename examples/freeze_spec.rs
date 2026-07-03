@@ -8,15 +8,25 @@
 //! this repo's artifacts (path + rendered text). A downstream crate writes the same loop over its
 //! own theories with `Spec::of::<MyTheory>().lock_in(spec_dir)`, rooting the locks in ITS repo.
 //!
+//! The SYSTEM lock (`spec/boundary-spec.system.spec`) freezes here too: the compiled
+//! `system!` graph — the module registry plus every seam's obligation and status — under the
+//! same discipline (see `discover::system`).
+//!
 //! Run `cargo run --example freeze_spec`.
 
-use boundary_spec::discover::{all_specs, Spec};
+use boundary_spec::discover::system::SystemReport;
+use boundary_spec::discover::{all_specs, BoundarySpec, Spec};
 
 fn main() {
     let specs = all_specs();
-    let locks: Vec<spec_lock::Lock> = specs.iter().map(Spec::lock).collect();
+    let mut locks: Vec<spec_lock::Lock> = specs.iter().map(Spec::lock).collect();
+    locks.push(SystemReport::of::<BoundarySpec>().lock());
     spec_lock::bless(&locks).expect("write spec locks");
     for (lock, spec) in locks.iter().zip(&specs) {
         println!("froze {} ({} laws)", lock.path.display(), spec.laws.len());
     }
+    println!(
+        "froze {} (the seam graph)",
+        locks.last().expect("system lock").path.display()
+    );
 }

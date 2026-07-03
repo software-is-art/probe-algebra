@@ -216,8 +216,10 @@ impl Sampled for crate::interp::boundary::Expr {
 // failure mode BY CONSTRUCTION, as a chain where the author names no variant anywhere:
 //
 //   `#[derive(Shaped)]`  — a value object's degrees of freedom, read off its variants/fields;
-//   `shadow_grid`        — the inhabitant closed under `all_perturbations()` (variant swaps
-//                          included), so the grid reaches every constructor within the cap;
+//   `shadow_grid`        — the inhabitant closed STRUCTURE-FIRST (the exhaustive, type-level
+//                          -finite partition: variant swaps, threaded through fields), then
+//                          under `all_perturbations()` with the remaining budget — so the cap
+//                          can starve value density, never constructor coverage;
 //   `shaped_strategy`    — that grid as a proptest base, folded into each probe's generator
 //                          via `prop_oneof!` alongside the domain-shaped recursive space;
 //   the completeness tests in `registry` — `std::mem::discriminant` as the judge that the
@@ -245,23 +247,10 @@ where
     proptest::sample::select(crate::discover::engine::shadow_grid::<V>(cap))
 }
 
-/// The constructors the derived space DEMANDS but `grid` never exhibits: discriminants
-/// reachable via `all_perturbations` from grid members that appear nowhere in the grid.
-/// Empty iff the grid is discriminant-closed — the requirement side comes from the type's
-/// own `Shaped` surface, so no variant is hand-listed here either.
-pub fn grid_gaps<V: crate::boundary::Shaped>(grid: &[V]) -> Vec<core::mem::Discriminant<V>> {
-    let exhibited: Vec<_> = grid.iter().map(core::mem::discriminant).collect();
-    let mut gaps = Vec::new();
-    for v in grid {
-        for n in v.all_perturbations() {
-            let d = core::mem::discriminant(&n);
-            if !exhibited.contains(&d) && !gaps.contains(&d) {
-                gaps.push(d);
-            }
-        }
-    }
-    gaps
-}
+/// The constructors the derived space DEMANDS but `grid` never exhibits — PROMOTED to the
+/// library (`boundary::grid_gaps`), so every downstream `#[derive(Shaped)]` grid can be held
+/// to the same invariant this harness pioneered; re-exported here for the audit tests below.
+pub use crate::boundary::grid_gaps;
 
 /// The constructors in `required` that `strategy` never produced (at the root) across
 /// `draws` DETERMINISTIC samples — how a generator is audited against the derived surface.

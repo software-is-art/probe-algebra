@@ -12,8 +12,12 @@
 //!     cargo run --example genesis -- examples/genesis_demo.rs /tmp/credit-app
 //!
 //! Grammar: see the header of `src/discover/genesis.rs` — every production is documented there.
-//! The `where` strings are validity-rule HOLES: prose carried verbatim into the generated stubs
-//! as doc'd `todo!()` predicates. Meaning is never generated.
+//! The `where` strings here are validity-rule HOLES: prose carried verbatim into the generated
+//! stubs as doc'd `todo!()` predicates — this sample keeps them prose ON PURPOSE, to exercise
+//! the hole-filling story end to end (the committed `genesis-demo/` is its convergence).
+//! STRUCTURED rules exist too and generate their own transcription: `Credits = i64 where
+//! 0..=20 saturating;` would derive the predicate, the clamping `mint`, and the edge-seeking
+//! `Shaped` grid, leaving only the operator interiors as meaning. Meaning is never generated.
 
 #[cfg(any())]
 system! {
