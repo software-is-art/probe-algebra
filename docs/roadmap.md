@@ -94,6 +94,23 @@ demo's `billing` module told the same story unprompted: `charge` sat in "operato
 `(x charge x) ≠ x`. Honest frame inverted but intact: a witness refutes triviality on the
 grid; it never proves richness.
 
+**The catalog IS the engine** (the de-restatement brick): the last code/data duality in the
+kernel is gone. `Engine::templates()` was the battery stated as CODE while
+`ShapeCatalog::inventory()` stated it as DATA, census-guarded to move together; now
+`templates()` is a ~150-line generic interpreter over the inventory — a shape's `gate_slots`
+decide where it fires (and bind its sort variables, via `ShapeGate::bind`, so admission and
+instantiation are one computation), its canonical `SchemaTerm`s are what discovery runs, its
+`template`/`holes` render the prose, its `polarity` is the judgment, and the three residues
+that were only code are now fields (`mirrored` for two-sided identity/annihilation, `guard`
+for bias's skipped-when-commutative, `const_rule` for irreflexivity vs self-application).
+Adding a shape is adding a STANZA OF DATA; `spec/shapes.spec` is executable the moment it
+lands. Genesis's fire model simplified with it (fire is uniformly slot 0 — the round-trip
+special case dissolved). The byte pins earned their keep on the way: they caught a real
+sort-variable inversion in round-trip's slot descriptors that the display census could not
+see. The canonical emission order (band → fire op → catalog rank → partner order) moved
+exactly two committed lock lines in the whole workspace — both pure reorders, ratified — and
+the demos did not change at all. Net −109 lines.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research

@@ -442,11 +442,11 @@ mod tests {
                 "With Multiplication, the grouping of three values doesn't matter.",
                 "((x * y) * z) = (x * (y * z))",
             ),
-            ("Multiplication by 0 always gives 0.", "(0 * x) = 0"),
             (
                 "Multiplication with 1 leaves a value unchanged.",
                 "(1 * x) = x",
             ),
+            ("Multiplication by 0 always gives 0.", "(0 * x) = 0"),
             (
                 "Multiplication distributes over Addition.",
                 "(x * (y + z)) = ((x * y) + (x * z))",

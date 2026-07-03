@@ -50,8 +50,9 @@ it). Individually: `cargo fmt --all --check`, `cargo clippy --workspace --all-ta
 - New public items drift the qualify census → re-bless (see table) and commit the diff.
 - Error messages / lock prose are byte-pinned by tests; changing wording means updating
   the pinned assertions in the same commit.
-- The shape catalog (`ShapeCatalog::inventory()`) and `Engine::templates()` MUST move
-  together — census tests hold prose, gates, and canonical terms against each other.
+- The shape catalog IS the engine: `Engine::templates()` interprets
+  `ShapeCatalog::inventory()` generically, so a new law shape is a new DATA stanza there
+  (gate slots, canonical terms, template, polarity) — never new battery code.
 - Declared expectations, genesis parsing, and the engine share ONE vocabulary
   (`discover::expect::Expectation`, catalog templates/terms) — never restate a law's
   prose or equation in a second place.

@@ -1514,20 +1514,15 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
         m.name
     );
     // laws in the order a confirming discovery renders them: EQUATIONS first, WITNESS laws
-    // last (the engine emits its inequation pass after the whole equational battery), each
-    // band grouped by the operator the engine FIRES the shape on (the first declared op —
-    // except a round trip, which fires on its INNER conversion), then in catalog order,
-    // declaration order breaking ties. The dynamic sync test holds this to the freeze's
-    // actual render.
+    // last (the engine emits its inequation band after the whole equational one), each band
+    // grouped by the operator the engine FIRES the shape on — uniformly the first declared
+    // op, the shape's slot 0, since the generic driver replaced the hand-written battery —
+    // then in catalog order, declaration order breaking ties. The dynamic sync test holds
+    // this to the freeze's actual render.
     let fire_index = |e: &Expectation| {
-        let fire_op = if e.shape == "round-trip" {
-            &e.ops[1]
-        } else {
-            &e.ops[0]
-        };
         m.ops
             .iter()
-            .position(|o| o.name == *fire_op)
+            .position(|o| o.name == e.ops[0])
             .expect("validated: every named operator is declared")
     };
     let band = |e: &Expectation| match shape_info(e).polarity {

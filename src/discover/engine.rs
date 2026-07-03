@@ -444,12 +444,13 @@ impl<T: Theory> Engine<T> {
 // -- the template battery: universal algebraic shapes instantiated over the operators -----------
 
 // ================================================================================================
-// THE SHAPE CATALOG — this block and `Engine::templates()` below MUST MOVE TOGETHER.
-//
-// `templates()` is the battery stated as CODE (shapes that fire); `ShapeCatalog::inventory()` is
-// the same battery stated as DATA (shapes that are ratified). Add, remove, or reword a shape in
-// one and the census tests fail until the other follows — and until the regenerated
-// `spec/shapes.spec` diff is reviewed.
+// THE SHAPE CATALOG IS THE ENGINE. There is no second artifact: `Engine::templates()` is a
+// generic interpreter over `ShapeCatalog::inventory()`, so a shape's gate decides where it
+// fires, its canonical terms are what discovery runs, its template is the prose a law renders
+// with, and its polarity is the judgment. Adding a shape is adding a STANZA OF DATA below —
+// ratified through the regenerated `spec/shapes.spec` diff, executable the moment it lands.
+// (The old MOVE-TOGETHER discipline, where this block and a hand-written battery restated
+// each other under census guard, is dissolved; the censuses remain as regression nets.)
 // ================================================================================================
 
 /// One universal algebraic shape, as a ratifiable datum: its name, its schematic equation, the
@@ -486,6 +487,46 @@ pub struct ShapeInfo {
     /// Equational (`=`, holds on every assignment) or WITNESS (`≠`, differs on some) — see
     /// [`Polarity`]. The witness shapes are the catalog's inequation half.
     pub polarity: Polarity,
+    /// The template hole each slot fills, in slot order (`["op", "const"]`) — the single
+    /// source for instantiating the prose over a concrete binding, engine- and genesis-side
+    /// alike. A constant slot fills its hole with the operator's SYMBOL (`0`, `false`),
+    /// every other slot with its NAME ("Addition") — the render `templates()` always used.
+    pub holes: &'static [&'static str],
+    /// Try the argument-swapped variant of `lhs`'s outer application too, under the same
+    /// prose — how identity and annihilation are two-sided (`(e ⊕ x) = x` or `(x ⊕ e) = x`)
+    /// without being two shapes.
+    pub mirrored: bool,
+    /// The shape's behavioural guard — the one applicability condition that is a GRID fact
+    /// rather than a signature fact, as data (see [`Guard`]).
+    pub guard: Guard,
+    /// What the shape requires of its constant slot's symbol (see [`ConstRule`]) — how
+    /// irreflexivity and self-application share one signature but split one vocabulary row.
+    pub const_rule: ConstRule,
+}
+
+/// A shape's behavioural applicability guard. Signature facts live in [`ShapeGate`]; this
+/// is the residue that only the grid can decide.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Guard {
+    /// No behavioural condition.
+    None,
+    /// Skip when the fire operator (slot 0) is commutative on the grid — a commutative
+    /// operator has no bias to state, and the two bias variants exist only where order
+    /// matters.
+    FireOpNotCommutative,
+}
+
+/// A constraint on the SYMBOL bound to a shape's constant slot. `rel(x, x) = false` is
+/// irreflexivity exactly when the constant renders as `false`; the same signature with any
+/// other constant is a self-application law.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ConstRule {
+    /// Any constant qualifies (or the shape has no constant slot).
+    Any,
+    /// The constant's symbol must be exactly this.
+    Named(&'static str),
+    /// The constant's symbol must NOT be this.
+    NotNamed(&'static str),
 }
 
 /// A schematic term: the shape's canonical equation halves as data, over SLOT indices (into
@@ -570,6 +611,18 @@ impl ShapeGate {
         sigs: &[(Vec<S>, S)],
         names: &[&str],
     ) -> Result<(), String> {
+        self.bind(sigs, names).map(|_| ())
+    }
+
+    /// [`ShapeGate::admit`], keeping its work: on success, the sort each sort VARIABLE
+    /// bound to (indexed by variable; `None` where no slot constrained it). The generic
+    /// template driver instantiates a shape's canonical terms through this binding, so
+    /// admission and instantiation are one computation, never two.
+    pub(crate) fn bind<S: PartialEq + Clone>(
+        &self,
+        sigs: &[(Vec<S>, S)],
+        names: &[&str],
+    ) -> Result<Vec<Option<S>>, String> {
         if sigs.len() != self.slots.len() || names.len() != self.slots.len() {
             return Err(format!(
                 "the shape ranges over {} operator(s), got {}",
@@ -649,7 +702,7 @@ impl ShapeGate {
                 ));
             }
         }
-        Ok(())
+        Ok(bound)
     }
 }
 
@@ -736,9 +789,9 @@ impl ShapeInfo {
 pub struct ShapeCatalog;
 
 impl ShapeCatalog {
-    /// The full inventory, in the order `templates()` tries the shapes. KEEP IN STEP with
-    /// `templates()` — the census tests hold each side against the other (prose AND data
-    /// gates), and the lock holds both against `spec/shapes.spec`.
+    /// The full inventory — the order IS the order discovery tries (and therefore renders)
+    /// the shapes within each polarity band, and `spec/shapes.spec` locks it. This is the
+    /// engine's whole battery: `templates()` interprets these stanzas, nothing else.
     pub fn inventory() -> Vec<ShapeInfo> {
         // the data-gate shorthand (prose gates render into the lock; these validate).
         const fn open(slots: &'static [Slot]) -> ShapeGate {
@@ -779,6 +832,10 @@ impl ShapeCatalog {
                 rhs: App(0, &[Y, X]),
                 placeholders: &["⊕"],
                 polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "associativity",
@@ -790,6 +847,10 @@ impl ShapeCatalog {
                 rhs: App(0, &[X, App(0, &[Y, Z])]),
                 placeholders: &["⊕"],
                 polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "idempotence",
@@ -801,6 +862,10 @@ impl ShapeCatalog {
                 rhs: X,
                 placeholders: &["⊕"],
                 polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "bias (right-regular)",
@@ -814,6 +879,10 @@ impl ShapeCatalog {
                 rhs: App(0, &[Y, X]),
                 placeholders: &["⊕"],
                 polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::FireOpNotCommutative,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "bias (left-regular)",
@@ -827,6 +896,10 @@ impl ShapeCatalog {
                 rhs: App(0, &[X, Y]),
                 placeholders: &["⊕"],
                 polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::FireOpNotCommutative,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "identity",
@@ -839,6 +912,10 @@ impl ShapeCatalog {
                 rhs: X,
                 placeholders: &["⊕", "e"],
                 polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: true,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "annihilation",
@@ -851,6 +928,10 @@ impl ShapeCatalog {
                 rhs: C,
                 placeholders: &["⊕", "a"],
                 polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: true,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "distributivity",
@@ -862,6 +943,10 @@ impl ShapeCatalog {
                 rhs: App(1, &[App(0, &[X, Y]), App(0, &[X, Z])]),
                 placeholders: &["⊕", "⊗"],
                 polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "absorption",
@@ -873,6 +958,10 @@ impl ShapeCatalog {
                 rhs: X,
                 placeholders: &["⊕", "⊗"],
                 polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "action identity",
@@ -889,6 +978,10 @@ impl ShapeCatalog {
                 rhs: X,
                 placeholders: &["act", "e"],
                 polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "monoid action",
@@ -905,6 +998,10 @@ impl ShapeCatalog {
                 rhs: App(0, &[X, App(1, &[P, Q])]),
                 placeholders: &["act", "⊗"],
                 polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "irreflexivity",
@@ -921,6 +1018,10 @@ impl ShapeCatalog {
                 rhs: C,
                 placeholders: &["rel", "false"],
                 polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("false"),
             },
             ShapeInfo {
                 name: "self-application",
@@ -936,6 +1037,10 @@ impl ShapeCatalog {
                 rhs: C,
                 placeholders: &["rel", "c"],
                 polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::NotNamed("false"),
             },
             ShapeInfo {
                 name: "involution",
@@ -947,13 +1052,20 @@ impl ShapeCatalog {
                 rhs: X,
                 placeholders: &["u"],
                 polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "round-trip",
                 schema: "g(f(x)) = x",
                 gate: "a pair of distinct unaries f : s → t and g : t → s",
+                // sort VARIABLE 0 is the carrier (x's sort, g's output): slot 0 is the
+                // outer g : 1 → 0, slot 1 the inner f : 0 → 1, so the canonical terms'
+                // `Var(0, 0)` is the value the trip returns to.
                 gate_slots: ShapeGate {
-                    slots: &[Slot::Unary(0, 1), Slot::Unary(1, 0)],
+                    slots: &[Slot::Unary(1, 0), Slot::Unary(0, 1)],
                     distinct_sorts: &[],
                     distinct_ops: &[(0, 1)],
                 },
@@ -962,6 +1074,10 @@ impl ShapeCatalog {
                 rhs: X,
                 placeholders: &["g", "f"],
                 polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "homomorphism",
@@ -973,6 +1089,10 @@ impl ShapeCatalog {
                 rhs: App(2, &[App(0, &[X]), App(0, &[Y])]),
                 placeholders: &["h", "⊕", "⊗"],
                 polarity: Polarity::Equal,
+                holes: &["op", "other", "via"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             // -- the WITNESS shapes: the catalog's inequation half (∃, not ∀). Found by
             // the algebra-mutation harness: its four survivors were all statements no
@@ -994,6 +1114,10 @@ impl ShapeCatalog {
                 rhs: X,
                 placeholders: &["act"],
                 polarity: Polarity::Differs,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
             ShapeInfo {
                 name: "non-constancy",
@@ -1011,6 +1135,10 @@ impl ShapeCatalog {
                 rhs: C,
                 placeholders: &["rel", "c"],
                 polarity: Polarity::Differs,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
             },
         ]
     }
@@ -1059,429 +1187,198 @@ impl<T: Theory> Engine<T> {
             .map(Term::Var)
     }
 
-    /// Every nullary operator (constant), as `(op id, the constant term)`.
-    fn constants(&self) -> Vec<(usize, Term)> {
-        self.ops
-            .iter()
-            .enumerate()
-            .filter(|(_, op)| op.inputs.is_empty())
-            .map(|(oid, _)| (oid, Term::App(oid, vec![])))
-            .collect()
-    }
-
     fn same(&self, a: &Term, b: &Term) -> bool {
         self.signature(a) == self.signature(b)
     }
 
-    fn app(op: usize, args: Vec<Term>) -> Term {
-        Term::App(op, args)
-    }
-
-    /// Instantiate the universal algebraic shapes over the operators; keep those that run true.
-    /// One law per recognised shape-instance, deduplicated by its prose (so left/right variants of
-    /// one symmetric law collapse).
+    /// Instantiate every catalog shape over the operators; keep those that run true.
     ///
-    /// !! MOVE TOGETHER !! This battery and `ShapeCatalog::inventory()` above are the same
-    /// catalog stated twice — as code that fires and as data that is locked in
-    /// `spec/shapes.spec`. A shape added, removed, or reworded here must be mirrored there
-    /// (the census tests enforce both directions — including that every `shape` tag pushed
-    /// here names a catalog entry), and the regenerated lock diff ratified.
+    /// THE CATALOG IS THE ENGINE: this is a generic interpreter over
+    /// [`ShapeCatalog::inventory()`] — the shape's `gate_slots` decide which operator
+    /// bindings are tried (and bind the sort variables), its `lhs`/`rhs` terms instantiate
+    /// through that binding, its `template`/`holes` render the prose, its `polarity` decides
+    /// the judgment, and `mirrored`/`guard`/`const_rule` carry the three residues that used
+    /// to live only in code. Adding a shape is adding a STANZA OF DATA — there is no second
+    /// artifact to keep in step, and the ratified catalog (`spec/shapes.spec`) is executable.
+    ///
+    /// Emission order is canonical and matches what genesis's target locks predict: the
+    /// equational band first, then the witness band; within a band, by FIRE operator (the
+    /// slot-0 binding), then catalog order, then partner bindings in operator-index order.
+    /// One law per confirmed instance, deduplicated by prose (a two-sided shape's mirrored
+    /// variant collapses onto the same line).
     fn templates(&self) -> Vec<DiscoveredLaw> {
         let mut out: Vec<DiscoveredLaw> = Vec::new();
         let mut seen_prose: Vec<String> = Vec::new();
-        let mut push = |this: &Self, shape: &'static str, prose: String, lhs: Term, rhs: Term| {
-            if this.same(&lhs, &rhs) && !seen_prose.contains(&prose) {
-                seen_prose.push(prose.clone());
-                let equation = format!("{} = {}", this.render(&lhs), this.render(&rhs));
-                out.push(DiscoveredLaw {
-                    shape,
-                    prose,
-                    equation,
-                    lhs,
-                    rhs,
-                    polarity: Polarity::Equal,
-                });
-            }
-        };
-
-        let ops = &self.ops;
-        for (fid, f) in ops.iter().enumerate() {
-            // homogeneous binary `f : s × s -> s`
-            if is_binary_on(f, f.output) {
-                let s = f.output;
-                let (Some(x), Some(y), Some(z)) = (self.var(s, 0), self.var(s, 1), self.var(s, 2))
-                else {
-                    continue;
-                };
-
-                // commutativity: f(x,y) = f(y,x)
-                push(
-                    self,
-                    "commutativity",
-                    format!("{} gives the same result in either order.", f.name),
-                    Self::app(fid, vec![x.clone(), y.clone()]),
-                    Self::app(fid, vec![y.clone(), x.clone()]),
-                );
-                // associativity: f(f(x,y),z) = f(x,f(y,z))
-                push(
-                    self,
-                    "associativity",
-                    format!(
-                        "With {}, the grouping of three values doesn't matter.",
-                        f.name
-                    ),
-                    Self::app(
-                        fid,
-                        vec![Self::app(fid, vec![x.clone(), y.clone()]), z.clone()],
-                    ),
-                    Self::app(
-                        fid,
-                        vec![x.clone(), Self::app(fid, vec![y.clone(), z.clone()])],
-                    ),
-                );
-                // idempotence: f(x,x) = x
-                push(
-                    self,
-                    "idempotence",
-                    format!("{} of a value with itself gives that value.", f.name),
-                    Self::app(fid, vec![x.clone(), x.clone()]),
-                    x.clone(),
-                );
-
-                // BIAS — the regular-band "sandwich" laws, tried only when order matters (a
-                // commutative operator has no bias to state): with `(x⊕y)⊕x`, does the re-applied
-                // EARLIER operand overwrite the later one? `(x⊕y)⊕x = y⊕x` says no — the later
-                // operand wins wherever the two disagree (right-regular / last-write-wins);
-                // the mirror `(x⊕y)⊕x = x⊕y` says the earlier wins (left-regular /
-                // first-write-wins). This shape exists because a hostile domain taught us the
-                // monoid laws are BIAS-BLIND: first- and last-write-wins merges satisfy
-                // identical monoid laws, so WHICH side wins was invisible to the discovered
-                // spec until this template named it. Given non-commutativity the two variants
-                // are mutually exclusive on the grid.
-                let commutative = self.same(
-                    &Self::app(fid, vec![x.clone(), y.clone()]),
-                    &Self::app(fid, vec![y.clone(), x.clone()]),
-                );
-                if !commutative {
-                    let sandwich = Self::app(
-                        fid,
-                        vec![Self::app(fid, vec![x.clone(), y.clone()]), x.clone()],
-                    );
-                    push(
-                        self,
-                        "bias (right-regular)",
-                        format!(
-                            "With {}, the later operand wins where the two disagree — \
-                             re-applying an earlier one cannot overwrite it.",
-                            f.name
-                        ),
-                        sandwich.clone(),
-                        Self::app(fid, vec![y.clone(), x.clone()]),
-                    );
-                    push(
-                        self,
-                        "bias (left-regular)",
-                        format!(
-                            "With {}, the earlier operand wins where the two disagree — \
-                             a later one cannot overwrite it.",
-                            f.name
-                        ),
-                        sandwich,
-                        Self::app(fid, vec![x.clone(), y.clone()]),
-                    );
-                }
-
-                // constant-bearing shapes
-                for (_, c) in self
-                    .constants()
-                    .into_iter()
-                    .filter(|(cid, _)| ops[*cid].output == s)
-                {
-                    let cs = self.render(&c);
-                    // identity: f(c,x) = x  (or f(x,c) = x)
-                    push(
-                        self,
-                        "identity",
-                        format!("{} with {} leaves a value unchanged.", f.name, cs),
-                        Self::app(fid, vec![c.clone(), x.clone()]),
-                        x.clone(),
-                    );
-                    push(
-                        self,
-                        "identity",
-                        format!("{} with {} leaves a value unchanged.", f.name, cs),
-                        Self::app(fid, vec![x.clone(), c.clone()]),
-                        x.clone(),
-                    );
-                    // annihilation: f(c,x) = c  (or f(x,c) = c)
-                    push(
-                        self,
-                        "annihilation",
-                        format!("{} by {} always gives {}.", f.name, cs, cs),
-                        Self::app(fid, vec![c.clone(), x.clone()]),
-                        c.clone(),
-                    );
-                    push(
-                        self,
-                        "annihilation",
-                        format!("{} by {} always gives {}.", f.name, cs, cs),
-                        Self::app(fid, vec![x.clone(), c.clone()]),
-                        c.clone(),
-                    );
-                }
-
-                // a second homogeneous binary `g` of the same sort: distributivity and absorption.
-                for (gid, g) in ops.iter().enumerate() {
-                    if gid != fid && is_binary_on(g, s) {
-                        // distributivity: f(x, g(y,z)) = g(f(x,y), f(x,z))
-                        push(
-                            self,
-                            "distributivity",
-                            format!("{} distributes over {}.", f.name, g.name),
-                            Self::app(
-                                fid,
-                                vec![x.clone(), Self::app(gid, vec![y.clone(), z.clone()])],
-                            ),
-                            Self::app(
-                                gid,
-                                vec![
-                                    Self::app(fid, vec![x.clone(), y.clone()]),
-                                    Self::app(fid, vec![x.clone(), z.clone()]),
-                                ],
-                            ),
-                        );
-                        // absorption: f(x, g(x,y)) = x  (e.g. `x ∧ (x ∨ y) = x`)
-                        push(
-                            self,
-                            "absorption",
-                            format!("{} absorbs {}.", f.name, g.name),
-                            Self::app(
-                                fid,
-                                vec![x.clone(), Self::app(gid, vec![x.clone(), y.clone()])],
-                            ),
-                            x.clone(),
-                        );
-                    }
-                }
-            }
-
-            // heterogeneous binary `f : s × t -> s` (an ACTION of `t` on `s`, `t ≠ s`)
-            if f.inputs.len() == 2 && f.inputs[0] == f.output && f.inputs[1] != f.output {
-                let s = f.output;
-                let t = f.inputs[1];
-                if let (Some(x), Some(p), Some(q)) =
-                    (self.var(s, 0), self.var(t, 0), self.var(t, 1))
-                {
-                    // action identity: f(x, c) = x for a constant `c : t` (`add(d, zero) = d`)
-                    for (_, c) in self
-                        .constants()
-                        .into_iter()
-                        .filter(|(cid, _)| ops[*cid].output == t)
-                    {
-                        let cs = self.render(&c);
-                        push(
-                            self,
-                            "action identity",
-                            format!("{} with {} leaves a value unchanged.", f.name, cs),
-                            Self::app(fid, vec![x.clone(), c.clone()]),
-                            x.clone(),
-                        );
-                    }
-                    // action compatibility: f(f(x,p),q) = f(x, g(p,q)) for a binary `g : t × t -> t`
-                    // (`add(add(d,p),q) = add(d, plus(p,q))`)
-                    for (gid, g) in ops.iter().enumerate() {
-                        if is_binary_on(g, t) {
-                            push(
-                                self,
-                                "monoid action",
-                                format!(
-                                    "Repeated {} combines its parameters with {}.",
-                                    f.name, g.name
-                                ),
-                                Self::app(
-                                    fid,
-                                    vec![Self::app(fid, vec![x.clone(), p.clone()]), q.clone()],
-                                ),
-                                Self::app(
-                                    fid,
-                                    vec![x.clone(), Self::app(gid, vec![p.clone(), q.clone()])],
-                                ),
-                            );
-                        }
-                    }
-                }
-            }
-
-            // relation `p : s × s -> r`, with `r` carrying a `false` constant → irreflexivity
-            if f.inputs.len() == 2 && f.inputs[0] == f.inputs[1] && f.output != f.inputs[0] {
-                let s = f.inputs[0];
-                let r = f.output;
-                if let Some(x) = self.var(s, 0) {
-                    for (_, c) in self
-                        .constants()
-                        .into_iter()
-                        .filter(|(cid, _)| ops[*cid].output == r)
-                    {
-                        // a relation collapsing to `false` is irreflexivity; any other constant is a
-                        // self-application law (`diff(x, x) = zero`).
-                        let cs = self.render(&c);
-                        let (shape, prose) = if cs == "false" {
-                            (
-                                "irreflexivity",
-                                format!("A value is never {} itself.", f.name),
-                            )
-                        } else {
-                            (
-                                "self-application",
-                                format!("{} of a value with itself gives {}.", f.name, cs),
-                            )
-                        };
-                        push(
-                            self,
-                            shape,
-                            prose,
-                            Self::app(fid, vec![x.clone(), x.clone()]),
-                            c.clone(),
-                        );
-                    }
-                }
-            }
-
-            // unary `u : s -> s` → involution
-            if f.inputs.len() == 1 && f.output == f.inputs[0] {
-                let s = f.output;
-                if let Some(x) = self.var(s, 0) {
-                    push(
-                        self,
-                        "involution",
-                        format!("{} twice returns the original value.", f.name),
-                        Self::app(fid, vec![Self::app(fid, vec![x.clone()])]),
-                        x.clone(),
-                    );
-                }
-            }
-
-            // round-trip: g(f(x)) = x for f : s -> t and g : t -> s
-            if f.inputs.len() == 1 {
-                let s = f.inputs[0];
-                let t = f.output;
-                if let Some(x) = self.var(s, 0) {
-                    for (gid, g) in ops.iter().enumerate() {
-                        if gid != fid && g.inputs.len() == 1 && g.inputs[0] == t && g.output == s {
-                            push(
-                                self,
-                                "round-trip",
-                                format!(
-                                    "{} undoes {} — the round trip is the identity.",
-                                    g.name, f.name
-                                ),
-                                Self::app(gid, vec![Self::app(fid, vec![x.clone()])]),
-                                x.clone(),
-                            );
-                        }
-                    }
-                }
-
-                // homomorphism: `h(p(x,y)) = q(h(x), h(y))` — `h = f` turns a binary `p` on its input
-                // sort into a binary `q` on its output sort (e.g. De Morgan: `¬(x∧y) = ¬x ∨ ¬y`).
-                if let (Some(xs), Some(ys)) = (self.var(s, 0), self.var(s, 1)) {
-                    for (pid, p) in ops.iter().enumerate() {
-                        if !is_binary_on(p, s) {
-                            continue;
-                        }
-                        for (qid, q) in ops.iter().enumerate() {
-                            if is_binary_on(q, t) {
-                                push(
-                                    self,
-                                    "homomorphism",
-                                    format!("{} turns {} into {}.", f.name, p.name, q.name),
-                                    Self::app(
-                                        fid,
-                                        vec![Self::app(pid, vec![xs.clone(), ys.clone()])],
-                                    ),
-                                    Self::app(
-                                        qid,
-                                        vec![
-                                            Self::app(fid, vec![xs.clone()]),
-                                            Self::app(fid, vec![ys.clone()]),
-                                        ],
-                                    ),
-                                );
-                            }
-                        }
-                    }
+        let inventory = ShapeCatalog::inventory();
+        for band in [Polarity::Equal, Polarity::Differs] {
+            for fire in 0..self.ops.len() {
+                for shape in inventory.iter().filter(|s| s.polarity == band) {
+                    self.instantiate_shape(shape, fire, &mut seen_prose, &mut out);
                 }
             }
         }
-
-        // -- the WITNESS pass: the catalog's inequation half (`Polarity::Differs`) -----------
-        //
-        // A witness law holds when the two terms DIFFER on some assignment (both meaningfully
-        // defined somewhere) — the ∃ the equational battery cannot state. Emitted after the
-        // equations so a spec reads universals first, witnesses last.
-        let mut refute = |this: &Self, shape: &'static str, prose: String, lhs: Term, rhs: Term| {
-            let (a, b) = (this.signature(&lhs), this.signature(&rhs));
-            if Self::meaningful(&a)
-                && Self::meaningful(&b)
-                && a != b
-                && !seen_prose.contains(&prose)
-            {
-                seen_prose.push(prose.clone());
-                let equation = format!("{} ≠ {}", this.render(&lhs), this.render(&rhs));
-                out.push(DiscoveredLaw {
-                    shape,
-                    prose,
-                    equation,
-                    lhs,
-                    rhs,
-                    polarity: Polarity::Differs,
-                });
-            }
-        };
-        for (fid, f) in ops.iter().enumerate() {
-            // action nontriviality: some parameter moves some value — `act(x, p) ≠ x`
-            // somewhere. Without it the TRIVIAL action (never moving anything) satisfies
-            // action identity and the monoid-action law vacuously — the algebra-mutation
-            // harness's founding survivor.
-            if f.inputs.len() == 2 && f.inputs[0] == f.output && f.inputs[1] != f.output {
-                if let (Some(x), Some(p)) = (self.var(f.output, 0), self.var(f.inputs[1], 0)) {
-                    refute(
-                        self,
-                        "action nontriviality",
-                        format!(
-                            "{} actually acts — some parameter moves some value.",
-                            f.name
-                        ),
-                        Self::app(fid, vec![x.clone(), p]),
-                        x,
-                    );
-                }
-            }
-            // non-constancy: a relation escapes each constant of its output sort somewhere —
-            // `rel(x, y) ≠ c`. Without it the never-true relation satisfies irreflexivity
-            // (its only equational law), and an operator no equation names is pinned by
-            // nothing at all.
-            if f.inputs.len() == 2 && f.inputs[0] == f.inputs[1] && f.output != f.inputs[0] {
-                if let (Some(x), Some(y)) = (self.var(f.inputs[0], 0), self.var(f.inputs[0], 1)) {
-                    for (_, c) in self
-                        .constants()
-                        .into_iter()
-                        .filter(|(cid, _)| ops[*cid].output == f.output)
-                    {
-                        let cs = self.render(&c);
-                        refute(
-                            self,
-                            "non-constancy",
-                            format!("{} is not constantly {}.", f.name, cs),
-                            Self::app(fid, vec![x.clone(), y.clone()]),
-                            c,
-                        );
-                    }
-                }
-            }
-        }
-
         out
+    }
+
+    /// Every confirmed instance of one shape fired on one operator: enumerate the partner
+    /// bindings, admit them through the shape's data gate, concretize the canonical terms,
+    /// judge by polarity, and push (deduplicated by prose).
+    fn instantiate_shape(
+        &self,
+        shape: &ShapeInfo,
+        fire: usize,
+        seen_prose: &mut Vec<String>,
+        out: &mut Vec<DiscoveredLaw>,
+    ) {
+        // the behavioural guard — the one applicability fact only the grid decides. The
+        // signature check comes first: the guard PROBES the fire operator on the grid, so
+        // it must not run on an operator the shape's gate would refuse anyway.
+        match shape.guard {
+            Guard::None => {}
+            Guard::FireOpNotCommutative => {
+                let s = self.ops[fire].output;
+                if !is_binary_on(&self.ops[fire], s) {
+                    return;
+                }
+                let (Some(x), Some(y)) = (self.var(s, 0), self.var(s, 1)) else {
+                    return;
+                };
+                let commutative = self.same(
+                    &Term::App(fire, vec![x.clone(), y.clone()]),
+                    &Term::App(fire, vec![y, x]),
+                );
+                if commutative {
+                    return;
+                }
+            }
+        }
+
+        // every operator tuple with slot 0 = the fire operator, remaining slots in
+        // operator-index order (lexicographic — the canonical partner order).
+        let n = self.ops.len();
+        let rest = shape.gate_slots.slots.len() - 1;
+        let combos = n.pow(rest as u32);
+        for code in 0..combos {
+            let mut tuple = vec![fire];
+            for digit in (0..rest).rev() {
+                tuple.push((code / n.pow(digit as u32)) % n);
+            }
+
+            // the data gate admits (and binds the sort variables) or the tuple is skipped.
+            let sigs: Vec<(Vec<T::Sort>, T::Sort)> = tuple
+                .iter()
+                .map(|&i| (self.ops[i].inputs.clone(), self.ops[i].output))
+                .collect();
+            let names: Vec<&str> = tuple.iter().map(|&i| self.ops[i].symbol).collect();
+            let Ok(bound) = shape.gate_slots.bind(&sigs, &names) else {
+                continue;
+            };
+
+            // the constant-symbol residue (irreflexivity vs self-application).
+            let constant_ok = tuple
+                .iter()
+                .zip(shape.gate_slots.slots)
+                .filter(|(_, slot)| matches!(slot, Slot::Constant(_)))
+                .all(|(&i, _)| match shape.const_rule {
+                    ConstRule::Any => true,
+                    ConstRule::Named(s) => self.ops[i].symbol == s,
+                    ConstRule::NotNamed(s) => self.ops[i].symbol != s,
+                });
+            if !constant_ok {
+                continue;
+            }
+
+            // prose: the template over the binding — constants by symbol, operators by name.
+            let subs: Vec<(&str, &str)> = shape
+                .holes
+                .iter()
+                .zip(&tuple)
+                .zip(shape.gate_slots.slots)
+                .map(|((hole, &i), slot)| {
+                    let name = if matches!(slot, Slot::Constant(_)) {
+                        self.ops[i].symbol
+                    } else {
+                        self.ops[i].name
+                    };
+                    (*hole, name)
+                })
+                .collect();
+            let prose = shape.instantiate(&subs);
+            if seen_prose.contains(&prose) {
+                continue;
+            }
+
+            // concretize the canonical terms; a shape whose variables the theory cannot
+            // mint (an uninhabited sort) simply never fires.
+            let (Some(lhs), Some(rhs)) = (
+                self.concretize(&shape.lhs, &tuple, &bound),
+                self.concretize(&shape.rhs, &tuple, &bound),
+            ) else {
+                continue;
+            };
+
+            // judge — trying the mirrored (argument-swapped) variant under the same prose
+            // where the shape is two-sided.
+            let mut variants = vec![lhs];
+            if shape.mirrored {
+                if let Some(Term::App(op, args)) = variants.first().cloned() {
+                    if args.len() == 2 {
+                        variants.push(Term::App(op, vec![args[1].clone(), args[0].clone()]));
+                    }
+                }
+            }
+            for lhs in variants {
+                let confirmed = match shape.polarity {
+                    Polarity::Equal => self.same(&lhs, &rhs),
+                    Polarity::Differs => {
+                        let (a, b) = (self.signature(&lhs), self.signature(&rhs));
+                        Self::meaningful(&a) && Self::meaningful(&b) && a != b
+                    }
+                };
+                if !confirmed {
+                    continue;
+                }
+                seen_prose.push(prose.clone());
+                let connective = match shape.polarity {
+                    Polarity::Equal => "=",
+                    Polarity::Differs => "≠",
+                };
+                let equation = format!("{} {connective} {}", self.render(&lhs), self.render(&rhs));
+                out.push(DiscoveredLaw {
+                    shape: shape.name,
+                    prose,
+                    equation,
+                    lhs,
+                    rhs,
+                    polarity: shape.polarity,
+                });
+                break;
+            }
+        }
+    }
+
+    /// A schematic term over a concrete binding: slots become the tuple's operators, sort
+    /// variables' variables become the theory's (`None` when the theory minted no such
+    /// variable — the instance simply cannot fire).
+    fn concretize(
+        &self,
+        term: &SchemaTerm,
+        tuple: &[usize],
+        bound: &[Option<T::Sort>],
+    ) -> Option<Term> {
+        match term {
+            SchemaTerm::Var(sv, ord) => {
+                let sort = (*bound.get(*sv as usize)?)?;
+                self.var(sort, *ord as usize)
+            }
+            SchemaTerm::App(slot, args) => {
+                let mut concrete = Vec::with_capacity(args.len());
+                for arg in *args {
+                    concrete.push(self.concretize(arg, tuple, bound)?);
+                }
+                Some(Term::App(tuple[*slot as usize], concrete))
+            }
+        }
     }
 
     /// Run discovery: the named template laws, the count of further (consequence) equalities, and
@@ -1827,8 +1724,8 @@ mod tests {
                 "And of a value with itself gives that value.",
                 "(x & x) = x",
             ),
-            ("And by F always gives F.", "(F & x) = F"),
             ("And with T leaves a value unchanged.", "(T & x) = x"),
+            ("And by F always gives F.", "(F & x) = F"),
             (
                 "And distributes over Or.",
                 "(x & (y | z)) = ((x & y) | (x & z))",

@@ -126,12 +126,12 @@ mod tests {
                 "diff(s, s) = zero",
             ),
             (
-                "at undoes since — the round trip is the identity.",
-                "at(since(s)) = s",
-            ),
-            (
                 "since undoes at — the round trip is the identity.",
                 "since(at(p)) = p",
+            ),
+            (
+                "at undoes since — the round trip is the identity.",
+                "at(since(s)) = s",
             ),
             // the WITNESS laws — the inequations that close the algebra-mutation
             // survivors: the trivial action and the constantly-zero measure now
