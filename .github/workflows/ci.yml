@@ -84,7 +84,7 @@ jobs:
           tool: cargo-mutants,cargo-nextest
       - name: mutate the drift since the certified tree
         run: |
-          git rev-parse -q --verify refs/tags/mutants-green >/dev/null || { echo "::error::no mutants-green tag - seed it at a fully-swept sha, then: git push origin mutants-green"; exit 1; }
+          git rev-parse -q --verify refs/tags/mutants-green >/dev/null || { echo "::error::no mutants-green tag - bootstrap by dispatching this workflow (Actions -> ci -> Run workflow): the full sweep's countersign plants the tag it earns"; exit 1; }
           git diff "mutants-green...HEAD" > since-green.diff
           .github/mutants-gate.sh --in-diff since-green.diff
       - name: countersign — advance the certified-tree tag
@@ -113,3 +113,22 @@ jobs:
         with:
           tool: cargo-mutants,cargo-nextest
       - run: .github/mutants-gate.sh --shard ${{ matrix.shard }}/8
+
+  # The tag is only ever planted or advanced by a run that EARNED it: the
+  # incremental gate advances it per-merge, and this countersign advances it when
+  # EVERY shard of the full sweep is green — which is also the BOOTSTRAP (no tag
+  # yet? dispatch this workflow once; the certification plants it) and the
+  # recovery after a red stretch (the weekly green re-anchors the diff).
+  mutants-full-countersign:
+    name: countersign (full sweep)
+    needs: mutants-full
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: countersign — advance the certified-tree tag
+        run: |
+          git tag -f mutants-green
+          git push -f origin mutants-green

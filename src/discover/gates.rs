@@ -341,7 +341,7 @@ impl GateRegistry {
                  \x20         tool: cargo-mutants,cargo-nextest\n\
                  \x20     - name: mutate the drift since the certified tree\n\
                  \x20       run: |\n\
-                 \x20         git rev-parse -q --verify refs/tags/{GREEN_TAG} >/dev/null || {{ echo \"::error::no {GREEN_TAG} tag - seed it at a fully-swept sha, then: git push origin {GREEN_TAG}\"; exit 1; }}\n\
+                 \x20         git rev-parse -q --verify refs/tags/{GREEN_TAG} >/dev/null || {{ echo \"::error::no {GREEN_TAG} tag - bootstrap by dispatching this workflow (Actions -> ci -> Run workflow): the full sweep's countersign plants the tag it earns\"; exit 1; }}\n\
                  \x20         git diff \"{GREEN_TAG}...HEAD\" > since-green.diff\n\
                  \x20         {}\n\
                  \x20     - name: countersign — advance the certified-tree tag\n\
@@ -374,7 +374,26 @@ impl GateRegistry {
                  \x20     - uses: taiki-e/install-action@v2\n\
                  \x20       with:\n\
                  \x20         tool: cargo-mutants,cargo-nextest\n\
-                 \x20     - run: {} --shard ${{{{ matrix.shard }}}}/{FULL_SWEEP_SHARDS}\n",
+                 \x20     - run: {} --shard ${{{{ matrix.shard }}}}/{FULL_SWEEP_SHARDS}\n\
+                 \n\
+                 \x20 # The tag is only ever planted or advanced by a run that EARNED it: the\n\
+                 \x20 # incremental gate advances it per-merge, and this countersign advances it when\n\
+                 \x20 # EVERY shard of the full sweep is green — which is also the BOOTSTRAP (no tag\n\
+                 \x20 # yet? dispatch this workflow once; the certification plants it) and the\n\
+                 \x20 # recovery after a red stretch (the weekly green re-anchors the diff).\n\
+                 \x20 mutants-full-countersign:\n\
+                 \x20   name: countersign (full sweep)\n\
+                 \x20   needs: mutants-full\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   permissions:\n\
+                 \x20     contents: write\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - name: countersign — advance the certified-tree tag\n\
+                 \x20       run: |\n\
+                 \x20         git tag -f {GREEN_TAG}\n\
+                 \x20         git push -f origin {GREEN_TAG}\n",
                 gate.command_line(),
                 shard_list = shards.join(", ")
             ));
@@ -504,6 +523,19 @@ mod tests {
         assert!(workflow.contains(
             "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
         ));
+        // the tag has NO manual path: it is planted and advanced only by runs that earned
+        // it — the full sweep's countersign (also the bootstrap: dispatch the workflow
+        // once), gated on every shard via `needs`, and the incremental gate per-merge.
+        assert!(workflow.contains("mutants-full-countersign:"));
+        assert!(workflow.contains("needs: mutants-full"));
+        let advances = workflow
+            .matches(&format!("git push -f origin {GREEN_TAG}"))
+            .count();
+        assert_eq!(
+            advances, 2,
+            "the tag must advance in exactly two places: the incremental gate and the \
+             full sweep's countersign"
+        );
     }
 
     /// Everywhere cargo-mutants is installed, cargo-nextest rides along: the mutation
