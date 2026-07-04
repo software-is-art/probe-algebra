@@ -2,7 +2,8 @@
 
 **Derive the spec by running the thing. Freeze it. Gate the drift.**
 
-This is a Rust workspace (root crate `boundary-spec`) built around one discipline: you author
+This is a Rust workspace (root crate `boundary-spec`) built around one discipline — call it
+**spec-lock**, after the [tiny crate](spec-lock) that carries its mechanics: you author
 *meaning* — value objects, validity rules, operator bodies — and everything checkable about it
 is **derived, committed, and drift-gated byte for byte**. The behaviour spec, the module seam
 graph, the CI pipeline, the mutation-testing verdicts: none of them are written by hand, all of
