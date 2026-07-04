@@ -152,8 +152,36 @@ its recorded residuals. The items below predate that inventory:
    dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
    end-to-end net over the freeze's actual render.
 
+## From the field (the first production adoption)
+
+A production Rust CLI adopted `spec-lock` as a pinned git dependency — four agent sessions in
+one day, five substrates (a command surface, checklist data, coverage manifests, a
+reconciliation policy, an accepted-findings baseline), every re-bless in the same commit as
+its cause, the discipline transferred from the README alone. Its field notes seeded two
+candidate bricks:
+
+4. **Negative-fixture batteries — mutation testing for PIPELINES.** The witness-inequation
+   idea (`∃`: prove the gate ACTS) kept being needed at the process level: the adoption hit
+   three separate self-attestation failures in one system — a coverage manifest asserted by
+   the session that produced it, a "pass" stamp byte-identical whether the work happened or
+   not, a data tree that would have passed reconciliation with zero items checked. The
+   generalization: a standing battery of KNOWN-BAD fixtures proving each gate can still fire
+   — including gates over pure prose. Nobody does this; the field notes show why someone
+   should. Plausibly extractable in the spec-lock spirit: small, substrate-free, adoptable in
+   minutes. This is the witness shapes' lesson ("a spec that says nothing kills nothing" —
+   the mute-theory fixture) applied to processes instead of algebras.
+
+5. **The exception-register pattern, first-class.** The adoption's highest-leverage use was
+   freezing an accepted-findings baseline (documented in
+   [ci-discipline.md](ci-discipline.md)). The convention (deterministic keyed serialization →
+   byte equality IS set equality) covers it with spec-lock as-is; if field use keeps wanting
+   set-diff rendering ("2 new findings, 1 resolved" instead of a byte diff), a tiny keyed
+   helper alongside `Lock` is the shape — resist anything larger.
+
 ## Standing follow-ups
 
+- **Tag `v0.1.0`** — consumers currently pin by bare rev; a tag makes downstream manifests
+  read as versioned intent. No crates.io needed for this half-step.
 - **Publish** when ready: `docs/publishing.md` has the dependency-ordered sequence;
   all four names (`boundary-spec`, `boundary-spec-macros`, `spec-lock`,
   `boundary-enforce`) were verified unclaimed on crates.io on 2026-07-02.

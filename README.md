@@ -19,6 +19,15 @@ cargo run --example gate    # every gate CI runs, locally, from the same declara
 cargo test --workspace      # all suites + every drift gate + in-process mutation
 ```
 
+**Start here if you want the discipline without the engine**: [`spec-lock`](spec-lock) is the
+whole freeze/gate/ratify mechanic as one zero-dependency crate — `Lock { name, path, live }`
+plus `bless` and `check`. If your project can derive *any* deterministic text about itself
+(an API census, a schema dump, a config baseline, an exception register), spec-lock turns it
+into a drift-gated, review-ratified artifact in minutes; the first production adoption applied
+it to five substrates in a day, by agents who had never seen this repo, from this README
+alone. The rest of this page is the full method built on top of that move — adopt as much or
+as little as pays.
+
 ---
 
 ## The loop, in sixty seconds
