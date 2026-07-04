@@ -14,6 +14,7 @@
 
 use std::path::PathBuf;
 
+use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::Spec;
 use downstream_fixture::ops::meter_ops::CreditMeter;
 
@@ -31,6 +32,25 @@ fn the_committed_spec_is_fresh() {
     if let Err(stale) = spec_lock::check(std::slice::from_ref(&lock)) {
         panic!(
             "discovered spec drifted from the committed lock for: {}. \
+             Run `cargo run -p downstream-fixture --example freeze` and ratify the diff.",
+            stale.join(", ")
+        );
+    }
+}
+
+/// The consumer's MUTATION verdict is fresh — where the library's economics claim lands
+/// downstream: the credit meter's operator table is perturbed in-process (confusion,
+/// projection, partiality) and every mutant judged by re-running discovery, in
+/// milliseconds, inside this ordinary `cargo test`. No cargo-mutants job, no CI minutes,
+/// no runner — the theory core's mutation testing shifted all the way left. A SURVIVOR in
+/// the regenerated lock names a degree of freedom the spec leaves open: ratify it there
+/// or sharpen the declaration; either way it is a reviewed diff.
+#[test]
+fn the_committed_mutation_verdict_is_fresh() {
+    let lock = MutationReport::of::<CreditMeter>().lock_in(&spec_dir());
+    if let Err(stale) = spec_lock::check(std::slice::from_ref(&lock)) {
+        panic!(
+            "the algebra-mutation verdict drifted for: {}. \
              Run `cargo run -p downstream-fixture --example freeze` and ratify the diff.",
             stale.join(", ")
         );

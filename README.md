@@ -2,7 +2,8 @@
 
 **Derive the spec by running the thing. Freeze it. Gate the drift.**
 
-This is a Rust workspace (root crate `boundary-spec`) built around one discipline: you author
+This is a Rust workspace (root crate `boundary-spec`) built around one discipline — call it
+**spec-lock**, after the [tiny crate](spec-lock) that carries its mechanics: you author
 *meaning* — value objects, validity rules, operator bodies — and everything checkable about it
 is **derived, committed, and drift-gated byte for byte**. The behaviour spec, the module seam
 graph, the CI pipeline, the mutation-testing verdicts: none of them are written by hand, all of
@@ -272,8 +273,12 @@ boundary-spec = { git = "https://github.com/software-is-art/probe-algebra" }
 Model the domain as value objects and operators (`#[algebra]` for the hands-free path,
 `theory!` where an observation or grid is a deliberate choice), declare what you intend with
 `expects`, freeze with `Spec::of::<T>().lock_in(your_spec_dir)`, and gate the drift with
-`spec_lock::check` in a test. The interior stays ordinary Rust — rigidity lives at the
-boundary, paid once.
+`spec_lock::check` in a test. Freeze the mutation verdict beside it
+(`MutationReport::of::<T>().lock_in(...)`) and your theory core's mutation testing runs
+in-process, in milliseconds, with no CI job — reserve cargo-mutants for your plumbing
+([`downstream-fixture`](downstream-fixture) is the copyable proof; the substitution is
+measured in [docs/discovery.md](docs/discovery.md#algebra-level-mutation)). The interior
+stays ordinary Rust — rigidity lives at the boundary, paid once.
 
 ## License
 

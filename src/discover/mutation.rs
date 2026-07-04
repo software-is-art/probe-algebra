@@ -225,7 +225,7 @@ impl MutationReport {
     pub fn render(&self) -> String {
         let survivors = self.survivors().len();
         let mut out = format!(
-            "# algebra mutation: {} — {} operator-table mutants, {} — regenerate via `cargo run --example freeze_spec`; ratify the diff.\n\
+            "# algebra mutation: {} — {} operator-table mutants, {} — regenerate via this repo's freeze path; ratify the diff.\n\
              #\n\
              # Every mutant is a perturbed operator table (a VALUE, not a build), judged by\n\
              # re-running discovery: KILLED means the named-law set changed — the committed\n\

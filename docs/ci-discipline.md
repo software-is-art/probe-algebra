@@ -1,4 +1,4 @@
-# The CI discipline: freeze the spec, gate the drift, mutate the diff
+# The spec-lock discipline: freeze the spec, gate the drift, mutate the diff
 
 This repo's CI is built around one extractable pattern, and none of it depends on the discovery
 engine or on algebra. If your project can derive *any* text about itself deterministically — an
