@@ -160,16 +160,22 @@ reconciliation policy, an accepted-findings baseline), every re-bless in the sam
 its cause, the discipline transferred from the README alone. Its field notes seeded two
 candidate bricks:
 
-4. **Negative-fixture batteries — mutation testing for PIPELINES.** The witness-inequation
-   idea (`∃`: prove the gate ACTS) kept being needed at the process level: the adoption hit
-   three separate self-attestation failures in one system — a coverage manifest asserted by
-   the session that produced it, a "pass" stamp byte-identical whether the work happened or
-   not, a data tree that would have passed reconciliation with zero items checked. The
-   generalization: a standing battery of KNOWN-BAD fixtures proving each gate can still fire
-   — including gates over pure prose. Nobody does this; the field notes show why someone
-   should. Plausibly extractable in the spec-lock spirit: small, substrate-free, adoptable in
-   minutes. This is the witness shapes' lesson ("a spec that says nothing kills nothing" —
-   the mute-theory fixture) applied to processes instead of algebras.
+4. **Negative-fixture batteries — mutation testing for PIPELINES — BUILT** (`fire-drill/`).
+   The witness-inequation idea (`∃`: prove the gate ACTS) at the process level, seeded by
+   three self-attestation failures the adoption hit in one system (a coverage manifest
+   asserted by the session that produced it, a "pass" stamp byte-identical whether the work
+   happened or not, a reconciliation that would have passed on zero items). The extraction is
+   spec-lock-shaped: zero dependencies, substrate-free (`Battery`/`Drill`/`Outcome` — the
+   adopter runs their gate over their known-bad fixture however they run it and hands over
+   the outcome), two failure modes each named in its own vocabulary (VACUOUS: the gate passed
+   a planted bad fixture; UNPROVEN: a required gate carries no fixture at all — the census
+   half, so a gate cannot join a pipeline without proof it can fail), and a deterministic
+   `render()` for spec-lock composition so removing a drill is a reviewed diff. Dogfooded in
+   `tests/fire_drill.rs`: the repo's own battery plants a tampered lock, a missing lock, a
+   lawless theory, an over-claiming declaration, a mis-sorted shape binding, and an
+   unratified vocabulary word — six known-bad fixtures across five of the discipline's gates,
+   every one fired on. Honest frame inherited: a drill refutes vacuousness for ITS fixture
+   only; the battery proves the alarm rings when pressed, never that it hears everything.
 
 5. **The exception-register pattern, first-class.** The adoption's highest-leverage use was
    freezing an accepted-findings baseline (documented in

@@ -20,6 +20,7 @@ members = [
     "boundary-spec-macros",
     "boundary-enforce",
     "downstream-fixture",
+    "fire-drill",
     "genesis-demo",
     "relay-demo",
     "spec-lock",
@@ -53,6 +54,9 @@ paste = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 
 [dev-dependencies]
+# the repo's own fire-drill battery (tests/fire_drill.rs): known-bad fixtures proving the
+# discipline's gates can still fire.
+fire-drill = { path = "fire-drill" }
 proptest = "1"
 trybuild = "1.0.117"
 # Only the `suite_audit` example uses these — to parse cargo-mutants' `outcomes.json`
