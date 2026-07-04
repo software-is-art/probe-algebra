@@ -152,8 +152,42 @@ its recorded residuals. The items below predate that inventory:
    dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
    end-to-end net over the freeze's actual render.
 
+## From the field (the first production adoption)
+
+A production Rust CLI adopted `spec-lock` as a pinned git dependency — four agent sessions in
+one day, five substrates (a command surface, checklist data, coverage manifests, a
+reconciliation policy, an accepted-findings baseline), every re-bless in the same commit as
+its cause, the discipline transferred from the README alone. Its field notes seeded two
+candidate bricks:
+
+4. **Negative-fixture batteries — mutation testing for PIPELINES — BUILT** (`fire-drill/`).
+   The witness-inequation idea (`∃`: prove the gate ACTS) at the process level, seeded by
+   three self-attestation failures the adoption hit in one system (a coverage manifest
+   asserted by the session that produced it, a "pass" stamp byte-identical whether the work
+   happened or not, a reconciliation that would have passed on zero items). The extraction is
+   spec-lock-shaped: zero dependencies, substrate-free (`Battery`/`Drill`/`Outcome` — the
+   adopter runs their gate over their known-bad fixture however they run it and hands over
+   the outcome), two failure modes each named in its own vocabulary (VACUOUS: the gate passed
+   a planted bad fixture; UNPROVEN: a required gate carries no fixture at all — the census
+   half, so a gate cannot join a pipeline without proof it can fail), and a deterministic
+   `render()` for spec-lock composition so removing a drill is a reviewed diff. Dogfooded in
+   `tests/fire_drill.rs`: the repo's own battery plants a tampered lock, a missing lock, a
+   lawless theory, an over-claiming declaration, a mis-sorted shape binding, and an
+   unratified vocabulary word — six known-bad fixtures across five of the discipline's gates,
+   every one fired on. Honest frame inherited: a drill refutes vacuousness for ITS fixture
+   only; the battery proves the alarm rings when pressed, never that it hears everything.
+
+5. **The exception-register pattern, first-class.** The adoption's highest-leverage use was
+   freezing an accepted-findings baseline (documented in
+   [ci-discipline.md](ci-discipline.md)). The convention (deterministic keyed serialization →
+   byte equality IS set equality) covers it with spec-lock as-is; if field use keeps wanting
+   set-diff rendering ("2 new findings, 1 resolved" instead of a byte diff), a tiny keyed
+   helper alongside `Lock` is the shape — resist anything larger.
+
 ## Standing follow-ups
 
+- **Tag `v0.1.0`** — consumers currently pin by bare rev; a tag makes downstream manifests
+  read as versioned intent. No crates.io needed for this half-step.
 - **Publish** when ready: `docs/publishing.md` has the dependency-ordered sequence;
   all four names (`boundary-spec`, `boundary-spec-macros`, `spec-lock`,
   `boundary-enforce`) were verified unclaimed on crates.io on 2026-07-02.

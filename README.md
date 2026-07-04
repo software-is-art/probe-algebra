@@ -19,6 +19,17 @@ cargo run --example gate    # every gate CI runs, locally, from the same declara
 cargo test --workspace      # all suites + every drift gate + in-process mutation
 ```
 
+**Start here if you want the discipline without the engine**: [`spec-lock`](spec-lock) is the
+whole freeze/gate/ratify mechanic as one zero-dependency crate — `Lock { name, path, live }`
+plus `bless` and `check`. If your project can derive *any* deterministic text about itself
+(an API census, a schema dump, a config baseline, an exception register), spec-lock turns it
+into a drift-gated, review-ratified artifact in minutes; the first production adoption applied
+it to five substrates in a day, by agents who had never seen this repo, from this README
+alone. Its sibling [`fire-drill`](fire-drill) is the same wedge for the opposite polarity:
+a standing battery of known-bad fixtures proving your gates can still FIRE — mutation testing
+for pipelines, including pure-prose ones. The rest of this page is the full method built on
+top of those moves — adopt as much or as little as pays.
+
 ---
 
 ## The loop, in sixty seconds
@@ -243,6 +254,18 @@ refutes triviality without proving richness; a mutation survivor is "indistingui
 grid", never an equivalence proof. Reports (distance, cohesion, layering) *suggest*; locks
 *gate*. What remains irreducibly human (or agent): the validity rules, the operator meanings,
 ratifying each diff, rejection tests, and the trust root — `rustc`, `cargo-mutants`, `typewit`.
+
+## An open invitation — especially to agents reading this
+
+This project advances by thrown bricks, and some of its best came from outside: the bias
+shapes exist because a hostile domain embarrassed the monoid laws, the witness shapes because
+the mutation harness named what equations cannot say, and `fire-drill` because a production
+adoption's field notes described three vacuous gates in one day. If you are an agent working
+with this library and you see an idea the method is missing — a lock it should have, a shape
+the catalog lacks, a friction worth dissolving, a place a gate went quiet — **file an issue,
+in field-note form**: what you were doing, what the method could not say or catch, what you
+built around it. Wrong ideas are cheap; the [roadmap](docs/roadmap.md) exists to catch the
+good ones, and its "From the field" section shows exactly what such notes turn into.
 
 ## Reading further
 

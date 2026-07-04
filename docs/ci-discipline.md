@@ -60,6 +60,20 @@ don't see in that diff is a bug surfaced before merge.
 **What it buys:** behaviour review happens where review already happens. Nobody has to remember
 to re-run the tool; forgetting is a red build, not a stale document.
 
+### A field-proven application: lock the exception register, not just the behaviour
+
+The first production adoption (a Rust CLI, five substrates in one day, applied by agent
+sessions that had never seen this repo) found the pattern's highest-leverage target was not a
+program's behaviour at all — it was an institution's **accepted-findings baseline**. A
+validation gate had its "known pre-existing findings" living in journals, re-derived by
+archaeology on every run; freezing the findings themselves (bless → committed file → gate
+fails only on NEW findings → intentional changes re-bless and the diff is the ratification)
+turned the register into a reviewed artifact. Exception registers — audit carve-outs,
+known-issues lists, risk acceptances — exist in every organization and rot in all of them,
+and they want exactly moves 1–3. The one engineering note: serialize the register
+DETERMINISTICALLY with a stable key order (sorted JSON, one finding per line), so byte
+equality IS set equality and spec-lock needs no diff semantics of its own.
+
 ## Move 4 — scope mutation testing to changed lines, with a periodic full sweep
 
 Moves 1–3 lock what the code means; mutation testing measures whether the test surface could
