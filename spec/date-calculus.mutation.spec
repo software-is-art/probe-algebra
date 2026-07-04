@@ -1,4 +1,4 @@
-# algebra mutation: date calculus — 13 operator-table mutants, all killed — regenerate via `cargo run --example freeze_spec`; ratify the diff.
+# algebra mutation: date calculus — 13 operator-table mutants, all killed — regenerate via this repo's freeze path; ratify the diff.
 #
 # Every mutant is a perturbed operator table (a VALUE, not a build), judged by
 # re-running discovery: KILLED means the named-law set changed — the committed

@@ -15,13 +15,22 @@
 
 use std::path::PathBuf;
 
+use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::Spec;
 use downstream_fixture::ops::meter_ops::CreditMeter;
 
 fn main() {
     let spec_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
-    let lock = Spec::of::<CreditMeter>().lock_in(&spec_dir);
-    spec_lock::bless(std::slice::from_ref(&lock)).expect("write the spec lock");
-    println!("blessed `{}` -> {}", lock.name, lock.path.display());
-    println!("ratify the diff: the committed spec file is the behaviour contract.");
+    let locks = [
+        Spec::of::<CreditMeter>().lock_in(&spec_dir),
+        // the consumer's OWN mutation verdict: operator-table mutants judged in-process
+        // by re-discovery (milliseconds, inside every `cargo test`) — the reason a
+        // consumer's theory core needs no cargo-mutants job of its own.
+        MutationReport::of::<CreditMeter>().lock_in(&spec_dir),
+    ];
+    spec_lock::bless(&locks).expect("write the spec locks");
+    for lock in &locks {
+        println!("blessed `{}` -> {}", lock.name, lock.path.display());
+    }
+    println!("ratify the diff: the committed spec files are the behaviour contract.");
 }
