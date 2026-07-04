@@ -177,6 +177,19 @@ per-theory work). Behaviourally-identical replacements are prefiltered as
 equivalent-by-construction. Source-level mutation keeps judging the plumbing the algebra can't
 see (parsers, emitters, renderers).
 
+**The consumer economics, measured.** A consumer's theory core needs no source-mutation job
+at all: freeze the mutation verdict beside the spec (`MutationReport::of::<T>().lock_in(dir)`
+— [`downstream-fixture`](../downstream-fixture) mints and drift-gates
+`spec/credit-meter.mutation.spec` this way, through public API, inside an ordinary
+`cargo test`), and point cargo-mutants at the plumbing only. The substitution is
+evidence-backed, not asserted: a file-scoped sweep over this repo's own five theory operator
+files — 90 source mutants, every comparison flipped and every arithmetic operator swapped —
+reports **zero missed** (51 caught, 39 unviable), killed by the freshness gates and law pins
+alone; those files carry no other tests. Honest boundary: that measurement is this repo's. A
+consumer whose operators do work the grid cannot see should run the same file-scoped sweep
+once (`cargo mutants -f src/my_theory.rs`) as their own evidence before leaving source
+mutation off their core.
+
 ## Honest frame
 
 Everything above refutes; nothing proves. Grids and batteries are bounded samples; term
