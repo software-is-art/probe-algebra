@@ -11,12 +11,18 @@ use std::path::PathBuf;
 
 use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::Spec;
+use delta_render::circuit::{circuit_locks, demo_circuit};
 use delta_render::license::Registry;
 use delta_render::ops::{DistinctOp, FilterOp, JoinOp, MapOp, MinOp, SumOp};
+use delta_render::stream::StreamCalculus;
 use delta_render::zset::ZSetAlgebra;
 
 fn main() {
-    let spec_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
+    let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let spec_dir = crate_root.join("spec");
+    let registry = Registry::derive();
+    let [gen_lock, derivation_lock] =
+        circuit_locks(&demo_circuit(&registry), &registry, &crate_root);
     let locks = [
         Spec::of::<ZSetAlgebra>().lock_in(&spec_dir),
         MutationReport::of::<ZSetAlgebra>().lock_in(&spec_dir),
@@ -32,9 +38,15 @@ fn main() {
         MutationReport::of::<DistinctOp>().lock_in(&spec_dir),
         Spec::of::<MinOp>().lock_in(&spec_dir),
         MutationReport::of::<MinOp>().lock_in(&spec_dir),
+        Spec::of::<StreamCalculus>().lock_in(&spec_dir),
+        MutationReport::of::<StreamCalculus>().lock_in(&spec_dir),
         // the pivot artifact: the registry READS the specs above; its lock makes the
         // read a reviewed diff.
-        Registry::derive().lock_in(&spec_dir),
+        registry.lock_in(&spec_dir),
+        // the RENDER: generated Rust + the plain-language derivation, one derivation,
+        // two locks.
+        gen_lock,
+        derivation_lock,
     ];
     spec_lock::bless(&locks).expect("write the spec locks");
     for lock in &locks {

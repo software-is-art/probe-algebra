@@ -70,3 +70,10 @@ serde_json = "1"
 # same discipline. This repo's build.rs is now a thin shim over it; the KERNEL allowlist stays in
 # the shim, where admitting a member remains a reviewed diff in THIS tree.
 boundary-enforce = { path = "boundary-enforce", version = "0.1.0" }
+
+# delta-render's drift gates re-run discovery (and the whole algebra-mutation verdict)
+# inside every `cargo test`, and Engine<T> monomorphizes INTO that crate — so it alone
+# is built optimized in dev/test. Measured: the freeze path drops from ~95s to seconds;
+# nothing else in the workspace pays for it.
+[profile.dev.package.delta-render]
+opt-level = 2

@@ -25,6 +25,14 @@
 //! deliberate grid — never proofs. The DBSP paper's theorems are the trust root for the
 //! rule table itself; the end gate is defense in depth, not a verifier.
 
+pub mod circuit;
 pub mod license;
 pub mod ops;
+pub mod stream;
 pub mod zset;
+
+/// The RENDERED incremental circuit — generated code, compiled and tested like any
+/// source. Its bytes are a lock: the drift gate re-renders and diffs it inside every
+/// `cargo test`, so a hand edit here is caught, never merged quietly.
+#[path = "../gen/demo_incremental.rs"]
+pub mod demo_incremental;
