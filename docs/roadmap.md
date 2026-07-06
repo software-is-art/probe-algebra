@@ -181,6 +181,26 @@ its recorded residuals. The items below predate that inventory:
    dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
    end-to-end net over the freeze's actual render.
 
+## From the field, day zero (fire-drill consumed in production)
+
+The production CLI adoption consumed fire-drill untagged, same-day — and the crate's
+motivating claim ("a rubber stamp passes every positive test") was validated in their
+system THE SAME MORNING, by an incident that happened before they'd read it: two committed
+regression fixtures both carried the degenerate case (a zero-valued pool), so a 95-test
+green suite could not see that two implementations of one identity disagreed — it surfaced
+when the first real non-degenerate job hit the validator. The vacuousness failure class
+exactly, one level down: not a gate that stopped firing, a fixture set that never pressed
+the button. Their six-drill battery froze both incident shapes as permanent drills, register
+spec-locked. Three findings folded back in: the CENSUS is the sleeper feature (the drills
+catch rot; `requires` + UNPROVEN prevents gates being born rotten — now leading the README),
+the strict outcome mapping is where consumers quietly cheat (`Fired` only when the verdict
+NAMES the planted defect; harness errors panic — now a documented example),
+and `Battery::drill_with` makes declaration order be execution order in one expression.
+Their line for the chronicle: "the loop is closed and it is short" — seven days from idea to
+a production consumer, a foreign-domain theory lock, the pattern reinvented locally in a
+client repo, and an incident-extracted module consumed back by the system whose report
+motivated it.
+
 ## From the field, third assessment (a registered-numerics research corpus)
 
 A ~1021-artifact corpus attacking a mathematical conjecture — 250 kernel-checked proofs
@@ -260,6 +280,26 @@ candidate bricks:
    (the catalog carries the unconditional join form). Needs a premise slot in the shape
    grammar and a driver that filters assignments by the guard; the honest frame carries
    over (a bounded grid refutes a guarded law on its satisfying assignments).
+
+10. **Statement-bite mutation** (from the proof-corpus assessment): mutation testing FOR
+    proof corpora — mutate the DEFINITIONS (not the proofs) and demand each theorem fail to
+    re-check; a proof that survives definition mutants never depended on that degree of
+    freedom, which is the vacuous-statement finding (wrong quantifier scope, a definition
+    too weak to constrain) the kernel cannot make. Killed/survived/ratified follows the
+    residue policy verbatim; the harness half is `mutants-gate.sh`'s pattern,
+    substrate-free; the mutant generator is per-language (Agda/Lean) work. The one brick
+    in this family that makes existing kernel-checked artifacts MORE trustworthy.
+
+11. **Theory-bridge** (same assessment): `Theory` from exported data — a prover emits
+    finite operator tables for its decidable fragments (a table IS an eval function), and
+    discovery runs as CONJECTURE SUPPLY and triage, never certification: grid survivors
+    become proof obligations rendered as statement stubs (the genesis meaning-hole move),
+    grid refutations kill false conjectures before anyone burns a day proving them.
+
+12. **The disagreement detector** (falls out of 11): grid-check already-proved laws over
+    the exported tables — agreement proves nothing new, but DISAGREEMENT is always a
+    defect somewhere in the export/bridge pipeline, with certainty. Differential testing
+    for the untrusted half of a proof corpus, same polarity as delta-render's end gate.
 
 ## Standing follow-ups
 

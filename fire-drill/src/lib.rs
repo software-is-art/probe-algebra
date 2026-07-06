@@ -30,11 +30,54 @@
 //! battery.verdict().expect("every gate still fires");
 //! ```
 //!
-//! `verdict()` fails, by name, on either failure mode: a drill whose gate PASSED its bad
-//! fixture (vacuous), or a required gate with no drill at all (unproven — the census half,
-//! so a gate cannot silently join the pipeline without a known-bad fixture). `render()` is
-//! deterministic text; freeze it with `spec-lock` and the battery's shape is itself
-//! drift-gated, so removing a drill is a reviewed diff, not a quiet deletion.
+//! `verdict()` fails, by name, on either failure mode — and the second one is the sleeper:
+//!
+//! - **VACUOUS**: a drill whose gate PASSED its planted bad fixture — the drills catch rot;
+//! - **UNPROVEN**: a required gate with no drill at all. This census half changes the
+//!   DEFAULT for new gates: a gate cannot join the pipeline without a fixture proving it
+//!   can fail. In systems where gates accrete fast, that default is worth more than the
+//!   drills themselves — the census prevents gates being born rotten. Lead with
+//!   `requires([...])`; the drills follow.
+//!
+//! `render()` is deterministic text; freeze it with `spec-lock` and the battery's shape is
+//! itself drift-gated, so removing a drill is a reviewed diff, not a quiet deletion.
+//!
+//! ## Mapping your gate's result to an `Outcome` — where consumers quietly cheat
+//!
+//! "Run your gate over your bad fixture however you run it" leaves one hole a consumer can
+//! reintroduce vacuousness through: the mapping to [`Outcome`]. `Fired` iff exit ≠ 0 is
+//! wrong twice — a USAGE error (missing input, bad flag) counts as fired though the gate
+//! never judged the planted defect, and a gate can fail for an UNRELATED reason (a second
+//! latent defect, an environment problem) while the drill silently stops testing what it
+//! claims. The strict mapping, from a production consumer's battery: `Fired` ONLY when the
+//! gate failed AND its verdict NAMES the planted defect; a clean pass is `Passed`; anything
+//! else is a harness bug — panic, don't count it.
+//!
+//! ```
+//! use fire_drill::Outcome;
+//!
+//! /// Fired ONLY when the gate exited fail AND the verdict names the planted defect.
+//! /// Exit 0 is a vacuous pass. Anything else is a harness bug — panic, don't count it.
+//! fn observe(code: i32, verdict: &str, planted: &str) -> Outcome {
+//!     match code {
+//!         0 => Outcome::Passed,
+//!         1 => {
+//!             assert!(verdict.contains(planted),
+//!                 "gate failed but not for the planted defect ({planted:?}): {verdict}");
+//!             Outcome::Fired
+//!         }
+//!         other => panic!("drill harness error: exit {other}, verdict {verdict}"),
+//!     }
+//! }
+//! # assert_eq!(observe(0, "", "x"), Outcome::Passed);
+//! # assert_eq!(observe(1, "found x", "x"), Outcome::Fired);
+//! ```
+//!
+//! The same discipline applies to PLANTING: if your mutation helper cannot find the text it
+//! plans to corrupt, panic — a mutation that silently missed its target makes the drill
+//! vacuous the wrong way round (the gate "fires" on input that was never actually bad, or
+//! passes on pristine input). Neither belongs in this crate as code — substrate-freedom is
+//! the point — but both belong in every consumer's harness.
 //!
 //! Honest frame, inherited: a drill refutes vacuousness for ITS fixture only — a gate can
 //! fire on the planted bad input and still miss others. The battery proves the alarm rings
@@ -112,6 +155,20 @@ impl Battery {
             outcome,
         });
         self
+    }
+
+    /// Record one drill, RUNNING its gate now: the closure executes at declaration, so
+    /// the declaration order in source is the execution order — and, once the register
+    /// is spec-locked, the frozen order. One expression per drill, no separated
+    /// run-then-record.
+    pub fn drill_with(
+        self,
+        gate: impl Into<String>,
+        fixture: impl Into<String>,
+        run: impl FnOnce() -> Outcome,
+    ) -> Battery {
+        let outcome = run();
+        self.drill(gate, fixture, outcome)
     }
 
     /// The drills whose gate accepted its known-bad fixture — the vacuous gates.
@@ -256,6 +313,29 @@ mod tests {
         let err = b.verdict().unwrap_err();
         assert!(err.contains("VACUOUS: `a`"));
         assert!(err.contains("UNPROVEN: `b`"));
+    }
+
+    /// `drill_with` runs the gate AT declaration — so source order, execution order, and
+    /// (once frozen) the register's order are one order, observable through a shared
+    /// counter.
+    #[test]
+    fn drill_with_executes_in_declaration_order() {
+        let log = std::cell::RefCell::new(Vec::new());
+        let observe = |tag: &'static str| {
+            log.borrow_mut().push(tag);
+            Outcome::Fired
+        };
+        let b = Battery::named("ordered")
+            .requires(["first", "second"])
+            .drill_with("first", "a planted defect", || observe("first"))
+            .drill_with("second", "another planted defect", || observe("second"));
+        assert_eq!(b.verdict(), Ok(()));
+        assert_eq!(*log.borrow(), vec!["first", "second"]);
+        assert_eq!(
+            b.drills.iter().map(|d| d.gate.as_str()).collect::<Vec<_>>(),
+            vec!["first", "second"],
+            "the register order is the execution order"
+        );
     }
 
     /// The render is deterministic and lockable: census order, one line per drill, the
