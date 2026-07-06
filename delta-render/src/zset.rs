@@ -107,8 +107,9 @@ fn op_neg(v: &[ZSet]) -> Option<ZSet> {
 
 /// The deliberate grid: every weight regime the group laws pivot on. `a@+2` and `a@−2`
 /// are both present so `plus` actually cancels ON the grid — the inverse law is judged
-/// against real annihilation, not just symbol shuffling.
-fn grid() -> Vec<ZSet> {
+/// against real annihilation, not just symbol shuffling. Shared by every lifted-operator
+/// theory in `ops`, so the licenses are judged over the same space as the group.
+pub(crate) fn grid() -> Vec<ZSet> {
     let a = Row::new(0);
     let b = Row::new(1);
     vec![

@@ -15,7 +15,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 # The discovery engine, the theory! grammar, the algebra-mutation harness.
 boundary-spec = { path = ".." }
-
-[dev-dependencies]
-# The freeze/drift-gate mechanics — the locks this crate exists to render.
+# The lock mechanics — a regular dependency (not dev-only) because the license registry
+# IS a lock renderer: `Registry::lock_in` lives in the library, where the render step
+# reads it.
 spec-lock = { path = "../spec-lock" }

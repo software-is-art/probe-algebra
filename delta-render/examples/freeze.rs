@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::Spec;
+use delta_render::license::Registry;
+use delta_render::ops::{DistinctOp, FilterOp, JoinOp, MapOp, MinOp, SumOp};
 use delta_render::zset::ZSetAlgebra;
 
 fn main() {
@@ -18,6 +20,21 @@ fn main() {
     let locks = [
         Spec::of::<ZSetAlgebra>().lock_in(&spec_dir),
         MutationReport::of::<ZSetAlgebra>().lock_in(&spec_dir),
+        Spec::of::<FilterOp>().lock_in(&spec_dir),
+        MutationReport::of::<FilterOp>().lock_in(&spec_dir),
+        Spec::of::<MapOp>().lock_in(&spec_dir),
+        MutationReport::of::<MapOp>().lock_in(&spec_dir),
+        Spec::of::<SumOp>().lock_in(&spec_dir),
+        MutationReport::of::<SumOp>().lock_in(&spec_dir),
+        Spec::of::<JoinOp>().lock_in(&spec_dir),
+        MutationReport::of::<JoinOp>().lock_in(&spec_dir),
+        Spec::of::<DistinctOp>().lock_in(&spec_dir),
+        MutationReport::of::<DistinctOp>().lock_in(&spec_dir),
+        Spec::of::<MinOp>().lock_in(&spec_dir),
+        MutationReport::of::<MinOp>().lock_in(&spec_dir),
+        // the pivot artifact: the registry READS the specs above; its lock makes the
+        // read a reviewed diff.
+        Registry::derive().lock_in(&spec_dir),
     ];
     spec_lock::bless(&locks).expect("write the spec locks");
     for lock in &locks {

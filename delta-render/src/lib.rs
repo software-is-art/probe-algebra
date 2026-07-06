@@ -25,4 +25,6 @@
 //! deliberate grid — never proofs. The DBSP paper's theorems are the trust root for the
 //! rule table itself; the end gate is defense in depth, not a verifier.
 
+pub mod license;
+pub mod ops;
 pub mod zset;
