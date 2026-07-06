@@ -80,6 +80,16 @@
       gate:     heterogeneous binary s × t → s (an action of t on s)
       template: {op} applications commute — the parameter order doesn't matter.
 
+- action equivariance
+      schema:   act((x ⊕ y), p) = (act(x, p) ⊕ act(y, p))
+      gate:     heterogeneous binary s × t → s (an action of t on s) plus a homogeneous binary on the carrier sort s
+      template: {op} distributes over {other} — acting on a combination is combining the actions.
+
+- action fixed point
+      schema:   act(c, p) = c
+      gate:     heterogeneous binary s × t → s (an action of t on s) plus a constant of the carrier sort s
+      template: {op} leaves {const} fixed — no parameter moves it.
+
 - irreflexivity
       schema:   rel(x, x) = false
       gate:     relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `false`
@@ -94,6 +104,11 @@
       schema:   u(u(x)) = x
       gate:     unary s → s
       template: {op} twice returns the original value.
+
+- projection
+      schema:   u(u(x)) = u(x)
+      gate:     unary s → s
+      template: {op} is a projection — applying it twice is applying it once.
 
 - fixed point
       schema:   u(c) = c
@@ -134,3 +149,8 @@
       schema:   le(f(x), f((x ⊕ y))) = true  (f(x) ≤ f(x ⊕ y) — monotone in the ⊕-order)
       gate:     unary endo s → s, a homogeneous binary on s (read as the domain's join), and an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true` — the unconditional form of `∀ x ≤ y: f(x) ≤ f(y)` for join-induced orders; the guarded general form stays a roadmap candidate (conditional laws)
       template: {op} is monotone in the {other}-order (under {via}).
+
+- totality
+      schema:   (le(x, y) ⊕ le(y, x)) = true  (every pair relates, one way or the other)
+      gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's or), and a constant of r rendering as `true` — a total order says yes somewhere on every pair; a strict order refuses this on the diagonal
+      template: {op} is total under {other} — every pair relates one way or the other.

@@ -14,6 +14,8 @@
       neg(zero) = zero
 - neg turns plus into plus.
       neg((x plus y)) = (neg(x) plus neg(y))
+- distinct is a projection — applying it twice is applying it once.
+      distinct(distinct(x)) = distinct(x)
 - distinct leaves zero fixed.
       distinct(zero) = zero
 

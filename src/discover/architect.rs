@@ -517,6 +517,10 @@ mod tests {
                 "esc((a ++ b)) = (esc(a) ++ esc(b))",
             ),
             (
+                "unesc is a projection — applying it twice is applying it once.",
+                "unesc(unesc(a)) = unesc(a)",
+            ),
+            (
                 "unesc undoes esc — the round trip is the identity.",
                 "unesc(esc(a)) = a",
             ),
@@ -531,7 +535,7 @@ mod tests {
             "uncovered: {:?}",
             d.uncovered_ops
         );
-        assert_eq!(d.consequences, 39, "consequence count changed");
+        assert_eq!(d.consequences, 38, "consequence count changed");
     }
 
     /// The codec STRUCTURE is discovered (above); the ENCODING is not a law — many invertible

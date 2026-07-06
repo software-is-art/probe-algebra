@@ -1,4 +1,4 @@
-# algebra mutation: stream — 33 operator-table mutants, 1 SURVIVED — regenerate via this repo's freeze path; ratify the diff.
+# algebra mutation: stream — 33 operator-table mutants, all killed — regenerate via this repo's freeze path; ratify the diff.
 #
 # Every mutant is a perturbed operator table (a VALUE, not a build), judged by
 # re-running discovery: KILLED means the named-law set changed — the committed
@@ -16,7 +16,7 @@
 - killed    `neg` evaluates as `delay`
 - killed    `neg` evaluates as `d`
 - killed    `neg` evaluates as `i`
-- SURVIVED  `delay` evaluates as `zero`
+- killed    `delay` evaluates as `zero`
 - killed    `delay` evaluates as `neg`
 - killed    `delay` evaluates as `d`
 - killed    `delay` evaluates as `i`

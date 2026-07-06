@@ -208,6 +208,10 @@ mod tests {
                 "tick(tick(s, p), q) = tick(tick(s, q), p)",
             ),
             (
+                "Tick leaves empty fixed — no parameter moves it.",
+                "tick(empty, p) = empty",
+            ),
+            (
                 "Plus gives the same result in either order.",
                 "(p + q) = (q + p)",
             ),
@@ -229,7 +233,7 @@ mod tests {
             .map(|(p, q)| (p.to_string(), q.to_string()))
             .collect();
         assert_eq!(got, expected, "the discovered ttl-store algebra changed");
-        assert_eq!(d.consequences, 148, "consequence count changed");
+        assert_eq!(d.consequences, 147, "consequence count changed");
         // put was curried out of the signature, so coverage is total by construction.
         assert!(
             d.uncovered_ops.is_empty(),

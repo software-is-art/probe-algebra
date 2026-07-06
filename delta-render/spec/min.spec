@@ -14,6 +14,8 @@
       neg(zero) = zero
 - neg turns plus into plus.
       neg((x plus y)) = (neg(x) plus neg(y))
+- min is a projection — applying it twice is applying it once.
+      min(min(x)) = min(x)
 - min leaves zero fixed.
       min(zero) = zero
 

@@ -14,6 +14,8 @@
       neg(zero) = zero
 - neg turns plus into plus.
       neg((x plus y)) = (neg(x) plus neg(y))
+- map is a projection — applying it twice is applying it once.
+      map(map(x)) = map(x)
 - map leaves zero fixed.
       map(zero) = zero
 - map turns plus into plus.

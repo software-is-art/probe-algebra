@@ -14,6 +14,8 @@
       tick(tick(s, p), q) = tick(s, (p + q))
 - Tick applications commute — the parameter order doesn't matter.
       tick(tick(s, p), q) = tick(tick(s, q), p)
+- Tick leaves empty fixed — no parameter moves it.
+      tick(empty, p) = empty
 - Plus gives the same result in either order.
       (p + q) = (q + p)
 - With Plus, the grouping of three values doesn't matter.

@@ -1077,6 +1077,47 @@ impl ShapeCatalog {
                 const_rule: ConstRule::Any,
             },
             ShapeInfo {
+                name: "action equivariance",
+                schema: "act((x ⊕ y), p) = (act(x, p) ⊕ act(y, p))",
+                gate: "heterogeneous binary s × t → s (an action of t on s) plus a \
+                       homogeneous binary on the carrier sort s",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Binary(0)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} distributes over {other} — acting on a combination is \
+                           combining the actions.",
+                lhs: App(0, &[App(1, &[X, Y]), P]),
+                rhs: App(1, &[App(0, &[X, P]), App(0, &[Y, P])]),
+                placeholders: &["act", "⊕"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "action fixed point",
+                schema: "act(c, p) = c",
+                gate: "heterogeneous binary s × t → s (an action of t on s) plus a \
+                       constant of the carrier sort s",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Constant(0)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} leaves {const} fixed — no parameter moves it.",
+                lhs: App(0, &[C, P]),
+                rhs: C,
+                placeholders: &["act", "c"],
+                polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
                 name: "irreflexivity",
                 schema: "rel(x, x) = false",
                 gate: "relation s × s → r (r ≠ s) whose output sort carries a constant \
@@ -1123,6 +1164,21 @@ impl ShapeCatalog {
                 template: "{op} twice returns the original value.",
                 lhs: App(0, &[App(0, &[X])]),
                 rhs: X,
+                placeholders: &["u"],
+                polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "projection",
+                schema: "u(u(x)) = u(x)",
+                gate: "unary s → s",
+                gate_slots: open(&[Slot::Unary(0, 0)]),
+                template: "{op} is a projection — applying it twice is applying it once.",
+                lhs: App(0, &[App(0, &[X])]),
+                rhs: App(0, &[X]),
                 placeholders: &["u"],
                 polarity: Polarity::Equal,
                 holes: &["op"],
@@ -1322,6 +1378,29 @@ impl ShapeCatalog {
                 placeholders: &["f", "⊕", "le", "true"],
                 polarity: Polarity::Equal,
                 holes: &["op", "other", "via", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+            },
+            ShapeInfo {
+                name: "totality",
+                schema: "(le(x, y) ⊕ le(y, x)) = true  (every pair relates, one way or the other)",
+                gate: "a relation s × s → r (r ≠ s), a homogeneous binary on r (read as \
+                       the verdict sort's or), and a constant of r rendering as `true` — \
+                       a total order says yes somewhere on every pair; a strict order \
+                       refuses this on the diagonal",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is total under {other} — every pair relates one way or \
+                           the other.",
+                lhs: App(1, &[App(0, &[X, Y]), App(0, &[Y, X])]),
+                rhs: App(2, &[]),
+                placeholders: &["le", "⊕", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
@@ -2883,6 +2962,9 @@ mod tests {
     fn s_clamp(v: &[SVal]) -> Option<SVal> {
         Some(SVal::V(s_v(&v[0]).min(s_d(&v[1]))))
     }
+    fn s_floor(_: &[SVal]) -> Option<SVal> {
+        Some(SVal::V(0))
+    }
 
     impl Theory for MaxSelect {
         type Sort = SSort;
@@ -2958,6 +3040,14 @@ mod tests {
                     inputs: vec![V, D],
                     output: V,
                     eval: s_clamp,
+                },
+                Operator {
+                    name: "floor",
+                    symbol: "floor",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: V,
+                    eval: s_floor,
                 },
             ]
         }

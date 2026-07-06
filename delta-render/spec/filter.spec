@@ -14,6 +14,8 @@
       neg(zero) = zero
 - neg turns plus into plus.
       neg((x plus y)) = (neg(x) plus neg(y))
+- filter is a projection — applying it twice is applying it once.
+      filter(filter(x)) = filter(x)
 - filter leaves zero fixed.
       filter(zero) = zero
 - filter turns plus into plus.

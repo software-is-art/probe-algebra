@@ -48,9 +48,12 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("monoid_action", "monoid action"),
     ("action_idempotent", "action idempotence"),
     ("action_commutation", "action commutation"),
+    ("action_equivariance", "action equivariance"),
+    ("action_fixed_point", "action fixed point"),
     ("irreflexive", "irreflexivity"),
     ("self_application", "self-application"),
     ("involution", "involution"),
+    ("projection", "projection"),
     ("fixed_point", "fixed point"),
     ("round_trip", "round-trip"),
     ("homomorphism", "homomorphism"),
@@ -59,6 +62,7 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("subadditive", "subadditivity"),
     ("triangle", "triangle inequality"),
     ("monotone", "monotonicity (join form)"),
+    ("total", "totality"),
 ];
 
 /// One declared law: a ratified catalog shape plus the operator symbols it ranges over —
