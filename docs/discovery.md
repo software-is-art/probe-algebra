@@ -43,7 +43,7 @@ Laws are judged over assignments of inhabitants to variables. Two honesty mechan
 
 ## The catalog IS the engine
 
-`ShapeCatalog::inventory()` is the law language — 21 shapes — and `Engine::templates()` is a
+`ShapeCatalog::inventory()` is the law language — 26 shapes — and `Engine::templates()` is a
 generic interpreter over it. There is no second statement of the battery anywhere. Each
 `ShapeInfo` stanza carries:
 

@@ -70,6 +70,16 @@
       gate:     heterogeneous binary s × t → s plus a homogeneous binary on the parameter sort t
       template: Repeated {op} combines its parameters with {other}.
 
+- action idempotence
+      schema:   act(act(x, p), p) = act(x, p)
+      gate:     heterogeneous binary s × t → s (an action of t on s)
+      template: Repeated {op} with one parameter settles on the first application.
+
+- action commutation
+      schema:   act(act(x, p), q) = act(act(x, q), p)
+      gate:     heterogeneous binary s × t → s (an action of t on s)
+      template: {op} applications commute — the parameter order doesn't matter.
+
 - irreflexivity
       schema:   rel(x, x) = false
       gate:     relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `false`
@@ -109,3 +119,18 @@
       schema:   rel(x, y) ≠ c  (for some x, y)
       gate:     relation s × s → r (r ≠ s) plus a constant of the output sort; a witness shape — holds when the relation escapes the constant somewhere
       template: {op} is not constantly {const}.
+
+- subadditivity
+      schema:   le(f((x ⊕ y)), (f(x) ⊕ f(y))) = true  (f(x ⊕ y) ≤ f(x) ⊕ f(y))
+      gate:     unary endo s → s, a homogeneous binary on s, and an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true`
+      template: {op} is subadditive over {other} (under {via}).
+
+- triangle inequality
+      schema:   le(d(x, z), (d(x, y) ⊕ d(y, z))) = true  (d(x, z) ≤ d(x, y) ⊕ d(y, z))
+      gate:     a distance d : s × s → t, a homogeneous binary on t, and an order relation t × t → r (r ≠ t) whose output sort carries a constant rendering as `true`; d and the binary must be different operators
+      template: {op} satisfies the triangle inequality with {other} (under {via}).
+
+- monotonicity (join form)
+      schema:   le(f(x), f((x ⊕ y))) = true  (f(x) ≤ f(x ⊕ y) — monotone in the ⊕-order)
+      gate:     unary endo s → s, a homogeneous binary on s (read as the domain's join), and an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true` — the unconditional form of `∀ x ≤ y: f(x) ≤ f(y)` for join-induced orders; the guarded general form stays a roadmap candidate (conditional laws)
+      template: {op} is monotone in the {other}-order (under {via}).

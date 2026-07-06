@@ -204,6 +204,10 @@ mod tests {
                 "tick(tick(s, p), q) = tick(s, (p + q))",
             ),
             (
+                "Tick applications commute — the parameter order doesn't matter.",
+                "tick(tick(s, p), q) = tick(tick(s, q), p)",
+            ),
+            (
                 "Plus gives the same result in either order.",
                 "(p + q) = (q + p)",
             ),

@@ -122,6 +122,10 @@ mod tests {
                 "add(add(s, p), q) = add(s, (p + q))",
             ),
             (
+                "Add applications commute — the parameter order doesn't matter.",
+                "add(add(s, p), q) = add(add(s, q), p)",
+            ),
+            (
                 "Diff of a value with itself gives zero.",
                 "diff(s, s) = zero",
             ),
