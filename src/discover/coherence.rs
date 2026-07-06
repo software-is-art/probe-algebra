@@ -253,6 +253,45 @@ mod tests {
                 Nullary "Empty" "empty" () -> Sort::Key = empty;
             }
         }
+        // the ||-joined mismatch arms, killed one field at a time: a table differing ONLY
+        // in an operator's NAME, and one differing ONLY in an operator's INPUTS, must each
+        // be reported (an &&-weakened check needs two fields to differ and misses both).
+        pub struct RenamedMerge;
+        crate::theory! {
+            RenamedMerge : "renamed-merge", Value = i64, Obs = i64, Sort = Sort,
+            sort_of = |_: &i64| Sort::Key,
+            observe = |v: &i64| *v,
+            vars { Sort::Key => &["a", "b", "c"], }
+            inhabit { Sort::Key => vec![0, 1, 2, 3, 4, 6, 12], }
+            ops {
+                Nullary "Empty" "empty" () -> Sort::Key = empty;
+                Infix   "Fused" "fused" (Sort::Key, Sort::Key) -> Sort::Key = max_merge;
+            }
+        }
+        pub struct WideMerge;
+        fn max3(v: &[i64]) -> Option<i64> {
+            Some(v[0].max(v[1]).max(v[2]))
+        }
+        crate::theory! {
+            WideMerge : "wide-merge", Value = i64, Obs = i64, Sort = Sort,
+            sort_of = |_: &i64| Sort::Key,
+            observe = |v: &i64| *v,
+            vars { Sort::Key => &["a", "b", "c"], }
+            inhabit { Sort::Key => vec![0, 1, 2, 3, 4, 6, 12], }
+            ops {
+                Nullary "Empty" "empty" () -> Sort::Key = empty;
+                Infix   "Merge" "merge" (Sort::Key, Sort::Key, Sort::Key) -> Sort::Key = max3;
+            }
+        }
+        assert!(
+            CoherenceReport::between::<MaxMerge, RenamedMerge>().is_err(),
+            "a name-only mismatch must be reported"
+        );
+        assert!(
+            CoherenceReport::between::<MaxMerge, WideMerge>().is_err(),
+            "an inputs-only mismatch must be reported"
+        );
+
         let err = CoherenceReport::between::<MaxMerge, SwappedMerge>()
             .expect_err("misaligned operator tables must be an error, not a coherence verdict");
         assert!(

@@ -79,6 +79,15 @@ impl Inert {
                 note: "the lexer's first-char guard is re-imposed by `Ident::new`, so relaxing it \
                        admits nothing new — the guard is redundant",
             },
+            Inert {
+                pattern: "replace Shaped::structural_perturbations",
+                kind: Inertia::FreeChoice,
+                note: "the trait DEFAULT's body is literally `Vec::new()` (a leaf has no \
+                       structural degree of freedom — that default IS the design), so the \
+                       `vec![]` replacement is the same program: a coincidence of spelling, \
+                       not an unpinned choice. The pattern is anchored without `<impl`, so \
+                       every derived override stays in scope",
+            },
         ]
     }
 
@@ -170,7 +179,7 @@ mod tests {
             .into_iter()
             .filter(|i| i.kind == Inertia::FreeChoice)
             .collect();
-        assert_eq!(free.len(), 2);
+        assert_eq!(free.len(), 3);
         assert!(free.iter().all(|i| i.remedy().contains("ACCEPT")));
     }
 
@@ -183,7 +192,9 @@ mod tests {
         // both free choices appear (so the free-choice section actually lists them, not a mislabel).
         assert!(text.contains("[free choice]"));
         assert!(
-            text.contains("inhabitant") && text.contains("declared_sources"),
+            text.contains("inhabitant")
+                && text.contains("declared_sources")
+                && text.contains("structural_perturbations"),
             "every free choice must be named: {text}"
         );
         // the redundant one is listed before the free choices (work first).

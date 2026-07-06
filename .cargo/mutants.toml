@@ -50,6 +50,9 @@ exclude_globs = [
 #   - the interpreter lexer's `is_ascii_alphabetic` first-char guard relaxed to `true` —
 #     every newly-admitted identifier is still rejected by `Ident::new`, so the guard is
 #     redundant and the relaxation is behaviour-preserving.
+#   - `Shaped::structural_perturbations`'s TRAIT DEFAULT body is literally `Vec::new()`, so
+#     the `vec![]` replacement is byte-for-byte the same program. The pattern is anchored
+#     without `<impl`, so every DERIVED override (`<impl Shaped for X>::...`) stays in scope.
 # (`select`'s former three equivalents were ELIMINATED, not excluded — the selector now
 # uses `Reverse` and `max_by_key` and drops a redundant guard, so it has no mutable
 # arithmetic/comparison left to survive.)
@@ -57,6 +60,7 @@ exclude_re = [
     "<impl Shaped for bool>::inhabitant",
     "<impl Declares for ResolvePretendsPure>::declared_sources",
     "match guard c.is_ascii_alphabetic",
+    "replace Shaped::structural_perturbations",
 ]
 
 # Mutation testing certifies the LIBRARY against the unit + property suites, so

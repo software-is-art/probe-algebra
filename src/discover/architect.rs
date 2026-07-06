@@ -560,6 +560,11 @@ mod tests {
             );
             assert_eq!(unesc(&wire), s, "control {c:?} must round-trip");
         }
+        // `unesc` is TOTAL off `esc`'s image: a truncated `\u` tail (fewer than four hex
+        // digits) is kept literally, never decoded on a partial parse — `\u0a` would
+        // otherwise become a raw newline that `esc` never emitted.
+        assert_eq!(unesc("\\u0a"), "\\u0a");
+        assert_eq!(unesc("\\u00"), "\\u00");
     }
 
     /// `render_lsp` emits the LSP payloads an editor consumes — a Hint (severity 4) diagnostic and a

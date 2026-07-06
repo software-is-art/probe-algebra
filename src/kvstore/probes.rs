@@ -354,3 +354,88 @@ fn dead_lookups_classify_gone() {
     let doa = empty.put(k.clone(), val(7), ttl(0));
     assert!(!is_live(&doa, &k), "a zero-TTL entry is dead on arrival");
 }
+
+/// The sanctioned exit hatches ROUND-TRIP: what was minted is what reads back — the full
+/// sweep proved these accessors were the only unprobed edges in the store (`get` pinned to
+/// a constant survived every state law, because the laws compare observations, not raws).
+/// Two distinct points per accessor, so no single constant can satisfy the pin.
+#[test]
+fn the_exit_hatches_read_back_what_was_minted() {
+    assert_eq!(key("alpha").get(), "alpha");
+    assert_eq!(key("beta").get(), "beta");
+    assert_eq!(val(7).get(), 7);
+    assert_eq!(val(3).get(), 3);
+}
+
+/// `until` measures FORWARD distance (later minus now) and floors at zero — the sweep's
+/// `-`→`+` mutant would report 7 for a 3-tick gap.
+#[test]
+fn until_measures_forward_distance_and_floors_at_zero() {
+    use super::store::Clock;
+    let now = Clock::new(2).expect("a valid instant");
+    let later = Clock::new(5).expect("a valid instant");
+    assert_eq!(now.until(later).get(), 3);
+    assert_eq!(later.until(now).get(), 0);
+}
+
+/// The layer-2/3 probe functions (`commutes`, `coefficient_holds`) judge `Tick`'s own
+/// laws — the full sweep found BOTH verdict comparisons unexercised (flip `==` to `!=`
+/// and nothing failed, because no relation had ever been run through them). Each is
+/// pinned from both sides: a true relation must come back `Some(true)` and a
+/// deliberately wrong one `Some(false)`, so neither probe can rot into a constant
+/// verdict.
+#[test]
+fn the_layer_probes_judge_ticks_relations_from_both_sides() {
+    use crate::boundary::{coefficient_holds, commutes, Coefficient, Metamorphic};
+
+    // metamorphic (reference-free): one EXTRA tick before the edge is one tick after
+    // it — the discovered action law `tick(tick(s,p),q) = tick(s,p+q)`, phrased as a
+    // commutation relation. The fixture's entry dies inside the extra window, so the
+    // relation is judged across a sweep, not on a quiet store.
+    struct ExtraTick;
+    crate::value_operator!(ExtraTick);
+    impl Metamorphic<Tick> for ExtraTick {
+        fn input_op(&self, x: &Advance) -> Option<Advance> {
+            Some(Advance::new(x.store().clone(), x.by().plus(ttl(1))))
+        }
+        fn output_op(&self, y: &Store) -> Store {
+            y.tick(ttl(1))
+        }
+    }
+    // its refuting twin claims the extra tick changes NOTHING — false on sight (the
+    // clock moved), and the probe must say so.
+    struct FreeTick;
+    crate::value_operator!(FreeTick);
+    impl Metamorphic<Tick> for FreeTick {
+        fn input_op(&self, x: &Advance) -> Option<Advance> {
+            Some(Advance::new(x.store().clone(), x.by().plus(ttl(1))))
+        }
+        fn output_op(&self, y: &Store) -> Store {
+            y.clone()
+        }
+    }
+    let store = Store::new().put(key("alpha"), val(7), ttl(2));
+    let x = Advance::new(store, ttl(1));
+    assert_eq!(commutes(&Tick, &ExtraTick, &x), Some(true));
+    assert_eq!(commutes(&Tick, &FreeTick, &x), Some(false));
+
+    // coefficient (reference-bearing): one extra input tick moves the output clock by
+    // EXACTLY one — the known unit response, then deliberately mis-stated as two.
+    struct ClockRate(i64);
+    crate::value_operator!(ClockRate);
+    impl Coefficient<Tick> for ClockRate {
+        type Delta = Ttl;
+        fn unit_step(&self, x: &Advance) -> Option<Advance> {
+            Some(Advance::new(x.store().clone(), x.by().plus(ttl(1))))
+        }
+        fn expected_delta(&self) -> Ttl {
+            ttl(self.0)
+        }
+        fn observed_delta(&self, before: &Store, after: &Store) -> Ttl {
+            before.clock().until(after.clock())
+        }
+    }
+    let x = Advance::new(Store::new(), ttl(3));
+    assert_eq!(coefficient_holds(&Tick, &ClockRate(1), &x), Some(true));
+    assert_eq!(coefficient_holds(&Tick, &ClockRate(2), &x), Some(false));
+}

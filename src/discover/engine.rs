@@ -3001,6 +3001,50 @@ mod tests {
         );
     }
 
+    /// The gate counts SIGS and NAMES independently — a caller handing the right number of
+    /// signatures but the wrong number of names (or vice versa) is refused, never indexed
+    /// out of step (the length check's `||` joins two separate claims).
+    #[test]
+    fn the_gate_refuses_mismatched_sig_and_name_counts() {
+        let inv = ShapeCatalog::inventory();
+        let gate = inv
+            .iter()
+            .find(|s| s.name == "commutativity")
+            .expect("shape")
+            .gate_slots;
+        let binary = (vec!["s", "s"], "s");
+        assert!(
+            gate.admit(std::slice::from_ref(&binary), &[]).is_err(),
+            "one sig, zero names must be refused"
+        );
+        assert!(
+            gate.admit::<&str>(&[], &["pool"]).is_err(),
+            "zero sigs, one name must be refused"
+        );
+    }
+
+    /// A template with NO holes matches exactly its own prose and nothing else — the literal
+    /// branch of the census matcher, exercised through a catalog shape with its template
+    /// overwritten (the fields are data; that is the point).
+    #[test]
+    fn a_hole_less_template_matches_only_its_exact_prose() {
+        let mut shape = ShapeCatalog::inventory()[0];
+        shape.template = "the whole prose, verbatim";
+        assert!(shape.matches("the whole prose, verbatim"));
+        assert!(!shape.matches("the whole prose, verbatim, plus drift"));
+        assert!(!shape.matches(""));
+    }
+
+    /// The sampling stride is pinned at the golden point: for a space of 10⁶ the raw stride
+    /// 618000 shares factors with the space, so the walk lands on 618001 — stepping DOWN
+    /// (or mis-scaling) from the golden point changes this value and degrades the spread.
+    #[test]
+    fn the_sampling_stride_walks_up_from_the_golden_point() {
+        assert_eq!(coprime_step(1_000_000), 618_001);
+        // degenerate space: the stride floors at 1 and 1 is coprime to everything.
+        assert_eq!(coprime_step(1), 1);
+    }
+
     /// THE LOCK: the catalog's deterministic rendering matches the committed, ratified
     /// `spec/shapes.spec` — the same spec-lock discipline as the theory specs, applied to the
     /// law-language itself.
