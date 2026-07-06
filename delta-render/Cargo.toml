@@ -1,0 +1,21 @@
+# delta-render — specs as LICENSES: a miniature of DBSP-style incremental computation in
+# which the derivation of the incremental program is generated code whose licenses are
+# discovered law specs. An operator's classification (linear / bilinear / neither) is the
+# presence or absence of specific laws in its frozen spec — never a boolean anyone types —
+# and the render step that emits the incremental circuit cites those laws, node by node.
+# A research member, never a product: version 0.0.0, publish = false.
+[package]
+name = "delta-render"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Specs as licenses: DBSP-style incremental derivation as a rendered, drift-gated lock."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# The discovery engine, the theory! grammar, the algebra-mutation harness.
+boundary-spec = { path = ".." }
+
+[dev-dependencies]
+# The freeze/drift-gate mechanics — the locks this crate exists to render.
+spec-lock = { path = "../spec-lock" }
