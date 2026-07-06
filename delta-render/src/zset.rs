@@ -248,6 +248,18 @@ mod probes {
         assert_eq!(ZSet::of(&[(a, -4)]).weight(&a), -4);
     }
 
+    /// The DECLARED group is met with no surprises, lib-side (the twin of the
+    /// integration distance gate, here so the mutation sweep can see the declaration:
+    /// an emptied `expectations()` reads "0 of 0 ... hold" and fails this pin).
+    #[test]
+    fn the_declared_group_is_met_with_no_surprises_from_the_library_side() {
+        let distance = boundary_spec::discover::expect::Distance::of::<ZSetAlgebra>();
+        assert_eq!(
+            distance.render(),
+            "zset: 7 of 7 declared laws hold; no surprises"
+        );
+    }
+
     /// The rim is SATURATING, by decision — pinned here so overflow is a stated
     /// semantics, never a debug-panic/release-wrap coin flip. (At the rim the group
     /// laws bend; the discovery grid never goes there — the bounded-grid concession,
