@@ -181,6 +181,28 @@ its recorded residuals. The items below predate that inventory:
    dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
    end-to-end net over the freeze's actual render.
 
+## From the field, third assessment (a registered-numerics research corpus)
+
+A ~1021-artifact corpus attacking a mathematical conjecture — 250 kernel-checked proofs
+(cubical Agda `--safe`, Lean), ~700 Julia/Python numerics whose entire warrant is a
+hand-rolled procedural discipline (pre-registered gates, sha-pinned inputs, cross-artifact
+string-identity, acceptance by independent rerun) — assessed the method as a feasibility
+test. Its verdict, kept verbatim in the chronicle because it is the honest positioning of
+the whole discipline: **the method strengthens the WARRANT, not the theorems.** For
+kernel-checked stones, discovery is strictly weaker than what already stands; for the
+~700 numerics stones there is no kernel underneath — the gate/rerun discipline IS the
+warrant — which makes fire-drill's question ("can every one of these
+positive-tested-only gates still fire?") the sharpest available upgrade to the corpus's
+credibility, and registered-numerics pipelines possibly fire-drill's highest-leverage
+domain. Three mechanism gaps became bricks: the CROSS-LOCK (spec-lock's check-only,
+sha-pinned anchor to a foreign ratified baseline — their most load-bearing integrity
+move, previously hand-rolled per stone with the chain topology living in prose), the
+ordered-relation stanzas (subadditivity, triangle, monotonicity — the ∀-inequality
+polarity, stated as equations over a declared order), and the toleranced-judgment
+candidate above. Their planned adoption: a fire-drill battery over the standing guard
+classes, and spec-lock over the corpus-level censuses — including a verbatim-copy
+provenance registry, which is the exception-register pattern almost exactly.
+
 ## From the field (the first production adoption)
 
 A production Rust CLI adopted `spec-lock` as a pinned git dependency — four agent sessions in
@@ -225,6 +247,19 @@ candidate bricks:
    vector, prefix equality) worked as a Theory carrier with zero engine changes — worth
    documenting as the supported way to put time-indexed values on a grid, alongside the grid
    and term-depth bounds the honest frame already declares.
+
+8. **Toleranced three-valued judgment** (from the third field report): for metric/setoid
+   carriers, judge laws as holds / refuted / UNDECIDED-at-ε, with ε carried in the lock
+   text so review ratifies the tolerance along with the law. The observation-hook
+   quantization route is documented (with its boundary hazard) in
+   [discovery.md](discovery.md); the undecided band is what makes a toleranced gate honest
+   where these domains actually live — near the boundary.
+
+9. **Conditional / guarded laws** (from the second and third field reports): `P(s) ⇒
+   lhs = rhs` — guarded identities, and monotonicity's general form `∀ x ≤ y: f(x) ≤ f(y)`
+   (the catalog carries the unconditional join form). Needs a premise slot in the shape
+   grammar and a driver that filters assignments by the guard; the honest frame carries
+   over (a bounded grid refutes a guarded law on its satisfying assignments).
 
 ## Standing follow-ups
 
