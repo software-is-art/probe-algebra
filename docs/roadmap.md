@@ -275,9 +275,11 @@ candidate bricks:
    circuit admission (no warranted opaque node in `Registry`/`circuit`) — kept out until a
    real open-inventory consumer forces its shape.
 
-7. **Depth-bounded stream carriers as a grid idiom**: `delta-render`'s `Stream` (fixed-depth
-   vector, prefix equality) worked as a Theory carrier with zero engine changes — worth
-   documenting as the supported way to put time-indexed values on a grid, alongside the grid
+7. **Depth-bounded stream carriers as a grid idiom — DONE** (documented in
+   [discovery.md](discovery.md)'s grid section): `delta-render`'s `Stream` (fixed-depth
+   vector, prefix equality) worked as a Theory carrier with zero engine changes — recorded
+   as the supported way to put time-indexed values on a grid (declared depth constant,
+   pad-and-truncate mint, deliberate histories over combinatorial soup), alongside the grid
    and term-depth bounds the honest frame already declares.
 
 8. **Toleranced three-valued judgment — BUILT.** `Theory::judge` returns

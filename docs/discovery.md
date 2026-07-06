@@ -41,6 +41,19 @@ Laws are judged over assignments of inhabitants to variables. Two honesty mechan
   exhaustively; a large one is sampled by a coprime-stride mixed-radix decode so no variable's
   value is a function of another's (the over-fitting failure mode a naive stride has).
 
+**Time-indexed values are grids too — the depth-bounded carrier idiom.** `delta-render`'s
+`Stream` (a FIXED-DEPTH vector of Z-sets; equality is prefix equality to that depth) worked
+as a `Theory` carrier with zero engine changes, and it is the supported way to put histories,
+traces, or tick-indexed state on a grid: make the depth a declared constant, make the mint
+pad-and-truncate so a wrong-depth value is unconstructible, and hand discovery a handful of
+deliberate histories (the impulse, the LATE impulse so delay is visible, the retraction
+pair, the ramp) rather than a combinatorial soup. The depth bound is the same concession the
+honest frame already declares for grids and term depth — bounded refutation, stated — and it
+composes with everything above: the discovered laws (`i` undoes `d`, linearity of all three
+stream operators) are exactly the ones the incremental-circuit derivation then leans on.
+Keep the grid lean on purpose when a drift gate re-derives the theory inside every
+`cargo test`: grid size is an economics decision the theory author owns, not an accident.
+
 ## The catalog IS the engine
 
 `ShapeCatalog::inventory()` is the law language — 35 shapes — and `Engine::templates()` is a
