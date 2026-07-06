@@ -150,6 +150,21 @@
       gate:     unary endo s → s, a homogeneous binary on s (read as the domain's join), and an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true` — the unconditional form of `∀ x ≤ y: f(x) ≤ f(y)` for join-induced orders; the guarded general form stays a roadmap candidate (conditional laws)
       template: {op} is monotone in the {other}-order (under {via}).
 
+- monotonicity (guarded)
+      schema:   le(x, y) = true ⟹ le(f(x), f(y)) = true  (∀ x ≤ y: f(x) ≤ f(y))
+      gate:     unary endo s → s plus an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true` — the general form of monotonicity, judged only where the premise fires
+      template: {op} is monotone under {other}.
+
+- transitivity
+      schema:   (le(x, y) ∧ le(y, z)) = true ⟹ le(x, z) = true
+      gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's and), and a constant of r rendering as `true` — judged only where both premise links fire
+      template: {op} is transitive (chained through {other}).
+
+- antisymmetry
+      schema:   (le(x, y) ∧ le(y, x)) = true ⟹ x = y
+      gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's and), and a constant of r rendering as `true`; the conclusion is CARRIER equality — and a strict order, whose premise is satisfiable nowhere, correctly earns nothing
+      template: {op} is antisymmetric — mutual relation forces equality.
+
 - totality
       schema:   (le(x, y) ⊕ le(y, x)) = true  (every pair relates, one way or the other)
       gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's or), and a constant of r rendering as `true` — a total order says yes somewhere on every pair; a strict order refuses this on the diagonal

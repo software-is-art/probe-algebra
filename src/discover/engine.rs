@@ -123,6 +123,11 @@ pub struct DiscoveredLaw {
     pub rhs: Term,
     /// Equality (`=`, holds everywhere) or witnessed inequation (`≠`, differs somewhere).
     pub polarity: Polarity,
+    /// The law's GUARD, where the shape is conditional: `(premise, truth)` terms — an
+    /// assignment counts only where they evaluate equal. `None` for unconditional laws.
+    /// A guarded law additionally requires its premise SATISFIABLE on the grid (a law
+    /// that never fires its guard is vacuous, not true — the fixed-point lesson, guarded).
+    pub premise: Option<(Term, Term)>,
 }
 
 impl DiscoveredLaw {
@@ -146,6 +151,10 @@ impl DiscoveredLaw {
         let mut out = Vec::new();
         walk(&self.lhs, symbols, &mut out);
         walk(&self.rhs, symbols, &mut out);
+        if let Some((premise, truth)) = &self.premise {
+            walk(premise, symbols, &mut out);
+            walk(truth, symbols, &mut out);
+        }
         out
     }
 }
@@ -502,6 +511,11 @@ pub struct ShapeInfo {
     /// What the shape requires of its constant slot's symbol (see [`ConstRule`]) — how
     /// irreflexivity and self-application share one signature but split one vocabulary row.
     pub const_rule: ConstRule,
+    /// The shape's PREMISE, where the law is conditional (`P ⟹ lhs = rhs`): a schematic
+    /// term that must evaluate equal to the shape's CONSTANT slot (the truth reference)
+    /// for an assignment to count. Requires a constant slot; judged only for
+    /// `Polarity::Equal`. `None` = unconditional (every prior shape).
+    pub premise: Option<SchemaTerm>,
 }
 
 /// A shape's behavioural applicability guard. Signature facts live in [`ShapeGate`]; this
@@ -765,11 +779,24 @@ impl ShapeInfo {
             Polarity::Equal => "=",
             Polarity::Differs => "≠",
         };
-        format!(
+        let body = format!(
             "{} {connective} {}",
             self.lhs.render(ops, vars),
             self.rhs.render(ops, vars)
-        )
+        );
+        match &self.premise {
+            None => body,
+            // the guard renders against the shape's constant slot — the truth reference.
+            Some(premise) => {
+                let truth = self
+                    .gate_slots
+                    .slots
+                    .iter()
+                    .position(|s| matches!(s, Slot::Constant(_)))
+                    .expect("a conditional shape carries a constant slot");
+                format!("{} = {} ⟹ {body}", premise.render(ops, vars), ops[truth].0)
+            }
+        }
     }
 }
 
@@ -836,6 +863,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "associativity",
@@ -851,6 +879,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "idempotence",
@@ -866,6 +895,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "bias (right-regular)",
@@ -883,6 +913,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "bias (left-regular)",
@@ -900,6 +931,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "identity",
@@ -916,6 +948,7 @@ impl ShapeCatalog {
                 mirrored: true,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "annihilation",
@@ -932,6 +965,7 @@ impl ShapeCatalog {
                 mirrored: true,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "inverse",
@@ -948,6 +982,7 @@ impl ShapeCatalog {
                 mirrored: true,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "distributivity",
@@ -963,6 +998,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "distributivity (right)",
@@ -981,6 +1017,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "absorption",
@@ -996,6 +1033,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action identity",
@@ -1016,6 +1054,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "monoid action",
@@ -1036,6 +1075,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action idempotence",
@@ -1056,6 +1096,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action commutation",
@@ -1075,6 +1116,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action equivariance",
@@ -1096,6 +1138,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action fixed point",
@@ -1116,6 +1159,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "irreflexivity",
@@ -1136,6 +1180,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("false"),
+                premise: None,
             },
             ShapeInfo {
                 name: "self-application",
@@ -1155,6 +1200,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::NotNamed("false"),
+                premise: None,
             },
             ShapeInfo {
                 name: "involution",
@@ -1170,6 +1216,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "projection",
@@ -1185,6 +1232,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "fixed point",
@@ -1200,6 +1248,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "round-trip",
@@ -1222,6 +1271,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "homomorphism",
@@ -1237,6 +1287,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             // -- the WITNESS shapes: the catalog's inequation half (∃, not ∀). Found by
             // the algebra-mutation harness: its four survivors were all statements no
@@ -1262,6 +1313,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "non-constancy",
@@ -1283,6 +1335,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             // -- the ORDERED-RELATION shapes: ∀-inequalities, stated as equations over a
             // theory's own declared order (`le(lhs, rhs) = true`). No new polarity: a
@@ -1322,6 +1375,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
             },
             ShapeInfo {
                 name: "triangle inequality",
@@ -1353,6 +1407,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
             },
             ShapeInfo {
                 name: "monotonicity (join form)",
@@ -1381,6 +1436,79 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
+            },
+            // -- the GUARDED shapes: conditional laws, `P ⟹ lhs = rhs`. The premise is a
+            // schematic term judged against the shape's constant slot; assignments where
+            // it does not fire are skipped, and a law whose premise never fires is
+            // VACUOUS, not true — antisymmetry of a strict order stays silent because
+            // `lt(x,y) ∧ lt(y,x)` is satisfiable nowhere.
+            ShapeInfo {
+                name: "monotonicity (guarded)",
+                schema: "le(x, y) = true ⟹ le(f(x), f(y)) = true  (∀ x ≤ y: f(x) ≤ f(y))",
+                gate: "unary endo s → s plus an order relation s × s → r (r ≠ s) whose \
+                       output sort carries a constant rendering as `true` — the general \
+                       form of monotonicity, judged only where the premise fires",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 0), Slot::Relation(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is monotone under {other}.",
+                lhs: App(1, &[App(0, &[X]), App(0, &[Y])]),
+                rhs: App(2, &[]),
+                placeholders: &["f", "le", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: Some(App(1, &[X, Y])),
+            },
+            ShapeInfo {
+                name: "transitivity",
+                schema: "(le(x, y) ∧ le(y, z)) = true ⟹ le(x, z) = true",
+                gate: "a relation s × s → r (r ≠ s), a homogeneous binary on r (read as \
+                       the verdict sort's and), and a constant of r rendering as `true` — \
+                       judged only where both premise links fire",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is transitive (chained through {other}).",
+                lhs: App(0, &[X, Z]),
+                rhs: App(2, &[]),
+                placeholders: &["le", "∧", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: Some(App(1, &[App(0, &[X, Y]), App(0, &[Y, Z])])),
+            },
+            ShapeInfo {
+                name: "antisymmetry",
+                schema: "(le(x, y) ∧ le(y, x)) = true ⟹ x = y",
+                gate: "a relation s × s → r (r ≠ s), a homogeneous binary on r (read as \
+                       the verdict sort's and), and a constant of r rendering as `true`; \
+                       the conclusion is CARRIER equality — and a strict order, whose \
+                       premise is satisfiable nowhere, correctly earns nothing",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is antisymmetric — mutual relation forces equality.",
+                lhs: X,
+                rhs: Y,
+                placeholders: &["le", "∧", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: Some(App(1, &[App(0, &[X, Y]), App(0, &[Y, X])])),
             },
             ShapeInfo {
                 name: "totality",
@@ -1404,6 +1532,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
             },
         ]
     }
@@ -1592,20 +1721,66 @@ impl<T: Theory> Engine<T> {
                     }
                 }
             }
+            // the GUARD, where the shape is conditional: the premise term and its truth
+            // reference (the shape's constant slot), concretized through the same binding.
+            let guard = match &shape.premise {
+                None => None,
+                Some(premise) => {
+                    let truth_slot = shape
+                        .gate_slots
+                        .slots
+                        .iter()
+                        .position(|s| matches!(s, Slot::Constant(_)))
+                        .expect("a conditional shape carries a constant slot");
+                    let (Some(p), Some(t)) = (
+                        self.concretize(premise, &tuple, &bound),
+                        Some(Term::App(tuple[truth_slot], vec![])),
+                    ) else {
+                        continue;
+                    };
+                    Some((p, t))
+                }
+            };
+
             for lhs in variants {
-                let confirmed = match shape.polarity {
+                let confirmed = match (&guard, shape.polarity) {
                     // meaningfulness guards BOTH polarities: two all-undefined sides agree
                     // on nothing yet compare equal, which "fixed point" (the first shape
                     // with no variable in either term) can reach where every older shape
                     // kept a defined variable in play.
-                    Polarity::Equal => {
+                    (None, Polarity::Equal) => {
                         let a = self.signature(&lhs);
                         Self::meaningful(&a) && a == self.signature(&rhs)
                     }
-                    Polarity::Differs => {
+                    (None, Polarity::Differs) => {
                         let (a, b) = (self.signature(&lhs), self.signature(&rhs));
                         Self::meaningful(&a) && Self::meaningful(&b) && a != b
                     }
+                    // a GUARDED equation: judged only where the premise evaluates equal
+                    // to the truth reference, and the premise must be SATISFIABLE with a
+                    // defined lhs somewhere — an unsatisfiable guard manufactures no law
+                    // (antisymmetry of a strict order stays silent, correctly).
+                    (Some((premise, truth)), Polarity::Equal) => {
+                        let (p, t) = (self.signature(premise), self.signature(truth));
+                        let (a, b) = (self.signature(&lhs), self.signature(&rhs));
+                        let mut grounded = false;
+                        let mut holds = true;
+                        for k in 0..p.len() {
+                            let satisfied = p[k].is_some() && p[k] == t[k];
+                            if !satisfied {
+                                continue;
+                            }
+                            grounded = grounded || a[k].is_some();
+                            if a[k] != b[k] {
+                                holds = false;
+                                break;
+                            }
+                        }
+                        grounded && holds
+                    }
+                    // no witness shape carries a premise (the catalog has none; the
+                    // combination is unratified until a stanza needs it).
+                    (Some(_), Polarity::Differs) => false,
                 };
                 if !confirmed {
                     continue;
@@ -1615,7 +1790,13 @@ impl<T: Theory> Engine<T> {
                     Polarity::Equal => "=",
                     Polarity::Differs => "≠",
                 };
-                let equation = format!("{} {connective} {}", self.render(&lhs), self.render(&rhs));
+                let body = format!("{} {connective} {}", self.render(&lhs), self.render(&rhs));
+                let equation = match &guard {
+                    None => body,
+                    Some((premise, truth)) => {
+                        format!("{} = {} ⟹ {body}", self.render(premise), self.render(truth))
+                    }
+                };
                 out.push(DiscoveredLaw {
                     shape: shape.name,
                     prose,
@@ -1623,6 +1804,7 @@ impl<T: Theory> Engine<T> {
                     lhs,
                     rhs,
                     polarity: shape.polarity,
+                    premise: guard.clone(),
                 });
                 break;
             }
@@ -1709,9 +1891,20 @@ impl<T: Theory> Engine<T> {
     pub fn check(&self, laws: &[DiscoveredLaw]) -> Result<(), String> {
         for l in laws {
             let mut witnessed = false;
+            let mut grounded = l.premise.is_none();
             for asn in &self.grid {
+                // a guarded law is judged only where its premise fires — and it must
+                // fire with a defined lhs SOMEWHERE, or the law has lost its ground.
+                if let Some((premise, truth)) = &l.premise {
+                    let p = self.eval(premise, asn).map(|v| T::observe(&v));
+                    let t = self.eval(truth, asn).map(|v| T::observe(&v));
+                    if p.is_none() || p != t {
+                        continue;
+                    }
+                }
                 let lhs = self.eval(&l.lhs, asn).map(|v| T::observe(&v));
                 let rhs = self.eval(&l.rhs, asn).map(|v| T::observe(&v));
+                grounded = grounded || lhs.is_some();
                 match l.polarity {
                     Polarity::Equal => {
                         if lhs != rhs {
@@ -1728,6 +1921,9 @@ impl<T: Theory> Engine<T> {
             }
             if l.polarity == Polarity::Differs && !witnessed {
                 return Err(format!("witness law lost its witness: {}", l.equation));
+            }
+            if !grounded {
+                return Err(format!("guarded law lost its ground: {}", l.equation));
             }
         }
         Ok(())
@@ -2059,6 +2255,7 @@ mod tests {
             lhs: Term::App(2, vec![Term::Var(0), Term::Var(1)]),
             rhs: Term::App(3, vec![Term::Var(0), Term::Var(1)]),
             polarity: Polarity::Equal,
+            premise: None,
         };
         assert!(e.check(&[bogus]).is_err(), "check must reject a false law");
     }
@@ -2417,6 +2614,7 @@ mod tests {
             lhs,
             rhs,
             polarity: Polarity::Differs,
+            premise: None,
         };
 
         // a witness that holds everywhere: the two constants never agree.
@@ -2556,6 +2754,7 @@ mod tests {
             lhs: Term::App(0, vec![Term::Var(0), Term::Var(1)]),
             rhs: Term::App(0, vec![Term::Var(1), Term::Var(0)]),
             polarity: Polarity::Equal,
+            premise: None,
         };
         assert!(
             e.check(&[frozen]).is_err(),
@@ -3405,6 +3604,69 @@ mod tests {
         assert_eq!(coprime_step(1_000_000), 618_001);
         // degenerate space: the stride floors at 1 and 1 is coprime to everything.
         assert_eq!(coprime_step(1), 1);
+    }
+
+    /// THE VACUITY RULE, pinned from both sides: the guarded shapes fire where the
+    /// premise has ground (`le` is antisymmetric and transitive; `less-than` is
+    /// transitive), and stay SILENT where it never fires — `less-than` is antisymmetric
+    /// only vacuously (`lt(x,y) ∧ lt(y,x)` is satisfiable nowhere), and a vacuous truth
+    /// is not a law. This is the fixed-point lesson, guarded.
+    #[test]
+    fn the_vacuity_rule_keeps_strict_orders_silent() {
+        let proses = discovered_prose::<MaxLogic>();
+        assert!(proses
+            .iter()
+            .any(|p| p == "le is antisymmetric — mutual relation forces equality."));
+        assert!(proses
+            .iter()
+            .any(|p| p == "le is transitive (chained through And)."));
+        assert!(proses
+            .iter()
+            .any(|p| p == "less-than is transitive (chained through And)."));
+        assert!(
+            !proses
+                .iter()
+                .any(|p| p.contains("less-than is antisymmetric")),
+            "a strict order's antisymmetry is vacuous — it must NOT be discovered"
+        );
+        assert!(proses.iter().any(|p| p == "cap is monotone under le."));
+    }
+
+    /// `check` on a frozen guarded law demands the premise stays SATISFIABLE: a law
+    /// whose guard lost all ground (here: antisymmetry guarded by a strict order's
+    /// mutual relation, unsatisfiable by construction) is an error naming the loss,
+    /// never a vacuous pass.
+    #[test]
+    fn a_guarded_law_that_lost_its_ground_is_named() {
+        let e = Engine::<MaxLogic>::new();
+        // operator indices in MaxLogic: find lt (name "less-than"), And, true.
+        let ops = MaxLogic::operators();
+        let idx = |n: &str| ops.iter().position(|o| o.name == n).expect("op");
+        let (lt, and, tru) = (idx("less-than"), idx("And"), idx("true"));
+        let x = e.var(LSort::N, 0).expect("var x");
+        let y = e.var(LSort::N, 1).expect("var y");
+        let groundless = DiscoveredLaw {
+            shape: "antisymmetry",
+            prose: "less-than is antisymmetric — mutual relation forces equality.".into(),
+            equation: "(lt(x, y) ∧ lt(y, x)) = true ⟹ x = y".into(),
+            lhs: x.clone(),
+            rhs: y.clone(),
+            polarity: Polarity::Equal,
+            premise: Some((
+                Term::App(
+                    and,
+                    vec![
+                        Term::App(lt, vec![x.clone(), y.clone()]),
+                        Term::App(lt, vec![y, x]),
+                    ],
+                ),
+                Term::App(tru, vec![]),
+            )),
+        };
+        let err = e
+            .check(std::slice::from_ref(&groundless))
+            .expect_err("an unsatisfiable guard must not read as a passing law");
+        assert!(err.contains("lost its ground"), "{err}");
     }
 
     /// THE LOCK: the catalog's deterministic rendering matches the committed, ratified

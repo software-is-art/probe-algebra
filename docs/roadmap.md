@@ -275,11 +275,18 @@ candidate bricks:
    [discovery.md](discovery.md); the undecided band is what makes a toleranced gate honest
    where these domains actually live — near the boundary.
 
-9. **Conditional / guarded laws** (from the second and third field reports): `P(s) ⇒
-   lhs = rhs` — guarded identities, and monotonicity's general form `∀ x ≤ y: f(x) ≤ f(y)`
-   (the catalog carries the unconditional join form). Needs a premise slot in the shape
-   grammar and a driver that filters assignments by the guard; the honest frame carries
-   over (a bounded grid refutes a guarded law on its satisfying assignments).
+9. **Conditional / guarded laws — BUILT.** `ShapeInfo` carries `premise:
+   Option<SchemaTerm>`, judged against the shape's constant slot: an assignment counts
+   only where the premise fires, and a law whose premise never fires is VACUOUS, not
+   true — the fixed-point lesson, guarded. Three stanzas prove the family: guarded
+   monotonicity (`∀ x ≤ y: f(x) ≤ f(y)`), transitivity, and antisymmetry (whose
+   conclusion is carrier equality) — and the vacuity rule earned its census on day one:
+   `le` is antisymmetric, `less-than` is NOT (its mutual premise is satisfiable nowhere,
+   and the pin holds the silence). Frozen guarded laws re-check with the same semantics
+   plus a "lost its ground" arm, so a mutant that empties a premise is named, never
+   passed. The guard rides `DiscoveredLaw`, renders as `premise = true ⟹ lhs = rhs`
+   through the one equation source, and `transitive` — the word two tests used as the
+   canonical UNKNOWN shape — became declarable, which the census caught in both places.
 
 10. **Statement-bite mutation** (from the proof-corpus assessment): mutation testing FOR
     proof corpora — mutate the DEFINITIONS (not the proofs) and demand each theorem fail to
