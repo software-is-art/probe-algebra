@@ -97,6 +97,9 @@ pub struct Gate {
     /// `Pure` = a deterministic function of the tree (cacheable, countersignable,
     /// executable anywhere). An eventual deploy / live-replay gate would be `Effectful`.
     pub effect: Capability,
+    /// Weekly gates only: split across the `FULL_SWEEP_SHARDS` matrix (the whole-tree
+    /// sweep's economics). An unsharded weekly gate renders as one plain job.
+    pub sharded: bool,
 }
 
 impl Gate {
@@ -122,6 +125,7 @@ impl GateRegistry {
                 command: &["cargo", "fmt", "--all", "--check"],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
+                sharded: false,
             },
             Gate {
                 name: "lint",
@@ -139,6 +143,7 @@ impl GateRegistry {
                 ],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
+                sharded: false,
             },
             Gate {
                 name: "test",
@@ -149,6 +154,7 @@ impl GateRegistry {
                 command: &["cargo", "test", "--workspace", "--all-targets"],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
+                sharded: false,
             },
             Gate {
                 name: "mutation (changed lines)",
@@ -158,6 +164,7 @@ impl GateRegistry {
                 command: &[".github/mutants-gate.sh", "--in-diff", "pr.diff"],
                 cadence: Cadence::PerDiff,
                 effect: Capability::Pure,
+                sharded: false,
             },
             Gate {
                 name: "mutation (since green)",
@@ -167,6 +174,7 @@ impl GateRegistry {
                 command: &[".github/mutants-gate.sh", "--in-diff", "since-green.diff"],
                 cadence: Cadence::DefaultBranch,
                 effect: Capability::Pure,
+                sharded: false,
             },
             Gate {
                 name: "mutation (full sweep)",
@@ -177,6 +185,27 @@ impl GateRegistry {
                 command: &[".github/mutants-gate.sh"],
                 cadence: Cadence::Weekly,
                 effect: Capability::Pure,
+                sharded: true,
+            },
+            Gate {
+                name: "mutation (delta-render plumbing)",
+                verifies: "no mutant of delta-render's plumbing (the license parser, the \
+                           circuit validity rule, the render, the stream calculus) \
+                           survives its lib probes — the workspace sweeps scope to the \
+                           root crate, so the member that turns specs into generated \
+                           code carries its own weekly verdict (config: \
+                           .github/delta-render-mutants.toml; the drift-gate twins live \
+                           in the lib precisely so this sweep can see them)",
+                command: &[
+                    ".github/mutants-gate.sh",
+                    "--package",
+                    "delta-render",
+                    "--config",
+                    ".github/delta-render-mutants.toml",
+                ],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                sharded: false,
             },
         ]
     }
@@ -351,7 +380,47 @@ impl GateRegistry {
                 gate.command_line()
             ));
         }
-        for gate in &weekly {
+        // weekly certification: the sharded whole-tree sweep, any unsharded weekly
+        // companions (each a plain job), and ONE countersign that needs them all — the
+        // tag is the whole weekly verdict, not one job's.
+        let weekly_job_id = |gate: &Gate| -> String {
+            match gate.sharded {
+                true => "mutants-full".to_string(),
+                false => format!(
+                    "mutants-{}",
+                    gate.name
+                        .trim_start_matches("mutation (")
+                        .trim_end_matches(')')
+                        .replace(' ', "-")
+                ),
+            }
+        };
+        for gate in weekly.iter().filter(|g| !g.sharded) {
+            out.push_str(&format!(
+                "\n  # Weekly companion sweep: same green gate (\"0 MISSED\"), same timeout\n\
+                 \x20 # semantics, one job — see the gate registry for what it verifies.\n\
+                 \x20 {job_id}:\n\
+                 \x20   name: dogfood ({label})\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - run: {}\n",
+                gate.command_line(),
+                job_id = weekly_job_id(gate),
+                label = gate
+                    .name
+                    .trim_start_matches("mutation (")
+                    .trim_end_matches(')'),
+            ));
+        }
+        let weekly_needs: Vec<String> = weekly.iter().map(|g| weekly_job_id(g)).collect();
+        for gate in weekly.iter().filter(|g| g.sharded) {
             let shards: Vec<String> = (0..FULL_SWEEP_SHARDS).map(|s| s.to_string()).collect();
             out.push_str(&format!(
                 "\n  # Whole-crate dogfood: the green gate is \"0 MISSED\". Timeouts (non-termination\n\
@@ -383,7 +452,7 @@ impl GateRegistry {
                  \x20 # recovery after a red stretch (the weekly green re-anchors the diff).\n\
                  \x20 mutants-full-countersign:\n\
                  \x20   name: countersign (full sweep)\n\
-                 \x20   needs: mutants-full\n\
+                 \x20   needs: [{needs_list}]\n\
                  \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
                  \x20   runs-on: ubuntu-latest\n\
                  \x20   permissions:\n\
@@ -395,7 +464,8 @@ impl GateRegistry {
                  \x20         git tag -f {GREEN_TAG}\n\
                  \x20         git push -f origin {GREEN_TAG}\n",
                 gate.command_line(),
-                shard_list = shards.join(", ")
+                shard_list = shards.join(", "),
+                needs_list = weekly_needs.join(", ")
             ));
         }
         out
@@ -472,14 +542,27 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: six gates — three every-change (all pure), one
-    /// per-diff, one default-branch incremental, one weekly sharded sweep — and every
-    /// declared command reappears verbatim in the rendered workflow (nothing declared can
-    /// fall out of execution).
+    /// The registry's SHAPE is pinned: seven gates — three every-change (all pure), one
+    /// per-diff, one default-branch incremental, and two weekly (the sharded whole-tree
+    /// sweep plus the delta-render plumbing companion) — and every declared command
+    /// reappears verbatim in the rendered workflow (nothing declared can fall out of
+    /// execution).
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 6);
+        assert_eq!(gates.len(), 7);
+        assert_eq!(
+            gates
+                .iter()
+                .filter(|g| g.cadence == Cadence::Weekly)
+                .count(),
+            2
+        );
+        assert_eq!(
+            gates.iter().filter(|g| g.sharded).count(),
+            1,
+            "exactly one gate fans out over the shard matrix"
+        );
         assert_eq!(
             gates
                 .iter()
@@ -527,7 +610,9 @@ mod tests {
         // it — the full sweep's countersign (also the bootstrap: dispatch the workflow
         // once), gated on every shard via `needs`, and the incremental gate per-merge.
         assert!(workflow.contains("mutants-full-countersign:"));
-        assert!(workflow.contains("needs: mutants-full"));
+        // ... and it needs EVERY weekly job: the tag is the whole weekly verdict, so a
+        // red companion sweep withholds the countersign exactly like a red shard.
+        assert!(workflow.contains("needs: [mutants-full, mutants-delta-render-plumbing]"));
         let advances = workflow
             .matches(&format!("git push -f origin {GREEN_TAG}"))
             .count();

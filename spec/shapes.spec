@@ -40,10 +40,20 @@
       gate:     homogeneous binary plus a constant of its sort; tried on both sides, deduplicated by prose
       template: {op} by {const} always gives {const}.
 
+- inverse
+      schema:   (x ⊕ inv(x)) = e
+      gate:     homogeneous binary plus a unary endo and a constant, all on one sort; tried on both sides, deduplicated by prose
+      template: {other} inverts {op} — a value {op} its own {other} gives {const}.
+
 - distributivity
       schema:   (x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))
       gate:     an ordered pair of distinct homogeneous binaries on one sort
       template: {op} distributes over {other}.
+
+- distributivity (right)
+      schema:   ((y ⊗ z) ⊕ x) = ((y ⊕ x) ⊗ (z ⊕ x))
+      gate:     an ordered pair of distinct homogeneous binaries on one sort; skipped when the first is commutative (the left-slot law already says it) — the other slot's distributivity, so each argument position carries its own additivity law
+      template: {op} distributes over {other} from the right.
 
 - absorption
       schema:   (x ⊕ (x ⊗ y)) = x
@@ -60,6 +70,26 @@
       gate:     heterogeneous binary s × t → s plus a homogeneous binary on the parameter sort t
       template: Repeated {op} combines its parameters with {other}.
 
+- action idempotence
+      schema:   act(act(x, p), p) = act(x, p)
+      gate:     heterogeneous binary s × t → s (an action of t on s)
+      template: Repeated {op} with one parameter settles on the first application.
+
+- action commutation
+      schema:   act(act(x, p), q) = act(act(x, q), p)
+      gate:     heterogeneous binary s × t → s (an action of t on s)
+      template: {op} applications commute — the parameter order doesn't matter.
+
+- action equivariance
+      schema:   act((x ⊕ y), p) = (act(x, p) ⊕ act(y, p))
+      gate:     heterogeneous binary s × t → s (an action of t on s) plus a homogeneous binary on the carrier sort s
+      template: {op} distributes over {other} — acting on a combination is combining the actions.
+
+- action fixed point
+      schema:   act(c, p) = c
+      gate:     heterogeneous binary s × t → s (an action of t on s) plus a constant of the carrier sort s
+      template: {op} leaves {const} fixed — no parameter moves it.
+
 - irreflexivity
       schema:   rel(x, x) = false
       gate:     relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `false`
@@ -74,6 +104,16 @@
       schema:   u(u(x)) = x
       gate:     unary s → s
       template: {op} twice returns the original value.
+
+- projection
+      schema:   u(u(x)) = u(x)
+      gate:     unary s → s
+      template: {op} is a projection — applying it twice is applying it once.
+
+- fixed point
+      schema:   u(c) = c
+      gate:     unary endo s → s plus a constant of its sort
+      template: {op} leaves {const} fixed.
 
 - round-trip
       schema:   g(f(x)) = x
@@ -94,3 +134,23 @@
       schema:   rel(x, y) ≠ c  (for some x, y)
       gate:     relation s × s → r (r ≠ s) plus a constant of the output sort; a witness shape — holds when the relation escapes the constant somewhere
       template: {op} is not constantly {const}.
+
+- subadditivity
+      schema:   le(f((x ⊕ y)), (f(x) ⊕ f(y))) = true  (f(x ⊕ y) ≤ f(x) ⊕ f(y))
+      gate:     unary endo s → s, a homogeneous binary on s, and an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true`
+      template: {op} is subadditive over {other} (under {via}).
+
+- triangle inequality
+      schema:   le(d(x, z), (d(x, y) ⊕ d(y, z))) = true  (d(x, z) ≤ d(x, y) ⊕ d(y, z))
+      gate:     a distance d : s × s → t, a homogeneous binary on t, and an order relation t × t → r (r ≠ t) whose output sort carries a constant rendering as `true`; d and the binary must be different operators
+      template: {op} satisfies the triangle inequality with {other} (under {via}).
+
+- monotonicity (join form)
+      schema:   le(f(x), f((x ⊕ y))) = true  (f(x) ≤ f(x ⊕ y) — monotone in the ⊕-order)
+      gate:     unary endo s → s, a homogeneous binary on s (read as the domain's join), and an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true` — the unconditional form of `∀ x ≤ y: f(x) ≤ f(y)` for join-induced orders; the guarded general form stays a roadmap candidate (conditional laws)
+      template: {op} is monotone in the {other}-order (under {via}).
+
+- totality
+      schema:   (le(x, y) ⊕ le(y, x)) = true  (every pair relates, one way or the other)
+      gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's or), and a constant of r rendering as `true` — a total order says yes somewhere on every pair; a strict order refuses this on the diagonal
+      template: {op} is total under {other} — every pair relates one way or the other.

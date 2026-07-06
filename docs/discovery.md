@@ -43,7 +43,7 @@ Laws are judged over assignments of inhabitants to variables. Two honesty mechan
 
 ## The catalog IS the engine
 
-`ShapeCatalog::inventory()` is the law language — 18 shapes — and `Engine::templates()` is a
+`ShapeCatalog::inventory()` is the law language — 26 shapes — and `Engine::templates()` is a
 generic interpreter over it. There is no second statement of the battery anywhere. Each
 `ShapeInfo` stanza carries:
 
@@ -196,3 +196,27 @@ Everything above refutes; nothing proves. Grids and batteries are bounded sample
 enumeration is depth-bounded; "discovered" means "the bounded grid could not refute it";
 "killed" is definite but "survived" is only "indistinguishable here". Reports suggest; locks
 gate. Keep the distinction when extending any of this.
+
+## Metric and setoid domains: judging at a declared tolerance
+
+Law judgment compares observations for equality, which assumes the carrier HAS a decidable
+equality worth judging. Constructive reals (Cauchy data), float-valued numerics, and other
+metric/setoid carriers do not — their honest observable is ε-closeness at a stated
+precision. The sanctioned route today is the OBSERVATION HOOK: `observe` maps the carrier
+to `Obs`, and every law is judged on `Obs`, so a metric domain declares its working
+precision by quantizing there (round to the registered number of digits, or map to a
+fixed-point bucket). The tolerance is thereby in the ratified theory declaration — code
+review sees it next to the operators — never ambient.
+
+State the hazard before adopting that route: **quantized equality is not ε-closeness.**
+Two values within δ ≪ ε of each other can straddle a bucket boundary and compare unequal,
+so near the boundary a TRUE law can be refuted by roundoff, and the lock would record the
+lie. The quantized route is only honest when the grid keeps values away from bucket
+boundaries by construction (residuals small against the bucket width) — a per-domain
+obligation the theory author owns and should write down beside the grid. A corpus that
+registers its numerics does this per claim: fixed working precision, explicit
+classification bars, and a disclosed UNDECIDED band between "holds" and "refuted" rather
+than a silent bin. That three-valued judgment — holds / refuted / undecided-at-ε, with ε
+part of the lock text so review ratifies the tolerance along with the law — is a roadmap
+candidate; without the undecided band, a toleranced grid gate is a coin flip exactly where
+metric domains live.

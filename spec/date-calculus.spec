@@ -10,6 +10,8 @@
       add(s, zero) = s
 - Repeated Add combines its parameters with Plus.
       add(add(s, p), q) = add(s, (p + q))
+- Add applications commute — the parameter order doesn't matter.
+      add(add(s, p), q) = add(add(s, q), p)
 - Diff of a value with itself gives zero.
       diff(s, s) = zero
 - since undoes at — the round trip is the identity.

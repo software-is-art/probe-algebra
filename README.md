@@ -27,8 +27,12 @@ into a drift-gated, review-ratified artifact in minutes; the first production ad
 it to five substrates in a day, by agents who had never seen this repo, from this README
 alone. Its sibling [`fire-drill`](fire-drill) is the same wedge for the opposite polarity:
 a standing battery of known-bad fixtures proving your gates can still FIRE — mutation testing
-for pipelines, including pure-prose ones. The rest of this page is the full method built on
-top of those moves — adopt as much or as little as pays.
+for pipelines, including pure-prose ones. And [`delta-render`](delta-render) is the method's
+newest polarity, discovery output consumed as generation input: a miniature of DBSP-style
+incremental computation whose derivation rules are LICENSED by discovered law specs, rendered
+as drift-gated generated code, and end-gated by a law that trusts no license. The rest of
+this page is the full method built on top of those moves — adopt as much or as little as
+pays.
 
 ---
 

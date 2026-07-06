@@ -707,18 +707,25 @@ mod tests {
     }
 
     /// THE SYSTEM-LEVEL DISTANCE over this repo's own graph — and the report earns its
-    /// keep: three of the five declared modules are SECRETLY SEVERAL, byte-pinned. The
-    /// interpreter splits arithmetic from comparison, the calendar splits duration
-    /// arithmetic from epoch conversion, and the TTL store splits the merge monoid from
-    /// the clock action — real architectural observations, each with its suggested seam
-    /// kind, held here as a deliberate keep-whole decision (this repo's modules are
-    /// demonstration substrates; splitting them is the downstream lesson, not ours).
+    /// keep twice over. Two of the five declared modules are SECRETLY SEVERAL,
+    /// byte-pinned: the interpreter splits arithmetic from comparison, the calendar
+    /// splits duration arithmetic from epoch conversion — real architectural
+    /// observations, each with its suggested seam kind, held here as a deliberate
+    /// keep-whole decision (this repo's modules are demonstration substrates; splitting
+    /// them is the downstream lesson, not ours).
+    ///
+    /// The TTL store USED to be the third split (merge monoid vs clock action) — until
+    /// the action-law stanzas landed and discovery found `tick(empty, p) = empty`: the
+    /// clock action FIXES the merge monoid's identity, a law that bridges the two
+    /// clusters. The split dissolved because the law language grew, not because any
+    /// code moved — cohesion is a verdict about what the vocabulary can SEE, and this
+    /// pin records the day that stopped being a hypothetical.
     #[test]
     fn the_repo_distance_names_the_latent_splits() {
         let distance = SystemDistance::of::<BoundarySpec>();
-        assert_eq!(distance.latent().len(), 3);
+        assert_eq!(distance.latent().len(), 2);
         let expected = "\
-boundary-spec: 2 of 5 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
+boundary-spec: 3 of 5 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
   module `interpreter arithmetic`: decomposes into 2 latent modules — consider splitting:
     module 0: { 0, 1, +, * }
     module 1: { false, < }
@@ -727,10 +734,6 @@ boundary-spec: 2 of 5 declared modules are cohesive; LATENT SPLITS (suggestions,
     module 0: { zero, +, add, diff }
     module 1: { since, at }
     seam 0↔1 on Date, Duration — transform (algebra changes — check the homomorphism)
-  module `ttl store`: decomposes into 2 latent modules — consider splitting:
-    module 0: { empty, <+ }
-    module 1: { tick, zero, + }
-    seam 0↔1 on Store — transport (algebra stays — check coherence)
 ";
         assert_eq!(distance.render(), expected);
     }

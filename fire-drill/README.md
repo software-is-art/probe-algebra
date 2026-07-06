@@ -7,11 +7,19 @@ stamps — and every gate can rot into a rubber stamp. A vacuous gate is worse t
 keeps emitting the confidence while no longer doing the work, and its positive tests can't
 tell, because a rubber stamp passes every positive test.
 
-This crate is the mutation-testing move applied to processes: keep a standing battery of
-**known-bad fixtures**, one or more per gate, and on every run demand that each gate REJECTS
-its planted bad input. A drill that passes is a gate that has gone vacuous, named. A required
-gate with no drill is UNPROVEN, so a gate cannot silently join the pipeline without a fixture
-showing it can fail.
+**Start with the census.** `requires([...])` declares the gates that must each carry a
+known-bad fixture; a required gate with no drill is UNPROVEN and fails the verdict. That
+default — a gate cannot join the pipeline without a fixture proving it can fail — is the
+sleeper feature: in systems where gates accrete fast, it is worth more than the drills
+themselves. The drills catch rot; the census prevents gates being born rotten.
+
+The drills are the mutation-testing move applied to processes: a standing battery of
+**known-bad fixtures**, one or more per gate, and on every run each gate must REJECT its
+planted bad input. A drill that passes is a gate that has gone vacuous, named — validated in
+production on day zero of this crate's first consumption, by an incident that predated
+reading it: two committed regression fixtures both carried the degenerate case, so a 95-test
+green suite could not see a real defect the first non-degenerate job hit. Not a gate that
+stopped firing — a fixture set that never pressed the button.
 
 ```rust
 use fire_drill::{Battery, Outcome};
@@ -26,7 +34,11 @@ battery.verdict().expect("every gate still fires");
 
 Substrate-free: a "gate" is anything whose verdict you can observe — a Rust function, a CLI,
 a prose checklist. Run your gate over your bad fixture however you run it; hand this crate
-the outcome. `render()` is deterministic text — freeze it with
+the outcome. That handoff is where consumers quietly cheat, so map it STRICTLY: `Fired` only
+when the gate failed AND its verdict names the planted defect (a usage error or an unrelated
+failure is a harness bug — panic, don't count it), and panic when a mutation helper cannot
+find the text it plans to corrupt (a mutation that misses its target makes the drill vacuous
+the wrong way round). The crate docs carry the worked example. `render()` is deterministic text — freeze it with
 [`spec-lock`](https://github.com/software-is-art/probe-algebra/tree/main/spec-lock) and the
 battery itself is drift-gated, so removing a drill is a reviewed diff, never a quiet deletion.
 

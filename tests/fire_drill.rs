@@ -96,9 +96,45 @@ fn the_battery(tamper_dir: &std::path::Path) -> Battery {
         (vec![], "vouchers"),
     ];
 
+    // the cross-lock anchor gate: a chain link whose live derivation drifted, one whose
+    // anchor was re-ratified upstream, and one whose anchor is gone — each must be
+    // refused WITH ITS OWN DIAGNOSIS (the three breaks are three different repairs).
+    let baseline = "the shared instrument\n";
+    let anchor_path = tamper_dir.join("anchor.spec");
+    std::fs::write(&anchor_path, baseline).expect("plant the anchor");
+    let cross = |name: &str, pinned_sha: String, live: &str| spec_lock::CrossLock {
+        name: name.into(),
+        foreign_path: anchor_path.clone(),
+        pinned_sha,
+        live: live.into(),
+    };
+    let drifted_live = cross(
+        "drifted",
+        spec_lock::sha256_hex(baseline.as_bytes()),
+        "not the shared instrument\n",
+    );
+    let reratified = cross(
+        "re-ratified",
+        spec_lock::sha256_hex(b"an older ratification\n"),
+        baseline,
+    );
+    let orphaned = spec_lock::CrossLock {
+        name: "orphaned".into(),
+        foreign_path: tamper_dir.join("never-existed.spec"),
+        pinned_sha: spec_lock::sha256_hex(baseline.as_bytes()),
+        live: baseline.into(),
+    };
+    let diagnosis = |lock: &spec_lock::CrossLock, fragment: &str| -> Outcome {
+        match spec_lock::check_cross(std::slice::from_ref(lock)) {
+            Err(broken) if broken[0].contains(fragment) => Outcome::Fired,
+            _ => Outcome::Passed,
+        }
+    };
+
     Battery::named("the discipline's own gates")
         .requires([
             "spec-lock drift gate",
+            "cross-lock anchor gate",
             "algebra mutation",
             "declared-expectation distance",
             "shape data gate",
@@ -113,6 +149,23 @@ fn the_battery(tamper_dir: &std::path::Path) -> Battery {
             "spec-lock drift gate",
             "a lock whose committed file was never written (missing is stale, never fresh)",
             outcome(spec_lock::check(std::slice::from_ref(&missing)).is_err()),
+        )
+        .drill(
+            "cross-lock anchor gate",
+            "a chain link whose live derivation no longer reproduces its anchor — the \
+             diagnosis must place the movement HERE, not upstream",
+            diagnosis(&drifted_live, "live derivation drifted"),
+        )
+        .drill(
+            "cross-lock anchor gate",
+            "an anchor re-blessed upstream (pin no longer matches the file) — the \
+             diagnosis must call for re-review, never a quiet re-pin",
+            diagnosis(&reratified, "anchor re-ratified upstream"),
+        )
+        .drill(
+            "cross-lock anchor gate",
+            "an anchor file that is gone entirely",
+            diagnosis(&orphaned, "anchor missing"),
         )
         .drill(
             "algebra mutation",

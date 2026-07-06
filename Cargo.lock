@@ -79,6 +79,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "delta-render"
+version = "0.0.0"
+dependencies = [
+ "boundary-spec",
+ "fire-drill",
+ "spec-lock",
+]
+
+[[package]]
 name = "downstream-fixture"
 version = "0.0.0"
 dependencies = [

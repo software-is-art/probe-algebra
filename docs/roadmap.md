@@ -111,6 +111,35 @@ see. The canonical emission order (band → fire op → catalog rank → partner
 exactly two committed lock lines in the whole workspace — both pure reorders, ratified — and
 the demos did not change at all. Net −109 lines.
 
+**Specs as licenses** (the `delta-render` brick, from a thrown design): discovery output
+consumed as GENERATION input — a new polarity for the whole method. The crate is a miniature
+of DBSP-style incremental computation in which each operator's derivation rule is LICENSED by
+the presence of laws in its frozen spec, never by a declared boolean: linear ⇔ the additive
+homomorphism plus the zero fixed point; bilinear ⇔ additive in each slot (the catalog gained
+three data stanzas for the vocabulary — `inverse`, `fixed point`, `distributivity (right)` —
+and the maximal logic theory promptly discovered the two classical Boolean complements the
+catalog had been silent about). The chain of derived artifacts: eight exhaustively-judged
+theories freeze their specs (including `scale`, the non-commutative bilinear whose license
+IS the discovered distributivity pair — both slot laws, no commutativity shortcut);
+`spec/licenses.spec` is derived by PARSING those specs' text, each row citing the law lines
+that granted it; the render walks a validated circuit DAG (unlicensed operators are
+unconstructible) and emits generated Rust — compiled, tested, drift-gated: the `ci.yml`
+move at a new altitude — plus a plain-language derivation artifact, from ONE derivation,
+for TWO circuits (the single-source demo chain, and an audit circuit with two sources and
+a fan-out). The end gate —
+`I ∘ Q^Δ ∘ D = Q` over the stream grid — trusts no license, and the fire drill proves both
+gates can fire: the almost-linear operator (drops retractions) is DENIED over the honest grid
+and, when forged via a pruned insert-only grid, caught by the end law instead; a forged
+`distinct → linear` registry fires the gate; the all-fallback floor passes it; and
+`spec/min.retraction.spec` freezes WHY min under deletion is hard, with values computed by
+the real operators. Two incidental findings while building it: the new `fixed point` stanza
+was the first equational shape with no variable on either side, exposing (and closing) a
+vacuous-truth hole — the `meaningful` filter now guards both polarities; and a per-package
+`opt-level` override collapsed the drift-gate economics from ~95s to ~6s because `Engine<T>`
+monomorphizes into the consumer crate. Deliberately absent from v1, recorded as candidates
+below: recursion/fixpoint circuits, SQL/NULL semantics (the end law's batch oracle is the
+declared seam), and phase 7's property-constrained interpretation sampling.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research
@@ -152,6 +181,48 @@ its recorded residuals. The items below predate that inventory:
    dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
    end-to-end net over the freeze's actual render.
 
+## From the field, day zero (fire-drill consumed in production)
+
+The production CLI adoption consumed fire-drill untagged, same-day — and the crate's
+motivating claim ("a rubber stamp passes every positive test") was validated in their
+system THE SAME MORNING, by an incident that happened before they'd read it: two committed
+regression fixtures both carried the degenerate case (a zero-valued pool), so a 95-test
+green suite could not see that two implementations of one identity disagreed — it surfaced
+when the first real non-degenerate job hit the validator. The vacuousness failure class
+exactly, one level down: not a gate that stopped firing, a fixture set that never pressed
+the button. Their six-drill battery froze both incident shapes as permanent drills, register
+spec-locked. Three findings folded back in: the CENSUS is the sleeper feature (the drills
+catch rot; `requires` + UNPROVEN prevents gates being born rotten — now leading the README),
+the strict outcome mapping is where consumers quietly cheat (`Fired` only when the verdict
+NAMES the planted defect; harness errors panic — now a documented example),
+and `Battery::drill_with` makes declaration order be execution order in one expression.
+Their line for the chronicle: "the loop is closed and it is short" — seven days from idea to
+a production consumer, a foreign-domain theory lock, the pattern reinvented locally in a
+client repo, and an incident-extracted module consumed back by the system whose report
+motivated it.
+
+## From the field, third assessment (a registered-numerics research corpus)
+
+A ~1021-artifact corpus attacking a mathematical conjecture — 250 kernel-checked proofs
+(cubical Agda `--safe`, Lean), ~700 Julia/Python numerics whose entire warrant is a
+hand-rolled procedural discipline (pre-registered gates, sha-pinned inputs, cross-artifact
+string-identity, acceptance by independent rerun) — assessed the method as a feasibility
+test. Its verdict, kept verbatim in the chronicle because it is the honest positioning of
+the whole discipline: **the method strengthens the WARRANT, not the theorems.** For
+kernel-checked stones, discovery is strictly weaker than what already stands; for the
+~700 numerics stones there is no kernel underneath — the gate/rerun discipline IS the
+warrant — which makes fire-drill's question ("can every one of these
+positive-tested-only gates still fire?") the sharpest available upgrade to the corpus's
+credibility, and registered-numerics pipelines possibly fire-drill's highest-leverage
+domain. Three mechanism gaps became bricks: the CROSS-LOCK (spec-lock's check-only,
+sha-pinned anchor to a foreign ratified baseline — their most load-bearing integrity
+move, previously hand-rolled per stone with the chain topology living in prose), the
+ordered-relation stanzas (subadditivity, triangle, monotonicity — the ∀-inequality
+polarity, stated as equations over a declared order), and the toleranced-judgment
+candidate above. Their planned adoption: a fire-drill battery over the standing guard
+classes, and spec-lock over the corpus-level censuses — including a verbatim-copy
+provenance registry, which is the exception-register pattern almost exactly.
+
 ## From the field (the first production adoption)
 
 A production Rust CLI adopted `spec-lock` as a pinned git dependency — four agent sessions in
@@ -183,6 +254,52 @@ candidate bricks:
    byte equality IS set equality) covers it with spec-lock as-is; if field use keeps wanting
    set-diff rendering ("2 new findings, 1 resolved" instead of a byte diff), a tiny keyed
    helper alongside `Lock` is the shape — resist anything larger.
+
+6. **Uninterpreted operators with ratified properties** (delta-render phase 7, deferred):
+   for an opaque symbol with declared properties (deterministic, additive, zero-preserving),
+   check circuit laws over SAMPLED random interpretations constrained only by those
+   properties — plus the REMOVAL drill: re-sample with one property dropped and demand the
+   law fail, proving each ratified property load-bearing (a property whose removal changes
+   nothing is decoration, flagged not frozen). The bridge to pipelines whose operator
+   inventory is open, and a fire-drill variant in its own right.
+
+7. **Depth-bounded stream carriers as a grid idiom**: `delta-render`'s `Stream` (fixed-depth
+   vector, prefix equality) worked as a Theory carrier with zero engine changes — worth
+   documenting as the supported way to put time-indexed values on a grid, alongside the grid
+   and term-depth bounds the honest frame already declares.
+
+8. **Toleranced three-valued judgment** (from the third field report): for metric/setoid
+   carriers, judge laws as holds / refuted / UNDECIDED-at-ε, with ε carried in the lock
+   text so review ratifies the tolerance along with the law. The observation-hook
+   quantization route is documented (with its boundary hazard) in
+   [discovery.md](discovery.md); the undecided band is what makes a toleranced gate honest
+   where these domains actually live — near the boundary.
+
+9. **Conditional / guarded laws** (from the second and third field reports): `P(s) ⇒
+   lhs = rhs` — guarded identities, and monotonicity's general form `∀ x ≤ y: f(x) ≤ f(y)`
+   (the catalog carries the unconditional join form). Needs a premise slot in the shape
+   grammar and a driver that filters assignments by the guard; the honest frame carries
+   over (a bounded grid refutes a guarded law on its satisfying assignments).
+
+10. **Statement-bite mutation** (from the proof-corpus assessment): mutation testing FOR
+    proof corpora — mutate the DEFINITIONS (not the proofs) and demand each theorem fail to
+    re-check; a proof that survives definition mutants never depended on that degree of
+    freedom, which is the vacuous-statement finding (wrong quantifier scope, a definition
+    too weak to constrain) the kernel cannot make. Killed/survived/ratified follows the
+    residue policy verbatim; the harness half is `mutants-gate.sh`'s pattern,
+    substrate-free; the mutant generator is per-language (Agda/Lean) work. The one brick
+    in this family that makes existing kernel-checked artifacts MORE trustworthy.
+
+11. **Theory-bridge** (same assessment): `Theory` from exported data — a prover emits
+    finite operator tables for its decidable fragments (a table IS an eval function), and
+    discovery runs as CONJECTURE SUPPLY and triage, never certification: grid survivors
+    become proof obligations rendered as statement stubs (the genesis meaning-hole move),
+    grid refutations kill false conjectures before anyone burns a day proving them.
+
+12. **The disagreement detector** (falls out of 11): grid-check already-proved laws over
+    the exported tables — agreement proves nothing new, but DISAGREEMENT is always a
+    defect somewhere in the export/bridge pipeline, with certainty. Differential testing
+    for the untrusted half of a proof corpus, same polarity as delta-render's end gate.
 
 ## Standing follow-ups
 

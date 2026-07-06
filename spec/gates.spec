@@ -30,3 +30,7 @@
 - mutation (full sweep) (weekly + manual, sharded; pure)
       .github/mutants-gate.sh
       promises: no mutant of the whole crate survives — the method's own "the real test", re-certifying the tree from scratch on a weekly clock (backstops incrementality's one gap: a test edit weakening kills for unchanged code)
+
+- mutation (delta-render plumbing) (weekly + manual, sharded; pure)
+      .github/mutants-gate.sh --package delta-render --config .github/delta-render-mutants.toml
+      promises: no mutant of delta-render's plumbing (the license parser, the circuit validity rule, the render, the stream calculus) survives its lib probes — the workspace sweeps scope to the root crate, so the member that turns specs into generated code carries its own weekly verdict (config: .github/delta-render-mutants.toml; the drift-gate twins live in the lib precisely so this sweep can see them)

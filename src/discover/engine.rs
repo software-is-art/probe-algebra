@@ -934,6 +934,22 @@ impl ShapeCatalog {
                 const_rule: ConstRule::Any,
             },
             ShapeInfo {
+                name: "inverse",
+                schema: "(x ⊕ inv(x)) = e",
+                gate: "homogeneous binary plus a unary endo and a constant, all on one \
+                       sort; tried on both sides, deduplicated by prose",
+                gate_slots: open(&[Slot::Binary(0), Slot::Unary(0, 0), Slot::Constant(0)]),
+                template: "{other} inverts {op} — a value {op} its own {other} gives {const}.",
+                lhs: App(0, &[X, App(1, &[X])]),
+                rhs: App(2, &[]),
+                placeholders: &["⊕", "inv", "e"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: true,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
                 name: "distributivity",
                 schema: "(x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))",
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
@@ -946,6 +962,24 @@ impl ShapeCatalog {
                 holes: &["op", "other"],
                 mirrored: false,
                 guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "distributivity (right)",
+                schema: "((y ⊗ z) ⊕ x) = ((y ⊕ x) ⊗ (z ⊕ x))",
+                gate: "an ordered pair of distinct homogeneous binaries on one sort; \
+                       skipped when the first is commutative (the left-slot law already \
+                       says it) — the other slot's distributivity, so each argument \
+                       position carries its own additivity law",
+                gate_slots: BINARY_PAIR,
+                template: "{op} distributes over {other} from the right.",
+                lhs: App(0, &[App(1, &[Y, Z]), X]),
+                rhs: App(1, &[App(0, &[Y, X]), App(0, &[Z, X])]),
+                placeholders: &["⊕", "⊗"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
             },
             ShapeInfo {
@@ -1004,6 +1038,86 @@ impl ShapeCatalog {
                 const_rule: ConstRule::Any,
             },
             ShapeInfo {
+                name: "action idempotence",
+                schema: "act(act(x, p), p) = act(x, p)",
+                gate: "heterogeneous binary s × t → s (an action of t on s)",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "Repeated {op} with one parameter settles on the first \
+                           application.",
+                lhs: App(0, &[App(0, &[X, P]), P]),
+                rhs: App(0, &[X, P]),
+                placeholders: &["act"],
+                polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "action commutation",
+                schema: "act(act(x, p), q) = act(act(x, q), p)",
+                gate: "heterogeneous binary s × t → s (an action of t on s)",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} applications commute — the parameter order doesn't matter.",
+                lhs: App(0, &[App(0, &[X, P]), Q]),
+                rhs: App(0, &[App(0, &[X, Q]), P]),
+                placeholders: &["act"],
+                polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "action equivariance",
+                schema: "act((x ⊕ y), p) = (act(x, p) ⊕ act(y, p))",
+                gate: "heterogeneous binary s × t → s (an action of t on s) plus a \
+                       homogeneous binary on the carrier sort s",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Binary(0)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} distributes over {other} — acting on a combination is \
+                           combining the actions.",
+                lhs: App(0, &[App(1, &[X, Y]), P]),
+                rhs: App(1, &[App(0, &[X, P]), App(0, &[Y, P])]),
+                placeholders: &["act", "⊕"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "action fixed point",
+                schema: "act(c, p) = c",
+                gate: "heterogeneous binary s × t → s (an action of t on s) plus a \
+                       constant of the carrier sort s",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Constant(0)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} leaves {const} fixed — no parameter moves it.",
+                lhs: App(0, &[C, P]),
+                rhs: C,
+                placeholders: &["act", "c"],
+                polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
                 name: "irreflexivity",
                 schema: "rel(x, x) = false",
                 gate: "relation s × s → r (r ≠ s) whose output sort carries a constant \
@@ -1053,6 +1167,36 @@ impl ShapeCatalog {
                 placeholders: &["u"],
                 polarity: Polarity::Equal,
                 holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "projection",
+                schema: "u(u(x)) = u(x)",
+                gate: "unary s → s",
+                gate_slots: open(&[Slot::Unary(0, 0)]),
+                template: "{op} is a projection — applying it twice is applying it once.",
+                lhs: App(0, &[App(0, &[X])]),
+                rhs: App(0, &[X]),
+                placeholders: &["u"],
+                polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "fixed point",
+                schema: "u(c) = c",
+                gate: "unary endo s → s plus a constant of its sort",
+                gate_slots: open(&[Slot::Unary(0, 0), Slot::Constant(0)]),
+                template: "{op} leaves {const} fixed.",
+                lhs: App(0, &[C]),
+                rhs: C,
+                placeholders: &["u", "c"],
+                polarity: Polarity::Equal,
+                holes: &["op", "const"],
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
@@ -1139,6 +1283,127 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+            },
+            // -- the ORDERED-RELATION shapes: ∀-inequalities, stated as equations over a
+            // theory's own declared order (`le(lhs, rhs) = true`). No new polarity: a
+            // bounded grid refutes a ∀-inequality exactly as it refutes an equation, and
+            // the order is an ordinary discovered relation, so the driver is untouched.
+            // (Field-note origin: metric/interval mathematics, whose bread and butter —
+            // triangle inequality, subadditive enclosures, monotone operators — the
+            // catalog previously could not say.)
+            ShapeInfo {
+                name: "subadditivity",
+                schema: "le(f((x ⊕ y)), (f(x) ⊕ f(y))) = true  (f(x ⊕ y) ≤ f(x) ⊕ f(y))",
+                gate: "unary endo s → s, a homogeneous binary on s, and an order relation \
+                       s × s → r (r ≠ s) whose output sort carries a constant rendering \
+                       as `true`",
+                gate_slots: ShapeGate {
+                    slots: &[
+                        Slot::Unary(0, 0),
+                        Slot::Binary(0),
+                        Slot::Relation(0, 1),
+                        Slot::Constant(1),
+                    ],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is subadditive over {other} (under {via}).",
+                lhs: App(
+                    2,
+                    &[
+                        App(0, &[App(1, &[X, Y])]),
+                        App(1, &[App(0, &[X]), App(0, &[Y])]),
+                    ],
+                ),
+                rhs: App(3, &[]),
+                placeholders: &["f", "⊕", "le", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "via", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+            },
+            ShapeInfo {
+                name: "triangle inequality",
+                schema: "le(d(x, z), (d(x, y) ⊕ d(y, z))) = true  (d(x, z) ≤ d(x, y) ⊕ d(y, z))",
+                gate: "a distance d : s × s → t, a homogeneous binary on t, and an order \
+                       relation t × t → r (r ≠ t) whose output sort carries a constant \
+                       rendering as `true`; d and the binary must be different operators",
+                gate_slots: ShapeGate {
+                    slots: &[
+                        Slot::Relation(0, 1),
+                        Slot::Binary(1),
+                        Slot::Relation(1, 2),
+                        Slot::Constant(2),
+                    ],
+                    // d's output MAY share its operand sort (an integer-valued distance
+                    // on integers); only the order's verdict sort must be foreign.
+                    distinct_sorts: &[(1, 2)],
+                    distinct_ops: &[(0, 1)],
+                },
+                template: "{op} satisfies the triangle inequality with {other} (under {via}).",
+                lhs: App(
+                    2,
+                    &[App(0, &[X, Z]), App(1, &[App(0, &[X, Y]), App(0, &[Y, Z])])],
+                ),
+                rhs: App(3, &[]),
+                placeholders: &["d", "⊕", "le", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "via", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+            },
+            ShapeInfo {
+                name: "monotonicity (join form)",
+                schema: "le(f(x), f((x ⊕ y))) = true  (f(x) ≤ f(x ⊕ y) — monotone in the ⊕-order)",
+                gate: "unary endo s → s, a homogeneous binary on s (read as the domain's \
+                       join), and an order relation s × s → r (r ≠ s) whose output sort \
+                       carries a constant rendering as `true` — the unconditional form of \
+                       `∀ x ≤ y: f(x) ≤ f(y)` for join-induced orders; the guarded \
+                       general form stays a roadmap candidate (conditional laws)",
+                gate_slots: ShapeGate {
+                    slots: &[
+                        Slot::Unary(0, 0),
+                        Slot::Binary(0),
+                        Slot::Relation(0, 1),
+                        Slot::Constant(1),
+                    ],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is monotone in the {other}-order (under {via}).",
+                lhs: App(2, &[App(0, &[X]), App(0, &[App(1, &[X, Y])])]),
+                rhs: App(3, &[]),
+                placeholders: &["f", "⊕", "le", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "via", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+            },
+            ShapeInfo {
+                name: "totality",
+                schema: "(le(x, y) ⊕ le(y, x)) = true  (every pair relates, one way or the other)",
+                gate: "a relation s × s → r (r ≠ s), a homogeneous binary on r (read as \
+                       the verdict sort's or), and a constant of r rendering as `true` — \
+                       a total order says yes somewhere on every pair; a strict order \
+                       refuses this on the diagonal",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is total under {other} — every pair relates one way or \
+                           the other.",
+                lhs: App(1, &[App(0, &[X, Y]), App(0, &[Y, X])]),
+                rhs: App(2, &[]),
+                placeholders: &["le", "⊕", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
             },
         ]
     }
@@ -1329,7 +1594,14 @@ impl<T: Theory> Engine<T> {
             }
             for lhs in variants {
                 let confirmed = match shape.polarity {
-                    Polarity::Equal => self.same(&lhs, &rhs),
+                    // meaningfulness guards BOTH polarities: two all-undefined sides agree
+                    // on nothing yet compare equal, which "fixed point" (the first shape
+                    // with no variable in either term) can reach where every older shape
+                    // kept a defined variable in play.
+                    Polarity::Equal => {
+                        let a = self.signature(&lhs);
+                        Self::meaningful(&a) && a == self.signature(&rhs)
+                    }
                     Polarity::Differs => {
                         let (a, b) = (self.signature(&lhs), self.signature(&rhs));
                         Self::meaningful(&a) && Self::meaningful(&b) && a != b
@@ -1727,6 +1999,10 @@ mod tests {
             ("And with T leaves a value unchanged.", "(T & x) = x"),
             ("And by F always gives F.", "(F & x) = F"),
             (
+                "Not inverts And — a value And its own Not gives F.",
+                "(x & ~(x)) = F",
+            ),
+            (
                 "And distributes over Or.",
                 "(x & (y | z)) = ((x & y) | (x & z))",
             ),
@@ -1742,6 +2018,10 @@ mod tests {
             ("Or of a value with itself gives that value.", "(x | x) = x"),
             ("Or with F leaves a value unchanged.", "(F | x) = x"),
             ("Or by T always gives T.", "(T | x) = T"),
+            (
+                "Not inverts Or — a value Or its own Not gives T.",
+                "(x | ~(x)) = T",
+            ),
             (
                 "Or distributes over And.",
                 "(x | (y & z)) = ((x | y) & (x | z))",
@@ -2421,8 +2701,10 @@ mod tests {
 
     // MaxLogic: booleans (commutativity, associativity, idempotence, identity, annihilation,
     // distributivity, absorption, involution, De Morgan homomorphism), a `<` relation into the
-    // boolean sort (irreflexivity), a mod-3 codec (round-trips), and a PARTIAL `half` (defined
-    // only on even values — it earns no law and must not fake one).
+    // boolean sort (irreflexivity), a mod-3 codec (round-trips), a PARTIAL `half` (defined
+    // only on even values — it earns no law and must not fake one), and the ordered-relation
+    // ingredients on N: `cap` (min with 1), `plus`, `dist` (abs diff), and `le` — the
+    // subadditivity, triangle, and monotonicity stanzas fire here, judged against `true`.
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
     enum LSort {
         B,
@@ -2473,6 +2755,18 @@ mod tests {
     fn l_half(v: &[LVal]) -> Option<LVal> {
         let n = l_nat(&v[0]);
         n.is_multiple_of(2).then_some(LVal::N(n / 2))
+    }
+    fn l_cap(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::N(l_nat(&v[0]).min(1)))
+    }
+    fn l_plus(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::N(l_nat(&v[0]) + l_nat(&v[1])))
+    }
+    fn l_dist(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::N(l_nat(&v[0]).abs_diff(l_nat(&v[1]))))
+    }
+    fn l_le(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(l_nat(&v[0]) <= l_nat(&v[1])))
     }
 
     impl Theory for MaxLogic {
@@ -2558,6 +2852,38 @@ mod tests {
                     output: N,
                     eval: l_half,
                 },
+                Operator {
+                    name: "cap",
+                    symbol: "cap",
+                    fixity: Prefix,
+                    inputs: vec![N],
+                    output: N,
+                    eval: l_cap,
+                },
+                Operator {
+                    name: "plus",
+                    symbol: "plus",
+                    fixity: Infix,
+                    inputs: vec![N, N],
+                    output: N,
+                    eval: l_plus,
+                },
+                Operator {
+                    name: "dist",
+                    symbol: "dist",
+                    fixity: Prefix,
+                    inputs: vec![N, N],
+                    output: N,
+                    eval: l_dist,
+                },
+                Operator {
+                    name: "le",
+                    symbol: "le",
+                    fixity: Prefix,
+                    inputs: vec![N, N],
+                    output: B,
+                    eval: l_le,
+                },
             ]
         }
         fn inhabitants(sort: Self::Sort) -> Vec<Self::Value> {
@@ -2585,7 +2911,10 @@ mod tests {
 
     // MaxSelect: two projections (`First` left-regular, `Last` right-regular — the bias laws), a
     // duration monoid (`Plus`/`zero`), a mod-3 `Shift` action of durations on values (action
-    // identity, monoid action), and a `Gap` relation whose self-application is `zero`.
+    // identity, monoid action), a `Gap` relation whose self-application is `zero`, and a
+    // doubling endo `Twice` on durations (fixed point at `zero`; the additive homomorphism —
+    // the very instance the license derivation reads as LINEARITY), and a `Clamp` action
+    // (min with the duration) — idempotent where `Shift` is not, so both action stanzas fire.
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
     enum SSort {
         V,
@@ -2626,6 +2955,15 @@ mod tests {
     }
     fn s_gap(v: &[SVal]) -> Option<SVal> {
         Some(SVal::D(s_v(&v[0]).abs_diff(s_v(&v[1]))))
+    }
+    fn s_twice(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::D(s_d(&v[0]) * 2))
+    }
+    fn s_clamp(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::V(s_v(&v[0]).min(s_d(&v[1]))))
+    }
+    fn s_floor(_: &[SVal]) -> Option<SVal> {
+        Some(SVal::V(0))
     }
 
     impl Theory for MaxSelect {
@@ -2686,6 +3024,30 @@ mod tests {
                     inputs: vec![V, V],
                     output: D,
                     eval: s_gap,
+                },
+                Operator {
+                    name: "Twice",
+                    symbol: "dbl",
+                    fixity: Prefix,
+                    inputs: vec![D],
+                    output: D,
+                    eval: s_twice,
+                },
+                Operator {
+                    name: "Clamp",
+                    symbol: "clamp",
+                    fixity: Prefix,
+                    inputs: vec![V, D],
+                    output: V,
+                    eval: s_clamp,
+                },
+                Operator {
+                    name: "floor",
+                    symbol: "floor",
+                    fixity: Nullary,
+                    inputs: vec![],
+                    output: V,
+                    eval: s_floor,
                 },
             ]
         }
