@@ -66,7 +66,10 @@ exclude_re = [
 # to COMPILE, never executing `src` runtime code, so it kills no `src` mutant. It is
 # also excluded because trybuild's `.stderr` matching is sensitive to the build
 # environment and is unstable inside cargo-mutants' copied tree.
-additional_cargo_test_args = ["--lib"]
+# ... plus the DRILL batteries: the refusal census and the gate fire-drill live in
+# tests/ (they exercise the PUBLIC surface, consumer-style), and they exist precisely to
+# kill guard-weakening mutants — so the sweep must run them or they protect nothing.
+additional_cargo_test_args = ["--lib", "--test", "refusal_drill", "--test", "fire_drill"]
 
 # Run each mutant's suite through nextest: its default is FAIL-FAST, so a killed mutant
 # stops at its first failing probe instead of running out the whole suite — most mutants
