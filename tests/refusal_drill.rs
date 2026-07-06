@@ -86,6 +86,18 @@ fn every_refusal_arm_still_fires() {
             planned(&good("drill-app", "Credits = i64 where 5..=5 saturating;", METER)))
         .drill("range rules", "an unsigned range starting at zero (must PLAN — kills < tightened to <=)",
             planned(&good("drill-app", "Credits = u8 where 0..=20 saturating;", METER)))
+        // the via seam's endpoint census: `is_binary_on_value` must demand ALL of arity 2,
+        // both input sorts, and the output sort — a NEAR-miss operator (right first input
+        // and output, wrong second input) must leave the count at zero, so any weakened
+        // conjunct falsely admits it and the refusal below goes quiet.
+        .drill("seam touch", "a via seam whose left side has only a near-miss binary (wrong second input)",
+            refused(&format!(
+                "system! {{ name: \"drill-app\", values {{ {CREDITS} Points = i64 where \"any\"; }} \
+                 modules {{ meter {{ ops {{ toPoints(Credits) -> Points; \
+                 mix(Credits, Points) -> Credits; }} }} \
+                 pay {{ ops {{ settle(Points, Points) -> Points; }} }} }} \
+                 seams {{ meter -- pay : transform on Credits via toPoints; }} }}"),
+                "exactly one homogeneous binary"))
         // a GOOD seam whose left side is not the first-declared module: the wrong-module
         // lookup (== flipped to !=) checks `ledger` for `meter`'s touches and falsely
         // refuses — declaration order is the fixture's whole point.
