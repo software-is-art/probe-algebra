@@ -2219,12 +2219,17 @@ mod tests {
             .contents;
         assert!(meter.contains("use boundary_spec::boundary::Shaped;"));
         assert!(meter.contains("boundary_spec::value_object!(Credits);"));
+        // the doc must sit ON ITS OWN operator (adjacency, not mere presence — a flipped
+        // filter swaps the lists between `grant` and `renew` while both strings still
+        // appear somewhere in the file).
         assert!(meter.contains(
             "Declared expectations (the target lock restates them): commutative(grant); \
-             identity(grant, zero)."
+             identity(grant, zero).\n    pub fn grant("
         ));
-        assert!(meter
-            .contains("Declared expectations (the target lock restates them): bias_later(renew)."));
+        assert!(meter.contains(
+            "Declared expectations (the target lock restates them): bias_later(renew).\n    \
+             pub fn renew("
+        ));
         // one blank line BETWEEN methods, none after the impl header.
         assert!(meter.contains("    }\n\n    /// `renew`"));
         assert!(!meter.contains("impl Credits {\n\n"));
