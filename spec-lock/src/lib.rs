@@ -208,6 +208,134 @@ pub fn anchor_graph(locks: &[CrossLock]) -> String {
     out
 }
 
+/// A ratified-exceptions REGISTER: a committed, HAND-AUTHORED baseline of findings a
+/// human has accepted, each with its justification — the third artifact kind, next to
+/// [`Lock`] (generated, blessed) and [`CrossLock`] (foreign, pinned).
+///
+/// A register is never generated: writing a key into it IS the ratification, and the
+/// justification is the one thing no derivation can produce. The tooling here only
+/// reads and diffs — [`Register::check`] compares the live finding set against the
+/// baseline and renders the drift as SET DIFFERENCE (`2 new finding(s)`, `1 resolved`)
+/// instead of a byte diff, because for keyed exception sets that is the review
+/// conversation: each new key wants a justification or a fix, each resolved key wants
+/// its line deleted (a stale exception is a lie the register tells forever).
+///
+/// File format, one exception per line (`#` comments and blank lines skipped):
+///
+/// ```text
+/// <key>: <justification — why this finding is accepted rather than fixed>
+/// ```
+///
+/// A key with no justification is a PARSE error, not an entry — the format enforces
+/// the discipline. A missing file is the empty register: zero ratified exceptions
+/// (registers are declarations, so absence honestly declares "no exceptions"; this is
+/// the one place missing-is-not-stale, because there is nothing to regenerate).
+pub struct Register {
+    /// Display name for drift messages.
+    pub name: String,
+    /// The committed register file.
+    pub path: PathBuf,
+}
+
+/// The set difference between live findings and a [`Register`]'s ratified baseline.
+pub struct RegisterDrift {
+    /// Live findings with no ratified entry — each wants a justification or a fix.
+    pub new: Vec<String>,
+    /// Ratified entries no longer found live — each wants its line deleted.
+    pub resolved: Vec<String>,
+}
+
+impl RegisterDrift {
+    /// The review conversation, rendered: what appeared, what dissolved.
+    pub fn render(&self, register: &Register) -> String {
+        let mut out = format!("register `{}` drifted:", register.name);
+        if !self.new.is_empty() {
+            out.push_str(&format!(
+                " {} new finding(s) — ratify each with a justification in {}, or fix it: {}.",
+                self.new.len(),
+                register.path.display(),
+                self.new.join(", ")
+            ));
+        }
+        if !self.resolved.is_empty() {
+            out.push_str(&format!(
+                " {} resolved — delete the line(s) (a stale exception is a lie): {}.",
+                self.resolved.len(),
+                self.resolved.join(", ")
+            ));
+        }
+        out
+    }
+}
+
+impl Register {
+    /// Read the ratified entries: `key -> justification`, in file order de-duplicated by
+    /// key (a duplicate key is a parse error — one finding, one ratification).
+    pub fn entries(&self) -> Result<Vec<(String, String)>, String> {
+        let text = match fs::read_to_string(&self.path) {
+            Ok(t) => t,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(format!("register `{}` unreadable: {e}", self.name)),
+        };
+        let mut entries: Vec<(String, String)> = Vec::new();
+        for (n, raw) in text.lines().enumerate() {
+            let line = raw.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let (key, justification) = line.split_once(':').ok_or(format!(
+                "register `{}` line {}: an entry is `<key>: <justification>` — a bare key \
+                 is not a ratification",
+                self.name,
+                n + 1
+            ))?;
+            let (key, justification) = (key.trim().to_string(), justification.trim());
+            if justification.is_empty() {
+                return Err(format!(
+                    "register `{}` line {}: `{key}` carries no justification — the \
+                     justification IS the ratification",
+                    self.name,
+                    n + 1
+                ));
+            }
+            if entries.iter().any(|(k, _)| *k == key) {
+                return Err(format!(
+                    "register `{}` line {}: `{key}` is ratified twice — one finding, one \
+                     ratification",
+                    self.name,
+                    n + 1
+                ));
+            }
+            entries.push((key, justification.to_string()));
+        }
+        Ok(entries)
+    }
+
+    /// Hold a live finding set against the baseline. `Ok(())` means byte-for-byte the
+    /// same SET (order-independent); `Err` is either a parse refusal (`Err(Err(msg))`
+    /// flattened to text) or the set difference, pre-rendered for the gate log.
+    pub fn check<'a>(&self, live: impl IntoIterator<Item = &'a str>) -> Result<(), String> {
+        let ratified: Vec<String> = self.entries()?.into_iter().map(|(k, _)| k).collect();
+        let live: Vec<&str> = live.into_iter().collect();
+        let drift = RegisterDrift {
+            new: live
+                .iter()
+                .filter(|k| !ratified.iter().any(|r| r == *k))
+                .map(|k| k.to_string())
+                .collect(),
+            resolved: ratified
+                .iter()
+                .filter(|r| !live.contains(&r.as_str()))
+                .cloned()
+                .collect(),
+        };
+        if drift.new.is_empty() && drift.resolved.is_empty() {
+            return Ok(());
+        }
+        Err(drift.render(self))
+    }
+}
+
 /// sha256 of `bytes`, lowercase hex — for minting a [`CrossLock`]'s pin at chain-review
 /// time. Implemented here (FIPS 180-4, pinned against the NIST vectors in this crate's
 /// tests) so the crate keeps its zero-dependency promise.
@@ -493,5 +621,69 @@ mod tests {
             p = scratch.0.join("anchor.spec").display(),
         );
         assert_eq!(rendered, expected);
+    }
+
+    fn register_at(scratch: &Scratch, text: Option<&str>) -> Register {
+        let path = scratch.0.join("findings.register");
+        if let Some(t) = text {
+            fs::write(&path, t).expect("write the register fixture");
+        }
+        Register {
+            name: "findings".to_string(),
+            path,
+        }
+    }
+
+    /// The register's whole contract in one walk: an exact set match is green
+    /// (order-independent), a new finding and a resolved one each drift with their own
+    /// verb, and both are named in one render — the set-diff review conversation,
+    /// never a byte diff.
+    #[test]
+    fn a_register_diffs_as_a_set_and_names_both_drift_directions() {
+        let scratch = Scratch::new("register-diff");
+        let r = register_at(
+            &scratch,
+            Some("# accepted findings\nf-1: known false positive, tracked upstream.\nf-2: rot is cosmetic here.\n"),
+        );
+        assert_eq!(r.check(["f-1", "f-2"]), Ok(()));
+        assert_eq!(r.check(["f-2", "f-1"]), Ok(()), "a register is a SET");
+        let err = r.check(["f-1", "f-2", "f-3"]).unwrap_err();
+        assert!(
+            err.contains("1 new finding(s)") && err.contains("f-3"),
+            "{err}"
+        );
+        let err = r.check(["f-1"]).unwrap_err();
+        assert!(err.contains("1 resolved") && err.contains("f-2"), "{err}");
+        let err = r.check(["f-3"]).unwrap_err();
+        assert!(
+            err.contains("f-3") && err.contains("resolved") && err.contains("f-1"),
+            "both directions in one render: {err}"
+        );
+    }
+
+    /// A missing register is the EMPTY register (a declaration honestly absent), so
+    /// zero live findings are green and any live finding is new.
+    #[test]
+    fn a_missing_register_declares_no_exceptions() {
+        let scratch = Scratch::new("register-missing");
+        let r = register_at(&scratch, None);
+        assert_eq!(r.check([]), Ok(()));
+        assert!(r.check(["f-1"]).unwrap_err().contains("1 new finding(s)"));
+    }
+
+    /// The format enforces the discipline: a bare key, an empty justification, and a
+    /// duplicate ratification are each refused by name — never silently counted.
+    #[test]
+    fn a_register_refuses_unjustified_and_duplicate_ratifications() {
+        let scratch = Scratch::new("register-refusals");
+        let bare = register_at(&scratch, Some("f-1\n"));
+        assert!(bare.check(["f-1"]).unwrap_err().contains("bare key"));
+        let empty = register_at(&scratch, Some("f-1:   \n"));
+        assert!(empty
+            .check(["f-1"])
+            .unwrap_err()
+            .contains("no justification"));
+        let dup = register_at(&scratch, Some("f-1: reason.\nf-1: reason again.\n"));
+        assert!(dup.check(["f-1"]).unwrap_err().contains("ratified twice"));
     }
 }

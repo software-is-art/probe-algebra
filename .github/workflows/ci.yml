@@ -92,8 +92,8 @@ jobs:
           git tag -f mutants-green
           git push -f origin mutants-green
 
-  # Weekly companion sweep: same green gate ("0 MISSED"), same timeout
-  # semantics, one job — see the gate registry for what it verifies.
+  # Weekly companion gate: one plain job on the weekly clock, feeding the
+  # same countersign — see the gate registry for what it verifies.
   mutants-delta-render-plumbing:
     name: dogfood (delta-render plumbing)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -106,6 +106,21 @@ jobs:
         with:
           tool: cargo-mutants,cargo-nextest
       - run: .github/mutants-gate.sh --package delta-render --config .github/delta-render-mutants.toml
+
+  # Weekly companion gate: one plain job on the weekly clock, feeding the
+  # same countersign — see the gate registry for what it verifies.
+  mutants-statement-bites-lean-corpus:
+    name: dogfood (statement bites (lean corpus))
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants,cargo-nextest
+      - run: .github/statement-bite.sh
 
   # Whole-crate dogfood: the green gate is "0 MISSED". Timeouts (non-termination
   # mutants) are DETECTIONS, not survivors — `.github/mutants-gate.sh` distinguishes
@@ -136,7 +151,7 @@ jobs:
   # recovery after a red stretch (the weekly green re-anchors the diff).
   mutants-full-countersign:
     name: countersign (full sweep)
-    needs: [mutants-full, mutants-delta-render-plumbing]
+    needs: [mutants-full, mutants-delta-render-plumbing, mutants-statement-bites-lean-corpus]
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:

@@ -14,11 +14,14 @@ agreements (proved upstream; the grid could not refute them):
 - associative(and)
 - identity(and, true)
 - commutative(or)
-
-conjectures (discovered here; unproved upstream — proof obligations):
-- involution(not)
 - homomorphism(not, and, or)
 - homomorphism(not, or, and)
+- involution(not)
+- commutative(xor)
+- identity(or, false)
+- self_inverse(xor, false)
+
+conjectures (discovered here; unproved upstream — proof obligations):
 - idempotent(and)
 - annihilation(and, false)
 - inverse(and, not, false)
@@ -27,13 +30,10 @@ conjectures (discovered here; unproved upstream — proof obligations):
 - absorption(and, or)
 - associative(or)
 - idempotent(or)
-- identity(or, false)
 - annihilation(or, true)
 - inverse(or, not, true)
 - distributive(or, and)
 - absorption(or, and)
-- commutative(xor)
 - associative(xor)
 - identity(xor, false)
 - inverse(xor, not, true)
-- self_inverse(xor, false)

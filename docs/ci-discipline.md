@@ -74,6 +74,12 @@ and they want exactly moves 1–3. The one engineering note: serialize the regis
 DETERMINISTICALLY with a stable key order (sorted JSON, one finding per line), so byte
 equality IS set equality and spec-lock needs no diff semantics of its own.
 
+Since built first-class: `spec_lock::Register` is the keyed variant — hand-authored
+(`<key>: <justification>` per line; an unjustified key is a parse refusal), read-and-diff
+only, with drift rendered as set difference ("1 new finding(s)…", "1 resolved — delete the
+line(s)") instead of a byte diff. First consumer: the Lean statement-bite survivors
+baseline (`lean/bites.register`).
+
 ## Move 4 — scope mutation testing to changed lines, with a periodic full sweep
 
 Moves 1–3 lock what the code means; mutation testing measures whether the test surface could

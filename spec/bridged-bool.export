@@ -1,10 +1,15 @@
-# bridged-bool — a demonstration prover emission: the Boolean fragment as finite
-# operator tables (a table IS an eval function; see `discover::bridge`).
+# bridged-bool — a prover emission: the Boolean fragment as finite operator tables
+# (a table IS an eval function; see `discover::bridge`).
 #
-# This file is the INPUT artifact — committed verbatim, standing for the kernel's
-# export. `spec/bridged-bool.spec` and `spec/bridged-bool.obligations.spec` are DERIVED
-# from it by the freeze path; edit THIS file (as the prover would re-emit it) and
-# regenerate, never the derived locks.
+# The prover is REAL and in-tree: `lean/ProbeBool.lean` formalises this fragment, and
+# every `proved:` line below cites one `-- certifies:` theorem annotation there — the
+# bijection, and the cell-for-cell table agreement, are gated by `discover::bite`'s
+# probes inside every `cargo test` (and the theorems re-check under Lean in the weekly
+# statement-bite gate).
+#
+# This file is the INPUT artifact — committed verbatim. `spec/bridged-bool.spec` and
+# `spec/bridged-bool.obligations.spec` are DERIVED from it by the freeze path; edit
+# THIS file (as the prover re-emits it) and regenerate, never the derived locks.
 #
 # format: `elements:` names the carrier in index order; an `op token/arity:` table is
 # row-major (the first argument fixes the row); `proved:` lines carry the prover's own
@@ -21,3 +26,9 @@ proved: commutative and
 proved: associative and
 proved: identity and true
 proved: commutative or
+proved: homomorphism not and or
+proved: homomorphism not or and
+proved: involution not
+proved: commutative xor
+proved: identity or false
+proved: self_inverse xor false

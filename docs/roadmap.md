@@ -249,12 +249,17 @@ candidate bricks:
    every one fired on. Honest frame inherited: a drill refutes vacuousness for ITS fixture
    only; the battery proves the alarm rings when pressed, never that it hears everything.
 
-5. **The exception-register pattern, first-class.** The adoption's highest-leverage use was
-   freezing an accepted-findings baseline (documented in
-   [ci-discipline.md](ci-discipline.md)). The convention (deterministic keyed serialization →
-   byte equality IS set equality) covers it with spec-lock as-is; if field use keeps wanting
-   set-diff rendering ("2 new findings, 1 resolved" instead of a byte diff), a tiny keyed
-   helper alongside `Lock` is the shape — resist anything larger.
+5. **The exception-register pattern, first-class — BUILT** (`spec_lock::Register`, with
+   candidate 10 as its first consumer). Exactly the resisted-to shape: a register is
+   HAND-AUTHORED, never generated — writing a key IS the ratification, the justification
+   is the one thing no derivation can produce, and the format enforces it (a bare key or
+   an empty justification is a parse refusal, not an entry). The tooling only reads and
+   diffs: `Register::check` renders drift as SET DIFFERENCE — "1 new finding(s) — ratify
+   with a justification or fix", "1 resolved — delete the line(s) (a stale exception is a
+   lie)" — never a byte diff. A missing register is honestly the empty register (the one
+   place missing-is-not-stale: a declaration's absence declares "no exceptions"; there is
+   nothing to regenerate). First consumer: `lean/bites.register`, the statement-bite
+   survivors baseline.
 
 6. **Uninterpreted operators with ratified properties — BUILT** (`delta-render/src/warrant.rs`,
    `spec/enrich.warrant.spec`). The opaque symbol `enrich` — no inventoried
@@ -303,21 +308,28 @@ candidate bricks:
    through the one equation source, and `transitive` — the word two tests used as the
    canonical UNKNOWN shape — became declarable, which the census caught in both places.
 
-10. **Statement-bite mutation** (from the proof-corpus assessment): mutation testing FOR
-    proof corpora — mutate the DEFINITIONS (not the proofs) and demand each theorem fail to
-    re-check; a proof that survives definition mutants never depended on that degree of
-    freedom, which is the vacuous-statement finding (wrong quantifier scope, a definition
-    too weak to constrain) the kernel cannot make. Killed/survived/ratified follows the
-    residue policy verbatim; the harness half is `mutants-gate.sh`'s pattern,
-    substrate-free; the mutant generator is per-language (Agda/Lean) work. The one brick
-    in this family that makes existing kernel-checked artifacts MORE trustworthy.
-    A first executable half now exists in-repo, via the bridge (11): the bridged
-    theory's algebra-mutation lock (`spec/bridged-bool.mutation.spec`) perturbs the
-    EXPORTED TABLES in-process and demands re-discovery notice — statement bites at the
-    table level. The per-language definition mutator, driving the prover's own
-    re-check instead of a grid, remains the missing (and out-of-repo) half; it waits
-    for a proof-corpus consumer the way the warrant's circuit admission waits for an
-    open-inventory one.
+10. **Statement-bite mutation — BUILT, with our own corpus as the consumer**
+    (`discover::bite`, `lean/ProbeBool.lean`, `lean/bites.register`, weekly gate
+    `.github/statement-bite.sh`). The proof-corpus consumer it was waiting for turned
+    out to be us: `lean/ProbeBool.lean` formalises the bridged Boolean fragment, making
+    it the REAL upstream prover behind `spec/bridged-bool.export` — six of the bridge's
+    conjectures (both De Morgan duals among them) were proved there and ratified into
+    `proved:` lines, so conjecture supply → upstream proof → certificate is now one
+    executed loop (agreements 4 → 10, obligations 21 → 15). The bites: flip one result
+    literal in the DEFINITIONS region (never a pattern — a syntax wound is not a
+    statement bite; never a proof) and demand the theorems fail to re-check under the
+    Lean kernel. A survivor is the vacuous-statement finding the kernel cannot make
+    about itself, ratified by key in `lean/bites.register` — candidate 5's register,
+    consumed. One survivor set is PLANTED (`bnand`: defined, deliberately untheoremed,
+    four surviving bites) so the survivor arm is exercised on every run. Honesty split:
+    the Lean kernel (weekly CI gate; the countersign now needs it) is the substrate
+    authority, while a Rust MIRROR of the ten theorems re-judges every bite inside
+    every `cargo test`, pinning the expected survivor set toolchain-free — plus
+    cell-for-cell corpus-tables ↔ export-tables agreement and a `proved:` ↔
+    `-- certifies:` bijection, so the Lean file, the export, and the register cannot
+    drift apart silently. Remaining out-of-repo half, disclosed: richer per-language
+    mutant families (quantifier scope, hypothesis deletion) beyond result-literal
+    flips.
 
 11. **Theory-bridge — BUILT** (`discover::bridge`, `spec/bridged-bool.export` →
     `.spec` / `.mutation.spec` / `.obligations.spec`). `Theory` from exported data: a

@@ -47,10 +47,11 @@ fn the_committed_bridge_locks_are_fresh() {
     }
 }
 
-/// The triage partition, pinned: all four upstream certificates round-trip as
-/// agreements, no disagreement exists (`certify` is the gate the freeze path also
-/// runs), and the conjecture supply contains the laws worth burning a proof day on —
-/// both De Morgan duals, xor's group structure — none of which the prover certified.
+/// The triage partition, pinned: all TEN upstream certificates round-trip as
+/// agreements — the original four plus the six conjectures the loop sent upstream,
+/// proved in `lean/ProbeBool.lean`, and ratified back into `proved:` (both De Morgan
+/// duals among them) — no disagreement exists (`certify` is the gate the freeze path
+/// also runs), and the remaining conjecture supply still holds laws worth a proof day.
 #[test]
 fn the_triage_partition_is_the_designed_table() {
     mount_committed();
@@ -66,16 +67,22 @@ fn the_triage_partition_is_the_designed_table() {
             "commutative(and)",
             "associative(and)",
             "identity(and, true)",
-            "commutative(or)"
+            "commutative(or)",
+            "homomorphism(not, and, or)",
+            "homomorphism(not, or, and)",
+            "involution(not)",
+            "commutative(xor)",
+            "identity(or, false)",
+            "self_inverse(xor, false)",
         ],
         "an upstream certificate stopped round-tripping"
     );
     for supplied in [
-        "homomorphism(not, and, or)",
-        "homomorphism(not, or, and)",
-        "involution(not)",
-        "self_inverse(xor, false)",
-        "identity(or, false)",
+        "idempotent(and)",
+        "absorption(or, and)",
+        "inverse(xor, not, true)",
+        "associative(xor)",
+        "annihilation(and, false)",
     ] {
         assert!(
             t.conjectures.iter().any(|c| c == supplied),
