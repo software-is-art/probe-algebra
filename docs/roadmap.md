@@ -311,6 +311,13 @@ candidate bricks:
     residue policy verbatim; the harness half is `mutants-gate.sh`'s pattern,
     substrate-free; the mutant generator is per-language (Agda/Lean) work. The one brick
     in this family that makes existing kernel-checked artifacts MORE trustworthy.
+    A first executable half now exists in-repo, via the bridge (11): the bridged
+    theory's algebra-mutation lock (`spec/bridged-bool.mutation.spec`) perturbs the
+    EXPORTED TABLES in-process and demands re-discovery notice — statement bites at the
+    table level. The per-language definition mutator, driving the prover's own
+    re-check instead of a grid, remains the missing (and out-of-repo) half; it waits
+    for a proof-corpus consumer the way the warrant's circuit admission waits for an
+    open-inventory one.
 
 11. **Theory-bridge — BUILT** (`discover::bridge`, `spec/bridged-bool.export` →
     `.spec` / `.mutation.spec` / `.obligations.spec`). `Theory` from exported data: a
