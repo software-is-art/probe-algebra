@@ -80,6 +80,31 @@ pub trait Theory: Sized {
     fn rounds() -> usize {
         2
     }
+    /// How this theory JUDGES two observations for law purposes. The default is exact
+    /// equality — right for every decidable carrier. A metric/setoid carrier (floats,
+    /// constructive reals as Cauchy data) overrides with its REGISTERED bars: closer
+    /// than the holds-bar judges `Holds`, farther than the refutes-bar judges
+    /// `Refuted`, and the band between is `Undecided` — disclosed, never silently
+    /// binned. Pair every override with [`Theory::tolerance`], so the bars ship in the
+    /// lock text and review ratifies the tolerance along with the laws.
+    ///
+    /// SCOPE: law judgment only (the template driver, `Engine::check`, witnesses).
+    /// Enumeration and canonicalization keep exact equality — a toleranced relation is
+    /// not transitive, so it cannot key the term-collision maps; the consequence count
+    /// therefore remains an exact-equality fact, disclosed.
+    fn judge(a: &Self::Obs, b: &Self::Obs) -> Verdict {
+        if a == b {
+            Verdict::Holds
+        } else {
+            Verdict::Refuted
+        }
+    }
+    /// The REGISTERED tolerance, as display text for the lock header ("micro-units: \
+    /// exact holds; |Δ| ≤ 2 undecided; else refuted") — `Some` exactly when [`Theory::judge`]
+    /// is overridden, so ε is part of the ratified artifact, never ambient.
+    fn tolerance() -> Option<&'static str> {
+        None
+    }
     /// How many grid assignments to sample (a resource limit, not a curated list).
     fn grid_size() -> usize {
         24
@@ -167,6 +192,10 @@ pub struct Discovered {
     pub consequences: usize,
     /// Operators (by symbol) that participate in NO named law — where the spec is silent.
     pub uncovered_ops: Vec<&'static str>,
+    /// Candidate laws that landed in the DECLARED tolerance's undecided band — neither
+    /// held nor refuted, disclosed as `(prose, equation)` so the lock can say so. Always
+    /// empty for exact-equality theories (the default [`Theory::judge`]).
+    pub undecided: Vec<(String, String)>,
 }
 
 #[derive(Clone, Copy)]
@@ -181,6 +210,20 @@ pub struct Engine<T: Theory> {
     vars: Vec<Var<T::Sort>>,
     /// Each assignment maps a variable id (index into `vars`) to a value.
     grid: Vec<Vec<T::Value>>,
+}
+
+/// A three-valued law judgment at one grid assignment: exact carriers only ever say
+/// `Holds`/`Refuted`; a toleranced carrier ([`Theory::judge`]) adds the DISCLOSED middle.
+/// Without the undecided band, a toleranced gate is a coin flip exactly where metric
+/// domains live — near the boundary.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Verdict {
+    /// The two observations agree at the declared precision.
+    Holds,
+    /// The two observations clearly differ — a refutation-strength difference.
+    Refuted,
+    /// Inside the declared band: neither held nor refuted, and said so.
+    Undecided,
 }
 
 /// A term's behavioural signature: the observation at each grid assignment (`None` where undefined).
@@ -315,6 +358,31 @@ impl<T: Theory> Engine<T> {
             .iter()
             .map(|asn| self.eval(t, asn).map(|v| T::observe(&v)))
             .collect()
+    }
+
+    /// Judge one assignment's pair of observations: `None == None` holds (both sides
+    /// undefined together, the partial-operator convention); a definedness mismatch
+    /// refutes; two defined values go to the theory's [`Theory::judge`].
+    fn judge_at(a: &Option<T::Obs>, b: &Option<T::Obs>) -> Verdict {
+        match (a, b) {
+            (None, None) => Verdict::Holds,
+            (Some(x), Some(y)) => T::judge(x, y),
+            _ => Verdict::Refuted,
+        }
+    }
+
+    /// Judge two whole signatures: `Refuted` if any assignment refutes, else `Undecided`
+    /// if any assignment is undecided, else `Holds`.
+    fn judge_sigs(a: &Sig<T>, b: &Sig<T>) -> Verdict {
+        let mut verdict = Verdict::Holds;
+        for (x, y) in a.iter().zip(b.iter()) {
+            match Self::judge_at(x, y) {
+                Verdict::Holds => {}
+                Verdict::Undecided => verdict = Verdict::Undecided,
+                Verdict::Refuted => return Verdict::Refuted,
+            }
+        }
+        verdict
     }
 
     /// Does a signature carry any information — is the term defined on at least one assignment?
@@ -1640,18 +1708,22 @@ impl<T: Theory> Engine<T> {
     /// slot-0 binding), then catalog order, then partner bindings in operator-index order.
     /// One law per confirmed instance, deduplicated by prose (a two-sided shape's mirrored
     /// variant collapses onto the same line).
-    fn templates(&self) -> Vec<DiscoveredLaw> {
+    fn templates(&self) -> (Vec<DiscoveredLaw>, Vec<(String, String)>) {
         let mut out: Vec<DiscoveredLaw> = Vec::new();
         let mut seen_prose: Vec<String> = Vec::new();
+        let mut undecided: Vec<(String, String)> = Vec::new();
         let inventory = ShapeCatalog::inventory();
         for band in [Polarity::Equal, Polarity::Differs] {
             for fire in 0..self.ops.len() {
                 for shape in inventory.iter().filter(|s| s.polarity == band) {
-                    self.instantiate_shape(shape, fire, &mut seen_prose, &mut out);
+                    self.instantiate_shape(shape, fire, &mut seen_prose, &mut out, &mut undecided);
                 }
             }
         }
-        out
+        // a candidate that eventually HELD (another fire order or partner) is not
+        // undecided — the law wins.
+        undecided.retain(|(p, _)| !out.iter().any(|l| l.prose == *p));
+        (out, undecided)
     }
 
     /// Every confirmed instance of one shape fired on one operator: enumerate the partner
@@ -1663,6 +1735,7 @@ impl<T: Theory> Engine<T> {
         fire: usize,
         seen_prose: &mut Vec<String>,
         out: &mut Vec<DiscoveredLaw>,
+        undecided: &mut Vec<(String, String)>,
     ) {
         // the behavioural guard — the one applicability fact only the grid decides. The
         // signature check comes first: the guard PROBES the fire operator on the grid, so
@@ -1782,49 +1855,97 @@ impl<T: Theory> Engine<T> {
                 }
             };
 
+            let prose_undecided = prose.clone();
+            let mut undecided_here: Option<String> = None;
             for lhs in variants {
-                let confirmed = match (&guard, shape.polarity) {
+                let verdict = match (&guard, shape.polarity) {
                     // meaningfulness guards BOTH polarities: two all-undefined sides agree
                     // on nothing yet compare equal, which "fixed point" (the first shape
                     // with no variable in either term) can reach where every older shape
                     // kept a defined variable in play.
                     (None, Polarity::Equal) => {
-                        let a = self.signature(&lhs);
-                        Self::meaningful(&a) && a == self.signature(&rhs)
+                        let (a, b) = (self.signature(&lhs), self.signature(&rhs));
+                        if Self::meaningful(&a) {
+                            Self::judge_sigs(&a, &b)
+                        } else {
+                            Verdict::Refuted
+                        }
                     }
+                    // a WITNESS needs a refutation-strength difference: a difference
+                    // that is merely undecided at the declared tolerance witnesses
+                    // nothing (and reports as undecided instead of firing).
                     (None, Polarity::Differs) => {
                         let (a, b) = (self.signature(&lhs), self.signature(&rhs));
-                        Self::meaningful(&a) && Self::meaningful(&b) && a != b
+                        if !(Self::meaningful(&a) && Self::meaningful(&b)) {
+                            Verdict::Refuted
+                        } else {
+                            match Self::judge_sigs(&a, &b) {
+                                Verdict::Refuted => Verdict::Holds,
+                                Verdict::Holds => Verdict::Refuted,
+                                Verdict::Undecided => Verdict::Undecided,
+                            }
+                        }
                     }
                     // a GUARDED equation: judged only where the premise evaluates equal
                     // to the truth reference, and the premise must be SATISFIABLE with a
                     // defined lhs somewhere — an unsatisfiable guard manufactures no law
-                    // (antisymmetry of a strict order stays silent, correctly).
+                    // (antisymmetry of a strict order stays silent, correctly). A premise
+                    // that is itself UNDECIDED anywhere taints the law to undecided.
                     (Some((premise, truth)), Polarity::Equal) => {
                         let (p, t) = (self.signature(premise), self.signature(truth));
                         let (a, b) = (self.signature(&lhs), self.signature(&rhs));
                         let mut grounded = false;
-                        let mut holds = true;
+                        let mut verdict = Verdict::Holds;
                         for k in 0..p.len() {
-                            let satisfied = p[k].is_some() && p[k] == t[k];
+                            let satisfied = match (&p[k], &t[k]) {
+                                (Some(pv), Some(tv)) => match T::judge(pv, tv) {
+                                    Verdict::Holds => true,
+                                    Verdict::Refuted => false,
+                                    Verdict::Undecided => {
+                                        verdict = Verdict::Undecided;
+                                        false
+                                    }
+                                },
+                                _ => false,
+                            };
                             if !satisfied {
                                 continue;
                             }
                             grounded = grounded || a[k].is_some();
-                            if a[k] != b[k] {
-                                holds = false;
-                                break;
+                            match Self::judge_at(&a[k], &b[k]) {
+                                Verdict::Holds => {}
+                                Verdict::Undecided => verdict = Verdict::Undecided,
+                                Verdict::Refuted => {
+                                    verdict = Verdict::Refuted;
+                                    break;
+                                }
                             }
                         }
-                        grounded && holds
+                        if !grounded && verdict != Verdict::Refuted {
+                            Verdict::Refuted
+                        } else {
+                            verdict
+                        }
                     }
                     // no witness shape carries a premise (the catalog has none; the
                     // combination is unratified until a stanza needs it).
-                    (Some(_), Polarity::Differs) => false,
+                    (Some(_), Polarity::Differs) => Verdict::Refuted,
                 };
-                if !confirmed {
+                if verdict != Verdict::Holds {
+                    if verdict == Verdict::Undecided {
+                        let connective = match shape.polarity {
+                            Polarity::Equal => "=",
+                            Polarity::Differs => "≠",
+                        };
+                        undecided_here = Some(format!(
+                            "{} {connective} {}",
+                            self.render(&lhs),
+                            self.render(&rhs)
+                        ));
+                    }
                     continue;
                 }
+                undecided_here = None;
                 seen_prose.push(prose.clone());
                 let connective = match shape.polarity {
                     Polarity::Equal => "=",
@@ -1847,6 +1968,11 @@ impl<T: Theory> Engine<T> {
                     premise: guard.clone(),
                 });
                 break;
+            }
+            if let Some(equation) = undecided_here {
+                if !undecided.iter().any(|(p, _)| *p == prose_undecided) {
+                    undecided.push((prose_undecided.clone(), equation));
+                }
             }
         }
     }
@@ -1878,7 +2004,7 @@ impl<T: Theory> Engine<T> {
     /// Run discovery: the named template laws, the count of further (consequence) equalities, and
     /// the operators that appear in no named law.
     pub fn discover(&self) -> Discovered {
-        let laws = self.templates();
+        let (laws, undecided) = self.templates();
 
         // signatures the named laws already account for (per sort), to separate consequences.
         let named_sigs: std::collections::BTreeSet<(T::Sort, Sig<T>)> = laws
@@ -1920,6 +2046,7 @@ impl<T: Theory> Engine<T> {
             laws,
             consequences: consequence_sigs.len(),
             uncovered_ops,
+            undecided,
         }
     }
 
@@ -1938,25 +2065,33 @@ impl<T: Theory> Engine<T> {
                 if let Some((premise, truth)) = &l.premise {
                     let p = self.eval(premise, asn).map(|v| T::observe(&v));
                     let t = self.eval(truth, asn).map(|v| T::observe(&v));
-                    if p.is_none() || p != t {
+                    if p.is_none() || Self::judge_at(&p, &t) != Verdict::Holds {
                         continue;
                     }
                 }
                 let lhs = self.eval(&l.lhs, asn).map(|v| T::observe(&v));
                 let rhs = self.eval(&l.rhs, asn).map(|v| T::observe(&v));
                 grounded = grounded || lhs.is_some();
-                match l.polarity {
-                    Polarity::Equal => {
-                        if lhs != rhs {
-                            return Err(format!("discovered law failed: {}", l.equation));
-                        }
+                match (l.polarity, Self::judge_at(&lhs, &rhs)) {
+                    (Polarity::Equal, Verdict::Refuted) => {
+                        return Err(format!("discovered law failed: {}", l.equation));
                     }
-                    Polarity::Differs => {
-                        if lhs != rhs {
-                            witnessed = true;
-                            break;
-                        }
+                    // a frozen law drifting into the band is DRIFT, named as such —
+                    // never a silent pass.
+                    (Polarity::Equal, Verdict::Undecided) => {
+                        return Err(format!(
+                            "law became undecided at the declared tolerance: {}",
+                            l.equation
+                        ));
                     }
+                    (Polarity::Equal, Verdict::Holds) => {}
+                    // a witness needs a refutation-STRENGTH difference; an undecided
+                    // difference witnesses nothing.
+                    (Polarity::Differs, Verdict::Refuted) => {
+                        witnessed = true;
+                        break;
+                    }
+                    (Polarity::Differs, _) => {}
                 }
             }
             if l.polarity == Polarity::Differs && !witnessed {
@@ -3718,6 +3853,124 @@ mod tests {
             .check(std::slice::from_ref(&groundless))
             .expect_err("an unsatisfiable guard must not read as a passing law");
         assert!(err.contains("lost its ground"), "{err}");
+    }
+
+    // -- the TOLERANCED theory: a metric carrier judged at registered bars ------------
+    //
+    // `blend` is integer averaging — commutative EXACTLY, idempotent exactly, but its
+    // associativity carries ±1 of integer-division noise: at exact equality it would be
+    // REFUTED, at a sloppy tolerance it would be certified; at the REGISTERED bars it is
+    // UNDECIDED, and the spec says so instead of flipping a coin at the boundary.
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    struct Micro;
+    struct NoisyGauge;
+    fn blend(v: &[i64]) -> Option<i64> {
+        Some((v[0] + v[1]) / 2)
+    }
+
+    impl Theory for NoisyGauge {
+        type Sort = Micro;
+        type Value = i64;
+        type Obs = i64;
+        fn name() -> &'static str {
+            "noisy gauge"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![Operator {
+                name: "blend",
+                symbol: "blend",
+                fixity: Fixity::Infix,
+                inputs: vec![Micro, Micro],
+                output: Micro,
+                eval: blend,
+            }]
+        }
+        fn inhabitants(_: Micro) -> Vec<i64> {
+            vec![0, 1, 2, 3]
+        }
+        fn sort_of(_: &i64) -> Micro {
+            Micro
+        }
+        fn observe(v: &i64) -> i64 {
+            *v
+        }
+        fn sort_vars(_: Micro) -> &'static [&'static str] {
+            &["x", "y", "z"]
+        }
+        fn grid_size() -> usize {
+            64 // = 4³, the whole space: the bars are judged exhaustively.
+        }
+        fn judge(a: &i64, b: &i64) -> Verdict {
+            match (a - b).abs() {
+                0 => Verdict::Holds,
+                1 => Verdict::Undecided,
+                _ => Verdict::Refuted,
+            }
+        }
+        fn tolerance() -> Option<&'static str> {
+            Some("micro-units: exact ⇒ holds; |Δ| = 1 ⇒ undecided; else refuted")
+        }
+    }
+
+    /// The three-valued judgment, end to end: exact laws are laws, boundary noise is
+    /// UNDECIDED (neither certified nor refuted), and the lock text carries both the
+    /// registered bars and the disclosed band — ε is ratified with the laws.
+    #[test]
+    fn a_toleranced_theory_disccloses_its_undecided_band() {
+        let d = Engine::<NoisyGauge>::new().discover();
+        let laws: Vec<&str> = d.laws.iter().map(|l| l.prose.as_str()).collect();
+        assert!(laws.contains(&"blend gives the same result in either order."));
+        assert!(laws.contains(&"blend of a value with itself gives that value."));
+        assert!(
+            !laws.iter().any(|p| p.contains("grouping")),
+            "noisy associativity must NOT be certified: {laws:?}"
+        );
+        assert_eq!(
+            d.undecided
+                .iter()
+                .map(|(p, _)| p.as_str())
+                .collect::<Vec<_>>(),
+            vec!["With blend, the grouping of three values doesn't matter."],
+            "the ±1 associativity noise lands in the DISCLOSED band"
+        );
+
+        // and the lock text carries the whole story.
+        let live = crate::discover::Spec::of::<NoisyGauge>()
+            .lock_in(std::path::Path::new("spec"))
+            .live;
+        assert!(live.contains("# tolerance (registered with the theory): micro-units:"));
+        assert!(live.contains("|Δ| = 1 ⇒ undecided; else refuted"));
+        assert!(live.contains(
+            "# undecided at the declared tolerance (disclosed — neither held nor refuted):"
+        ));
+        assert!(live.contains("\n- With blend, the grouping of three values doesn't matter."));
+    }
+
+    /// `check` on a frozen law that DRIFTS into the band is an error naming the drift —
+    /// never a silent pass, never a spurious hard failure.
+    #[test]
+    fn a_frozen_law_drifting_into_the_band_is_named() {
+        let e = Engine::<NoisyGauge>::new();
+        let x = e.var(Micro, 0).expect("x");
+        let y = e.var(Micro, 1).expect("y");
+        let z = e.var(Micro, 2).expect("z");
+        // associativity, frozen as if it had once been certified.
+        let frozen = DiscoveredLaw {
+            shape: "associativity",
+            prose: "With blend, the grouping of three values doesn't matter.".into(),
+            equation: "((x blend y) blend z) = (x blend (y blend z))".into(),
+            lhs: Term::App(0, vec![Term::App(0, vec![x.clone(), y.clone()]), z.clone()]),
+            rhs: Term::App(0, vec![x, Term::App(0, vec![y, z])]),
+            polarity: Polarity::Equal,
+            premise: None,
+        };
+        let err = e
+            .check(std::slice::from_ref(&frozen))
+            .expect_err("band drift must be named");
+        assert!(
+            err.contains("became undecided at the declared tolerance"),
+            "{err}"
+        );
     }
 
     /// THE LOCK: the catalog's deterministic rendering matches the committed, ratified

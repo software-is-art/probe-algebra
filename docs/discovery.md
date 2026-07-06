@@ -208,7 +208,19 @@ precision by quantizing there (round to the registered number of digits, or map 
 fixed-point bucket). The tolerance is thereby in the ratified theory declaration — code
 review sees it next to the operators — never ambient.
 
-State the hazard before adopting that route: **quantized equality is not ε-closeness.**
+**Now built, the second arm:** [`Theory::judge`] returns a three-valued
+[`Verdict`] — holds / refuted / UNDECIDED — and [`Theory::tolerance`] registers the bars
+as display text. A candidate law with any undecided assignment (and no refutation) is
+neither certified nor refuted: it lands in the lock's DISCLOSED band
+(`# undecided at the declared tolerance …`), under a header that carries the registered
+bars — so review ratifies ε along with the laws, and a frozen law that drifts into the
+band re-checks as a named error, never a silent pass. Scope, disclosed: judgment only —
+enumeration and the consequence count keep exact equality, because a toleranced relation
+is not transitive and cannot key the term-collision maps.
+
+The quantization route below remains valid for carriers that can keep values off bucket
+boundaries; state the hazard before adopting it: **quantized equality is not
+ε-closeness.**
 Two values within δ ≪ ε of each other can straddle a bucket boundary and compare unequal,
 so near the boundary a TRUE law can be refuted by roundoff, and the lock would record the
 lie. The quantized route is only honest when the grid keeps values away from bucket

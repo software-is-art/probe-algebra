@@ -268,12 +268,13 @@ candidate bricks:
    documenting as the supported way to put time-indexed values on a grid, alongside the grid
    and term-depth bounds the honest frame already declares.
 
-8. **Toleranced three-valued judgment** (from the third field report): for metric/setoid
-   carriers, judge laws as holds / refuted / UNDECIDED-at-ε, with ε carried in the lock
-   text so review ratifies the tolerance along with the law. The observation-hook
-   quantization route is documented (with its boundary hazard) in
-   [discovery.md](discovery.md); the undecided band is what makes a toleranced gate honest
-   where these domains actually live — near the boundary.
+8. **Toleranced three-valued judgment — BUILT.** `Theory::judge` returns
+   holds / refuted / UNDECIDED and `Theory::tolerance` registers the bars; an undecided
+   candidate is disclosed in the lock under the registered-ε header instead of being
+   coin-flipped at the boundary, and a frozen law drifting into the band re-checks as a
+   named error. The demonstration is integer averaging: commutativity certified exactly,
+   its ±1-noise associativity landing in the band, pinned. Scope disclosed: judgment
+   only — enumeration keeps exact equality (a toleranced relation is not transitive).
 
 9. **Conditional / guarded laws — BUILT.** `ShapeInfo` carries `premise:
    Option<SchemaTerm>`, judged against the shape's constant slot: an assignment counts

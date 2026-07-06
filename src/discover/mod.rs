@@ -278,6 +278,12 @@ pub struct Spec {
     pub laws: Vec<Law>,
     pub consequences: usize,
     pub uncovered_ops: Vec<&'static str>,
+    /// Candidates in the declared tolerance's UNDECIDED band — neither held nor refuted,
+    /// disclosed in the lock. Empty for exact-equality theories.
+    pub undecided: Vec<Law>,
+    /// The theory's REGISTERED tolerance bars, as display text — rendered into the lock
+    /// header so ε is ratified along with the laws. `None` = exact equality.
+    pub tolerance: Option<&'static str>,
 }
 
 impl Spec {
@@ -299,6 +305,15 @@ impl Spec {
                 .collect(),
             consequences: discovered.consequences,
             uncovered_ops: discovered.uncovered_ops,
+            undecided: discovered
+                .undecided
+                .iter()
+                .map(|(prose, equation)| Law {
+                    prose: prose.clone(),
+                    equation: equation.clone(),
+                })
+                .collect(),
+            tolerance: T::tolerance(),
         }
     }
 }

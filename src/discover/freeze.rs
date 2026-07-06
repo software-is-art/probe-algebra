@@ -46,13 +46,32 @@ fn render(spec: &Spec) -> String {
     // too, and a consumer's freeze path is its own (see docs/ci-discipline.md).
     let mut out = String::new();
     out.push_str(&format!(
-        "# discovered spec: {} — a behaviour lock; regenerate via this repo's freeze path and ratify the diff.\n\n",
+        "# discovered spec: {} — a behaviour lock; regenerate via this repo's freeze path and ratify the diff.\n",
         spec.theory
     ));
+    // the REGISTERED tolerance is part of the ratified artifact: review approves ε along
+    // with the laws, never an ambient constant.
+    if let Some(tolerance) = spec.tolerance {
+        out.push_str(&format!(
+            "# tolerance (registered with the theory): {tolerance}\n"
+        ));
+    }
+    out.push('\n');
     for law in &spec.laws {
         out.push_str(&format!("- {}\n      {}\n", law.prose(), law.equation()));
     }
     out.push('\n');
+    // the DISCLOSED band: candidates neither held nor refuted at the declared tolerance.
+    // Absent entirely for exact theories, so no existing lock moves.
+    if !spec.undecided.is_empty() {
+        out.push_str(
+            "# undecided at the declared tolerance (disclosed — neither held nor refuted):\n",
+        );
+        for law in &spec.undecided {
+            out.push_str(&format!("- {}\n      {}\n", law.prose(), law.equation()));
+        }
+        out.push('\n');
+    }
     let coverage = if spec.uncovered_ops.is_empty() {
         "none — every operator participates in a law".to_string()
     } else {
