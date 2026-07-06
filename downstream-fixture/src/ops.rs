@@ -36,6 +36,7 @@ use boundary_spec::algebra;
         identity(grant, zero),
         identity(spend, zero),
         annihilation(spend, zero),
+        self_inverse(spend, zero),
         associative(renew),
         idempotent(renew),
         bias_later(renew),

@@ -45,6 +45,11 @@
       gate:     homogeneous binary plus a unary endo and a constant, all on one sort; tried on both sides, deduplicated by prose
       template: {other} inverts {op} — a value {op} its own {other} gives {const}.
 
+- self-inverse
+      schema:   (x ⊕ x) = e
+      gate:     homogeneous binary plus a constant of its sort — every element its own inverse (the Boolean-group law `inverse` cannot say, because the inverting map is the identity and identity is not an operator)
+      template: {op} of a value with itself gives {const} — every element is its own inverse.
+
 - distributivity
       schema:   (x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))
       gate:     an ordered pair of distinct homogeneous binaries on one sort
@@ -89,6 +94,11 @@
       schema:   act(c, p) = c
       gate:     heterogeneous binary s × t → s (an action of t on s) plus a constant of the carrier sort s
       template: {op} leaves {const} fixed — no parameter moves it.
+
+- symmetry
+      schema:   rel(x, y) = rel(y, x)
+      gate:     relation s × s → r (r ≠ s) — a symmetric distance says so here; an order refuses it
+      template: {op} is symmetric — the arguments' order doesn't matter.
 
 - irreflexivity
       schema:   rel(x, x) = false

@@ -985,6 +985,25 @@ impl ShapeCatalog {
                 premise: None,
             },
             ShapeInfo {
+                name: "self-inverse",
+                schema: "(x ⊕ x) = e",
+                gate: "homogeneous binary plus a constant of its sort — every element its \
+                       own inverse (the Boolean-group law `inverse` cannot say, because \
+                       the inverting map is the identity and identity is not an operator)",
+                gate_slots: WITH_CONSTANT,
+                template: "{op} of a value with itself gives {const} — every element is \
+                           its own inverse.",
+                lhs: App(0, &[X, X]),
+                rhs: C,
+                placeholders: &["⊕", "e"],
+                polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
                 name: "distributivity",
                 schema: "(x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))",
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
@@ -1156,6 +1175,27 @@ impl ShapeCatalog {
                 placeholders: &["act", "c"],
                 polarity: Polarity::Equal,
                 holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
+                name: "symmetry",
+                schema: "rel(x, y) = rel(y, x)",
+                gate: "relation s × s → r (r ≠ s) — a symmetric distance says so here; an \
+                       order refuses it",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is symmetric — the arguments' order doesn't matter.",
+                lhs: App(0, &[X, Y]),
+                rhs: App(0, &[Y, X]),
+                placeholders: &["rel"],
+                polarity: Polarity::Equal,
+                holes: &["op"],
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
@@ -2942,6 +2982,9 @@ mod tests {
     fn l_not(v: &[LVal]) -> Option<LVal> {
         Some(LVal::B(!l_bool(&v[0])))
     }
+    fn l_xor(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(l_bool(&v[0]) ^ l_bool(&v[1])))
+    }
     fn l_lt(v: &[LVal]) -> Option<LVal> {
         Some(LVal::B(l_nat(&v[0]) < l_nat(&v[1])))
     }
@@ -3018,6 +3061,14 @@ mod tests {
                     inputs: vec![B],
                     output: B,
                     eval: l_not,
+                },
+                Operator {
+                    name: "Xor",
+                    symbol: "^",
+                    fixity: Infix,
+                    inputs: vec![B, B],
+                    output: B,
+                    eval: l_xor,
                 },
                 Operator {
                     name: "less-than",

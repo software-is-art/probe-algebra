@@ -41,6 +41,7 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("identity", "identity"),
     ("annihilation", "annihilation"),
     ("inverse", "inverse"),
+    ("self_inverse", "self-inverse"),
     ("distributive", "distributivity"),
     ("distributive_right", "distributivity (right)"),
     ("absorption", "absorption"),
@@ -50,6 +51,7 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("action_commutation", "action commutation"),
     ("action_equivariance", "action equivariance"),
     ("action_fixed_point", "action fixed point"),
+    ("symmetric", "symmetry"),
     ("irreflexive", "irreflexivity"),
     ("self_application", "self-application"),
     ("involution", "involution"),
@@ -289,12 +291,12 @@ mod tests {
 
     /// An unknown shape name fails LOUDLY at construction — a declaration the catalog never
     /// ratified must never silently sit in `missing` looking like unfinished work.
-    /// (`transitive` used to be this test's unknown word, until the guarded-law stanzas
-    /// ratified it — the fixture moved to a shape the catalog still cannot say.)
+    /// (`transitive` held this fixture until the guarded-law stanzas ratified it; then
+    /// `symmetric`, until the metric stanzas did — the lockstep works, twice in one day.)
     #[test]
-    #[should_panic(expected = "unknown shape \"symmetric\"")]
+    #[should_panic(expected = "unknown shape \"euclidean\"")]
     fn an_unratified_shape_name_is_refused_by_name() {
-        Expectation::of("symmetric", vec!["<"]);
+        Expectation::of("euclidean", vec!["<"]);
     }
 
     /// Both spellings construct the same expectation: the declaration key (`bias_later`) and

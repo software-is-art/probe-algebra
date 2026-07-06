@@ -129,14 +129,14 @@ fn every_refusal_arm_still_fires() {
 
 /// The vocabulary refusal lists the whole declarable vocabulary (kills the irreflexive
 /// filter's `!=`→`==`, which would collapse the listing to nothing useful).
-/// (`transitive` held this fixture until the guarded-law stanzas ratified it.)
+/// (`transitive`, then `symmetric`, each held this fixture until ratified.)
 #[test]
 fn an_unknown_shape_refusal_teaches_the_vocabulary() {
     let err = Genesis::plan(
         &good(
             "drill-app",
             CREDITS,
-            "meter { ops { grant(Credits, Credits) -> Credits; } expects { symmetric(grant); } }",
+            "meter { ops { grant(Credits, Credits) -> Credits; } expects { euclidean(grant); } }",
         ),
         &Deps::Version("0".into()),
     );
