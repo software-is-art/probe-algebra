@@ -206,6 +206,54 @@ lifted_theory!(JoinOp, "join", Infix "join"(Zs, Zs) = op_join);
 lifted_theory!(DistinctOp, "distinct", Prefix "distinct"(Zs) = op_distinct);
 lifted_theory!(MinOp, "min", Prefix "min"(Zs) = op_min);
 
+/// The MIN-RETRACTION WITNESS — the frozen red instance behind `min: NEITHER`, as a
+/// derived artifact (`spec/min.retraction.spec`): every value below is COMPUTED by the
+/// real operators, so a `min` that somehow became additive flips this lock, not just
+/// the registry row. The plain-language voice is the catalog's: say why retraction is
+/// hard, with the instance that proves it.
+pub fn min_retraction_witness() -> String {
+    let a = Row::new(0);
+    let b = Row::new(1);
+    let state = ZSet::of(&[(a, 1), (b, 1)]);
+    let delta = ZSet::of(&[(a, -1)]);
+    let render = |z: &ZSet| -> String {
+        let entries: Vec<String> = z
+            .entries()
+            .iter()
+            .map(|(r, w)| format!("r{}: {:+}", r.get(), w))
+            .collect();
+        if entries.is_empty() {
+            "{} (nothing positive)".to_string()
+        } else {
+            format!("{{{}}}", entries.join(", "))
+        }
+    };
+    let true_route = least(&state.plus(&delta));
+    let delta_route = least(&state).plus(&least(&delta));
+    assert_ne!(
+        true_route, delta_route,
+        "the witness collapsed — min became additive; re-derive the licenses"
+    );
+    format!(
+        "# the min retraction — why `min` earns no license, frozen as a WITNESS — \
+         regenerate via this repo's freeze path and ratify the diff.\n#\n\
+         # Additivity is what a delta needs: f(state plus delta) = f(state) plus f(delta).\n\
+         # For min, ONE retraction refutes it: deleting the current minimum uncovers the\n\
+         # next, and no delta short of recomputation says which row that is. The instance\n\
+         # below is computed by the real operators, not typed:\n#\n\
+         #   state = {state}   delta = {delta}\n\
+         #   min(state plus delta)       = {true_route}\n\
+         #   min(state) plus min(delta)  = {delta_route}\n\
+         #   the two routes DISAGREE — the incremental one still names the deleted row.\n#\n\
+         # This is the red instance behind `min: NEITHER` in spec/licenses.spec; the\n\
+         # generic fallback (D \u{2218} Q \u{2218} I) is what correctness costs here.\n",
+        state = render(&state),
+        delta = render(&delta),
+        true_route = render(&true_route),
+        delta_route = render(&delta_route),
+    )
+}
+
 #[cfg(test)]
 mod probes {
     use super::*;

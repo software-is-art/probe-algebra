@@ -19,3 +19,7 @@ boundary-spec = { path = ".." }
 # IS a lock renderer: `Registry::lock_in` lives in the library, where the render step
 # reads it.
 spec-lock = { path = "../spec-lock" }
+
+[dev-dependencies]
+# The fire drill: known-bad fixtures proving the classifier and the end gate can FIRE.
+fire-drill = { path = "../fire-drill" }

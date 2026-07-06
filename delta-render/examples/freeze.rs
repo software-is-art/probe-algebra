@@ -13,7 +13,9 @@ use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::Spec;
 use delta_render::circuit::{circuit_locks, demo_circuit};
 use delta_render::license::Registry;
-use delta_render::ops::{DistinctOp, FilterOp, JoinOp, MapOp, MinOp, SumOp};
+use delta_render::ops::{
+    min_retraction_witness, DistinctOp, FilterOp, JoinOp, MapOp, MinOp, SumOp,
+};
 use delta_render::stream::StreamCalculus;
 use delta_render::zset::ZSetAlgebra;
 
@@ -47,6 +49,12 @@ fn main() {
         // two locks.
         gen_lock,
         derivation_lock,
+        // the frozen red instance behind `min: NEITHER` — computed, never typed.
+        spec_lock::Lock {
+            name: "min retraction witness".into(),
+            path: spec_dir.join("min.retraction.spec"),
+            live: min_retraction_witness(),
+        },
     ];
     spec_lock::bless(&locks).expect("write the spec locks");
     for lock in &locks {
