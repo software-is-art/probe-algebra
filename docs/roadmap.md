@@ -312,16 +312,30 @@ candidate bricks:
     substrate-free; the mutant generator is per-language (Agda/Lean) work. The one brick
     in this family that makes existing kernel-checked artifacts MORE trustworthy.
 
-11. **Theory-bridge** (same assessment): `Theory` from exported data — a prover emits
-    finite operator tables for its decidable fragments (a table IS an eval function), and
-    discovery runs as CONJECTURE SUPPLY and triage, never certification: grid survivors
-    become proof obligations rendered as statement stubs (the genesis meaning-hole move),
-    grid refutations kill false conjectures before anyone burns a day proving them.
+11. **Theory-bridge — BUILT** (`discover::bridge`, `spec/bridged-bool.export` →
+    `.spec` / `.mutation.spec` / `.obligations.spec`). `Theory` from exported data: a
+    prover emits finite operator tables (a table IS an eval function) in a small line
+    format whose every malformed line is a named, fire-drilled refusal;
+    `Export::install` mounts it in a compile-time slot and `Bridged<SLOT>` is a full
+    citizen of the apparatus — spec lock, algebra-mutation verdict, distance — with
+    zero new engine machinery (the slot table is the price of keeping `Operator.eval`
+    a plain fn pointer). The prover's certificates ride along as `proved:` lines in
+    the `expects` vocabulary, and `Triage` re-reads the distance with the prover's
+    epistemics: agreements cross-check the pipeline, conjectures are proof
+    obligations (the demonstration Boolean fragment yields 21, both De Morgan duals
+    among them, from four certificates). The carrier is judged EXHAUSTIVELY (v1 caps
+    exports at 8 elements / 8 operators to keep that true), so a refutation is a
+    fact, not a sample; absence of a conjecture remains no evidence, and agreement
+    never certifies.
 
-12. **The disagreement detector** (falls out of 11): grid-check already-proved laws over
-    the exported tables — agreement proves nothing new, but DISAGREEMENT is always a
-    defect somewhere in the export/bridge pipeline, with certainty. Differential testing
-    for the untrusted half of a proof corpus, same polarity as delta-render's end gate.
+12. **The disagreement detector — BUILT** (falls out of 11, and did): `Triage::certify`
+    fails — by law name, with the certainty prose — whenever an upstream-proved law is
+    refuted over the exhaustive carrier: a defect SOMEWHERE in the export/bridge
+    pipeline, unconditionally (differential testing for the untrusted half of a proof
+    corpus, same polarity as delta-render's end gate). A disagreement never renders in
+    the obligations artifact and the freeze path refuses to freeze it — it is a defect
+    to fix upstream, never a row to ratify; the drill export (`proved: commutative
+    implies`) pins the conviction end to end.
 
 ## Standing follow-ups
 
