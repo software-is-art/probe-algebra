@@ -83,7 +83,18 @@ fn every_refusal_arm_still_fires() {
             refused(&good("drill-app", "Credits = String where 0..=20 saturating;", METER),
                 "is not a "))
         .drill("range rules", "a degenerate one-point range (must PLAN — the over-eager twin)",
-            planned(&good("drill-app", "Credits = i64 where 5..=5 saturating;", METER)));
+            planned(&good("drill-app", "Credits = i64 where 5..=5 saturating;", METER)))
+        .drill("range rules", "an unsigned range starting at zero (must PLAN — kills < tightened to <=)",
+            planned(&good("drill-app", "Credits = u8 where 0..=20 saturating;", METER)))
+        // a GOOD seam whose left side is not the first-declared module: the wrong-module
+        // lookup (== flipped to !=) checks `ledger` for `meter`'s touches and falsely
+        // refuses — declaration order is the fixture's whole point.
+        .drill("seam touch", "a valid seam declared after an unrelated module (must PLAN)",
+            planned(&format!(
+                "system! {{ name: \"drill-app\", values {{ {CREDITS} Ghost = i64 where \"any\"; }} \
+                 modules {{ ledger {{ ops {{ file(Ghost, Ghost) -> Ghost; }} }} {METER} \
+                 pay {{ ops {{ spend(Credits, Credits) -> Credits; }} }} }} \
+                 seams {{ meter -- pay : transport on Credits; }} }}")));
 
     if let Err(rot) = battery.verdict() {
         panic!(
