@@ -1,0 +1,29 @@
+# cargo-mutants configuration for the DELTA-RENDER plumbing sweep — passed explicitly
+# via `--config` by the "mutation (delta-render plumbing)" gate, never picked up
+# implicitly (the workspace's own sweeps keep `.cargo/mutants.toml`).
+#
+# Why a second file at all: the workspace config's per-mutant suite names the ROOT
+# crate's drill batteries (`--test refusal_drill --test fire_drill`), and cargo-mutants
+# scopes the per-mutant test command to the MUTATED package — those targets do not
+# exist in delta-render, so the shared config cannot even reach a baseline there.
+#
+# The per-mutant suite here is delta-render's own LIB tests: the probes, and the
+# lib-side DRIFT-GATE TWINS (spec freshness, the license registry, both rendered
+# circuits) that exist precisely so this sweep can see the crate's whole lock
+# discipline. The integration tests (end gate over the grids, fire drill) stay outside
+# the per-mutant loop by economics; their kill power is mirrored into the lib twins.
+additional_cargo_test_args = ["--lib"]
+
+# Same runner economics as the workspace config: nextest's fail-fast default means a
+# killed mutant stops at its first failing probe.
+test_tool = "nextest"
+
+# Two EQUIVALENT mutants, ratified: `>` relaxed to `>=` against a weight of zero in
+# `distinct` and `least`. A stored zero weight is UNCONSTRUCTIBLE — canonical form is
+# the ZSet smart constructor's invariant (`spec/zset.spec`'s carrier), so the two
+# comparisons are indistinguishable on every reachable input. A finding, not a gap:
+# the invariant is doing the work, and these carve-outs name where.
+exclude_re = [
+    "replace > with >= in distinct",
+    "replace > with >= in least",
+]

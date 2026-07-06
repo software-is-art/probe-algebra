@@ -118,12 +118,15 @@ the presence of laws in its frozen spec, never by a declared boolean: linear ⇔
 homomorphism plus the zero fixed point; bilinear ⇔ additive in each slot (the catalog gained
 three data stanzas for the vocabulary — `inverse`, `fixed point`, `distributivity (right)` —
 and the maximal logic theory promptly discovered the two classical Boolean complements the
-catalog had been silent about). The chain of derived artifacts: seven exhaustively-judged
-theories freeze their specs; `spec/licenses.spec` is derived by PARSING those specs' text,
-each row citing the law lines that granted it; the render walks a validated circuit DAG
-(unlicensed operators are unconstructible) and emits generated Rust
-(`gen/demo_incremental.rs` — compiled, tested, drift-gated: the `ci.yml` move at a new
-altitude) plus a plain-language derivation artifact, from ONE derivation. The end gate —
+catalog had been silent about). The chain of derived artifacts: eight exhaustively-judged
+theories freeze their specs (including `scale`, the non-commutative bilinear whose license
+IS the discovered distributivity pair — both slot laws, no commutativity shortcut);
+`spec/licenses.spec` is derived by PARSING those specs' text, each row citing the law lines
+that granted it; the render walks a validated circuit DAG (unlicensed operators are
+unconstructible) and emits generated Rust — compiled, tested, drift-gated: the `ci.yml`
+move at a new altitude — plus a plain-language derivation artifact, from ONE derivation,
+for TWO circuits (the single-source demo chain, and an audit circuit with two sources and
+a fan-out). The end gate —
 `I ∘ Q^Δ ∘ D = Q` over the stream grid — trusts no license, and the fire drill proves both
 gates can fire: the almost-linear operator (drops retractions) is DENIED over the honest grid
 and, when forged via a pruned insert-only grid, caught by the end law instead; a forged

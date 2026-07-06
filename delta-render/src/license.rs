@@ -30,7 +30,7 @@ use std::path::Path;
 use boundary_spec::discover::engine::Theory;
 use boundary_spec::discover::Spec;
 
-use crate::ops::{DistinctOp, FilterOp, JoinOp, MapOp, MinOp, SumOp};
+use crate::ops::{DistinctOp, FilterOp, JoinOp, MapOp, MinOp, ScaleOp, SumOp};
 
 /// What an operator's spec licenses — the derivation rule its circuit nodes may use.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -137,6 +137,7 @@ impl Registry {
                 one::<MapOp>("map"),
                 one::<SumOp>("sum"),
                 one::<JoinOp>("join"),
+                one::<ScaleOp>("scale"),
                 one::<DistinctOp>("distinct"),
                 one::<MinOp>("min"),
             ],
@@ -267,5 +268,50 @@ mod probes {
         let r = Registry::derive();
         assert_eq!(r.get("join").expect("join is inventoried").operator, "join");
         assert!(r.get("median").is_none());
+    }
+
+    /// WHAT A LICENSE CAN NEVER SAY, frozen as a fact instead of left as luck: `filter`
+    /// and `map` are DIFFERENT maps with byte-identical license shapes (the same two
+    /// laws, modulo the operator's name). A license is membership in "the additive
+    /// maps", never identity — value-level identity is the per-operator probes' job and
+    /// the end law's, and the phase-7 program (property-constrained interpretation
+    /// sampling) is the roadmap answer for operators with no implementation to probe.
+    #[test]
+    fn a_license_is_membership_never_identity() {
+        let r = Registry::derive();
+        let (filter, map) = (r.get("filter").expect("row"), r.get("map").expect("row"));
+        assert_eq!(filter.classification, map.classification);
+        let shape = |l: &License| -> Vec<String> {
+            l.citations
+                .iter()
+                .map(|c| c.replace(&l.operator, "{op}"))
+                .collect()
+        };
+        assert_eq!(
+            shape(filter),
+            shape(map),
+            "two different linear maps must carry the SAME license shape — that \
+             blindness is the design, not a bug, and this pin keeps it stated"
+        );
+        // and the maps really are different (the ops probes pin their values; this is
+        // the cross-reference that the blindness above is about REAL divergence).
+        let x = crate::zset::ZSet::of(&[(crate::zset::Row::new(1), 1)]);
+        assert_ne!(crate::ops::filter_even(&x), crate::ops::project_halved(&x));
+    }
+
+    /// The registry's committed lock, LIB-SIDE: the mutation sweeps judge library
+    /// mutants against lib tests only, so the freshness of `spec/licenses.spec` must be
+    /// checkable from here or a mutant in `Registry::render` outlives every sweep.
+    #[test]
+    fn the_committed_license_registry_is_fresh_from_the_library_side() {
+        let spec_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
+        let lock = Registry::derive().lock_in(&spec_dir);
+        if let Err(stale) = spec_lock::check(std::slice::from_ref(&lock)) {
+            panic!(
+                "the license registry drifted for: {}. Regenerate \
+                 (`cargo run -p delta-render --example freeze`) and ratify the diff.",
+                stale.join(", ")
+            );
+        }
     }
 }

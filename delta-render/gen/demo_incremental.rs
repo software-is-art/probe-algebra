@@ -11,7 +11,7 @@
 #![allow(unused_imports, clippy::let_and_return)]
 
 use crate::circuit::{bilinear, fallback1, fallback2, lift2, linear1};
-use crate::ops::{distinct, filter_even, join, least, project_halved, total};
+use crate::ops::{distinct, filter_even, join, least, project_halved, scale, total};
 use crate::stream::Stream;
 
 /// The incremental form of circuit `demo`: deltas in, deltas out —

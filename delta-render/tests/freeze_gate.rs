@@ -9,7 +9,7 @@ use boundary_spec::discover::expect::Distance;
 use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::Spec;
 use delta_render::license::{Classification, Registry};
-use delta_render::ops::{DistinctOp, FilterOp, JoinOp, MapOp, MinOp, SumOp};
+use delta_render::ops::{DistinctOp, FilterOp, JoinOp, MapOp, MinOp, ScaleOp, SumOp};
 use delta_render::zset::ZSetAlgebra;
 
 fn spec_dir() -> PathBuf {
@@ -39,6 +39,7 @@ fn every_committed_spec_and_mutation_verdict_is_fresh() {
     check_theory::<MapOp>();
     check_theory::<SumOp>();
     check_theory::<JoinOp>();
+    check_theory::<ScaleOp>();
     check_theory::<DistinctOp>();
     check_theory::<MinOp>();
 }
@@ -79,6 +80,7 @@ fn the_classifications_are_exactly_the_designed_table() {
             ("map", Classification::Linear),
             ("sum", Classification::Linear),
             ("join", Classification::Bilinear),
+            ("scale", Classification::Bilinear),
             ("distinct", Classification::Neither),
             ("min", Classification::Neither),
         ],

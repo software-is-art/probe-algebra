@@ -24,6 +24,10 @@
       spec/join.spec: "join distributes over plus."
       spec/join.spec: "join gives the same result in either order."
 
+- scale: BILINEAR
+      spec/scale.spec: "scale distributes over plus."
+      spec/scale.spec: "scale distributes over plus from the right."
+
 - distinct: NEITHER
       no additivity law in spec/distinct.spec — every delta recomputes (D ∘ Q ∘ I)
 

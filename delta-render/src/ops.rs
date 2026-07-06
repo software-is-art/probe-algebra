@@ -45,13 +45,13 @@ pub fn project_halved(x: &ZSet) -> ZSet {
 /// `sum`: the canonical incremental aggregate — the weighted total of row values
 /// (value of row `r` is `r + 1`, so every row counts), carried as a weight on one
 /// output row. A linear functional of the weights, so deltas of the input ARE deltas
-/// of the aggregate.
+/// of the aggregate. DISCLOSED SIMPLIFICATION: v1 is the ONE-group case — a real
+/// GROUP BY needs an indexed Z-set carrier (a map of group key → Z-set), a genuinely
+/// new carrier, not a new law; the licenses and rules above it would be unchanged.
 pub fn total(x: &ZSet) -> ZSet {
-    let t: i64 = x
-        .entries()
-        .into_iter()
-        .map(|(r, w)| w * (i64::from(r.get()) + 1))
-        .sum();
+    let t: i64 = x.entries().into_iter().fold(0i64, |acc, (r, w)| {
+        acc.saturating_add(w.saturating_mul(i64::from(r.get()) + 1))
+    });
     ZSet::of(&[(Row::new(0), t)])
 }
 
@@ -63,7 +63,26 @@ pub fn join(a: &ZSet, b: &ZSet) -> ZSet {
     ZSet::of(
         &a.entries()
             .into_iter()
-            .map(|(r, w)| (r, w * b.weight(&r)))
+            .map(|(r, w)| (r, w.saturating_mul(b.weight(&r))))
+            .collect::<Vec<_>>(),
+    )
+}
+
+/// `scale` (a weighting join): every row of `a`, its weight multiplied by the TOTAL
+/// weight of `b` — "weight one relation by the other's size". The inventory's
+/// NON-commutative bilinear: additive in each slot (totals add; products distribute),
+/// but `a` supplies the rows and `b` only a scalar, so the two slots are different
+/// jobs — which makes it the first REAL consumer of the catalog's distributivity PAIR
+/// (a commutative join gets the right-slot law by guard, never by discovery).
+pub fn scale(a: &ZSet, b: &ZSet) -> ZSet {
+    let t: i64 = b
+        .entries()
+        .into_iter()
+        .fold(0i64, |acc, (_, w)| acc.saturating_add(w));
+    ZSet::of(
+        &a.entries()
+            .into_iter()
+            .map(|(r, w)| (r, w.saturating_mul(t)))
             .collect::<Vec<_>>(),
     )
 }
@@ -192,6 +211,9 @@ fn op_sum(v: &[ZSet]) -> Option<ZSet> {
 fn op_join(v: &[ZSet]) -> Option<ZSet> {
     Some(join(&v[0], &v[1]))
 }
+fn op_scale(v: &[ZSet]) -> Option<ZSet> {
+    Some(scale(&v[0], &v[1]))
+}
 fn op_distinct(v: &[ZSet]) -> Option<ZSet> {
     Some(distinct(&v[0]))
 }
@@ -203,6 +225,7 @@ lifted_theory!(FilterOp, "filter", Prefix "filter"(Zs) = op_filter);
 lifted_theory!(MapOp, "map", Prefix "map"(Zs) = op_map);
 lifted_theory!(SumOp, "sum", Prefix "sum"(Zs) = op_sum);
 lifted_theory!(JoinOp, "join", Infix "join"(Zs, Zs) = op_join);
+lifted_theory!(ScaleOp, "scale", Infix "scale"(Zs, Zs) = op_scale);
 lifted_theory!(DistinctOp, "distinct", Prefix "distinct"(Zs) = op_distinct);
 lifted_theory!(MinOp, "min", Prefix "min"(Zs) = op_min);
 
@@ -306,6 +329,16 @@ mod probes {
         // join: pointwise products.
         assert_eq!(join(&x, &z(&[(0, 5), (1, -1)])), z(&[(0, 10), (1, -3)]));
         assert_eq!(join(&x, &ZSet::empty()), ZSet::empty());
+        // scale: rows from the left, magnitude from the right — and NOT symmetric.
+        let x2 = z(&[(0, 1)]);
+        let y2 = z(&[(0, 1), (1, 2)]);
+        assert_eq!(scale(&x2, &y2), z(&[(0, 3)]));
+        assert_ne!(
+            scale(&x2, &y2),
+            scale(&y2, &x2),
+            "scale must not be commutative"
+        );
+        assert_eq!(scale(&x2, &ZSet::empty()), ZSet::empty());
         // distinct: positive support at weight 1.
         assert_eq!(distinct(&z(&[(0, 3), (1, -2)])), z(&[(0, 1)]));
         // min: least positive row.

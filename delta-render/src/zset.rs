@@ -39,7 +39,7 @@ impl Row {
 /// A Z-set: rows weighted by non-zero integers, in canonical form (no zero weights
 /// stored — the invariant every constructor and operator maintains, so `==` is semantic
 /// equality and `ZSet::empty()` is the group identity).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ZSet(BTreeMap<Row, i64>);
 
 impl ZSet {
@@ -48,30 +48,42 @@ impl ZSet {
         ZSet(BTreeMap::new())
     }
 
-    /// Build from row/weight pairs: duplicate rows sum, zero totals are dropped — the one
-    /// mint, so a non-canonical `ZSet` is unconstructible.
+    /// Build from row/weight pairs: duplicate rows sum (saturating), zero totals are
+    /// dropped — the one mint, so a non-canonical `ZSet` is unconstructible.
     pub fn of(pairs: &[(Row, i64)]) -> ZSet {
         let mut map: BTreeMap<Row, i64> = BTreeMap::new();
         for (row, w) in pairs {
-            *map.entry(*row).or_insert(0) += w;
+            let e = map.entry(*row).or_insert(0);
+            *e = e.saturating_add(*w);
         }
         map.retain(|_, w| *w != 0);
         ZSet(map)
     }
 
-    /// Pointwise weight sum, dropping cancellations — the group operation.
+    /// Pointwise weight sum, dropping cancellations — the group operation. SATURATING,
+    /// the declared overflow decision (the kvstore's `Ttl::plus` precedent): near the
+    /// `i64` rim the group laws bend (a saturated sum has no exact inverse), which the
+    /// discovery grid never reaches — the honest frame's bounded-grid concession, with
+    /// the rim behaviour pinned by probe instead of left to panic-or-wrap.
     pub fn plus(&self, other: &ZSet) -> ZSet {
         let mut out = self.0.clone();
         for (row, w) in &other.0 {
-            *out.entry(*row).or_insert(0) += w;
+            let e = out.entry(*row).or_insert(0);
+            *e = e.saturating_add(*w);
         }
         out.retain(|_, w| *w != 0);
         ZSet(out)
     }
 
-    /// Pointwise negation — the group inverse (a retraction of everything).
+    /// Pointwise negation — the group inverse (a retraction of everything). Saturating
+    /// at the rim (`-i64::MIN` has no `i64` twin).
     pub fn neg(&self) -> ZSet {
-        ZSet(self.0.iter().map(|(row, w)| (*row, -w)).collect())
+        ZSet(
+            self.0
+                .iter()
+                .map(|(row, w)| (*row, w.saturating_neg()))
+                .collect(),
+        )
     }
 
     /// A row's weight (zero when absent — absence IS weight zero).
@@ -234,5 +246,22 @@ mod probes {
         let a = Row::new(0);
         assert_eq!(ZSet::of(&[(a, 4)]).weight(&a), 4);
         assert_eq!(ZSet::of(&[(a, -4)]).weight(&a), -4);
+    }
+
+    /// The rim is SATURATING, by decision — pinned here so overflow is a stated
+    /// semantics, never a debug-panic/release-wrap coin flip. (At the rim the group
+    /// laws bend; the discovery grid never goes there — the bounded-grid concession,
+    /// disclosed.)
+    #[test]
+    fn weights_saturate_at_the_rim() {
+        let a = Row::new(0);
+        let top = ZSet::of(&[(a, i64::MAX)]);
+        assert_eq!(top.plus(&ZSet::of(&[(a, 1)])).weight(&a), i64::MAX);
+        assert_eq!(
+            ZSet::of(&[(a, i64::MIN)]).neg().weight(&a),
+            i64::MAX,
+            "-i64::MIN has no i64 twin; the retraction saturates"
+        );
+        assert_eq!(ZSet::of(&[(a, i64::MAX), (a, 1)]).weight(&a), i64::MAX);
     }
 }

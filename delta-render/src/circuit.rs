@@ -19,6 +19,12 @@
 //!   differentiate. Correct always, cheap never. This rule existing is what makes the
 //!   render TOTAL; licenses only ever upgrade nodes.
 //!
+//! Time-invariance and causality are BY CONSTRUCTION, not by check: every rule lifts
+//! a SET-level operator tickwise (plus `delay`/`I`, which only look backward), so a
+//! licensed operator cannot peek across ticks. An operator authored directly at the
+//! stream level would be outside this license system entirely — the licenses read
+//! Z-set specs and mean nothing about stream-level behaviour they never judged.
+//!
 //! The render emits two locks from ONE derivation (never restated): the generated
 //! Rust (`gen/<circuit>_incremental.rs` — compiled and tested like any source; a hand
 //! edit is caught by the drift gate) and the plain-language ratification artifact
@@ -46,6 +52,7 @@ fn op_info(name: &str) -> Option<(usize, &'static str)> {
         "map" => Some((1, "project_halved")),
         "sum" => Some((1, "total")),
         "join" => Some((2, "join")),
+        "scale" => Some((2, "scale")),
         "distinct" => Some((1, "distinct")),
         "min" => Some((1, "least")),
         _ => None,
@@ -59,6 +66,7 @@ fn apply(name: &str, args: &[&ZSet]) -> ZSet {
         ("map", [x]) => ops::project_halved(x),
         ("sum", [x]) => ops::total(x),
         ("join", [a, b]) => ops::join(a, b),
+        ("scale", [a, b]) => ops::scale(a, b),
         ("distinct", [x]) => ops::distinct(x),
         ("min", [x]) => ops::least(x),
         _ => unreachable!("arity and name validated at construction"),
@@ -183,11 +191,6 @@ impl Circuit {
         })
     }
 
-    /// The nodes, read-only (constructed only through the validity rule).
-    pub fn nodes(&self) -> &[Node] {
-        &self.nodes
-    }
-
     /// The BATCH reference: evaluate the DAG tickwise — slot `t` of the output is the
     /// plain set-level query applied to slot `t` of every source. This is the `Q` the
     /// end gate holds every incremental form against.
@@ -241,6 +244,7 @@ impl Circuit {
                 "map" => unary(ops::project_halved, &values),
                 "sum" => unary(ops::total, &values),
                 "join" => binary(ops::join, &values),
+                "scale" => binary(ops::scale, &values),
                 "distinct" => unary(ops::distinct, &values),
                 "min" => unary(ops::least, &values),
                 _ => unreachable!("validated at construction"),
@@ -338,7 +342,7 @@ pub fn render_incremental(circuit: &Circuit, registry: &Registry) -> String {
          // not every circuit uses every rule; the imports are the rule table.\n\
          #![allow(unused_imports, clippy::let_and_return)]\n\n\
          use crate::circuit::{{bilinear, fallback1, fallback2, lift2, linear1}};\n\
-         use crate::ops::{{distinct, filter_even, join, least, project_halved, total}};\n\
+         use crate::ops::{{distinct, filter_even, join, least, project_halved, scale, total}};\n\
          use crate::stream::Stream;\n\n\
          /// The incremental form of circuit `{name}`: deltas in, deltas out —\n\
          /// `I ∘ {name}_incremental ∘ D = batch` is the end gate's law.\n\
@@ -501,6 +505,37 @@ pub fn demo_circuit(registry: &Registry) -> Circuit {
     .expect("the demo circuit is valid by design")
 }
 
+/// The audit circuit — the DAG shapes the demo cannot show: TWO sources, a FAN-OUT
+/// (node 0 feeds both node 1 and node 2), and the non-commutative bilinear `scale`
+/// (whose license is the distributivity PAIR, both laws discovered):
+/// `sum(scale(filter(join(s0, s1)), join(s0, s1)))`.
+pub fn audit_circuit(registry: &Registry) -> Circuit {
+    Circuit::new(
+        "audit",
+        2,
+        vec![
+            Node {
+                operator: "join".into(),
+                inputs: vec![0, 1],
+            },
+            Node {
+                operator: "filter".into(),
+                inputs: vec![2],
+            },
+            Node {
+                operator: "scale".into(),
+                inputs: vec![3, 2],
+            },
+            Node {
+                operator: "sum".into(),
+                inputs: vec![4],
+            },
+        ],
+        registry,
+    )
+    .expect("the audit circuit is valid by design")
+}
+
 #[cfg(test)]
 mod probes {
     use super::*;
@@ -544,20 +579,37 @@ mod probes {
         assert!(err.contains("unlicensed"), "{err}");
     }
 
-    /// The batch reference computes the plain tickwise query — pinned on one worked
-    /// tick so the end gate's oracle is itself oracle-checked once.
+    /// The batch reference computes the plain tickwise query — pinned against a
+    /// HAND-computed table (the one absolute referent in the crate: these numbers were
+    /// derived on paper, not by running the code). The end law is otherwise RELATIVE —
+    /// incremental vs batch share the operator implementations — so this pin plus the
+    /// per-operator probes are what anchor it; the declared SQL-emulator slot is the
+    /// eventual independent oracle.
     #[test]
-    fn batch_is_the_plain_tickwise_query() {
+    fn batch_is_the_plain_tickwise_query_pinned_by_hand() {
         let r = registry();
         let c = demo_circuit(&r);
         // one tick: rows 0 (even, kept) and 1 (odd, dropped); map folds 0→0; join with
         // the full source multiplies weights; distinct re-weights to 1; sum weighs it.
-        let state = z(&[(0, 2), (1, 3)]);
-        let out = c.batch(&[Stream::of(&[state])]);
-        // filter → {0:2}; map → {0:2}; join with {0:2,1:3} → {0:4}; distinct → {0:1};
-        // sum → weight 1·(0+1) = 1 on row 0.
+        // by hand, tick 0: {0:2, 1:3} → filter {0:2} → map {0:2} → join·src {0:4}
+        //   → distinct {0:1} → sum 1·(0+1) = {0:1}.
+        // by hand, tick 1: {1:5} → filter {} → everything downstream {} → sum {}.
+        // by hand, tick 2: {0:1} → filter {0:1} → map {0:1} → join·src {0:1}
+        //   → distinct {0:1} → sum {0:1}.
+        let history = [z(&[(0, 2), (1, 3)]), z(&[(1, 5)]), z(&[(0, 1)])];
+        let out = c.batch(&[Stream::of(&history)]);
         assert_eq!(out.at(0), z(&[(0, 1)]));
-        assert_eq!(out.at(1), z(&[]), "a single-tick history ends there");
+        assert_eq!(out.at(1), ZSet::empty());
+        assert_eq!(out.at(2), z(&[(0, 1)]));
+        // and the audit circuit, one hand-worked tick: s0 {0:2,1:1}, s1 {0:3} →
+        // join {0:6} → filter {0:6} → scale by total-weight(join)=6 → {0:36} → sum
+        // 36·(0+1) = {0:36}.
+        let a = audit_circuit(&r);
+        let out = a.batch(&[
+            Stream::of(&[z(&[(0, 2), (1, 1)])]),
+            Stream::of(&[z(&[(0, 3)])]),
+        ]);
+        assert_eq!(out.at(0), z(&[(0, 36)]));
     }
 
     /// The interpreter twin obeys the end law on the honest registry — the same claim
@@ -572,7 +624,79 @@ mod probes {
             let incremental = c.incremental_with(&r, &[s.differentiate()]).integrate();
             assert_eq!(
                 incremental, batch,
-                "I(Q^Δ(D(s))) = Q(s) failed on the honest registry"
+                "I(Q^Δ(D(s))) = Q(s) failed on the honest registry (demo)"
+            );
+        }
+        // and the audit circuit — two sources, fan-out, the non-commutative
+        // bilinear — over every grid PAIR.
+        let a = audit_circuit(&r);
+        for s in crate::stream::grid() {
+            for t in crate::stream::grid() {
+                let batch = a.batch(&[s.clone(), t.clone()]);
+                let incremental = a
+                    .incremental_with(&r, &[s.differentiate(), t.differentiate()])
+                    .integrate();
+                assert_eq!(
+                    incremental, batch,
+                    "I(Q^Δ(D(s))) = Q(s) failed on the honest registry (audit)"
+                );
+            }
+        }
+    }
+
+    /// EVERY inventoried operator is drivable through a one-node circuit, and meets the
+    /// end law under its honest license — so no dispatch arm (batch's or the
+    /// interpreter's) is dead code, `min` and `distinct` included: the operators outside
+    /// any committed demo circuit still carry executable proof their fallback works.
+    #[test]
+    fn every_operator_drives_a_one_node_circuit_through_the_end_law() {
+        let r = registry();
+        for license in &r.licenses {
+            let arity = if matches!(license.operator.as_str(), "join" | "scale") {
+                2
+            } else {
+                1
+            };
+            let c = Circuit::new(
+                &format!("one-{}", license.operator),
+                1,
+                vec![Node {
+                    operator: license.operator.clone(),
+                    // a binary gets the one source twice — indices, not copies.
+                    inputs: vec![0; arity],
+                }],
+                &r,
+            )
+            .expect("a one-node circuit of an inventoried operator is valid");
+            for s in crate::stream::grid() {
+                let batch = c.batch(std::slice::from_ref(&s));
+                let incremental = c.incremental_with(&r, &[s.differentiate()]).integrate();
+                assert_eq!(
+                    incremental, batch,
+                    "the end law failed for one-node `{}`",
+                    license.operator
+                );
+            }
+        }
+    }
+
+    /// The RENDER drift gates, lib-side: both circuits' committed artifacts re-render
+    /// byte for byte. This duplicates the integration gate ON PURPOSE — the mutation
+    /// sweeps judge library mutants against LIB tests only, so without this twin a
+    /// mutant in the render string-building would survive every sweep while the
+    /// integration gate slept.
+    #[test]
+    fn the_committed_renders_are_fresh_from_the_library_side() {
+        let crate_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let r = registry();
+        let [a, b] = circuit_locks(&demo_circuit(&r), &r, &crate_root);
+        let [c, d] = circuit_locks(&audit_circuit(&r), &r, &crate_root);
+        let locks = [a, b, c, d];
+        if let Err(stale) = spec_lock::check(&locks) {
+            panic!(
+                "a rendered circuit artifact drifted: {}. Never hand-edit — run \
+                 `cargo run -p delta-render --example freeze` and ratify the diff.",
+                stale.join(", ")
             );
         }
     }

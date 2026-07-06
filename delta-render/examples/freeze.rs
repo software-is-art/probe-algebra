@@ -11,10 +11,10 @@ use std::path::PathBuf;
 
 use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::Spec;
-use delta_render::circuit::{circuit_locks, demo_circuit};
+use delta_render::circuit::{audit_circuit, circuit_locks, demo_circuit};
 use delta_render::license::Registry;
 use delta_render::ops::{
-    min_retraction_witness, DistinctOp, FilterOp, JoinOp, MapOp, MinOp, SumOp,
+    min_retraction_witness, DistinctOp, FilterOp, JoinOp, MapOp, MinOp, ScaleOp, SumOp,
 };
 use delta_render::stream::StreamCalculus;
 use delta_render::zset::ZSetAlgebra;
@@ -25,6 +25,8 @@ fn main() {
     let registry = Registry::derive();
     let [gen_lock, derivation_lock] =
         circuit_locks(&demo_circuit(&registry), &registry, &crate_root);
+    let [audit_gen_lock, audit_derivation_lock] =
+        circuit_locks(&audit_circuit(&registry), &registry, &crate_root);
     let locks = [
         Spec::of::<ZSetAlgebra>().lock_in(&spec_dir),
         MutationReport::of::<ZSetAlgebra>().lock_in(&spec_dir),
@@ -36,6 +38,8 @@ fn main() {
         MutationReport::of::<SumOp>().lock_in(&spec_dir),
         Spec::of::<JoinOp>().lock_in(&spec_dir),
         MutationReport::of::<JoinOp>().lock_in(&spec_dir),
+        Spec::of::<ScaleOp>().lock_in(&spec_dir),
+        MutationReport::of::<ScaleOp>().lock_in(&spec_dir),
         Spec::of::<DistinctOp>().lock_in(&spec_dir),
         MutationReport::of::<DistinctOp>().lock_in(&spec_dir),
         Spec::of::<MinOp>().lock_in(&spec_dir),
@@ -49,6 +53,8 @@ fn main() {
         // two locks.
         gen_lock,
         derivation_lock,
+        audit_gen_lock,
+        audit_derivation_lock,
         // the frozen red instance behind `min: NEITHER` — computed, never typed.
         spec_lock::Lock {
             name: "min retraction witness".into(),

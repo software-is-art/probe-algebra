@@ -10,7 +10,8 @@
 //! attached, the batch oracle becomes the emulator and this same equation becomes the
 //! emulator-differential tier. Nothing else here depends on it.)
 
-use delta_render::circuit::{circuit_locks, demo_circuit};
+use delta_render::audit_incremental::audit_incremental;
+use delta_render::circuit::{audit_circuit, circuit_locks, demo_circuit};
 use delta_render::demo_incremental::demo_incremental;
 use delta_render::license::Registry;
 use delta_render::stream::grid;
@@ -28,6 +29,25 @@ fn the_generated_circuit_meets_the_end_law_on_every_grid_stream() {
             incremental, batch,
             "I(Q^Δ(D(s))) = Q(s) failed on grid stream {i}: {s:?}"
         );
+    }
+}
+
+/// THE END LAW on the AUDIT circuit's generated code — two sources, a fan-out, and
+/// the non-commutative bilinear, over every grid PAIR: the DAG shapes the demo cannot
+/// show, held to the same law.
+#[test]
+fn the_generated_audit_circuit_meets_the_end_law_on_every_grid_pair() {
+    let registry = Registry::derive();
+    let circuit = audit_circuit(&registry);
+    for (i, s) in grid().into_iter().enumerate() {
+        for (j, t) in grid().into_iter().enumerate() {
+            let batch = circuit.batch(&[s.clone(), t.clone()]);
+            let incremental = audit_incremental(&s.differentiate(), &t.differentiate()).integrate();
+            assert_eq!(
+                incremental, batch,
+                "I(Q^Δ(D(s))) = Q(s) failed on grid pair ({i}, {j})"
+            );
+        }
     }
 }
 
@@ -55,7 +75,9 @@ fn the_generated_code_agrees_with_the_interpreter_twin() {
 fn the_committed_renders_are_fresh() {
     let crate_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let registry = Registry::derive();
-    let locks = circuit_locks(&demo_circuit(&registry), &registry, &crate_root);
+    let [a, b] = circuit_locks(&demo_circuit(&registry), &registry, &crate_root);
+    let [c, d] = circuit_locks(&audit_circuit(&registry), &registry, &crate_root);
+    let locks = [a, b, c, d];
     if let Err(stale) = spec_lock::check(&locks) {
         panic!(
             "a rendered circuit artifact drifted: {}. Never hand-edit — run \
