@@ -111,6 +111,32 @@ see. The canonical emission order (band → fire op → catalog rank → partner
 exactly two committed lock lines in the whole workspace — both pure reorders, ratified — and
 the demos did not change at all. Net −109 lines.
 
+**Specs as licenses** (the `delta-render` brick, from a thrown design): discovery output
+consumed as GENERATION input — a new polarity for the whole method. The crate is a miniature
+of DBSP-style incremental computation in which each operator's derivation rule is LICENSED by
+the presence of laws in its frozen spec, never by a declared boolean: linear ⇔ the additive
+homomorphism plus the zero fixed point; bilinear ⇔ additive in each slot (the catalog gained
+three data stanzas for the vocabulary — `inverse`, `fixed point`, `distributivity (right)` —
+and the maximal logic theory promptly discovered the two classical Boolean complements the
+catalog had been silent about). The chain of derived artifacts: seven exhaustively-judged
+theories freeze their specs; `spec/licenses.spec` is derived by PARSING those specs' text,
+each row citing the law lines that granted it; the render walks a validated circuit DAG
+(unlicensed operators are unconstructible) and emits generated Rust
+(`gen/demo_incremental.rs` — compiled, tested, drift-gated: the `ci.yml` move at a new
+altitude) plus a plain-language derivation artifact, from ONE derivation. The end gate —
+`I ∘ Q^Δ ∘ D = Q` over the stream grid — trusts no license, and the fire drill proves both
+gates can fire: the almost-linear operator (drops retractions) is DENIED over the honest grid
+and, when forged via a pruned insert-only grid, caught by the end law instead; a forged
+`distinct → linear` registry fires the gate; the all-fallback floor passes it; and
+`spec/min.retraction.spec` freezes WHY min under deletion is hard, with values computed by
+the real operators. Two incidental findings while building it: the new `fixed point` stanza
+was the first equational shape with no variable on either side, exposing (and closing) a
+vacuous-truth hole — the `meaningful` filter now guards both polarities; and a per-package
+`opt-level` override collapsed the drift-gate economics from ~95s to ~6s because `Engine<T>`
+monomorphizes into the consumer crate. Deliberately absent from v1, recorded as candidates
+below: recursion/fixpoint circuits, SQL/NULL semantics (the end law's batch oracle is the
+declared seam), and phase 7's property-constrained interpretation sampling.
+
 ## The next brick: candidates
 
 The authoring-experience frictions found while converging the demo — and the I/O research
@@ -183,6 +209,19 @@ candidate bricks:
    byte equality IS set equality) covers it with spec-lock as-is; if field use keeps wanting
    set-diff rendering ("2 new findings, 1 resolved" instead of a byte diff), a tiny keyed
    helper alongside `Lock` is the shape — resist anything larger.
+
+6. **Uninterpreted operators with ratified properties** (delta-render phase 7, deferred):
+   for an opaque symbol with declared properties (deterministic, additive, zero-preserving),
+   check circuit laws over SAMPLED random interpretations constrained only by those
+   properties — plus the REMOVAL drill: re-sample with one property dropped and demand the
+   law fail, proving each ratified property load-bearing (a property whose removal changes
+   nothing is decoration, flagged not frozen). The bridge to pipelines whose operator
+   inventory is open, and a fire-drill variant in its own right.
+
+7. **Depth-bounded stream carriers as a grid idiom**: `delta-render`'s `Stream` (fixed-depth
+   vector, prefix equality) worked as a Theory carrier with zero engine changes — worth
+   documenting as the supported way to put time-indexed values on a grid, alongside the grid
+   and term-depth bounds the honest frame already declares.
 
 ## Standing follow-ups
 
