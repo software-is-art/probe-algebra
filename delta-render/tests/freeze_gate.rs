@@ -88,6 +88,22 @@ fn the_classifications_are_exactly_the_designed_table() {
     );
 }
 
+/// The WARRANT is fresh: the uninterpreted operator's sampled-evidence license,
+/// re-derived (same seed, same interpretations, same removal arms) and held against
+/// `spec/enrich.warrant.spec` — a changed sampler, law judge, or property list is a
+/// reviewed diff, never a silent re-roll.
+#[test]
+fn the_committed_warrant_is_fresh() {
+    let lock = delta_render::warrant::Warrant::derive().lock_in(&spec_dir());
+    if let Err(stale) = spec_lock::check(std::slice::from_ref(&lock)) {
+        panic!(
+            "the enrich warrant drifted: {}. Regenerate \
+             (`cargo run -p delta-render --example freeze`) and ratify the diff.",
+            stale.join(", ")
+        );
+    }
+}
+
 /// The DECLARED Abelian group is met with no surprises: everything discovery finds was
 /// declared, everything declared is found. The inverse law is the one the whole design
 /// leans on — deltas need retractions — so the distance gate holding green IS the

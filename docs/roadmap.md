@@ -138,7 +138,8 @@ vacuous-truth hole — the `meaningful` filter now guards both polarities; and a
 `opt-level` override collapsed the drift-gate economics from ~95s to ~6s because `Engine<T>`
 monomorphizes into the consumer crate. Deliberately absent from v1, recorded as candidates
 below: recursion/fixpoint circuits, SQL/NULL semantics (the end law's batch oracle is the
-declared seam), and phase 7's property-constrained interpretation sampling.
+declared seam), and phase 7's property-constrained interpretation sampling (since BUILT —
+candidate 6).
 
 ## The next brick: candidates
 
@@ -255,13 +256,24 @@ candidate bricks:
    set-diff rendering ("2 new findings, 1 resolved" instead of a byte diff), a tiny keyed
    helper alongside `Lock` is the shape — resist anything larger.
 
-6. **Uninterpreted operators with ratified properties** (delta-render phase 7, deferred):
-   for an opaque symbol with declared properties (deterministic, additive, zero-preserving),
-   check circuit laws over SAMPLED random interpretations constrained only by those
-   properties — plus the REMOVAL drill: re-sample with one property dropped and demand the
-   law fail, proving each ratified property load-bearing (a property whose removal changes
-   nothing is decoration, flagged not frozen). The bridge to pipelines whose operator
-   inventory is open, and a fire-drill variant in its own right.
+6. **Uninterpreted operators with ratified properties — BUILT** (`delta-render/src/warrant.rs`,
+   `spec/enrich.warrant.spec`). The opaque symbol `enrich` — no inventoried
+   implementation, standing for the open half of a real pipeline's inventory — holds a
+   linear license on SAMPLED evidence: the circuit law (`i(enrich(d(s))) = enrich(s)`)
+   judged over interpretations sampled under the declared properties, deterministically
+   (splitmix64, fixed seed), so the warrant is a derivation, not a dice roll. The REMOVAL
+   drill keeps the property list honest: drop one property, re-sample under the rest (each
+   counter-sample violates exactly the dropped one), demand refutation — and a property
+   whose removal refutes nothing is DECORATION, flagged in the artifact and never ratified.
+   The demonstration plants one on purpose (`bounded-fanout`), so the flag's polarity is
+   exercised on every regeneration; `tests/gates.rs` registers each arm as a fire-drill
+   gate. One subtlety earned its own disclosure: full additivity implies zero preservation
+   (a cancellation pair reaches the basepoint from non-empty inputs), so the ratified
+   properties are declared as INDEPENDENT constraints — additivity away from the
+   basepoint, zero-preservation as the basepoint — mirroring how the license classifier
+   already reads them as two separate laws. Recorded residual: the warrant is not yet a
+   circuit admission (no warranted opaque node in `Registry`/`circuit`) — kept out until a
+   real open-inventory consumer forces its shape.
 
 7. **Depth-bounded stream carriers as a grid idiom**: `delta-render`'s `Stream` (fixed-depth
    vector, prefix equality) worked as a Theory carrier with zero engine changes — worth

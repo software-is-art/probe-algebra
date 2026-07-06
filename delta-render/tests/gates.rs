@@ -262,6 +262,63 @@ fn every_gate_still_fires() {
     }
 }
 
+/// THE REMOVAL DRILL AS A FIRE DRILL, census-first: the warrant's whole point is that
+/// each ratified property can be caught missing — so each arm is registered as a gate
+/// and drilled with its own counter-samples, and the planted decoration proves the
+/// flag's other polarity (a property the drill CANNOT make matter must read as
+/// decoration, never sneak into the ratified list).
+#[test]
+fn the_warrant_removal_drill_still_fires() {
+    use delta_render::warrant::{Warrant, SAMPLES};
+
+    let w = Warrant::derive();
+    let row = |name: &str| {
+        w.rows
+            .iter()
+            .find(|r| r.property.name() == name)
+            .expect("a declared property has a drill row")
+    };
+    let battery = Battery::named("the enrich warrant's removal arms")
+        .requires([
+            "additivity arm",
+            "zero-preservation arm",
+            "determinism arm",
+            "decoration flag",
+        ])
+        .drill(
+            "additivity arm",
+            "interpretations sampled WITHOUT additivity (a multi-row kicker) — every \
+             counter-sample must refute the circuit law",
+            outcome(row("additive").refuted == SAMPLES),
+        )
+        .drill(
+            "zero-preservation arm",
+            "interpretations whose basepoint moved (enrich(∅) ≠ ∅) — every \
+             counter-sample must refute the circuit law",
+            outcome(row("zero-preserving").refuted == SAMPLES),
+        )
+        .drill(
+            "determinism arm",
+            "interpretations answering each call differently (a phantom row per call) — \
+             every counter-sample must refute the circuit law",
+            outcome(row("deterministic").refuted == SAMPLES),
+        )
+        .drill(
+            "decoration flag",
+            "the planted weightless property (bounded-fanout) — its removal must refute \
+             NOTHING, and the artifact must flag it instead of ratifying it",
+            outcome(row("bounded-fanout").refuted == 0 && !row("bounded-fanout").load_bearing()),
+        );
+    if let Err(rot) = battery.verdict() {
+        panic!(
+            "a warrant arm went vacuous:\n{rot}\n\nregister:\n{}",
+            battery.render()
+        );
+    }
+    // and the license itself is standing (the full-constraint arm survived).
+    assert!(w.held, "{}", w.held_detail);
+}
+
 /// THE FLOOR: an all-generic-fallback derivation (every license stripped to NEITHER)
 /// still meets the end law on every grid stream — correctness never depended on a
 /// license; upgrades only ever buy cost.

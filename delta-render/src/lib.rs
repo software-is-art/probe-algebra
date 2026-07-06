@@ -39,6 +39,7 @@ pub mod circuit;
 pub mod license;
 pub mod ops;
 pub mod stream;
+pub mod warrant;
 pub mod zset;
 
 /// The RENDERED incremental circuit — generated code, compiled and tested like any
