@@ -40,10 +40,20 @@
       gate:     homogeneous binary plus a constant of its sort; tried on both sides, deduplicated by prose
       template: {op} by {const} always gives {const}.
 
+- inverse
+      schema:   (x ⊕ inv(x)) = e
+      gate:     homogeneous binary plus a unary endo and a constant, all on one sort; tried on both sides, deduplicated by prose
+      template: {other} inverts {op} — a value {op} its own {other} gives {const}.
+
 - distributivity
       schema:   (x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))
       gate:     an ordered pair of distinct homogeneous binaries on one sort
       template: {op} distributes over {other}.
+
+- distributivity (right)
+      schema:   ((y ⊗ z) ⊕ x) = ((y ⊕ x) ⊗ (z ⊕ x))
+      gate:     an ordered pair of distinct homogeneous binaries on one sort; skipped when the first is commutative (the left-slot law already says it) — the other slot's distributivity, so each argument position carries its own additivity law
+      template: {op} distributes over {other} from the right.
 
 - absorption
       schema:   (x ⊕ (x ⊗ y)) = x
@@ -74,6 +84,11 @@
       schema:   u(u(x)) = x
       gate:     unary s → s
       template: {op} twice returns the original value.
+
+- fixed point
+      schema:   u(c) = c
+      gate:     unary endo s → s plus a constant of its sort
+      template: {op} leaves {const} fixed.
 
 - round-trip
       schema:   g(f(x)) = x

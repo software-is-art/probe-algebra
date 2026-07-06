@@ -934,6 +934,22 @@ impl ShapeCatalog {
                 const_rule: ConstRule::Any,
             },
             ShapeInfo {
+                name: "inverse",
+                schema: "(x ⊕ inv(x)) = e",
+                gate: "homogeneous binary plus a unary endo and a constant, all on one \
+                       sort; tried on both sides, deduplicated by prose",
+                gate_slots: open(&[Slot::Binary(0), Slot::Unary(0, 0), Slot::Constant(0)]),
+                template: "{other} inverts {op} — a value {op} its own {other} gives {const}.",
+                lhs: App(0, &[X, App(1, &[X])]),
+                rhs: App(2, &[]),
+                placeholders: &["⊕", "inv", "e"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: true,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
                 name: "distributivity",
                 schema: "(x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))",
                 gate: "an ordered pair of distinct homogeneous binaries on one sort",
@@ -946,6 +962,24 @@ impl ShapeCatalog {
                 holes: &["op", "other"],
                 mirrored: false,
                 guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "distributivity (right)",
+                schema: "((y ⊗ z) ⊕ x) = ((y ⊕ x) ⊗ (z ⊕ x))",
+                gate: "an ordered pair of distinct homogeneous binaries on one sort; \
+                       skipped when the first is commutative (the left-slot law already \
+                       says it) — the other slot's distributivity, so each argument \
+                       position carries its own additivity law",
+                gate_slots: BINARY_PAIR,
+                template: "{op} distributes over {other} from the right.",
+                lhs: App(0, &[App(1, &[Y, Z]), X]),
+                rhs: App(1, &[App(0, &[Y, X]), App(0, &[Z, X])]),
+                placeholders: &["⊕", "⊗"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
             },
             ShapeInfo {
@@ -1053,6 +1087,21 @@ impl ShapeCatalog {
                 placeholders: &["u"],
                 polarity: Polarity::Equal,
                 holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+            },
+            ShapeInfo {
+                name: "fixed point",
+                schema: "u(c) = c",
+                gate: "unary endo s → s plus a constant of its sort",
+                gate_slots: open(&[Slot::Unary(0, 0), Slot::Constant(0)]),
+                template: "{op} leaves {const} fixed.",
+                lhs: App(0, &[C]),
+                rhs: C,
+                placeholders: &["u", "c"],
+                polarity: Polarity::Equal,
+                holes: &["op", "const"],
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
@@ -1329,7 +1378,14 @@ impl<T: Theory> Engine<T> {
             }
             for lhs in variants {
                 let confirmed = match shape.polarity {
-                    Polarity::Equal => self.same(&lhs, &rhs),
+                    // meaningfulness guards BOTH polarities: two all-undefined sides agree
+                    // on nothing yet compare equal, which "fixed point" (the first shape
+                    // with no variable in either term) can reach where every older shape
+                    // kept a defined variable in play.
+                    Polarity::Equal => {
+                        let a = self.signature(&lhs);
+                        Self::meaningful(&a) && a == self.signature(&rhs)
+                    }
                     Polarity::Differs => {
                         let (a, b) = (self.signature(&lhs), self.signature(&rhs));
                         Self::meaningful(&a) && Self::meaningful(&b) && a != b
@@ -1727,6 +1783,10 @@ mod tests {
             ("And with T leaves a value unchanged.", "(T & x) = x"),
             ("And by F always gives F.", "(F & x) = F"),
             (
+                "Not inverts And — a value And its own Not gives F.",
+                "(x & ~(x)) = F",
+            ),
+            (
                 "And distributes over Or.",
                 "(x & (y | z)) = ((x & y) | (x & z))",
             ),
@@ -1742,6 +1802,10 @@ mod tests {
             ("Or of a value with itself gives that value.", "(x | x) = x"),
             ("Or with F leaves a value unchanged.", "(F | x) = x"),
             ("Or by T always gives T.", "(T | x) = T"),
+            (
+                "Not inverts Or — a value Or its own Not gives T.",
+                "(x | ~(x)) = T",
+            ),
             (
                 "Or distributes over And.",
                 "(x | (y & z)) = ((x | y) & (x | z))",
@@ -2585,7 +2649,9 @@ mod tests {
 
     // MaxSelect: two projections (`First` left-regular, `Last` right-regular — the bias laws), a
     // duration monoid (`Plus`/`zero`), a mod-3 `Shift` action of durations on values (action
-    // identity, monoid action), and a `Gap` relation whose self-application is `zero`.
+    // identity, monoid action), a `Gap` relation whose self-application is `zero`, and a
+    // doubling endo `Twice` on durations (fixed point at `zero`; the additive homomorphism —
+    // the very instance the license derivation reads as LINEARITY).
     #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
     enum SSort {
         V,
@@ -2626,6 +2692,9 @@ mod tests {
     }
     fn s_gap(v: &[SVal]) -> Option<SVal> {
         Some(SVal::D(s_v(&v[0]).abs_diff(s_v(&v[1]))))
+    }
+    fn s_twice(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::D(s_d(&v[0]) * 2))
     }
 
     impl Theory for MaxSelect {
@@ -2686,6 +2755,14 @@ mod tests {
                     inputs: vec![V, V],
                     output: D,
                     eval: s_gap,
+                },
+                Operator {
+                    name: "Twice",
+                    symbol: "dbl",
+                    fixity: Prefix,
+                    inputs: vec![D],
+                    output: D,
+                    eval: s_twice,
                 },
             ]
         }
