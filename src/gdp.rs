@@ -323,6 +323,18 @@ mod tests {
     use proptest::prelude::*;
     use std::collections::BTreeMap;
 
+    /// A found position IS the key's rank in the ordered key sequence — pinned at rank 2
+    /// over a three-key map, so neither constant (0 or 1) can impersonate it.
+    #[test]
+    fn a_found_position_is_the_keys_rank() {
+        let map: BTreeMap<i16, i64> = [(10, 0), (20, 0), (30, 0)].into_iter().collect();
+        let idx = with_seed(|seed| {
+            let named = seed.new_named(map);
+            lookup(&named, &30).expect("present").index()
+        });
+        assert_eq!(idx, 2);
+    }
+
     /// A genuine permutation of `0..n`: stable-sort the identity by random keys, so the
     /// result is always a rearrangement of `0..n` (no `prop_shuffle` dependency).
     fn permutation() -> impl Strategy<Value = Vec<usize>> {

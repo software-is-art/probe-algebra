@@ -382,6 +382,46 @@ mod tests {
         );
     }
 
+    // The remaining quadrant: MET but with surprises. `Undersold` declares one true law and
+    // stays silent about the rest, so the gate is green while the report still owes prompts.
+    struct Undersold;
+
+    crate::theory! {
+        Undersold : "undersold",
+        Value = V,
+        Obs = u8,
+        Sort = N,
+        sort_of = |_: &V| N,
+        observe = |v: &V| v.0,
+        vars { N => &["x", "y", "z"], }
+        inhabit { N => (0..3).map(V).collect(), }
+        ops {
+            Nullary "zero" "zero" () -> N = zero_op;
+            Infix   "max"  "max"  (N, N) -> N = max_op;
+        }
+        expects {
+            commutative(max);
+        }
+    }
+
+    /// A met declaration with surprises must still SAY the surprises — "no surprises" is only
+    /// sayable when BOTH lists are empty, never when merely one is (the early-return's `&&` is
+    /// the whole claim).
+    #[test]
+    fn a_met_declaration_with_surprises_still_owes_its_prompts() {
+        let distance = Distance::of::<Undersold>();
+        assert!(distance.is_met(), "report: {}", distance.render());
+        let report = distance.render();
+        assert!(
+            !report.contains("no surprises"),
+            "a green gate must not swallow its surprises: {report}"
+        );
+        assert!(
+            report.starts_with("undersold: 1 of 1 declared laws hold; SURPRISES"),
+            "the surprises must be reported in the pinned voice: {report}"
+        );
+    }
+
     // The MINIMAL `theory!` form delegates to the derived-grid form; its `expects` clause must
     // survive the delegation. `bool` is `Shaped`, so the whole theory is two lines of meaning.
     struct Fused;

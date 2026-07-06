@@ -2202,6 +2202,64 @@ mod tests {
         );
     }
 
+    /// The boundary emission is CONDITIONAL grammar, pinned from both sides: a module that
+    /// owns values gets the `Shaped` import and the `value_object!` registration; one that
+    /// owns none gets neither (the sample cannot see this — both its modules own a value,
+    /// so the sweep watched these guards flip unpunished). Each operator's doc restates its
+    /// OWN declared expectations in catalog order, methods sit one blank line apart, and a
+    /// system with no expectations and no via seams plans no expectations gate at all.
+    #[test]
+    fn the_boundary_emission_is_conditional_grammar_pinned_from_both_sides() {
+        let plan = sample_plan();
+        let meter = &plan
+            .edits
+            .iter()
+            .find(|e| e.path == "src/meter.rs")
+            .expect("meter boundary")
+            .contents;
+        assert!(meter.contains("use boundary_spec::boundary::Shaped;"));
+        assert!(meter.contains("boundary_spec::value_object!(Credits);"));
+        // the doc must sit ON ITS OWN operator (adjacency, not mere presence — a flipped
+        // filter swaps the lists between `grant` and `renew` while both strings still
+        // appear somewhere in the file).
+        assert!(meter.contains(
+            "Declared expectations (the target lock restates them): commutative(grant); \
+             identity(grant, zero).\n    pub fn grant("
+        ));
+        assert!(meter.contains(
+            "Declared expectations (the target lock restates them): bias_later(renew).\n    \
+             pub fn renew("
+        ));
+        // one blank line BETWEEN methods, none after the impl header.
+        assert!(meter.contains("    }\n\n    /// `renew`"));
+        assert!(!meter.contains("impl Credits {\n\n"));
+
+        // the ownerless twin: `pay` touches only meter's value, so its boundary file must
+        // carry NO registration grammar — and this lawless, seamless system plans no
+        // `tests/expectations.rs`.
+        let lean = Genesis::plan(
+            r#"system! {
+                name: "lean-app",
+                values { Credits = i64 where "0..=20"; }
+                modules {
+                    meter { ops { grant(Credits, Credits) -> Credits; } }
+                    pay { ops { spend(Credits, Credits) -> Credits; } }
+                }
+            }"#,
+            &Deps::Version("0".into()),
+        )
+        .expect("the lean declaration must plan");
+        let pay = &lean
+            .edits
+            .iter()
+            .find(|e| e.path == "src/pay.rs")
+            .expect("pay boundary")
+            .contents;
+        assert!(!pay.contains("Shaped"));
+        assert!(!pay.contains("value_object!"));
+        assert!(!lean.listing().contains(&"tests/expectations.rs"));
+    }
+
     /// The captured declaration text is trimmed EDGE TO EDGE: exactly the author's tokens,
     /// with the newlines hugging the braces stripped and nothing else — so the splice sits
     /// flush under the marker line with the author's own indentation. Pinned at both edges
