@@ -9,6 +9,11 @@ is **derived, committed, and drift-gated byte for byte**. The behaviour spec, th
 graph, the CI pipeline, the mutation-testing verdicts: none of them are written by hand, all of
 them are locks, and a change to any of them is a diff you consciously ratify in review.
 
+> **New here, and human?** This page is written densely (agents metabolise it fine). Start
+> with **[the tour](docs/tour.md)** instead: one idea at a time, one running example —
+> hand-written tests and hand-written `ci.yml` next to their derived twins — with a marked
+> exit after every station.
+
 The bet, stated falsifiably: *a module boundary can be specified precisely enough that the
 tests validating it write themselves.* The yardstick is mutation — plant bugs in the interior
 and count what survives. The interior of the lead example (a full expression-language
@@ -273,6 +278,8 @@ good ones, and its "From the field" section shows exactly what such notes turn i
 
 ## Reading further
 
+- [docs/tour.md](docs/tour.md) — the gentle version of this page: the whole discipline as
+  five stations with exits, for readers who'd rather meet one idea at a time.
 - [docs/discovery.md](docs/discovery.md) — the discovery half, precisely: theories, the grid,
   the catalog's fields and driver semantics, expectations, every lock kind, seams and
   `system!`, genesis, the world lock, the gate registry, algebra mutation.
