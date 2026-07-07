@@ -678,6 +678,23 @@ mod tests {
             1,
             "reported once, at the first occurrence: {err}"
         );
+
+        // three occurrences still report ONCE — two entries cannot tell "report at the
+        // first occurrence" apart from "report at every occurrence but the first".
+        let triple = battery().census(
+            ["reconcile"],
+            [
+                ("reconcile", CensusEntry::drilled(["reconciliation"])),
+                ("reconcile", CensusEntry::exempt("also this")),
+                ("reconcile", CensusEntry::exempt("and this")),
+            ],
+        );
+        let err = triple.verdict().unwrap_err();
+        assert_eq!(
+            err.matches("DUPLICATE").count(),
+            1,
+            "one report regardless of occurrence count: {err}"
+        );
     }
 
     /// The census render is deterministic and lockable, in surface order, with problems
