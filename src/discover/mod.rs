@@ -26,6 +26,7 @@ pub mod coherence;
 pub mod cohesion;
 pub mod composition;
 pub mod date;
+pub mod depend;
 pub mod derived;
 pub mod engine;
 pub mod expect;
