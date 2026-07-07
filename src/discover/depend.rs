@@ -146,6 +146,15 @@ impl Dependence {
                 ));
             };
             let (theory, equation) = (theory.trim(), equation.trim());
+            // the theory names a lock FILE, so it must stay inside the spec directory:
+            // a name carrying path syntax is refused, never resolved — the register is
+            // reviewed data, but the judge does not lean on that.
+            if theory.contains('/') || theory.contains('\\') || theory.contains("..") {
+                return Err(format!(
+                    "downstream reliance `{key}` refused: `{theory}` is not a theory \
+                     name — path syntax cannot name a lock"
+                ));
+            }
             let slug: String = theory
                 .chars()
                 .map(|c| if c == ' ' { '-' } else { c })
@@ -394,6 +403,15 @@ mod probes {
         let malformed = register("malformed.register", "router idempotence: someone — why\n");
         let err = Dependence::judge_register(&malformed, &root.join("spec")).unwrap_err();
         assert!(err.contains("` | `"), "{err}");
+
+        // a theory name carrying path syntax is refused, never resolved — the lock
+        // lookup must not be steerable outside the spec directory:
+        let traversal = register(
+            "traversal.register",
+            "../outside | (a or a) = a: someone — a path is not a theory\n",
+        );
+        let err = Dependence::judge_register(&traversal, &root.join("spec")).unwrap_err();
+        assert!(err.contains("path syntax cannot name a lock"), "{err}");
 
         // a reliance on a theory with no committed lock refuses by path:
         let unknown = register(
