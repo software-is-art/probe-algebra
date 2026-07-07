@@ -150,3 +150,29 @@ pillar 3 (one data structure, three payoffs), then pillar 1 (grammar unification
 3's richer compiled parser), with pillar 4 running as the research track alongside — its
 first concrete step is a second stateful fixture: a fake-but-realistic external store
 modeled, probed, locked, and drift-gated end to end inside this workspace.
+
+## The workbench protocol (authoring with the autorouter)
+
+Writing behaviour and deciding shape are two problems, and doing them simultaneously
+degrades both — for agents especially. The placer (`discover::shape`) and its editor
+half (`Architect::place`) dissolve the interleaving. The protocol:
+
+1. **Declare a workbench** when new work starts: one bundle `theory!`, no structure
+   decisions. Append operators to it as the behaviour comes.
+2. **Let the placer watch.** `Architect::place::<Workbench>(file, out_dir)` is cheap
+   enough for every keystroke (signatures only, no discovery). While new operators
+   share nets with existing ones, it is silent.
+3. **Extract when it fires.** A net-disjoint component is an indisputable, lossless,
+   seamless split — the finding's action is `isPreferred` and writes the scaffolded
+   module files; move the operator evals in and name the module. The workbench shrinks
+   back to one component and writing continues.
+4. **Extract before merge.** A workbench never ships with two components: assert
+   `Placement::of::<Workbench>().is_settled()` in the crate's tests while the
+   workbench lives, and retire the bundle (fold it into its final module) when the
+   work is done. The shape lock holds the boundary from then on.
+
+No standing workbench file exists in this repo between features — a placeholder theory
+would be dead weight for the mutation gates to chew on. The workbench is declared when
+work starts and retired when it ends; the fixtures in `architect.rs` pin the machinery
+meanwhile. Dogfood commitment: the next algebra brick in this repository gets written
+through this protocol, and what it teaches goes back into this section.

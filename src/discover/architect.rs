@@ -1,15 +1,34 @@
 //! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
-//! architect — the cohesion suggestion as an EDITOR DEV TOOL: LSP-shaped diagnostics and an
-//! auto-applicable code action that scaffolds the split.
+//! architect — the structure instruments as an EDITOR DEV TOOL: LSP-shaped diagnostics
+//! and code actions that scaffold the split.
 //!
-//! This is the core a rust-analyzer / VS-Code extension calls. It runs the cohesion analysis over a
-//! registry of the crate's theories, and for every decomposable module emits a `Diagnostic` (a
-//! `Hint` at the `theory!` site — "this module is secretly N modules") and a `CodeAction` whose edit
-//! CREATES the scaffolded sub-module files (`discover::scaffold`). `render_lsp` serialises both to
-//! the JSON an editor consumes; `apply` writes the files. The full LSP server (the stdio protocol
-//! loop) is a thin shim over this — the interesting part, the architecture-to-quick-fix pipeline,
-//! lives here and is mutation-tested like everything else.
+//! This is the core a rust-analyzer / VS-Code extension calls. Two signals feed it, and
+//! the derivation/suggestion distinction between them maps directly onto LSP semantics:
+//!
+//! - **cohesion** (laws): a decomposable module gets a `Hint` at its `theory!` site and
+//!   a quick-fix whose edits create the scaffolded sub-modules. The split creates seam
+//!   obligations, so a human ratifies it (`isPreferred: false`).
+//! - **placement** (nets, via [`Architect::place`]): a theory whose operators fall into
+//!   net-disjoint components gets an `Information` diagnostic and an auto-applicable
+//!   extraction (`isPreferred: true`) — the components share nothing, no seam is
+//!   created, and the split is lossless, so an editor or an agent loop may apply it
+//!   unattended. Placement reads signatures only, so this check is cheap enough for
+//!   every keystroke; cohesion needs discovery and is not.
+//!
+//! Together they answer "where does an agent write code as it goes": into a WORKBENCH —
+//! one designated bundle `theory!` the agent appends operators to, making no structure
+//! decisions while writing. The architect watches the bundle through `place::<Bundle>`;
+//! while new operators share nets with existing ones, nothing fires; the moment a
+//! net-disjoint feature accumulates, the extraction crystallises it into its own module
+//! file and the workbench shrinks back to one component. Modules precipitate out of the
+//! bundle; the boundary is derived, never decided mid-thought. (The shape lock then
+//! holds it: see `discover::shape`.)
+//!
+//! `render_lsp` serialises findings to the JSON an editor consumes; `apply` writes the
+//! files, path-confined. The full LSP server (the stdio protocol loop) is a thin shim
+//! over this — the analysis-to-action pipeline lives here and is mutation-tested like
+//! everything else.
 
 use std::path::Path;
 
@@ -42,9 +61,14 @@ pub struct FileEdit {
     pub contents: String,
 }
 
-/// An auto-applicable fix (LSP `CodeAction`, kind `refactor.extract`).
+/// An LSP `CodeAction` (kind `refactor.extract`). `preferred` maps to the wire field
+/// `isPreferred` and carries the derivation/suggestion distinction into the editor: a
+/// PLACEMENT split shares no nets, needs no seams, and is safe to apply unattended
+/// (`preferred: true`); a COHESION split creates seam obligations a human ratifies
+/// (`preferred: false` — a quick-fix, not an auto-fix).
 pub struct CodeAction {
     pub title: String,
+    pub preferred: bool,
     pub edits: Vec<FileEdit>,
 }
 
@@ -62,6 +86,9 @@ struct Entry {
     /// The directory new sub-modules are written under (repo-relative).
     out_dir: &'static str,
     scaffold: fn() -> Option<Scaffold>,
+    /// The PLACEMENT finding for this theory (None when settled) — the placer's editor
+    /// half, checked on every analysis alongside cohesion.
+    place: fn(&str, &str) -> Option<Finding>,
 }
 
 /// The theories the architect analyses (the crate's real discovery domains).
@@ -69,24 +96,30 @@ fn registry() -> Vec<Entry> {
     fn s<T: Theory>() -> Option<Scaffold> {
         Scaffold::of::<T>()
     }
+    fn p<T: Theory>(file: &str, out_dir: &str) -> Option<Finding> {
+        Architect::place::<T>(file, out_dir)
+    }
     vec![
         Entry {
             name: Arithmetic::name(),
             file: "src/discover/arithmetic.rs",
             out_dir: "src/discover/arithmetic",
             scaffold: s::<Arithmetic>,
+            place: p::<Arithmetic>,
         },
         Entry {
             name: Router::name(),
             file: "src/discover/router.rs",
             out_dir: "src/discover/router",
             scaffold: s::<Router>,
+            place: p::<Router>,
         },
         Entry {
             name: Calendar::name(),
             file: "src/discover/date.rs",
             out_dir: "src/discover/date",
             scaffold: s::<Calendar>,
+            place: p::<Calendar>,
         },
     ]
 }
@@ -119,9 +152,51 @@ impl Architect {
     /// would surface a hint only where there is something to act on. The analysis is an associated
     /// function of the TOOL — the public surface is the typestate, not a loose function (the
     /// no-rats-nest rule: every public callable hangs off a typestate).
+    /// The PLACEMENT finding for one theory — the autorouter's editor half, and the
+    /// entry point a bundle workbench is watched through (`Architect::place::<Bundle>`
+    /// on the file the agent writes into). Returns `None` when the placement is settled.
+    /// Cheap enough for every keystroke: placement reads signatures only, never
+    /// discovery. The finding's action is `preferred` — the components share no nets,
+    /// no seam is created, and the split is lossless, so an editor (or an agent loop)
+    /// may apply it unattended.
+    pub fn place<T: Theory>(file: &str, out_dir: &str) -> Option<Finding> {
+        let sc = Scaffold::placement::<T>()?;
+        let n = sc.modules.len();
+        let edits = sc
+            .modules
+            .iter()
+            .enumerate()
+            .map(|(i, m)| FileEdit {
+                path: format!("{out_dir}/module{i}.rs"),
+                contents: m.source.clone(),
+            })
+            .collect();
+        Some(Finding {
+            name: T::name().to_string(),
+            diagnostic: Diagnostic {
+                file: file.to_string(),
+                line: theory_line(file),
+                severity: Severity::Information,
+                message: format!(
+                    "`{}` places as {n} modules — the components share no nets, so the \
+                     split is indisputable and lossless. Extract.",
+                    T::name()
+                ),
+            },
+            action: CodeAction {
+                title: format!("Extract `{}`'s {n} net-disjoint modules", T::name()),
+                preferred: true,
+                edits,
+            },
+        })
+    }
+
     pub fn analyze() -> Vec<Finding> {
         let mut findings = Vec::new();
         for e in registry() {
+            if let Some(finding) = (e.place)(e.file, e.out_dir) {
+                findings.push(finding);
+            }
             let Some(sc) = (e.scaffold)() else {
                 continue;
             };
@@ -157,6 +232,7 @@ impl Architect {
                 },
                 action: CodeAction {
                     title: format!("Split `{}` into {} modules", e.name, sc.modules.len()),
+                    preferred: false,
                     edits,
                 },
             });
@@ -262,8 +338,9 @@ impl Architect {
                     .collect();
                 format!(
                     "{{\"title\":\"{}\",\"kind\":\"refactor.extract\",\
-                     \"edit\":{{\"documentChanges\":[{}]}}}}",
+                     \"isPreferred\":{},\"edit\":{{\"documentChanges\":[{}]}}}}",
                     esc(&f.action.title),
+                    f.action.preferred,
                     changes.join(",")
                 )
             })
@@ -583,6 +660,106 @@ mod tests {
         assert!(json.contains("\"kind\":\"create\""));
         // the scaffolded source rides inside the edit (escaped).
         assert!(json.contains("crate::theory! {"));
+        // cohesion findings are quick-fixes, never auto-applied.
+        assert!(json.contains("\"isPreferred\":false"));
+        assert!(!json.contains("\"isPreferred\":true"));
+    }
+
+    // ===== the placer's editor half: the bundle workbench ================================
+
+    // A WORKBENCH bundle: two features written into one theory with no structure
+    // decisions — a counter (zero/bump over sort A) and a flag (off/toggle over sort B).
+    // They share no sorts, so the placement is 2 net-disjoint components.
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum WSort {
+        A,
+        B,
+    }
+    struct Workbench;
+    fn zero(_: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, 0))
+    }
+    fn bump(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1 + 1))
+    }
+    fn off(_: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, 0))
+    }
+    fn toggle(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, 1 - v[0].1))
+    }
+    crate::theory! {
+        Workbench : "workbench", Value = (u8, i64), Obs = (u8, i64), Sort = WSort,
+        sort_of = |v: &(u8, i64)| if v.0 == 0 { WSort::A } else { WSort::B },
+        observe = |v: &(u8, i64)| *v,
+        vars { WSort::A => &["a", "b"], WSort::B => &["p", "q"], }
+        inhabit {
+            WSort::A => vec![(0, 0), (0, 1), (0, 2)],
+            WSort::B => vec![(1, 0), (1, 1)],
+        }
+        ops {
+            Nullary "zero"   "zero"   () -> WSort::A = zero;
+            Prefix  "bump"   "bump"   (WSort::A) -> WSort::A = bump;
+            Nullary "off"    "off"    () -> WSort::B = off;
+            Prefix  "toggle" "toggle" (WSort::B) -> WSort::B = toggle;
+        }
+    }
+
+    /// The autorouter's loop, end to end: the workbench bundle produces a PREFERRED
+    /// extraction (Information, not Hint — a derivation, not a suggestion), its edits
+    /// carry one scaffolded module per net-disjoint component with the right owners,
+    /// no seam obligation exists (the components share nothing), and `apply` writes
+    /// the files confined to the root.
+    #[test]
+    fn the_workbench_extraction_is_preferred_and_seamless() {
+        let finding = Architect::place::<Workbench>("src/workbench.rs", "src/workbench")
+            .expect("two net-disjoint features must place apart");
+        assert_eq!(finding.diagnostic.severity, Severity::Information);
+        assert_eq!(
+            finding.diagnostic.message,
+            "`workbench` places as 2 modules — the components share no nets, so the \
+             split is indisputable and lossless. Extract."
+        );
+        assert_eq!(
+            finding.action.title,
+            "Extract `workbench`'s 2 net-disjoint modules"
+        );
+        assert!(finding.action.preferred, "safe to apply unattended");
+
+        let scaffold = Scaffold::placement::<Workbench>().expect("unsettled");
+        assert!(scaffold.seams.is_empty(), "no nets shared, nothing crosses");
+        assert_eq!(scaffold.modules[0].operators, vec!["zero", "bump"]);
+        assert_eq!(scaffold.modules[1].operators, vec!["off", "toggle"]);
+        assert_eq!(finding.action.edits.len(), 2);
+        assert_eq!(finding.action.edits[0].path, "src/workbench/module0.rs");
+        assert!(finding.action.edits[0].contents.contains("\"bump\""));
+        assert!(!finding.action.edits[0].contents.contains("\"toggle\""));
+
+        // and the preferred flag reaches the wire.
+        let json = Architect::render_lsp(&[finding]);
+        assert!(json.contains("\"isPreferred\":true"));
+        assert!(json.contains("\"severity\":3"));
+
+        let finding = Architect::place::<Workbench>("src/workbench.rs", "src/workbench").unwrap();
+        let dir = std::env::temp_dir().join(format!("architect-place-{}", std::process::id()));
+        let written = Architect::apply(&finding.action, &dir).expect("write");
+        assert!(written.iter().all(|p| p.starts_with(&dir)));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A settled theory is SILENT to the placer — including the registry's own modules,
+    /// every one of which cohesion may still hint about. The two instruments disagree on
+    /// arithmetic by design: cohesion suggests a split (laws don't link `<` to `+`);
+    /// placement derives keep-whole (`Int` nets them together). The editor shows the
+    /// hint and withholds the auto-fix — exactly the derivation/suggestion line.
+    #[test]
+    fn settled_theories_are_silent_to_the_placer() {
+        assert!(Architect::place::<Arithmetic>("f", "d").is_none());
+        assert!(Architect::place::<Router>("f", "d").is_none());
+        assert!(Architect::place::<Calendar>("f", "d").is_none());
+        assert!(Scaffold::placement::<Arithmetic>().is_none());
+        // analyze() therefore carries cohesion findings only, none preferred.
+        assert!(Architect::analyze().iter().all(|f| !f.action.preferred));
     }
 
     /// DOGFOOD: the architect's own domain is a discovered algebra. Its report is a join-semilattice
@@ -650,6 +827,7 @@ mod tests {
         for bad in ["../escape.rs", "/etc/passwd"] {
             let action = CodeAction {
                 title: "x".to_string(),
+                preferred: false,
                 edits: vec![FileEdit {
                     path: bad.to_string(),
                     contents: "x".to_string(),
