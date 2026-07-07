@@ -60,13 +60,12 @@ it). Individually: `cargo fmt --all --check`, `cargo clippy --workspace --all-ta
   prose or equation in a second place.
 - The `system!` macro has two arms (compact and full-grammar); both must keep
   generating `modules()`, `seams()`, `cohesions()`, and `placements()`.
-- Commit messages: plain prose — what changed and why, a few sentences at most.
-  Mechanical changes (re-blesses, bumps, fmt) get one-liners. Do NOT imitate the older
-  high-voice style in `git log`; it predates this rule. The same goes for docs and doc
-  comments: state facts and constraints, skip aphorisms and rhetorical caps. Keep caps
-  only for the method's epistemic status words (a report SUGGESTS, a lock GATES, a
-  timeout is a DETECTION) — those are vocabulary, not emphasis. The toolchain is pinned
-  in `discover::gates::TOOLCHAIN`.
+- Prose is yours: write to your own taste, matching intensity to content — plain for
+  routine changes, and say more only when something genuinely earned it. The high
+  register in older `git log` entries and docs is history, not a style guide; don't
+  inherit it by imitation. One vocabulary is load-bearing, not stylistic: a report
+  SUGGESTS, a lock GATES, a timeout is a DETECTION. The toolchain is pinned in
+  `discover::gates::TOOLCHAIN`.
 - PRs land by SQUASH-MERGE — one commit per brick on main, and the belt for any
   branch-history rewrite. (Prose fallback: delete this line if the repo setting ever
   enforces squash-only.)
