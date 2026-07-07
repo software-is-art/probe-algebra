@@ -182,6 +182,41 @@ its recorded residuals. The items below predate that inventory:
    dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
    end-to-end net over the freeze's actual render.
 
+## From the field, fifth report (genesis as a greenfield contract generator)
+
+Delivered as a screenshot of another agent's session (a transpiler workitem —
+different org, different assistant; the project stays anonymous here, per house
+practice for field reports): genesis was pointed at a real declaration and
+driven to a compiling generated crate. The verdict — "usable as a greenfield contract
+generator, not yet as a clean drop-in"; "the system lock is exactly the kind of small
+public-contract review surface we wanted"; "do not vendor the generated crate
+wholesale — adapt the generated system.rs/locks pattern, and treat the generator gaps
+as follow-up improvements to probe-algebra." Those gaps, verbatim, with dispositions:
+
+1. *Generates a full crate layout, not an existing-module patch.* The migration-mode
+   gap — genesis as a PATCHER that emits theory impls, locks, and gates INTO an
+   existing tree instead of scaffolding a new one. The largest and realest item.
+2. *Value ownership by "first module that mentions it" is surprising.* Make ownership
+   declarative (an `owns` clause) and make the inference a stated, locked fact rather
+   than a silent heuristic.
+3. *Module names can collide with generated theory/value markers.* A generator
+   collision must be a NAMED REFUSAL at generation time, never a downstream rustc
+   error — the parser-as-gate discipline applied to genesis's own output.
+4. *`MEANING:` holes make it scaffolding, not migration.* Fold into (1): migration
+   mode should ADOPT an existing function as a meaning (`= path::to::fn`) instead of
+   emitting a hole where an implementation already lives.
+5. *The algebra is only meaningful with good contract values* (their `u8` stage
+   weights "proved mechanics, not [the domain's] semantics"). Partly documentation
+   (the carrier IS the contract), partly a possible instrument: a toy-carrier
+   advisory in the distance report when a theory's values are bare primitives.
+
+Converging ask from this repo's own operator, same week: genesis should also speak
+PROTOCOL — the `protocol!` states-as-sorts form (built; see `discover::protocol`)
+as a genesis declaration block, so a blank-slate system can declare a workflow's
+states and transitions and get the sort enums, the tagged values, the closure grid,
+and the target locks generated with meaning-holes only in the transition bodies.
+Together these are the genesis v2 work list.
+
 ## From the field, day zero (fire-drill consumed in production)
 
 The production CLI adoption consumed fire-drill untagged, same-day — and the crate's
