@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! agenda — the review router: the reading list DERIVED from which locks moved.
 //!
@@ -36,8 +35,8 @@ pub enum Ratification {
     Seams,
     /// A qualify census moved: the public surface changed — admit the new operators.
     Surface,
-    /// The tier census moved: the declared partition's distance from derived evidence
-    /// changed — a disagreement appeared, resolved, or a kernel decision was made.
+    /// The tier lock moved: a file's DERIVED tier changed — its structure carried it
+    /// through a door or out of reach — or a kernel decision was made.
     Partition,
     /// The pipeline moved (gates.spec / ci.yml): the promises or their execution
     /// changed — re-read what CI now claims.
@@ -72,8 +71,8 @@ impl Ratification {
                 "the public surface census moved — admit the new operators.".to_string()
             }
             Ratification::Partition => {
-                "the tier census moved — declared-vs-derived coherence changed; is the \
-                 movement intended?"
+                "the tier partition moved — a file's derived tier changed; is the new \
+                 placement intended?"
                     .to_string()
             }
             Ratification::Pipeline => {
@@ -170,7 +169,14 @@ impl Agenda {
     /// `build.rs` refusing at compile time). Registers and exports are exempt from the
     /// first — they are hand-authored inputs, not derived artifacts. `None` when the
     /// edit is unremarkable, because silence must stay free.
-    pub fn edit_guard(path: &str, source: &str) -> Option<String> {
+    ///
+    /// `kernel` is the CALLER's fact: registered kernel files are exempt from the
+    /// structural rules (the shim never refuses them), so the guard stays quiet on
+    /// them too — it pre-fires refusals, never invents stricter ones. Kernel-hood
+    /// comes from the ratified register (`spec/kernel.register`, matched by the hook
+    /// caller), never from anything in the file: a marker in the source grants
+    /// nothing to the build, so it grants nothing here.
+    pub fn edit_guard(path: &str, source: &str, kernel: bool) -> Option<String> {
         let mut lines = Vec::new();
         if !path.ends_with(".export") && !path.ends_with(".register") {
             match classify(path) {
@@ -185,13 +191,6 @@ impl Agenda {
                 )),
             }
         }
-        // KERNEL-tier files are exempt from the structural rules (the shim never
-        // refuses them), so the guard stays quiet too — it pre-fires refusals, it
-        // does not invent stricter ones.
-        let kernel = source
-            .lines()
-            .next()
-            .is_some_and(|l| l.contains("Tier: KERNEL"));
         if path.ends_with(".rs") && !kernel {
             for name in source.lines().filter_map(|l| {
                 l.strip_prefix("pub fn ")
@@ -223,6 +222,14 @@ enum Class {
 fn classify(path: &str) -> Result<Class, String> {
     let file = path.rsplit('/').next().unwrap_or(path);
     let theory = |suffix: &str| file.trim_end_matches(suffix).replace('-', " ").to_string();
+    // a register routes as its exception class WHEREVER it lives — `spec/kernel.register`
+    // included: it is a hand-authored ratification input whose justifications ARE the
+    // review, so it must not fall into the spec-directory unknown-class refusal below.
+    if file.ends_with(".register") {
+        return Ok(Class::Ratify(Ratification::Exceptions {
+            register: path.to_string(),
+        }));
+    }
     if path.contains("spec/") || path.starts_with("spec/") {
         return Ok(Class::Ratify(if file == "qualify.spec" {
             Ratification::Surface
@@ -264,11 +271,6 @@ fn classify(path: &str) -> Result<Class, String> {
             ));
         }));
     }
-    if file.ends_with(".register") {
-        return Ok(Class::Ratify(Ratification::Exceptions {
-            register: path.to_string(),
-        }));
-    }
     if path.ends_with("ci.yml") {
         return Ok(Class::Ratify(Ratification::Pipeline));
     }
@@ -296,6 +298,7 @@ mod probes {
             "spec/tiers.spec",
             ".github/workflows/ci.yml",
             "spec/gates.spec",
+            "spec/kernel.register",
             "lean/bites.register",
             "docs/roadmap.md",
             "tests/bridge.rs",
@@ -314,6 +317,11 @@ mod probes {
                 Ratification::Surface,
                 Ratification::Partition,
                 Ratification::Pipeline,
+                // a register routes as its exception class even INSIDE spec/ — the
+                // kernel register is a hand-authored input, never an unknown lock:
+                Ratification::Exceptions {
+                    register: "spec/kernel.register".to_string()
+                },
                 Ratification::Exceptions {
                     register: "lean/bites.register".to_string()
                 },
@@ -327,7 +335,7 @@ mod probes {
         );
         let text = agenda.render();
         assert!(text.starts_with(
-            "# review agenda — 7 ratification(s) required; 2 file(s) machinery-verified.\n"
+            "# review agenda — 8 ratification(s) required; 2 file(s) machinery-verified.\n"
         ));
         assert!(text.contains("`router`: the discovered laws moved"));
         assert!(text.contains("read for sense (prose, no lock question):\n- docs/roadmap.md\n"));
@@ -364,26 +372,32 @@ mod probes {
     /// as repo-relative — the Edit tool hands the hook absolute paths.
     #[test]
     fn the_edit_guard_prefires_only_existing_refusals() {
-        let g = Agenda::edit_guard("spec/router.spec", "").expect("a lock warns");
+        let g = Agenda::edit_guard("spec/router.spec", "", false).expect("a lock warns");
         assert!(g.contains("never hand-edit"), "{g}");
-        assert!(Agenda::edit_guard("/home/u/repo/spec/router.spec", "").is_some());
-        assert_eq!(Agenda::edit_guard("lean/bites.register", ""), None);
-        assert_eq!(Agenda::edit_guard("spec/bridged-bool.export", ""), None);
-        assert_eq!(Agenda::edit_guard("docs/roadmap.md", ""), None);
+        assert!(Agenda::edit_guard("/home/u/repo/spec/router.spec", "", false).is_some());
+        assert_eq!(Agenda::edit_guard("lean/bites.register", "", false), None);
+        assert_eq!(
+            Agenda::edit_guard("spec/bridged-bool.export", "", false),
+            None
+        );
+        assert_eq!(Agenda::edit_guard("docs/roadmap.md", "", false), None);
 
         let loose = "pub fn pipeline() -> Pipeline {\n    todo!()\n}\n";
-        let g = Agenda::edit_guard("src/gates.rs", loose).expect("a loose fn warns");
+        let g = Agenda::edit_guard("src/gates.rs", loose, false).expect("a loose fn warns");
         assert!(
             g.contains("`pub fn pipeline` is a loose public function"),
             "{g}"
         );
         let hung = "impl Ci {\n    pub fn pipeline() -> Pipeline { todo!() }\n}\n";
-        assert_eq!(Agenda::edit_guard("src/gates.rs", hung), None);
-        // a KERNEL-tier file is exempt from the shim, so the guard is silent on it.
-        let kernel = "//! Tier: KERNEL — the trusted floor.\npub fn shadow_grid() {}\n";
-        assert_eq!(Agenda::edit_guard("src/engine.rs", kernel), None);
+        assert_eq!(Agenda::edit_guard("src/gates.rs", hung, false), None);
+        // a REGISTERED kernel file is exempt from the shim, so the guard is silent on
+        // it — and only the register grants that: a `Tier: KERNEL` marker in the
+        // source is dead syntax.
+        assert_eq!(Agenda::edit_guard("src/engine.rs", loose, true), None);
+        let marker = "//! Tier: KERNEL — self-asserted; grants nothing.\npub fn shadow_grid() {}\n";
+        assert!(Agenda::edit_guard("src/engine.rs", marker, false).is_some());
 
-        let unknown = Agenda::edit_guard("spec/new.frobnicate", "").expect("unknown warns");
+        let unknown = Agenda::edit_guard("spec/new.frobnicate", "", false).expect("unknown warns");
         assert!(unknown.contains("no known class"), "{unknown}");
     }
 

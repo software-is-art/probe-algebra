@@ -66,6 +66,9 @@ trybuild = "1.0.117"
 serde_json = "1"
 
 [build-dependencies]
+# The kernel register's parser: build.rs feeds the enforcement's allowlist from
+# spec/kernel.register, so every exemption carries a ratified justification.
+spec-lock = { path = "spec-lock" }
 # The enforcement passes themselves (tier partition, boundary grammar, inward rule, capability
 # honesty, probe completeness, qualify census) — extracted so any crate's build.rs can attach the
 # same discipline. This repo's build.rs is now a thin shim over it; the KERNEL allowlist stays in

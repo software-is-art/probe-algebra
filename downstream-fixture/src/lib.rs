@@ -1,4 +1,5 @@
-//! Tier: KERNEL — the crate's trusted floor: the module roster and the macro re-export shim.
+//! The crate's trusted floor: the module roster and the macro re-export shim. KERNEL is
+//! a REGISTRATION in this crate's own build.rs, never an assertion in a file.
 //!
 //! # downstream-fixture — the consumer tutorial, as a crate that must keep compiling
 //!
@@ -26,16 +27,19 @@
 //! ## The pieces, and why each exists
 //!
 //! * **`build.rs`** — the enforcement shim: attaches `boundary-enforce` with THIS crate's own
-//!   kernel allowlist and its own drift-gated `spec/qualify.spec`. From then on every source
-//!   file must declare a `//! Tier:` marker and carry that tier's rules, exactly as in the
-//!   library's own tree.
-//! * **[`meter`]** (`Tier: BOUNDARY`) — the strict value-object surface: `Credits`, its validity
+//!   kernel allowlist and its own drift-gated `spec/qualify.spec` and `spec/tiers.spec`. Every
+//!   source file's tier is DERIVED from structure (reachability, doors, glue) and carries that
+//!   tier's rules, exactly as in the library's own tree.
+//! * **[`meter`]** (BOUNDARY — derived: pub-reachable, carries production edges) — the strict
+//!   value-object surface: `Credits`, its validity
 //!   rule, and the operator methods. The tier-1 grammar (no free functions, no public fields,
 //!   no I/O, primitives only as lone newtype fields) is enforced on it at build time.
-//! * **`internal`** (`Tier: INTERIOR`, private) — the workshop the boundary delegates to. The
+//! * **`internal`** (INTERIOR — derived: not pub-reachable) — the workshop the boundary
+//!   delegates to. The
 //!   inward rule holds here: no function returns a raw primitive, so a domain quantity cannot
 //!   leak out un-typed.
-//! * **[`ops`]** (`Tier: ALGEBRA`) — the minimal authoring path: `#[algebra]` over three
+//! * **[`ops`]** (ALGEBRA — derived: the reachable remainder) — the minimal authoring path:
+//!   `#[algebra]` over three
 //!   ordinary operator functions synthesises the whole discovery `Theory` (operator table,
 //!   sort, shadow-derived grid). Nothing about the algebra is declared; it is discovered by
 //!   running these functions.

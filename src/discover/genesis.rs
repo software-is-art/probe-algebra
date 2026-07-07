@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! genesis — the BLANK-SLATE layout generator: one compact declaration in, a whole crate
 //! layout out.
@@ -940,6 +939,11 @@ fn bless_env(name: &str) -> String {
     format!("BLESS_{}_QUALIFY", name.to_uppercase().replace('-', "_"))
 }
 
+/// The per-crate bless variable for the derived tier partition (`spec/tiers.spec`).
+fn bless_tiers_env(name: &str) -> String {
+    format!("BLESS_{}_TIERS", name.to_uppercase().replace('-', "_"))
+}
+
 /// Escape text for embedding inside a generated double-quoted string literal.
 fn esc_lit(s: &str) -> String {
     s.replace('\\', "\\\\")
@@ -1020,21 +1024,23 @@ fn emit_build_rs(sys: &SystemDecl) -> String {
 //!
 //! Two decisions live here and must live here:
 //!
-//! * **The kernel allowlist.** Claiming `Tier: KERNEL` exempts a file from every structural
-//!   rule, so it cannot be self-serve — the file must ALSO be named here, where admitting a
-//!   member is a reviewed diff in this crate's tree. The generated kernel is exactly
-//!   `src/lib.rs` (the module roster).
+//! * **The kernel allowlist.** KERNEL exempts a file from every structural rule, so it is a
+//!   RATIFICATION, never derived from the file itself — membership is named here, where
+//!   admitting a member is a reviewed diff in this crate's tree. The generated kernel is
+//!   exactly `src/lib.rs` (the module roster).
 //!
-//! * **The qualification census.** FIRST BUILD: run `@BLESS@=1 cargo build`
-//!   once to mint `spec/qualify.spec` — a missing lock is stale, never fresh, so an unblessed
-//!   tree refuses to build. From then on the census is drift-gated; regenerate with the same
-//!   variable and ratify the diff.
+//! * **The two censuses.** FIRST BUILD: run `@BLESS@=1 @BLESS_TIERS@=1 cargo build`
+//!   once to mint `spec/qualify.spec` (the algebra-qualification census) and
+//!   `spec/tiers.spec` (the DERIVED tier partition — reachability, doors, glue; no file
+//!   declares a tier) — a missing lock is stale, never fresh, so an unblessed tree refuses
+//!   to build. From then on both are drift-gated; regenerate with the same variables and
+//!   ratify the diff.
 
 use std::path::PathBuf;
 
 use boundary_enforce::{Config, Enforcement};
 
-/// The RATIFIED kernel of THIS crate — the only files allowed to declare `Tier: KERNEL`.
+/// The RATIFIED kernel of THIS crate — the only files the partition places in KERNEL.
 const KERNEL_ALLOWLIST: &[&str] = &["src/lib.rs"];
 
 fn main() {
@@ -1043,22 +1049,27 @@ fn main() {
     config.kernel_allowlist = KERNEL_ALLOWLIST.iter().map(|s| s.to_string()).collect();
     config.qualify_spec = Some(manifest.join("spec/qualify.spec"));
     config.bless_env = "@BLESS@".to_string();
+    config.tiers_spec = Some(manifest.join("spec/tiers.spec"));
+    config.tiers_bless_env = "@BLESS_TIERS@".to_string();
     Enforcement::enforce_or_panic(&config);
 }
 "#;
-    template.replace("@BLESS@", &bless_env(&sys.name))
+    template
+        .replace("@BLESS_TIERS@", &bless_tiers_env(&sys.name))
+        .replace("@BLESS@", &bless_env(&sys.name))
 }
 
 fn emit_lib_rs(sys: &SystemDecl) -> String {
     let mut out = String::from(
-        "//! Tier: KERNEL — the crate's trusted floor: the module roster, and nothing else.\n",
+        "//! The crate's trusted floor: the module roster, and nothing else. KERNEL is a\n\
+         //! REGISTRATION (this crate's build.rs names it), never an assertion in a file.\n",
     );
     out.push_str(&banner(&sys.name));
     out.push_str(&format!(
         "//!\n\
          //! # {name} — a crate whose layout was DERIVED from one declaration\n\
          //!\n\
-         //! Everything structural in this tree — the tier-marked files, the operator plumbing,\n\
+         //! Everything structural in this tree — the tiered layout, the operator plumbing,\n\
          //! the lock loop — was emitted by `genesis` from a single `system! {{ ... }}` declaration\n\
          //! that fits in a context window. The declaration→files translation was mechanical, so\n\
          //! reviewing THIS crate means reviewing meaning, not transcription.\n\
@@ -1091,15 +1102,17 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
          //!    predicates, interior operator bodies, constants, grid shapes, edge probes.\n",
     );
     out.push_str(&format!(
-        "//! 2. First build: `{bless}=1 cargo build` — mints `spec/qualify.spec`, which the\n\
-         //!    enforcement shim (`build.rs`) drift-gates from then on.\n\
+        "//! 2. First build: `{bless}=1 {bless_tiers}=1 cargo build` — mints `spec/qualify.spec`\n\
+         //!    and `spec/tiers.spec` (the derived tier partition), which the enforcement shim\n\
+         //!    (`build.rs`) drift-gates from then on.\n\
          //! 3. `cargo test` — the expectations gate names each module's DISTANCE from its\n\
          //!    declaration, and the freeze gate holds the LIVE discovered spec (module laws and\n\
          //!    the seam graph) against the TARGET locks; red means the meaning does not yet earn\n\
          //!    the declaration.\n\
          //! 4. `cargo run --example freeze` — regenerate the locks from discovery and read the\n\
          //!    diff against the targets. That diff IS the review: ratify it, or fix the meaning.\n",
-        bless = bless_env(&sys.name)
+        bless = bless_env(&sys.name),
+        bless_tiers = bless_tiers_env(&sys.name)
     ));
     out.push('\n');
     for m in &sys.modules {
@@ -1258,7 +1271,8 @@ fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
         .collect();
 
     let mut out = format!(
-        "//! Tier: BOUNDARY — `{m}`'s strict value-object surface (the tier-1 grammar).\n",
+        "//! `{m}`'s strict value-object surface — a DOOR by structure: its operator methods\n\
+         //! front the interior workshop, which derives this file BOUNDARY (the tier-1 grammar).\n",
         m = m.name
     );
     out.push_str(&banner(&sys.name));
@@ -1351,8 +1365,8 @@ fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
 
 fn emit_internal(sys: &SystemDecl, m: &ModuleDecl) -> String {
     let mut out = format!(
-        "//! Tier: INTERIOR — the workshop `{m}`'s boundary delegates to (the tier-2 inward\n\
-         //! rule holds: nothing here returns a raw primitive).\n",
+        "//! The workshop `{m}`'s boundary delegates to — not pub-reachable, deriving INTERIOR\n\
+         //! (the tier-2 inward rule holds: nothing here returns a raw primitive).\n",
         m = m.name
     );
     out.push_str(&banner(&sys.name));
@@ -1396,8 +1410,8 @@ fn emit_internal(sys: &SystemDecl, m: &ModuleDecl) -> String {
 
 fn emit_ops(sys: &SystemDecl) -> String {
     let mut out = String::from(
-        "//! Tier: ALGEBRA — the discovered-law layer: each declared module's operators, as the\n\
-         //! theory `#[algebra]` synthesises from ordinary function signatures.\n",
+        "//! The discovered-law layer: each declared module's operators, as the theory\n\
+         //! `#[algebra]` synthesises from ordinary function signatures.\n",
     );
     out.push_str(&banner(&sys.name));
     out.push_str(
@@ -1576,10 +1590,8 @@ fn emit_system(sys: &SystemDecl, declaration: &str) -> String {
         .filter(|s| s.kind == SeamKindDecl::Transform && s.via.is_none())
         .count();
 
-    let mut out = String::from(
-        "//! Tier: ALGEBRA — the compiled `system!` graph: ONE declaration, two lifecycle \
-         stages.\n",
-    );
+    let mut out =
+        String::from("//! The compiled `system!` graph: ONE declaration, two lifecycle stages.\n");
     out.push_str(&banner(&sys.name));
     out.push_str(
         "//!\n\
@@ -1813,7 +1825,7 @@ fn the_committed_specs_are_fresh() {
 }
 
 fn emit_gates_module(sys: &SystemDecl) -> String {
-    let template = r#"//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
+    let template = r#"//! A discovered-law / report layer (exempt from the inward rule).
 //!
 //! gates — THE PIPELINE IS A LOCK, the consumer form: this crate's CI is a declaration.
 //!

@@ -1,4 +1,3 @@
-//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
 //! Tests for the boundary algebra, exercised through the interpreter — the sole
 //! demonstration substrate. These import ONLY through `interp::boundary`, exactly as

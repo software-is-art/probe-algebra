@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! world — EFFECTS AS THEORIES, and the WORLD LOCK: the freeze discipline pointed outward.
 //!

@@ -1,4 +1,3 @@
-//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
 //!
 //! kvstore — a key-value store with TTL expiry: the crate's first STATEFUL domain.
 //!

@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! mutation — MUTATION TESTING AT THE ALGEBRA LEVEL: the spec's kill power, measured
 //! in-process.

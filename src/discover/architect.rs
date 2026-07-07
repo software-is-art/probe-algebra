@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! architect — the structure instruments as an EDITOR DEV TOOL: LSP-shaped diagnostics
 //! and code actions that scaffold the split.
@@ -557,7 +556,7 @@ mod tests {
         assert_eq!(date.diagnostic.file, "src/discover/date.rs");
         // the exact line of `crate::theory! {` in date.rs — pins the `i + 1` line math.
         assert_eq!(
-            date.diagnostic.line, 58,
+            date.diagnostic.line, 57,
             "should locate the theory! declaration"
         );
     }

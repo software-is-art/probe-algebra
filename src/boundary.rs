@@ -1,4 +1,3 @@
-//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
 //! boundary.rs — the GRAMMAR of module boundaries.
 //!

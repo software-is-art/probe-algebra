@@ -1,4 +1,4 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
+//! A discovered-law / report layer (exempt from the inward rule).
 //!
 //! gates — THE PIPELINE IS A LOCK, the consumer form: this crate's CI is a declaration.
 //!

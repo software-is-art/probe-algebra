@@ -1,6 +1,11 @@
 //! The rule inventory, as executable spec: one tiny source-tree fixture per rule, asserting the
 //! rule FIRES on the offending shape and stays silent on the clean one. A consumer can read this
 //! file top-to-bottom as the list of what `boundary-enforce` will reject.
+//!
+//! No fixture declares a tier — there is nothing to declare. Each earns its place the way a real
+//! tree does: a `src/lib.rs` root and `pub mod` chains make a file reachable, a production edge
+//! impl or a fronting reference makes it a BOUNDARY, unreachability makes it INTERIOR, and the
+//! reachable remainder is ALGEBRA. KERNEL never appears without a `kernel_allowlist` entry.
 
 use std::path::PathBuf;
 
@@ -36,52 +41,72 @@ fn assert_fires(violations: &[String], needle: &str) {
     );
 }
 
-// ===== the total partition: every file names its tier ====================
-
-#[test]
-fn missing_tier_is_a_build_error() {
-    let vs = violations("missing-tier", &[("src/lib.rs", "pub struct Foo;\n")]);
-    assert_fires(&vs, "no `Tier:` declaration");
+/// A reachable BOUNDARY fixture: root and glue wire `src/domain/boundary.rs` into the pub tree,
+/// and an appended probed production edge is the door evidence that derives the file BOUNDARY —
+/// so each test's `body` is judged under the tier-1 grammar.
+fn boundary_violations(name: &str, body: &str) -> Vec<String> {
+    let contents = format!(
+        "{body}pub struct DoorEdge;\nimpl Morphism for DoorEdge {{}}\nimpl Probed for DoorEdge {{}}\n"
+    );
+    violations(
+        name,
+        &[
+            ("src/lib.rs", "pub mod domain;\n"),
+            ("src/domain/mod.rs", "pub mod boundary;\n"),
+            ("src/domain/boundary.rs", &contents),
+        ],
+    )
 }
 
+// ===== the partition is total by DERIVATION ================================
+
 #[test]
-fn tier_in_a_plain_comment_does_not_count() {
-    // only `//!` module-doc lines can declare (or spoof) a tier — a `//` code comment cannot.
+fn an_unmarked_file_is_judged_by_derivation() {
+    // no marker, no registration — the file exists, so it HAS a tier: unreachable from the
+    // root, it derives INTERIOR, and the inward rule fires. Nothing can opt out by silence.
     let vs = violations(
-        "plain-comment-tier",
-        &[(
-            "src/lib.rs",
-            "// Tier: INTERIOR — not a module-doc line\npub struct Foo;\n",
-        )],
+        "derived-interior",
+        &[
+            ("src/lib.rs", "mod helper;\n"),
+            (
+                "src/helper.rs",
+                "pub(crate) fn render() -> String { String::new() }\n",
+            ),
+        ],
     );
-    assert_fires(&vs, "no `Tier:` declaration");
+    assert_fires(&vs, "`render` returns a raw `String`");
 }
 
-// ===== KERNEL: exemption must be ratified in the consumer's build.rs =====
-
 #[test]
-fn unratified_kernel_is_a_violation() {
+fn a_tier_marker_grants_nothing() {
+    // the old `//! Tier:` markers are dead syntax: a self-asserted KERNEL is judged like any
+    // other file (here: reachable, no edges, fronts nothing — ALGEBRA, where a loose pub fn
+    // still fires).
     let vs = violations(
-        "unratified-kernel",
-        &[(
-            "src/lib.rs",
-            "//! Tier: KERNEL — self-asserted, not allowlisted.\n",
-        )],
+        "marker-is-inert",
+        &[
+            ("src/lib.rs", "pub mod tool;\n"),
+            (
+                "src/tool.rs",
+                "//! Tier: KERNEL — self-asserted; the marker is dead syntax.\n\
+                 pub fn is_set(f: i64) -> bool { f > 0 }\n",
+            ),
+        ],
     );
-    assert_fires(
-        &vs,
-        "declares `Tier: KERNEL` but is not in KERNEL_ALLOWLIST",
-    );
+    assert_fires(&vs, "`pub fn is_set` is a LOOSE public function");
 }
 
+// ===== KERNEL: a register decision, never derived ==========================
+
 #[test]
-fn allowlisted_kernel_is_exempt_from_every_rule() {
+fn kernel_comes_only_from_the_ratified_register() {
     let mut config = fixture(
         "ratified-kernel",
         &[(
             "src/lib.rs",
-            // would violate BOUNDARY/INTERIOR rules — but a ratified kernel is exempt.
-            "//! Tier: KERNEL — the trusted floor.\npub fn raw() -> String { std::fs::read_to_string(\"x\").unwrap() }\n",
+            // would violate ALGEBRA rules (loose pub fn, undeclared effect) — but the
+            // registered kernel is exempt from every structural rule.
+            "pub fn raw() -> String { std::fs::read_to_string(\"x\").unwrap() }\n",
         )],
     );
     config.kernel_allowlist = vec!["src/lib.rs".to_string()];
@@ -89,21 +114,45 @@ fn allowlisted_kernel_is_exempt_from_every_rule() {
     assert!(e.violations.is_empty(), "got: {:#?}", e.violations);
 }
 
+#[test]
+fn an_unregistered_file_gets_no_exemption() {
+    // the same tree WITHOUT the register entry: the root derives ALGEBRA and both the
+    // capability-honesty and no-rats-nest rules fire.
+    let vs = violations(
+        "unregistered-kernel",
+        &[(
+            "src/lib.rs",
+            "pub fn raw() -> String { std::fs::read_to_string(\"x\").unwrap() }\n",
+        )],
+    );
+    assert_fires(
+        &vs,
+        "touches the world (`std::fs`) but declares no capability",
+    );
+    assert_fires(&vs, "`pub fn raw` is a LOOSE public function");
+}
+
+#[test]
+fn a_stale_kernel_registration_is_a_violation() {
+    // a register line for a file that no longer exists is a stale ratification — refused,
+    // never silently ignored.
+    let mut config = fixture("stale-register", &[("src/lib.rs", "pub struct Foo;\n")]);
+    config.kernel_allowlist = vec!["src/ghost.rs".to_string()];
+    let vs = Enforcement::run(&config).violations;
+    assert_fires(&vs, "registered as KERNEL but no such file exists");
+}
+
 // ===== BOUNDARY: the strict tier-1 grammar ================================
 
 #[test]
 fn boundary_bans_free_fns_statics_submodules_and_traits() {
-    let vs = violations(
+    let vs = boundary_violations(
         "boundary-items",
-        &[(
-            "src/domain/boundary.rs",
-            "//! Tier: BOUNDARY — the value-object surface.\n\
-             pub struct Ok1(String);\n\
-             pub fn loose() -> Ok1 { Ok1(String::new()) }\n\
-             static COUNT: i64 = 0;\n\
-             mod inner {}\n\
-             pub trait Sneaky {}\n",
-        )],
+        "pub struct Ok1(String);\n\
+         pub fn loose() -> Ok1 { Ok1(String::new()) }\n\
+         static COUNT: i64 = 0;\n\
+         mod inner {}\n\
+         pub trait Sneaky {}\n",
     );
     assert_fires(&vs, "free function `loose`");
     assert_fires(&vs, "`static COUNT` — a boundary may not hold global state");
@@ -113,15 +162,11 @@ fn boundary_bans_free_fns_statics_submodules_and_traits() {
 
 #[test]
 fn boundary_field_purity_public_and_raw_primitive_fields() {
-    let vs = violations(
+    let vs = boundary_violations(
         "boundary-fields",
-        &[(
-            "src/domain/boundary.rs",
-            "//! Tier: BOUNDARY — the value-object surface.\n\
-             pub struct Leaky { pub name: Ident }\n\
-             pub struct Downgraded { table: std::collections::BTreeMap<String, Ident> }\n\
-             pub struct Ident(String); // the sanctioned newtype wrapper\n",
-        )],
+        "pub struct Leaky { pub name: Ident }\n\
+         pub struct Downgraded { table: std::collections::BTreeMap<String, Ident> }\n\
+         pub struct Ident(String); // the sanctioned newtype wrapper\n",
     );
     assert_fires(&vs, "`Leaky` has a public field");
     assert_fires(&vs, "`Downgraded` has a field containing raw `String`");
@@ -136,15 +181,11 @@ fn boundary_field_purity_public_and_raw_primitive_fields() {
 fn boundary_effect_via_use_import_is_not_an_evasion() {
     // `use std::fs;` then `fs::write(…)` — no two-segment `std::fs` window in any path, so a
     // naive path scan misses it; the import map must close the loophole.
-    let vs = violations(
+    let vs = boundary_violations(
         "boundary-use-evasion",
-        &[(
-            "src/domain/boundary.rs",
-            "//! Tier: BOUNDARY — the value-object surface.\n\
-             use std::fs;\n\
-             pub struct Saver;\n\
-             impl Saver { pub fn save(&self) { fs::write(\"out\", \"data\").unwrap(); } }\n",
-        )],
+        "use std::fs;\n\
+         pub struct Saver;\n\
+         impl Saver { pub fn save(&self) { fs::write(\"out\", \"data\").unwrap(); } }\n",
     );
     assert_fires(
         &vs,
@@ -155,32 +196,24 @@ fn boundary_effect_via_use_import_is_not_an_evasion() {
 #[test]
 fn boundary_effect_smuggled_in_macro_tokens_is_caught() {
     // a macro's tokens are unparsed — the path visitor never sees them; the token scan must.
-    let vs = violations(
+    let vs = boundary_violations(
         "boundary-macro-tokens",
-        &[(
-            "src/domain/boundary.rs",
-            "//! Tier: BOUNDARY — the value-object surface.\n\
-             pub struct Sneaky;\n\
-             impl Sneaky { pub fn go(&self) { some_macro!(std::fs::write(\"out\", \"data\")); } }\n",
-        )],
+        "pub struct Sneaky;\n\
+         impl Sneaky { pub fn go(&self) { some_macro!(std::fs::write(\"out\", \"data\")); } }\n",
     );
     assert_fires(&vs, "`some_macro!` carries `std::fs` in its tokens");
 }
 
 #[test]
 fn boundary_bans_unsafe_in_all_three_keyword_positions() {
-    let vs = violations(
+    let vs = boundary_violations(
         "boundary-unsafe",
-        &[(
-            "src/domain/boundary.rs",
-            "//! Tier: BOUNDARY — the value-object surface.\n\
-             pub struct Foo;\n\
-             impl Foo {\n\
-                 pub unsafe fn dance(&self) {}\n\
-                 pub fn block(&self) { unsafe { std::ptr::null::<Foo>(); } }\n\
-             }\n\
-             unsafe impl Send for Foo {}\n",
-        )],
+        "pub struct Foo;\n\
+         impl Foo {\n\
+             pub unsafe fn dance(&self) {}\n\
+             pub fn block(&self) { unsafe { std::ptr::null::<Foo>(); } }\n\
+         }\n\
+         unsafe impl Send for Foo {}\n",
     );
     assert_fires(&vs, "`unsafe fn dance` — boundaries are safe code");
     assert_fires(&vs, "`unsafe` block — boundaries are safe code");
@@ -189,17 +222,32 @@ fn boundary_bans_unsafe_in_all_three_keyword_positions() {
 
 #[test]
 fn boundary_bans_printing_macros_and_reexports() {
-    let vs = violations(
+    let vs = boundary_violations(
         "boundary-print-reexport",
-        &[(
-            "src/domain/boundary.rs",
-            "//! Tier: BOUNDARY — the value-object surface.\n\
-             pub use crate::other::Thing;\n\
-             pub struct Foo;\n\
-             impl Foo { pub fn shout(&self) { println!(\"hi\"); } }\n",
-        )],
+        "pub use crate::other::Thing;\n\
+         pub struct Foo;\n\
+         impl Foo { pub fn shout(&self) { println!(\"hi\"); } }\n",
     );
     assert_fires(&vs, "re-export (`pub use`)");
+    assert_fires(&vs, "`println!` — a boundary performs no I/O");
+}
+
+#[test]
+fn a_fronting_file_is_held_to_the_boundary_grammar() {
+    // no edge impls anywhere: the file derives BOUNDARY purely by FRONTING an interior
+    // sibling (the tier-2 relation read backwards) — and the tier-1 grammar then applies.
+    let vs = violations(
+        "fronting-door",
+        &[
+            ("src/lib.rs", "pub mod door;\nmod inner_work;\n"),
+            ("src/inner_work.rs", "pub(crate) fn helper() {}\n"),
+            (
+                "src/door.rs",
+                "pub struct Door;\n\
+                 impl Door { pub fn go(&self) { crate::inner_work::helper(); println!(\"hi\"); } }\n",
+            ),
+        ],
+    );
     assert_fires(&vs, "`println!` — a boundary performs no I/O");
 }
 
@@ -209,11 +257,13 @@ fn boundary_bans_printing_macros_and_reexports() {
 fn interior_inward_rule_no_raw_primitive_returns() {
     let vs = violations(
         "interior-inward",
-        &[(
-            "src/domain/internal.rs",
-            "//! Tier: INTERIOR — the workshop.\n\
-             pub(crate) fn render() -> String { String::new() }\n",
-        )],
+        &[
+            ("src/lib.rs", "mod internal;\n"),
+            (
+                "src/internal.rs",
+                "pub(crate) fn render() -> String { String::new() }\n",
+            ),
+        ],
     );
     assert_fires(&vs, "`render` returns a raw `String`");
 }
@@ -223,12 +273,14 @@ fn interior_loose_pub_fn_is_a_rats_nest() {
     // `bool` return disqualifies the operator shape, and full `pub` makes it loose plumbing.
     let vs = violations(
         "interior-loose-pub",
-        &[(
-            "src/domain/internal.rs",
-            "//! Tier: INTERIOR — the workshop.\n\
-             pub struct Flag;\n\
-             pub fn is_set(f: Flag) -> bool { let _ = f; true }\n",
-        )],
+        &[
+            ("src/lib.rs", "mod internal;\n"),
+            (
+                "src/internal.rs",
+                "pub struct Flag;\n\
+                 pub fn is_set(f: Flag) -> bool { let _ = f; true }\n",
+            ),
+        ],
     );
     assert_fires(&vs, "`pub fn is_set` is a LOOSE public function");
 }
@@ -237,12 +289,14 @@ fn interior_loose_pub_fn_is_a_rats_nest() {
 fn operator_shaped_pub_fn_is_attached_not_loose() {
     let e = Enforcement::run(&fixture(
         "interior-operator-ok",
-        &[(
-            "src/domain/internal.rs",
-            "//! Tier: INTERIOR — the workshop.\n\
-             pub struct Tri;\n\
-             pub fn join(a: Tri, b: Tri) -> Tri { let _ = b; a }\n",
-        )],
+        &[
+            ("src/lib.rs", "mod internal;\n"),
+            (
+                "src/internal.rs",
+                "pub struct Tri;\n\
+                 pub fn join(a: Tri, b: Tri) -> Tri { let _ = b; a }\n",
+            ),
+        ],
     ));
     assert!(e.violations.is_empty(), "got: {:#?}", e.violations);
     // and the same shape is what the census counts:
@@ -260,11 +314,13 @@ fn operator_shaped_pub_fn_is_attached_not_loose() {
 fn algebra_undeclared_world_touch_is_a_violation() {
     let vs = violations(
         "algebra-undeclared-effect",
-        &[(
-            "src/report.rs",
-            "//! Tier: ALGEBRA — a report layer.\n\
-             fn slurp() -> Source { Source::from(std::fs::read_to_string(\"x\").unwrap()) }\n",
-        )],
+        &[
+            ("src/lib.rs", "pub mod report;\n"),
+            (
+                "src/report.rs",
+                "fn slurp() -> Source { Source::from(std::fs::read_to_string(\"x\").unwrap()) }\n",
+            ),
+        ],
     );
     assert_fires(
         &vs,
@@ -276,12 +332,14 @@ fn algebra_undeclared_world_touch_is_a_violation() {
 fn algebra_malformed_capability_line_is_decoration_not_contract() {
     let vs = violations(
         "algebra-malformed-capability",
-        &[(
-            "src/report.rs",
-            "//! Tier: ALGEBRA — a report layer.\n\
-             /// Capability: whatever\n\
-             fn slurp() -> Source { Source::from(std::fs::read_to_string(\"x\").unwrap()) }\n",
-        )],
+        &[
+            ("src/lib.rs", "pub mod report;\n"),
+            (
+                "src/report.rs",
+                "/// Capability: whatever\n\
+                 fn slurp() -> Source { Source::from(std::fs::read_to_string(\"x\").unwrap()) }\n",
+            ),
+        ],
     );
     assert_fires(
         &vs,
@@ -293,12 +351,14 @@ fn algebra_malformed_capability_line_is_decoration_not_contract() {
 fn algebra_declared_capability_makes_the_effect_an_honest_edge() {
     let e = Enforcement::run(&fixture(
         "algebra-declared-capability",
-        &[(
-            "src/report.rs",
-            "//! Tier: ALGEBRA — a report layer.\n\
-             /// Capability: Effectful — reads the source tree.\n\
-             fn slurp() -> Source { Source::from(std::fs::read_to_string(\"x\").unwrap()) }\n",
-        )],
+        &[
+            ("src/lib.rs", "pub mod report;\n"),
+            (
+                "src/report.rs",
+                "/// Capability: Effectful — reads the source tree.\n\
+                 fn slurp() -> Source { Source::from(std::fs::read_to_string(\"x\").unwrap()) }\n",
+            ),
+        ],
     ));
     assert!(e.violations.is_empty(), "got: {:#?}", e.violations);
 }
@@ -307,12 +367,13 @@ fn algebra_declared_capability_makes_the_effect_an_honest_edge() {
 
 #[test]
 fn concrete_edge_without_probe_is_a_violation() {
+    // probe completeness is checked over EVERY file, whatever its tier — here an
+    // unreachable (INTERIOR-derived) one.
     let vs = violations(
         "edge-no-probe",
         &[(
             "src/domain/internal.rs",
-            "//! Tier: INTERIOR — the workshop.\n\
-             pub struct Halve;\n\
+            "pub struct Halve;\n\
              impl Morphism for Halve {}\n",
         )],
     );
@@ -325,8 +386,7 @@ fn probed_edge_and_generic_combinator_pass() {
         "edge-probed",
         &[(
             "src/domain/internal.rs",
-            "//! Tier: INTERIOR — the workshop.\n\
-             pub struct Halve;\n\
+            "pub struct Halve;\n\
              impl Morphism for Halve {}\n\
              impl Probed for Halve {}\n\
              pub struct Compose<F, G>(F, G);\n\
@@ -345,8 +405,7 @@ fn census_drifts_then_blesses_then_holds() {
     let spec_rel = "spec/qualify.spec";
     let algebra_file = (
         "src/domain/internal.rs",
-        "//! Tier: INTERIOR — the workshop.\n\
-         pub struct Tri;\n\
+        "pub struct Tri;\n\
          pub fn meet(a: Tri, b: Tri) -> Tri { let _ = b; a }\n",
     );
     let mut config = fixture("census-drift", &[algebra_file]);
@@ -392,22 +451,18 @@ fn a_disciplined_tree_passes_all_passes() {
     let mut config = fixture(
         "clean-tree",
         &[
-            (
-                "src/lib.rs",
-                "//! Tier: KERNEL — the crate root.\npub mod domain;\n",
-            ),
+            ("src/lib.rs", "pub mod domain;\n"),
+            ("src/domain/mod.rs", "pub mod boundary;\nmod internal;\n"),
             (
                 "src/domain/boundary.rs",
-                "//! Tier: BOUNDARY — the value-object surface.\n\
-                 pub struct Ident(String);\n\
+                "pub struct Ident(String);\n\
                  pub struct Halve;\n\
                  impl Morphism for Halve {}\n\
                  impl Probed for Halve {}\n",
             ),
             (
                 "src/domain/internal.rs",
-                "//! Tier: INTERIOR — the workshop.\n\
-                 pub struct Ident2;\n\
+                "pub struct Ident2;\n\
                  pub(crate) fn intern(raw: Ident2) -> Ident2 { raw }\n",
             ),
         ],
@@ -427,75 +482,82 @@ fn a_disciplined_tree_passes_all_passes() {
         .any(|p| p.ends_with(PathBuf::from("src/domain/boundary.rs"))));
 }
 
-// ===== the tier census: the declared partition vs derived evidence ========
+// ===== the tier lock: the derived partition, frozen ========================
 
 #[test]
-fn the_tier_census_derives_and_records_coherence() {
-    let config = fixture(
-        "tier-census",
+fn the_tier_partition_derives_every_file() {
+    // one file per kind of evidence: a registered kernel, glue, an edge-carrying door, a
+    // fronting door, the plain reachable remainder, and an unreachable interior.
+    let mut config = fixture(
+        "tier-partition",
         &[
             (
                 "src/lib.rs",
-                "//! Tier: KERNEL — floor\npub mod api;\npub mod report;\npub mod rogue;\npub mod hub;\npub mod front;\nmod internal;\n",
+                "pub mod api;\npub mod report;\npub mod rogue;\npub mod hub;\npub mod front;\nmod internal;\n",
             ),
             (
                 "src/hub.rs",
-                "//! Tier: ALGEBRA — glue\npub mod nothing_here;\npub use crate::api::Credit;\n",
+                "pub mod nothing_here;\npub use crate::api::Credit;\n",
             ),
             (
                 "src/api.rs",
-                "//! Tier: BOUNDARY — surface\npub struct Credit;\nimpl Construction for Credit { }\n",
+                "pub struct Credit;\nimpl Construction for Credit { }\n",
             ),
-            (
-                "src/report.rs",
-                "//! Tier: ALGEBRA — report\npub fn render() -> i64 { 1 }\n",
-            ),
-            (
-                "src/internal.rs",
-                "//! Tier: INTERIOR — workshop\nfn helper() {}\n",
-            ),
+            ("src/report.rs", "pub fn render() -> i64 { 1 }\n"),
+            ("src/internal.rs", "fn helper() {}\n"),
             (
                 "src/front.rs",
-                "//! Tier: BOUNDARY — fronts the workshop\npub struct Door;\nimpl Door { pub fn go(&self) { crate::internal::helper() } }\n",
+                "pub struct Door;\nimpl Door { pub fn go(&self) { crate::internal::helper() } }\n",
             ),
-            (
-                "src/rogue.rs",
-                "//! Tier: INTERIOR — misdeclared: pub-reachable cannot be interior\npub fn misc() -> i64 { 2 }\n",
-            ),
+            ("src/rogue.rs", "pub fn misc() -> i64 { 2 }\n"),
         ],
     );
+    config.kernel_allowlist = vec!["src/lib.rs".to_string()];
     let census = Enforcement::run(&config).tiers_census;
     assert!(
-        census.contains("# 7 files: 5 agree, 1 disagree, 1 kernel decisions."),
+        census.contains("# 7 files: 2 boundary, 1 interior, 3 algebra, 1 kernel."),
         "{census}"
     );
-    assert!(census.contains(
-        "src/front.rs: declared BOUNDARY; derived BOUNDARY (pub-reachable, fronts an interior sibling) — agree"
-    ));
-    assert!(census.contains(
-        "src/api.rs: declared BOUNDARY; derived BOUNDARY (pub-reachable, carries production edges) — agree"
-    ));
-    assert!(census
-        .contains("src/hub.rs: declared ALGEBRA — glue (module declarations and re-exports only,"));
-    assert!(census.contains(
-        "src/internal.rs: declared INTERIOR; derived INTERIOR (not pub-reachable) — agree"
-    ));
-    assert!(census.contains(
-        "src/rogue.rs: declared INTERIOR; derived ALGEBRA (pub-reachable, no production edges, fronts nothing) — DISAGREES"
-    ));
-    assert!(census.contains("src/lib.rs: declared KERNEL — a decision"));
+    assert!(
+        census.contains("- src/api.rs: BOUNDARY (pub-reachable, carries production edges)"),
+        "{census}"
+    );
+    assert!(
+        census.contains("- src/front.rs: BOUNDARY (pub-reachable, fronts an interior sibling)"),
+        "{census}"
+    );
+    assert!(
+        census.contains(
+            "- src/hub.rs: ALGEBRA (glue — module declarations and re-exports only; tier by reachability)"
+        ),
+        "{census}"
+    );
+    assert!(
+        census.contains("- src/internal.rs: INTERIOR (not pub-reachable)"),
+        "{census}"
+    );
+    assert!(
+        census.contains(
+            "- src/rogue.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)"
+        ),
+        "{census}"
+    );
+    assert!(
+        census.contains("- src/lib.rs: KERNEL (registered — a decision, never derived)"),
+        "{census}"
+    );
 }
 
 #[test]
 fn a_stale_tier_census_is_a_violation() {
-    let mut config = fixture(
-        "tier-census-stale",
-        &[("src/lib.rs", "//! Tier: KERNEL — floor\n")],
-    );
+    let mut config = fixture("tier-census-stale", &[("src/lib.rs", "pub struct Foo;\n")]);
     let spec = config.manifest_dir.join("spec/tiers.spec");
     std::fs::create_dir_all(spec.parent().unwrap()).unwrap();
     std::fs::write(&spec, "old\n").unwrap();
     config.tiers_spec = Some(spec);
+    // a per-test bless variable, so a real BLESS_TIERS in the environment can't flip this
+    // into a bless run:
+    config.tiers_bless_env = "BLESS_TIERS_ENFORCE_TEST".to_string();
     let vs = Enforcement::run(&config).violations;
     assert_fires(&vs, "the tier census drifted");
 }

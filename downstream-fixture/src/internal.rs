@@ -1,4 +1,5 @@
-//! Tier: INTERIOR — the workshop the boundary delegates to (the tier-2 inward rule).
+//! The workshop the boundary delegates to — INTERIOR by derivation: not pub-reachable
+//! (`mod internal`, never `pub mod`), so the tier-2 inward rule holds here.
 //!
 //! internal — the credit meter's arithmetic, in ordinary imperative Rust.
 //!

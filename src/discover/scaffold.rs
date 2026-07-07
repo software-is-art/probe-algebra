@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! scaffold — turn a cohesion SUGGESTION into the SPLIT: emit one `theory!` sub-module per latent
 //! component, plus the seam obligation that keeps the split honest.

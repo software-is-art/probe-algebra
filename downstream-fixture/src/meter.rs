@@ -1,12 +1,13 @@
-//! Tier: BOUNDARY — this domain's strict value-object surface (the tier-1 grammar).
+//! This domain's strict value-object surface — BOUNDARY by derivation (the tier-1 grammar).
 //!
 //! meter — the credit meter's one value object, `Credits`, and its operator methods.
 //!
-//! Declaring `Tier: BOUNDARY` subjects this file to the full tier-1 grammar from our own
-//! `build.rs`: no free functions, no public fields, no submodules, no re-exports, no I/O, no
+//! Nothing here declares a tier: this file is pub-reachable and carries production edges,
+//! which DERIVES it BOUNDARY and subjects it to the full tier-1 grammar from our own
+//! `build.rs` — no free functions, no public fields, no submodules, no re-exports, no I/O, no
 //! `unsafe`, and a raw primitive may appear only as the lone field of a newtype wrapper —
 //! exactly the discipline the library enforces on its own `kvstore::store`. Boundary-hood is
-//! the declared tier plus the enforced shape, not a filename.
+//! derived structure plus the enforced shape, not a filename.
 //!
 //! CONSUMER NOTE: this fixture originally surfaced the finding that the citizen macros and
 //! edge traits were sealed shut to downstream crates. That is fixed — `boundary::citizen`

@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! The TTL store's algebra, as a `Theory` — the first STATEFUL domain handed to the
 //! discovery engine, to test whether "the spec falls out of running the operators"

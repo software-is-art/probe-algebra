@@ -1,4 +1,3 @@
-//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
 //! gdp — "Ghosts of Departed Proofs" (Noonan 2018) via mononym's technique, hand-rolled (no
 //! dependency): unique TYPE-LEVEL names plus proofs phrased about a named value.

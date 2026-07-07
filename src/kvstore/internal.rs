@@ -1,4 +1,3 @@
-//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
 //!
 //! internal — PRIVATE implementation of the store: entry storage, lookup, the expiry
 //! sweep, and the right-biased merge. Other modules cannot name anything here.

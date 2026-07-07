@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! gates — THE PIPELINE IS A LOCK: CI/CD subsumed into the declaration discipline.
 //!

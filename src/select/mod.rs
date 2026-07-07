@@ -1,4 +1,3 @@
-//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
 //!
 //! select — the kill-matrix selector, brought under the boundary discipline it serves.
 //!

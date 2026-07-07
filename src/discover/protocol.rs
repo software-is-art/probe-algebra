@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! protocol — TYPESTATES AS SORTS: the `protocol!` demonstration, and the executable
 //! answer to the bag of booleans.

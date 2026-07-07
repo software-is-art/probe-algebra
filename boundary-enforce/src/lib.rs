@@ -1,20 +1,27 @@
-//! Build-time enforcement of the boundary discipline, over an EXPLICIT, TOTAL partition —
+//! Build-time enforcement of the boundary discipline, over a DERIVED, TOTAL partition —
 //! extracted from `probe-algebra`'s build script so ANY crate can attach the same discipline
 //! from its own `build.rs`.
 //!
 //! A boundary is a CATEGORY: value-object OBJECTS and value-operator MORPHISMS
 //! (`Morphism` / `Construction` / `Branch` / `Guarded`), with typestates as object INDICES.
 //!
-//! Every source file declares its place in the partition with a `//! Tier: <NAME>` marker in its
-//! header — there is no silent exemption. A new module that names no tier is a BUILD ERROR, so the
-//! partition stays total and the choice is ratified in the diff. The four tiers, and what each
+//! No source file declares its tier — the partition is COMPUTED from structure, so it is total
+//! by construction: a new module is categorized the moment it exists, and nothing can opt out
+//! by silence. The derivation (see `derive_partition`): INTERIOR is non-pub reachability from
+//! the crate roots; BOUNDARY is being a DOOR — carrying production edge impls, or FRONTING an
+//! interior sibling (delegating into a non-reachable module in its own directory: the tier-2
+//! relation read backwards); ALGEBRA is the reachable remainder; pure glue (module declarations
+//! and re-exports only) takes its reachability's tier. The one tier that is a DECISION rather
+//! than evidence is KERNEL, and it is ratified, never inferred. The four tiers, and what each
 //! enforces:
 //!
 //! * **KERNEL** — the trusted floor: it DEFINES and RUNS the format, so it is exempt from the
-//!   structural rules — but it is NAMED, not silently skipped. Claiming kernel-hood claims
-//!   exemption from every other rule, so it cannot be self-serve: the file must ALSO be on the
-//!   consumer's [`Config::kernel_allowlist`], which lives in the consumer's OWN `build.rs` — every
-//!   new kernel member is a reviewed diff in the consumer's tree, ratified, not asserted.
+//!   structural rules — but it is NAMED, not silently skipped. Kernel-hood exempts a file from
+//!   every other rule, so it cannot be self-serve or derived from conduct: the file must be on
+//!   the consumer's [`Config::kernel_allowlist`], fed from the consumer's OWN `build.rs` — every
+//!   new kernel member is a reviewed diff in the consumer's tree (in `probe-algebra`, a
+//!   justified line in `spec/kernel.register`). A registered file that no longer exists is a
+//!   stale ratification, refused.
 //!
 //! * **BOUNDARY** — a domain's strict value-object surface: TIER 1. May contain ONLY value
 //!   objects, typestates, and value operators — no free functions, global state, submodules,
@@ -42,10 +49,13 @@
 //! * **Edge-probe completeness** (every file): each concrete, non-test `impl` of
 //!   `Morphism`/`Construction`/`Branch`/`Guarded` must have a matching `impl Probed`.
 //!
-//! Finally, the **qualification census**: boundary-hood as a COMPUTED property. Every module whose
-//! functions form a discoverable algebra is listed, the report is frozen to
-//! [`Config::qualify_spec`] and drift-gated (regenerate by setting the [`Config::bless_env`]
-//! environment variable, `BLESS_QUALIFY=1` by default).
+//! Finally, two frozen censuses. The **qualification census**: boundary-hood as a COMPUTED
+//! property — every module whose functions form a discoverable algebra is listed, the report
+//! frozen to [`Config::qualify_spec`] and drift-gated (regenerate via [`Config::bless_env`],
+//! `BLESS_QUALIFY=1` by default). And the **tier lock**: the derived partition itself, one line
+//! per file with its evidence, frozen to [`Config::tiers_spec`] — the SAME rows the rule
+//! dispatch consumes, so what the lock says and what the rules enforce cannot diverge; a
+//! partition move (a file changing tier because its structure changed) is a ratified diff.
 //!
 //! # Wiring it up (a consumer's `build.rs`)
 //!
@@ -59,6 +69,7 @@
 //!     // The kernel allowlist stays HERE, in your build.rs — a reviewed diff in your own tree.
 //!     config.kernel_allowlist = vec!["src/lib.rs".into()];
 //!     config.qualify_spec = Some(manifest.join("spec/qualify.spec"));
+//!     config.tiers_spec = Some(manifest.join("spec/tiers.spec"));
 //!     Enforcement::enforce_or_panic(&config);
 //! }
 //! ```
@@ -97,10 +108,11 @@ pub struct Config {
     /// The manifest directory: violation locations are rendered relative to it, so messages
     /// never leak a machine's absolute path and stay stable across checkouts.
     pub manifest_dir: PathBuf,
-    /// The RATIFIED kernel — the only files (manifest-relative paths) allowed to declare
-    /// `Tier: KERNEL`. The marker alone is not enough: kernel-hood exempts a file from every
-    /// structural rule, so admitting a new member must be a diff in the consumer's build.rs,
-    /// where review cannot miss it.
+    /// The RATIFIED kernel — the only files (manifest-relative paths) the partition places
+    /// in KERNEL. Kernel-hood exempts a file from every structural rule, so it is never
+    /// derived from the file itself: admitting a new member must be a diff in the consumer's
+    /// own tree (its build.rs, or a register file that build.rs parses), where review cannot
+    /// miss it. An entry naming a file that no longer exists is a violation.
     pub kernel_allowlist: Vec<String>,
     /// Where the qualification census is frozen and drift-gated. `None` skips the census
     /// freeze/drift pass entirely (the census is still computed and returned).
@@ -108,9 +120,9 @@ pub struct Config {
     /// The environment variable that, when set, regenerates [`Config::qualify_spec`] instead of
     /// drift-checking it. Default: `BLESS_QUALIFY`.
     pub bless_env: String,
-    /// Where the TIER census is frozen and drift-gated — the declared partition held against
-    /// DERIVED evidence (ladder step one of tiers-as-a-lock; see the consumer's roadmap).
-    /// `None` skips the freeze/drift pass (the census is still computed and returned).
+    /// Where the TIER lock is frozen and drift-gated — the derived partition itself, the
+    /// same rows the rule dispatch consumes, so a file changing tier is a ratified diff.
+    /// `None` skips the freeze/drift pass (the partition is still computed and returned).
     pub tiers_spec: Option<PathBuf>,
     /// The bless variable for [`Config::tiers_spec`]. Default: `BLESS_TIERS`.
     pub tiers_bless_env: String,
@@ -141,8 +153,8 @@ pub struct Enforcement {
     pub violations: Vec<String>,
     /// The rendered qualification census (what [`Config::qualify_spec`] freezes).
     pub qualify_census: String,
-    /// The rendered tier census (what [`Config::tiers_spec`] freezes): per file, the declared
-    /// tier held against the derived evidence — agreement, disagreement, or kernel decision.
+    /// The rendered tier lock (what [`Config::tiers_spec`] freezes): the derived partition,
+    /// one line per file with the evidence that placed it.
     pub tiers_census: String,
     /// The files and directories whose change must re-trigger enforcement, in emission order.
     pub rerun_paths: Vec<PathBuf>,
@@ -156,10 +168,32 @@ impl Enforcement {
     pub fn run(config: &Config) -> Enforcement {
         let mut rerun: Vec<PathBuf> = vec![config.src_root.clone()];
         let mut violations = Vec::new();
-        walk(
+
+        // THE PARTITION, derived once and consumed twice: the rule dispatch below and
+        // the tier lock both read this map, so what the lock says and what the rules
+        // enforce cannot diverge. KERNEL comes only from the ratified allowlist; a
+        // registered file that no longer exists is a stale ratification, refused.
+        let partition = derive_partition(
             &config.src_root,
             &config.manifest_dir,
             &config.kernel_allowlist,
+        );
+        for registered in &config.kernel_allowlist {
+            if !partition.iter().any(|(_, loc, _, _)| loc == registered) {
+                violations.push(format!(
+                    "{registered}: registered as KERNEL but no such file exists — a stale \
+                     ratification is a lie; delete its register line."
+                ));
+            }
+        }
+        let tier_of: HashMap<&str, &'static str> = partition
+            .iter()
+            .map(|(_, loc, tier, _)| (loc.as_str(), *tier))
+            .collect();
+        walk(
+            &config.src_root,
+            &config.manifest_dir,
+            &tier_of,
             &mut violations,
             &mut rerun,
         );
@@ -206,19 +240,12 @@ impl Enforcement {
             &mut violations,
         );
 
-        // TIER CENSUS: the declared partition held against DERIVED evidence — ladder step
-        // one of tiers-as-a-lock. INTERIOR is derivable (pub-reachability from the crate
-        // roots), BOUNDARY is derivable (the qualify bar: operator-shaped structure),
-        // ALGEBRA is the reachable remainder; KERNEL is a DECISION (a privilege can never
-        // be inferred from conduct), recorded and never judged. A DISAGREES row is the
-        // honest distance between the declared partition and what structure can currently
-        // derive — the freeze ratifies that distance; burning it down (or improving the
-        // derivation) is the prerequisite for ladder step two.
-        let tiers_census = render_tiers(
-            &config.src_root,
-            &config.manifest_dir,
-            &config.tiers_bless_env,
-        );
+        // TIER LOCK: the derived partition, frozen. The same rows the dispatch above
+        // consumed, rendered one line per file with the evidence that placed it — so a
+        // file changing tier (its structure moved it through a door, or out of reach)
+        // is a diff a reviewer ratifies, and the lock can never disagree with what was
+        // enforced.
+        let tiers_census = render_tiers(&partition, &config.tiers_bless_env);
         freeze_or_gate(
             &config.tiers_spec,
             &tiers_census,
@@ -298,10 +325,9 @@ fn freeze_or_gate(
     }
 }
 
-/// One file's row in the tier census: what it declares, and the derived evidence.
+/// One file's row in the derived partition.
 struct TierRow {
     loc: String,
-    declared: Option<&'static str>,
     /// Does the file carry anything beyond module declarations and re-exports? Pure
     /// glue has no evidence to judge, so its declared tier stands.
     substance: bool,
@@ -314,8 +340,19 @@ struct TierRow {
     source: String,
 }
 
-/// The tier census: every file's declared tier held against the derived evidence.
-fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
+/// The DERIVED partition: every file's tier, computed — the single source both the rule
+/// dispatch and the tier lock consume. INTERIOR is non-pub reachability from the crate
+/// roots; BOUNDARY is being a DOOR (production edge impls, or fronting an interior
+/// sibling — the tier-2 relation read backwards); ALGEBRA is the reachable remainder;
+/// pure glue takes its reachability's tier (its content gives the rules nothing to
+/// judge either way). KERNEL is never derived: it comes from the ratified allowlist the
+/// consumer's build.rs feeds (in this workspace, parsed from `spec/kernel.register`,
+/// where every exemption carries a justification).
+fn derive_partition(
+    src: &Path,
+    manifest: &Path,
+    kernel_allowlist: &[String],
+) -> Vec<(PathBuf, String, &'static str, String)> {
     let mut rows: Vec<(PathBuf, TierRow)> = Vec::new();
     collect_tier_rows(src, manifest, &mut rows);
 
@@ -351,19 +388,20 @@ fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
         }
     }
 
-    // the BOUNDARY evidence: production edge impls (Morphism/Construction/Branch/
-    // Guarded, non-generic, non-test) — the same collector the probe-completeness pass
-    // runs. Operator-shape stays the QUALIFY census's fact: it marks a discoverable
-    // algebra wherever it lives, which is not a tier claim.
+    // the BOUNDARY evidence, half one: production edge impls (Morphism/Construction/
+    // Branch/Guarded, non-generic, non-test) — the same collector the probe-completeness
+    // pass runs. Operator-shape stays the QUALIFY census's fact: a discoverable algebra
+    // wherever it lives is not a tier claim.
     let mut edges: Vec<EdgeImpl> = Vec::new();
     let mut probed: HashSet<String> = HashSet::new();
     collect_edges_and_probes(src, manifest, &mut edges, &mut probed);
     let edge_locs: HashSet<&str> = edges.iter().map(|e| e.loc.as_str()).collect();
 
-    // the FRONTING relation — the tier system's own semantics as evidence: INTERIOR is
-    // not merely unreachable, it is fronted, and the front is the file that delegates
-    // into it. A pub-reachable file that references an interior sibling (a non-pub-
-    // reachable module in its own directory) by path is a door. Doors are boundaries.
+    // half two, the FRONTING relation — the tier system's own semantics as evidence:
+    // INTERIOR is not merely unreachable, it is fronted, and the front is the file that
+    // delegates into it. A pub-reachable file that references an interior sibling (a
+    // non-pub-reachable module in its own directory) by path is a door. Doors are
+    // boundaries.
     let interior_stems: Vec<(PathBuf, String)> = rows
         .iter()
         .filter(|(p, _)| !reachable.contains(p))
@@ -375,85 +413,83 @@ fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
         })
         .collect();
 
-    let mut lines: Vec<String> = Vec::new();
-    let (mut agree, mut disagree, mut kernel) = (0usize, 0usize, 0usize);
-    for (path, row) in &rows {
-        let is_reachable = reachable.contains(path);
-        let carries_edges = edge_locs.contains(row.loc.as_str());
-        let fronts = interior_stems.iter().any(|(dir, stem)| {
-            Some(dir.as_path()) == path.parent() && row.source.contains(&format!("{stem}::"))
-        });
-        if row.declared.is_some() && row.declared != Some("KERNEL") && !row.substance {
-            agree += 1;
-            lines.push(format!(
-                "- {}: declared {} — glue (module declarations and re-exports only, no \
-                 own substance); the declared tier stands",
-                row.loc,
-                row.declared.unwrap_or("?")
-            ));
-            continue;
-        }
-        let derived = if !is_reachable {
-            "INTERIOR"
-        } else if carries_edges || fronts {
-            "BOUNDARY"
-        } else {
-            "ALGEBRA"
-        };
-        let evidence = match (is_reachable, carries_edges, fronts) {
-            (false, _, _) => "not pub-reachable",
-            (true, true, _) => "pub-reachable, carries production edges",
-            (true, false, true) => "pub-reachable, fronts an interior sibling",
-            (true, false, false) => "pub-reachable, no production edges, fronts nothing",
-        };
-        let line = match row.declared {
-            Some("KERNEL") => {
-                kernel += 1;
-                format!(
-                    "- {}: declared KERNEL — a decision (ratified in build.rs), never derived; \
-                     evidence for the record: {evidence}",
-                    row.loc
-                )
+    rows.into_iter()
+        .map(|(path, row)| {
+            if kernel_allowlist.iter().any(|k| k == &row.loc) {
+                return (
+                    path,
+                    row.loc,
+                    "KERNEL",
+                    "registered — a decision, never derived".to_string(),
+                );
             }
-            Some(declared) if declared == derived => {
-                agree += 1;
-                format!(
-                    "- {}: declared {declared}; derived {derived} ({evidence}) — agree",
-                    row.loc
+            let is_reachable = reachable.contains(&path);
+            let carries_edges = edge_locs.contains(row.loc.as_str());
+            let fronts = interior_stems.iter().any(|(dir, stem)| {
+                Some(dir.as_path()) == path.parent() && row.source.contains(&format!("{stem}::"))
+            });
+            let (tier, evidence): (&'static str, String) = if !row.substance {
+                let t = if is_reachable { "ALGEBRA" } else { "INTERIOR" };
+                (
+                    t,
+                    "glue — module declarations and re-exports only; tier by reachability"
+                        .to_string(),
                 )
-            }
-            Some(declared) => {
-                disagree += 1;
-                format!(
-                    "- {}: declared {declared}; derived {derived} ({evidence}) — DISAGREES",
-                    row.loc
+            } else if !is_reachable {
+                ("INTERIOR", "not pub-reachable".to_string())
+            } else if carries_edges {
+                (
+                    "BOUNDARY",
+                    "pub-reachable, carries production edges".to_string(),
                 )
-            }
-            None => format!(
-                "- {}: declares no tier (the partition pass refuses this separately)",
-                row.loc
-            ),
-        };
-        lines.push(line);
-    }
-    lines.sort();
+            } else if fronts {
+                (
+                    "BOUNDARY",
+                    "pub-reachable, fronts an interior sibling".to_string(),
+                )
+            } else {
+                (
+                    "ALGEBRA",
+                    "pub-reachable, no production edges, fronts nothing".to_string(),
+                )
+            };
+            (path, row.loc, tier, evidence)
+        })
+        .collect()
+}
 
+/// The tier lock's render: the derived partition, one line per file. What
+/// [`Config::tiers_spec`] freezes — THE partition, not a coherence report; there is no
+/// declared column left to disagree with.
+fn render_tiers(partition: &[(PathBuf, String, &'static str, String)], bless_env: &str) -> String {
+    let count = |t: &str| {
+        partition
+            .iter()
+            .filter(|(_, _, tier, _)| *tier == t)
+            .count()
+    };
     let mut report = format!(
-        "# tier census — the declared partition held against DERIVED evidence: INTERIOR is\n\
-         # non-pub reachability, BOUNDARY is being a DOOR (carrying production edge impls,\n\
-         # or fronting an interior sibling — the tier-2 relation read backwards), ALGEBRA\n\
-         # is the reachable remainder; pure glue stands as declared. KERNEL is a decision,\n\
-         # recorded and never judged — a privilege cannot be inferred from conduct. A\n\
-         # DISAGREES row is the\n\
-         # honest distance between the declared partition and what structure can derive\n\
-         # today; burn it down or improve the derivation before deleting any marker\n\
-         # (the ladder: derive alongside, coherence-gate, then delete). Regenerate with\n\
-         # `{bless_env}=1 cargo build`.\n",
+        "# the tier partition, DERIVED — the single source the rule dispatch and this lock\n\
+         # both consume. INTERIOR is non-pub reachability; BOUNDARY is being a DOOR\n\
+         # (production edge impls, or fronting an interior sibling — the tier-2 relation\n\
+         # read backwards); ALGEBRA is the reachable remainder; glue takes its\n\
+         # reachability's tier. KERNEL is a decision, never derived: it is ratified in the\n\
+         # consumer's own tree (the build.rs allowlist, or a register it parses).\n\
+         # Regenerate with `{bless_env}=1 cargo build`.\n",
     );
     report.push_str(&format!(
-        "# {} files: {agree} agree, {disagree} disagree, {kernel} kernel decisions.\n\n",
-        rows.len()
+        "# {} files: {} boundary, {} interior, {} algebra, {} kernel.\n\n",
+        partition.len(),
+        count("BOUNDARY"),
+        count("INTERIOR"),
+        count("ALGEBRA"),
+        count("KERNEL"),
     ));
+    let mut lines: Vec<String> = partition
+        .iter()
+        .map(|(_, loc, tier, evidence)| format!("- {loc}: {tier} ({evidence})"))
+        .collect();
+    lines.sort();
     for l in &lines {
         report.push_str(l);
         report.push('\n');
@@ -512,7 +548,6 @@ fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierR
                     .unwrap_or(&path)
                     .display()
                     .to_string(),
-                declared: declared_tier(&source),
                 substance,
                 mods,
                 child_dir,
@@ -671,7 +706,7 @@ fn named_value_type(ty: &Type) -> Option<String> {
 fn walk(
     dir: &Path,
     manifest: &Path,
-    kernel_allowlist: &[String],
+    tier_of: &HashMap<&str, &'static str>,
     out: &mut Vec<String>,
     rerun: &mut Vec<PathBuf>,
 ) {
@@ -687,7 +722,7 @@ fn walk(
             // watching only the files that existed at the last build would let a new module land
             // unchecked until something else happened to dirty the build.
             rerun.push(path.clone());
-            walk(&path, manifest, kernel_allowlist, out, rerun);
+            walk(&path, manifest, tier_of, out, rerun);
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("rs") {
@@ -708,20 +743,16 @@ fn walk(
             }
         };
 
-        // THE PARTITION, made total and explicit: every source file must DECLARE its tier. This
-        // replaces path heuristics (filename `boundary.rs` → tier 1; a blanket directory skip) —
-        // so a new module cannot land silently un-categorized; placing it in the partition is a
-        // build obligation, ratified in the diff.
-        let Some(tier) = declared_tier(&source) else {
-            out.push(format!(
-                "{loc}: no `Tier:` declaration — every source file must name its place in the \
-                 partition. Add a `//! Tier: <{}> — …` line to the module header.",
-                TIERS.join(" | ")
-            ));
+        // THE PARTITION, total by DERIVATION: every file's tier comes from the derived
+        // map (reachability, doors, glue — see `derive_partition`), so a new module is
+        // categorized the moment it exists; nothing is declared and nothing can be
+        // forgotten. KERNEL appears in the map only via the ratified allowlist.
+        let Some(tier) = tier_of.get(loc.as_str()).copied() else {
+            // unparseable files never enter the partition; the parse pass reports them.
             continue;
         };
 
-        // dispatch the STRUCTURAL discipline on the declared tier:
+        // dispatch the STRUCTURAL discipline on the derived tier:
         //   KERNEL   — the trusted floor (the grammar, the engine, the macros, crate tooling):
         //              defines/runs the format, so it is exempt — but NAMED, not silently skipped.
         //   BOUNDARY — a domain's strict value-object surface: the tier-1 grammar.
@@ -733,17 +764,9 @@ fn walk(
         //              capability — the fine seam/capability/leaf split, made a build obligation.
         match tier {
             "KERNEL" => {
-                // Claiming kernel-hood is claiming EXEMPTION from every rule below, so it cannot
-                // be self-serve: the file must ALSO be on the allowlist the CONSUMER's build.rs
-                // passes in, making every new kernel member a diff in the consumer's own tree —
-                // ratified, not asserted.
-                if !kernel_allowlist.iter().any(|k| k == &loc) {
-                    out.push(format!(
-                        "{loc}: declares `Tier: KERNEL` but is not in KERNEL_ALLOWLIST — KERNEL \
-                         tier must be ratified in build.rs. Add the file to the allowlist there \
-                         (making the exemption a reviewed diff), or declare its real tier."
-                    ));
-                }
+                // exemption from every rule below — reached only through the ratified
+                // allowlist (fed, in this workspace, from spec/kernel.register, where
+                // every entry carries a justification). Named, never silently skipped.
                 continue;
             }
             "BOUNDARY" | "INTERIOR" | "ALGEBRA" => {}
@@ -829,35 +852,6 @@ fn check_loose_pub_fns(loc: &str, file: &syn::File, out: &mut Vec<String>) {
         }
     }
     go(loc, &file.items, &imports, false, &mut *out);
-}
-
-/// The partition tiers — every source file declares exactly one (see `walk` for what each enforces).
-const TIERS: &[&str] = &["KERNEL", "BOUNDARY", "INTERIOR", "ALGEBRA"];
-
-/// The tier a file declares, via a `//! Tier: <NAME>` marker in its header (the module doc). `None`
-/// if it declares none — which `walk` turns into a violation, so the partition stays total. Only
-/// lines that ARE module-doc lines (`//!`) count: a `Tier:` mention in a string literal, a code
-/// comment, or prose cannot satisfy (or spoof) the declaration. We keep the simple fixed 40-line
-/// window — every real header opens the file, so a marker below line 40 is a marker hidden from the
-/// reader, and we would rather reject it than hunt for it.
-fn declared_tier(source: &str) -> Option<&'static str> {
-    for line in source.lines().take(40) {
-        if !line.trim_start().starts_with("//!") {
-            continue;
-        }
-        let Some((_, rest)) = line.split_once("Tier:") else {
-            continue;
-        };
-        let word: String = rest
-            .trim_start()
-            .chars()
-            .take_while(|c| c.is_ascii_alphabetic())
-            .collect();
-        if let Some(t) = TIERS.iter().find(|t| word.eq_ignore_ascii_case(t)) {
-            return Some(t);
-        }
-    }
-    None
 }
 
 fn parse(path: &Path) -> Result<syn::File, String> {

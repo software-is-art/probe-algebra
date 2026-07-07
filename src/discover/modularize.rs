@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! modularize — SELECT the right shapes out of a flat bag of functions. The whole discovery stack,
 //! turned around and pointed at the PATHOLOGICAL case: one file with everything crammed together,

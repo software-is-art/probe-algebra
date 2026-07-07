@@ -620,7 +620,7 @@ fact wearing a ritual's clothes — and the operator's phrase for the programme,
    would be a silently dropped review. First run routed its own branch: one ratification
    (the qualify census), seven files machinery-verified.
 
-## Candidate: tiers as a lock — derive three, Register the fourth (step one BUILT)
+## Tiers as a lock — derive three, Register the fourth (BUILT: the ladder ran to the top)
 
 The tier annotations (`//! Tier: <...>` on every file) are the last per-file ceremony:
 N scattered hand-maintained declarations of a partition that is mostly derivable.
@@ -647,16 +647,22 @@ the right question — are we just missing evidence? Yes: the FRONTING relation,
 system's own semantics read backwards. INTERIOR is not merely unreachable, it is
 fronted; the front is the file that delegates into it; doors are boundaries. A
 pub-reachable file referencing an interior sibling by path derives BOUNDARY. Derivation
-v3 froze at 46 files: 36 agree, 0 DISAGREE, 10 kernel decisions — the partition is
-fully derivable, and step two (flip boundary-enforce to read the lock, delete the
-derivable markers, kernel to a justification register) is unblocked.
+v3 froze at 46 files: 36 agree, 0 DISAGREE, 10 kernel decisions — the partition was
+fully derivable, and steps two and three followed in one motion: `derive_partition` is
+now the single source both the rule dispatch and the lock consume (they cannot
+diverge — same rows), KERNEL comes only from `spec/kernel.register` (ten entries, each
+with its justification; `build.rs` parses it via `spec_lock::Register`, a stale entry
+is a violation), and every `//! Tier:` marker is deleted. `spec/tiers.spec` no longer
+records coherence — there is no declared column left to disagree with; it IS the
+partition, one line per file with the evidence that placed it. The edit hook's kernel
+exemption reads the register too, so a marker in a file grants nothing anywhere.
 
-Migration is the proven ladder, never skipping step one: (1) derive and freeze
+The ladder held at every rung, never skipping step one: (1) derive and freeze
 alongside the markers with a coherence gate — declared vs derived, disagreement is a
-build error; (2) once quiet, flip boundary-enforce to read the lock and register;
-(3) delete the derivable markers. Prerequisite work: an interior-reachability
-derivation (does not exist yet) and boundary-enforce consuming lock+register instead
-of first lines.
+build error; (2) once quiet, flip enforcement to the derivation; (3) delete the
+markers. The lesson worth keeping: when the coherence gate disagrees, ask whether the
+declaration is wrong or the derivation is missing EVIDENCE — both v2 and v3 came from
+disagreements that were really undiscovered relations.
 
 ## Standing follow-ups
 

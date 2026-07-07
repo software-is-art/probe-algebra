@@ -1,4 +1,5 @@
-//! Tier: ALGEBRA — the discovered-law layer: the meter's operators, as a synthesised theory.
+//! The discovered-law layer (ALGEBRA by derivation): the meter's operators, as a
+//! synthesised theory.
 //!
 //! ops — the MINIMAL authoring path, exercised downstream: `#[algebra]` over three ordinary
 //! operator functions synthesises the entire discovery `Theory` (`CreditMeter`) — operator

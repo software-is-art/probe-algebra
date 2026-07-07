@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! coherence — does a value's ALGEBRA survive a seam between modules?
 //!
