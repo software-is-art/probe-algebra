@@ -508,6 +508,40 @@ candidate bricks:
     survive corpus growth; means do not — a census row must be a fact a new diagram
     can only move visibly, never smear).
 
+14. **Continuous autoshaping: the placer — BUILT** (`discover::shape`,
+    `spec/boundary-spec.shape.spec`). The friction it dissolves, named by this repo's
+    operator: LLMs writing code and considering shape at the same time degrade at
+    both — the useful move is the circuit-CAD one, where the author writes the
+    NETLIST (behaviour in one big bundle) and the tool derives the placement.
+    The algebraic twin of a net is a SORT: the placer partitions operators by
+    net connectivity (a sort in both signatures — one produces what the other
+    consumes), read off declarations alone, never discovery, so shape is derived
+    before a single law is judged. Two instruments now, two questions: cohesion
+    links by LAW co-occurrence and reads wiring density (a suggestion a human
+    ratifies); placement links by NETS and reads the boundary (a derivation).
+    The dogfood was the design constraint — "if we can get this to work where
+    we've manually pinned things we've got something really good; falling back
+    to pinning kicks the can" — and it landed on the first run: all six declared
+    modules place SETTLED, including the three cohesion wants split and this repo
+    keeps whole by hand-ratified pin (arithmetic's `<` shares `Int` with `+`,
+    the calendar's `since` shares `Date` with `add`, the protocol's transitions
+    share its state sorts). The keep-wholes are now derived, not spent; the pin
+    survives only as the wiring observation it always was. CONTINUOUS because the
+    shape is a lock like everything else: `ShapeReport` freezes per system,
+    re-judged every `cargo test`, and placement is MONOTONE by union-find's own
+    algebra — a new operator joins a component or bridges two, it can never
+    re-split or reshuffle what it does not touch (the layout-probe locality
+    property, holding for the placer itself). First-run bonus finding: the report
+    surfaces cross-module net-NAME coincidences no declared seam covers as SEAM
+    CANDIDATES — and this repo has exactly one, `Duration` named by both the
+    calendar and the ttl store (two Rust types agreeing on a word; declare the
+    seam or leave the coincidence standing — rendered, never merged). Follow-ups:
+    the splits placement CANNOT see (a genuinely shared net carrying two features
+    — the rail-sort problem, circuit CAD's power-plane exclusion) stay cohesion's
+    territory, disclosed; genesis v2 should close the loop by EMITTING a bundle's
+    derived modules as the scaffolded tree (write the netlist, get the placed
+    crate), which is the autoshaping half of the v2 work list below.
+
 ## Standing follow-ups
 
 - **Tag `v0.1.0`** — consumers currently pin by bare rev; a tag makes downstream manifests

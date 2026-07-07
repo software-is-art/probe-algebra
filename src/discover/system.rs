@@ -60,6 +60,10 @@ pub trait System {
     /// `system!` macro is the implementing path, and it always generates this — a default
     /// body would be dead code wearing a trait's clothes (and an equivalent-mutant site).
     fn cohesions() -> Vec<CohesionReport>;
+    /// Each registry module's PLACEMENT — the net-connectivity partition, for
+    /// [`super::shape::ShapeReport`] to hold the declared shape against the derived one.
+    /// REQUIRED for the same reason as `cohesions`: the macro always generates it.
+    fn placements() -> Vec<super::shape::Placement>;
 }
 
 /// A seam obligation's verdict — what the checker actually returned, never a claim.
@@ -531,6 +535,15 @@ macro_rules! system {
                     }
                 ),+ ]
             }
+            fn placements() -> ::std::vec::Vec<$crate::discover::shape::Placement> {
+                ::std::vec![ $(
+                    $crate::__paste! {
+                        $crate::discover::shape::Placement::of::<
+                            crate::ops::[<$m _ops>]::[<$m:camel>],
+                        >()
+                    }
+                ),+ ]
+            }
         }
         // DRIFT WITNESSES — every declared operator signature, held against the code at
         // compile time. The paths go through the declaration's own module names, so the
@@ -567,6 +580,11 @@ macro_rules! system {
             fn cohesions() -> ::std::vec::Vec<$crate::discover::cohesion::CohesionReport> {
                 ::std::vec![ $(
                     $crate::discover::cohesion::CohesionReport::of::<$module>()
+                ),+ ]
+            }
+            fn placements() -> ::std::vec::Vec<$crate::discover::shape::Placement> {
+                ::std::vec![ $(
+                    $crate::discover::shape::Placement::of::<$module>()
                 ),+ ]
             }
         }
@@ -731,6 +749,12 @@ mod tests {
         // protocol's "latent seams" are its states, and carving them apart would
         // destroy exactly the unrepresentability it exists for. Keep-whole, ratified
         // here: the suggestion stands recorded, deliberately declined.
+        //
+        // All three keep-wholes are now also DERIVED, not merely ratified: the placer
+        // (`discover::shape`) partitions by net connectivity — nets connect what laws
+        // do not — and places every one of these modules as a single component (see
+        // `shape::probes::nets_place_what_laws_cannot_see`). Cohesion keeps naming the
+        // sparse wiring (this pin); placement settles the boundary.
         let expected = "\
 boundary-spec: 3 of 6 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
   module `interpreter arithmetic`: decomposes into 2 latent modules — consider splitting:

@@ -39,6 +39,7 @@ pub mod protocol;
 pub mod residue;
 pub mod router;
 pub mod scaffold;
+pub mod shape;
 pub mod system;
 pub mod world;
 

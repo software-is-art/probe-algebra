@@ -249,7 +249,7 @@ coherent groups and some misfits. All of it is **a suggestion a reviewer ratifie
 constraint** — reports suggest; locks gate.
 
 <details>
-<summary><b>Full density: the six instruments</b></summary>
+<summary><b>Full density: the seven instruments</b></summary>
 
 - **cohesion** (`cargo run --example cohesion`) — a module is smelly not when its algebra is
   large but when it is *decomposable*: the operator-interaction graph's components are the
@@ -265,6 +265,11 @@ constraint** — reports suggest; locks gate.
 - **system distance** (`SystemDistance::of`) — the declared module graph vs the latent one,
   in the distance voice; this repo's own registry names declared modules that are secretly
   several, byte-pinned as a deliberate keep-whole decision.
+- **the placer** (`discover::shape`, frozen as `spec/<system>.shape.spec`) — the circuit-CAD
+  move: write behaviour as one big bundle, and module boundaries are *derived* from net
+  connectivity (operators sharing a sort), continuously drift-gated. The one instrument
+  here that is a derivation rather than a suggestion: on this repo's own graph it
+  re-derives every hand-drawn boundary, including the three cohesion wants split.
 - **the architect** (`… --example architect`) — the cohesion signal as an LSP diagnostic
   plus a `refactor.extract` code action that writes the scaffolded split. The tool's own
   report type is a discovered join-semilattice; the abstraction validates the tool that
