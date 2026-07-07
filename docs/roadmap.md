@@ -356,6 +356,53 @@ candidate bricks:
     to fix upstream, never a row to ratify; the drill export (`proved: commutative
     implies`) pins the conviction end to end.
 
+13. **Second-domain validation: layout engines under metamorphic probe** (scoped; builds
+    DOWNSTREAM, in the diagram tool's repo, pinning this library — the second production
+    adoption, not a workspace member). The domain: diagram source → layout engine →
+    geometry, with an agent loop editing the source. The operators live on SOURCE
+    (add node, add edge, rename, reorder declarations, group into container, toggle
+    theme); the OBSERVATION is canonicalized geometry — which makes the proposed
+    metamorphic relations mostly existing catalog vocabulary, not new machinery:
+
+    - *rename-then-render = render-then-relabel* is the `action_equivariance` stanza,
+      verbatim: `f(act(x, p)) = act'(f(x), p)` with `f` = render.
+    - *declaration-reorder invariance* is not even a new law — with geometry as the
+      observation, a stable engine makes `reorder` OBSERVATIONALLY IDENTITY, and
+      discovery finds (or refuses) that on its own. Declare it (`expects`) and the
+      DISTANCE REPORT becomes an engine scorecard: dagre expected red on exactly this
+      row (the known agent-loop "layout jumping" pathology, named as a missing law),
+      ELK expected green. Refutation as product insight.
+    - *insertion locality* (a new node must not move geometrically distant nodes beyond
+      ε) is a TOLERANCED law — the three-valued judgment built for the trace-logic
+      corpus, pointed at pixels: register the metric bars, and near-threshold layouts
+      land in the DISCLOSED band instead of coin-flipping (float coordinates are the
+      quantization hazard discovery.md already documents). Likely ONE new catalog
+      stanza (toleranced action locality, premise-guarded by distance) — the intended
+      growth dynamic: hostile domain → stanza → every theory benefits.
+    - *theme toggle is geometry-invariant* is an action fixed point on the projected
+      observation.
+
+    The rest of the apparatus maps one-to-one: the layout engine is an EXTERNAL
+    dependency, so its conduct over a derived source battery freezes into a WORLD
+    lock — replay after an engine upgrade names exactly which fixtures moved (upgrade
+    drift, currently discovered by squinting at diagrams); known-unstable fixtures are
+    exception-register entries with justifications; and a fire drill plants a
+    deliberately unstable engine stub (seeded jitter) to prove the stability gates can
+    fire. Economics, disclosed up front: an observation is a process spawn (~50–200ms),
+    so the grid must be DELIBERATE (the stream-idiom lesson — a handful of designed
+    fixtures, not a soup), renders memoized, and the gate probably PR-cadence rather
+    than per-`cargo test`. Scope fence, agreed with the field assessment that prompted
+    this entry: the lint layer (contrast thresholds, spacing-grid conformance,
+    alignment) is plain predicates over rendered output — no algebra earns rent there,
+    and wrapping it here would be the internal-consistency trap. What this domain
+    uniquely buys the METHOD: millisecond feedback with visible ground truth — the
+    fastest refutation loop any consumer has offered yet. Open questions for the
+    build session: engine order (ELK first, exhaust it before anything proprietary;
+    Graphviz as the free DAG baseline), observation canonicalization (quantized
+    positions vs topology-only, possibly BOTH as two observers over one carrier), and
+    whether locality needs its own stanza or premise-guarded monotonicity over a
+    declared distance order suffices.
+
 ## Standing follow-ups
 
 - **Tag `v0.1.0`** — consumers currently pin by bare rev; a tag makes downstream manifests
