@@ -181,6 +181,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "layout-probe"
+version = "0.0.0"
+dependencies = [
+ "boundary-spec",
+ "fire-drill",
+ "spec-lock",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"

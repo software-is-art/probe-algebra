@@ -1,0 +1,26 @@
+# layout-probe — the second-domain miniature: a diagram LAYOUT ENGINE under metamorphic
+# probe (roadmap candidate 13, built in-tree the way delta-render built DBSP-in-miniature).
+# Two deterministic layered engines share one operator vocabulary; the discovered specs
+# split them along a REAL tradeoff no engine wins both sides of: name-ordered layout is
+# reorder-inert but not rename-equivariant, declaration-ordered layout is the reverse —
+# dagre's "layout jumping" pathology, reproduced honestly and named by a distance report.
+# A research member, never a product: version 0.0.0, publish = false. The ELK/d2 binding
+# remains the downstream adoption; this member validates the method's fit.
+[package]
+name = "layout-probe"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Layout engines under metamorphic probe: stability and equivariance as discovered laws."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# The discovery engine and the algebra-mutation harness.
+boundary-spec = { path = ".." }
+# The lock mechanics — regular dependency: the visual census and the locality witness
+# are lock renderers living in the library, where the drift gates read them.
+spec-lock = { path = "../spec-lock" }
+
+[dev-dependencies]
+# The fire drill: a jittering engine and a cramped engine prove the gates can FIRE.
+fire-drill = { path = "../fire-drill" }

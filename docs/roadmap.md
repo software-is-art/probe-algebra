@@ -356,9 +356,25 @@ candidate bricks:
     to fix upstream, never a row to ratify; the drill export (`proved: commutative
     implies`) pins the conviction end to end.
 
-13. **Second-domain validation: layout engines under metamorphic probe** (scoped; builds
-    DOWNSTREAM, in the diagram tool's repo, pinning this library — the second production
-    adoption, not a workspace member). The domain: diagram source → layout engine →
+13. **Second-domain validation: layout engines under metamorphic probe — BUILT IN
+    MINIATURE** (`layout-probe/`; the ELK/d2 binding in the diagram tool's repo remains
+    the downstream adoption this member de-risks). What the build proved, over two
+    deterministic layered engines differing by one policy bit (within-rank order: node
+    name vs declaration index): the scoped laws needed TWO new catalog stanzas —
+    `inert` (u(x) = x) and `equivariant map` (the commuting square f(act(x,p)) =
+    act2(f(x),p), which `action equivariance` could not say) — and with geometry as
+    the observation, discovery split the engines along a REAL tradeoff neither wins:
+    the stable engine holds `inert(reorder)` and loses rename-equivariance (its
+    missing law shows as coverage silence: "operators in no law: render"), the eager
+    engine holds the square and loses reorder-inertness (dagre's layout-jumping
+    pathology, named by an absent law). Both declare the same three laws, so the two
+    pinned distance reports ARE the engine scorecard. The visual census emerged as
+    designed (floors 4/2 derived never typed; freeze-stable rows only), the locality
+    witness measured the same tradeoff in pixels (an early-sorting insertion shifts a
+    whole rank under stable, nothing under eager), and the fire drills prove refusal
+    is earned: a jittering engine never reads as stable, and a grown corpus reddens
+    the census. Weekly member sweep (`--lib`, the delta-render economics) feeds the
+    countersign. Original scoping below, kept as the downstream build's brief. The domain: diagram source → layout engine →
     geometry, with an agent loop editing the source. The operators live on SOURCE
     (add node, add edge, rename, reorder declarations, group into container, toggle
     theme); the OBSERVATION is canonicalized geometry — which makes the proposed
