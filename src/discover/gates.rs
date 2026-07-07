@@ -35,7 +35,7 @@
 //! for everything, split across `FULL_SWEEP_SHARDS` parallel shards). All three are now
 //! VISIBLE as registry data instead of implicit in YAML.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use spec_lock::Lock;
 
@@ -107,6 +107,333 @@ impl Gate {
     /// anywhere in the pipeline's own machinery).
     pub fn command_line(&self) -> String {
         self.command.join(" ")
+    }
+}
+
+/// The registry inventory's stanza list — one stanza per gate (name, cadence, capability,
+/// command, promise). ONE render for this repo's registry and every consumer pipeline, so
+/// the two lock dialects cannot drift apart.
+fn registry_stanzas(gates: &[Gate]) -> String {
+    let mut out = String::new();
+    for gate in gates {
+        let cadence = match gate.cadence {
+            Cadence::EveryChange => "every change",
+            Cadence::PerDiff => "per PR diff",
+            Cadence::DefaultBranch => "default branch, diff since mutants-green",
+            Cadence::Weekly => "weekly + manual, sharded",
+        };
+        let effect = match gate.effect {
+            Capability::Pure => "pure",
+            Capability::Lossy => "lossy",
+            Capability::Stateful => "stateful",
+            Capability::Effectful => "EFFECTFUL",
+        };
+        out.push_str(&format!(
+            "\n- {} ({cadence}; {effect})\n      {}\n      promises: {}\n",
+            gate.name,
+            gate.command_line(),
+            gate.verifies
+        ));
+    }
+    out
+}
+
+/// A GitHub Actions job id from a gate's name — job ids allow only alphanumerics and
+/// dashes.
+fn job_slug(label: &str) -> String {
+    let mut id = String::new();
+    for c in label.chars() {
+        match c {
+            c if c.is_ascii_alphanumeric() => id.push(c),
+            _ if id.ends_with('-') || id.is_empty() => {}
+            _ => id.push('-'),
+        }
+    }
+    id.trim_end_matches('-').to_string()
+}
+
+/// A DOWNSTREAM pipeline declaration — the CONSUMER form of the gate discipline, the
+/// sibling of `Spec::lock_in`. This repo's own [`GateRegistry`] stays bespoke (its
+/// workflow carries the green-tag countersign and the sharded-sweep economics, sized to
+/// this workspace); a consumer declares its OWN gates here and derives both locks rooted
+/// in ITS repository:
+///
+/// ```ignore
+/// let pipeline = Pipeline::starter(); // or a hand-declared Pipeline { .. }
+/// spec_lock::bless(&pipeline.locks_in(Path::new(env!("CARGO_MANIFEST_DIR")))?)?;
+/// ```
+///
+/// The render covers the tiers a downstream pipeline generally needs — every-change
+/// gates (one `check` job), per-diff mutation, and unsharded weekly jobs on a declared
+/// schedule. The two bespoke tiers REFUSE by name rather than render wrong YAML: the
+/// default-branch incremental cadence is green-tag countersign economics, and sharding
+/// is sweep economics sized to a mutant count — both live in this repo's own render as
+/// the reference for a consumer who grows into them.
+pub struct Pipeline {
+    /// The workflow's name (`name:` in the YAML, and the workflow file's stem).
+    pub name: &'static str,
+    /// The pinned toolchain the workflow installs.
+    pub toolchain: &'static str,
+    /// The command that regenerates both locks — named in the lock headers so the fix
+    /// for drift is always spelled where the drift is reported.
+    pub regen: &'static str,
+    /// The weekly schedule, when any weekly gate is declared.
+    pub cron: Option<&'static str>,
+    /// The declared gates, in execution order.
+    pub gates: Vec<Gate>,
+}
+
+impl Pipeline {
+    /// The STARTER pipeline — the three every-change gates every crate in this
+    /// discipline runs (format, lint, test — workspace-scoped, the paid-for lesson),
+    /// pinned to the toolchain this library is tested against. Genesis emits generated
+    /// crates' pipelines as a call to this constructor, so the starter is ONE
+    /// declaration, not a restatement per crate; an adopter outgrowing it replaces the
+    /// call with a hand-declared `Pipeline { .. }`.
+    pub fn starter() -> Pipeline {
+        Pipeline {
+            name: "ci",
+            toolchain: TOOLCHAIN,
+            regen: "cargo run --example freeze_gates",
+            cron: None,
+            gates: vec![
+                Gate {
+                    name: "format",
+                    verifies: "the whole workspace is rustfmt-canonical",
+                    command: &["cargo", "fmt", "--all", "--check"],
+                    cadence: Cadence::EveryChange,
+                    effect: Capability::Pure,
+                    sharded: false,
+                },
+                Gate {
+                    name: "lint",
+                    verifies: "clippy holds every workspace member, all targets and \
+                               features, to deny-warnings",
+                    command: &[
+                        "cargo",
+                        "clippy",
+                        "--workspace",
+                        "--all-targets",
+                        "--all-features",
+                        "--",
+                        "-D",
+                        "warnings",
+                    ],
+                    cadence: Cadence::EveryChange,
+                    effect: Capability::Pure,
+                    sharded: false,
+                },
+                Gate {
+                    name: "test",
+                    verifies: "every suite: the drift gates (module, system, and gates \
+                               locks), the distance gates, and the probes",
+                    command: &["cargo", "test", "--workspace", "--all-targets"],
+                    cadence: Cadence::EveryChange,
+                    effect: Capability::Pure,
+                    sharded: false,
+                },
+            ],
+        }
+    }
+
+    /// The human-readable inventory — what the consumer's `spec/gates.spec` locks. Same
+    /// stanza dialect as this repo's registry (one shared render), consumer header.
+    pub fn render_registry(&self) -> String {
+        let mut out = format!(
+            "# gate registry: the pipeline as a declaration — regenerate via `{}`; ratify the diff.\n\
+             #\n\
+             # Every gate below is a declared, executable claim: the workflow CI runs is\n\
+             # RENDERED from this same declaration and drift-gated byte for byte, so \"green\n\
+             # locally\" and \"green in CI\" are one claim. Cadence and capability are visible\n\
+             # here instead of implicit in YAML.\n",
+            self.regen
+        );
+        out.push_str(&registry_stanzas(&self.gates));
+        out
+    }
+
+    /// The consumer workflow — every-change gates as one `check` job, per-diff mutation
+    /// and unsharded weekly jobs as declared. The bespoke tiers refuse by name (see the
+    /// type docs); a duplicate job id refuses rather than emitting colliding YAML.
+    pub fn render_workflow(&self) -> Result<String, String> {
+        for gate in &self.gates {
+            if gate.cadence == Cadence::DefaultBranch {
+                return Err(format!(
+                    "gate `{}` declares the default-branch incremental cadence — that tier \
+                     is green-tag countersign economics, implemented bespoke in this \
+                     library's own pipeline (`GateRegistry::render_workflow` is the \
+                     reference); a consumer pipeline declares EveryChange, PerDiff, or an \
+                     unsharded Weekly gate",
+                    gate.name
+                ));
+            }
+            if gate.sharded {
+                return Err(format!(
+                    "gate `{}` declares sharding — the shard matrix is whole-tree sweep \
+                     economics sized to a specific mutant count (`GateRegistry::\
+                     render_workflow` is the reference); declare the gate unsharded or \
+                     render a bespoke workflow",
+                    gate.name
+                ));
+            }
+        }
+        let weekly: Vec<&Gate> = self
+            .gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::Weekly)
+            .collect();
+        if !weekly.is_empty() && self.cron.is_none() {
+            return Err(format!(
+                "gate `{}` is weekly but the pipeline declares no schedule — set \
+                 `Pipeline::cron`",
+                weekly[0].name
+            ));
+        }
+        let per_diff: Vec<&Gate> = self
+            .gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::PerDiff)
+            .collect();
+        let mut job_ids = vec!["check".to_string()];
+        for gate in per_diff
+            .iter()
+            .map(|g| ("diff", g))
+            .chain(weekly.iter().map(|g| ("weekly", g)))
+        {
+            let id = format!("{}-{}", gate.0, job_slug(gate.1.name));
+            if job_ids.contains(&id) {
+                return Err(format!(
+                    "two gates render the same workflow job id `{id}` — rename one"
+                ));
+            }
+            job_ids.push(id);
+        }
+
+        let mut out = format!(
+            "# GENERATED from this crate's gate declaration — THE PIPELINE IS A LOCK.\n\
+             # Never edit by hand: regenerate with `{regen}` and ratify the diff. The\n\
+             # declaration is the single source for the commands, the cadences, and the\n\
+             # toolchain pin; `spec/gates.spec` carries the promises.\n\
+             name: {name}\n\
+             \n\
+             on:\n\
+             {sp2}push:\n\
+             {sp4}branches: [main]\n\
+             {sp2}pull_request:\n",
+            regen = self.regen,
+            name = self.name,
+            sp2 = "  ",
+            sp4 = "    ",
+        );
+        if let (Some(cron), false) = (self.cron, weekly.is_empty()) {
+            out.push_str(&format!(
+                "  schedule:\n    - cron: \"{cron}\"\n  workflow_dispatch:\n"
+            ));
+        }
+        out.push_str(&format!(
+            "\n\
+             env:\n\
+             {sp2}CARGO_TERM_COLOR: always\n\
+             {sp2}RUSTFLAGS: \"-D warnings\"\n\
+             \n\
+             jobs:\n\
+             {sp2}check:\n\
+             {sp4}name: fmt + clippy + test\n\
+             {sp4}runs-on: ubuntu-latest\n\
+             {sp4}steps:\n\
+             {sp6}- uses: actions/checkout@v4\n\
+             {sp6}- uses: dtolnay/rust-toolchain@{toolchain}\n\
+             {sp8}with:\n\
+             {sp10}components: rustfmt, clippy\n\
+             {sp6}- uses: Swatinem/rust-cache@v2\n",
+            toolchain = self.toolchain,
+            sp2 = "  ",
+            sp4 = "    ",
+            sp6 = "      ",
+            sp8 = "        ",
+            sp10 = "          ",
+        ));
+        for gate in self
+            .gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::EveryChange)
+        {
+            out.push_str(&format!("      - run: {}\n", gate.command_line()));
+        }
+        for gate in &per_diff {
+            out.push_str(&format!(
+                "\n  # Per-change dogfood: mutate only the lines this PR touches — see the\n\
+                 \x20 # gate registry for what it promises.\n\
+                 \x20 diff-{slug}:\n\
+                 \x20   name: {label}\n\
+                 \x20   if: github.event_name == 'pull_request'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20       with:\n\
+                 \x20         fetch-depth: 0\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{toolchain}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - name: mutate the diff\n\
+                 \x20       run: |\n\
+                 \x20         git diff \"origin/${{{{ github.base_ref }}}}...HEAD\" > pr.diff\n\
+                 \x20         {command}\n",
+                slug = job_slug(gate.name),
+                label = gate.name,
+                toolchain = self.toolchain,
+                command = gate.command_line(),
+            ));
+        }
+        for gate in &weekly {
+            out.push_str(&format!(
+                "\n  # Weekly gate: one plain job on the declared schedule — see the gate\n\
+                 \x20 # registry for what it promises.\n\
+                 \x20 weekly-{slug}:\n\
+                 \x20   name: {label}\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{toolchain}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - run: {command}\n",
+                slug = job_slug(gate.name),
+                label = gate.name,
+                toolchain = self.toolchain,
+                command = gate.command_line(),
+            ));
+        }
+        Ok(out)
+    }
+
+    /// BOTH locks, rooted in a caller-supplied repository root: the registry inventory at
+    /// `spec/gates.spec` and the workflow at `.github/workflows/<name>.yml` — the exact
+    /// sibling of `Spec::lock_in`, one call for a consumer's whole pipeline freeze. A
+    /// declaration the render refuses surfaces here as the named refusal, never as a
+    /// half-written lock list.
+    pub fn locks_in(&self, root: &Path) -> Result<Vec<Lock>, String> {
+        let workflow = self.render_workflow()?;
+        Ok(vec![
+            Lock {
+                name: format!("{} gate registry", self.name),
+                path: root.join("spec").join("gates.spec"),
+                live: self.render_registry(),
+            },
+            Lock {
+                name: format!("{} workflow", self.name),
+                path: root
+                    .join(".github")
+                    .join("workflows")
+                    .join(format!("{}.yml", self.name)),
+                live: workflow,
+            },
+        ])
     }
 }
 
@@ -257,26 +584,7 @@ impl GateRegistry {
              # countersigning, effects, and the economics of the expensive sweeps — all three\n\
              # visible here as cadence and capability instead of implicit in YAML.\n",
         );
-        for gate in Self::declared() {
-            let cadence = match gate.cadence {
-                Cadence::EveryChange => "every change",
-                Cadence::PerDiff => "per PR diff",
-                Cadence::DefaultBranch => "default branch, diff since mutants-green",
-                Cadence::Weekly => "weekly + manual, sharded",
-            };
-            let effect = match gate.effect {
-                Capability::Pure => "pure",
-                Capability::Lossy => "lossy",
-                Capability::Stateful => "stateful",
-                Capability::Effectful => "EFFECTFUL",
-            };
-            out.push_str(&format!(
-                "\n- {} ({cadence}; {effect})\n      {}\n      promises: {}\n",
-                gate.name,
-                gate.command_line(),
-                gate.verifies
-            ));
-        }
+        out.push_str(&registry_stanzas(&Self::declared()));
         out
     }
 
@@ -701,6 +1009,213 @@ mod tests {
         assert!(
             config.contains("test_tool = \"nextest\""),
             "the mutants config no longer selects nextest — the fail-fast speedup is gone"
+        );
+    }
+
+    /// THE STARTER PIPELINE, byte-pinned end to end — this is exactly what a genesis
+    /// crate is born with, so its shape is a product surface: three every-change gates,
+    /// no schedule block (no weekly gates declared), one `check` job carrying every
+    /// declared command.
+    #[test]
+    fn the_starter_pipeline_renders_exactly() {
+        let starter = Pipeline::starter();
+        assert_eq!(
+            starter.render_registry(),
+            "# gate registry: the pipeline as a declaration — regenerate via `cargo run --example freeze_gates`; ratify the diff.\n\
+             #\n\
+             # Every gate below is a declared, executable claim: the workflow CI runs is\n\
+             # RENDERED from this same declaration and drift-gated byte for byte, so \"green\n\
+             # locally\" and \"green in CI\" are one claim. Cadence and capability are visible\n\
+             # here instead of implicit in YAML.\n\
+             \n\
+             - format (every change; pure)\n\
+             \x20     cargo fmt --all --check\n\
+             \x20     promises: the whole workspace is rustfmt-canonical\n\
+             \n\
+             - lint (every change; pure)\n\
+             \x20     cargo clippy --workspace --all-targets --all-features -- -D warnings\n\
+             \x20     promises: clippy holds every workspace member, all targets and features, to deny-warnings\n\
+             \n\
+             - test (every change; pure)\n\
+             \x20     cargo test --workspace --all-targets\n\
+             \x20     promises: every suite: the drift gates (module, system, and gates locks), the distance gates, and the probes\n"
+        );
+        assert_eq!(
+            starter.render_workflow().expect("the starter renders"),
+            format!(
+                "# GENERATED from this crate's gate declaration — THE PIPELINE IS A LOCK.\n\
+                 # Never edit by hand: regenerate with `cargo run --example freeze_gates` and ratify the diff. The\n\
+                 # declaration is the single source for the commands, the cadences, and the\n\
+                 # toolchain pin; `spec/gates.spec` carries the promises.\n\
+                 name: ci\n\
+                 \n\
+                 on:\n\
+                 \x20 push:\n\
+                 \x20   branches: [main]\n\
+                 \x20 pull_request:\n\
+                 \n\
+                 env:\n\
+                 \x20 CARGO_TERM_COLOR: always\n\
+                 \x20 RUSTFLAGS: \"-D warnings\"\n\
+                 \n\
+                 jobs:\n\
+                 \x20 check:\n\
+                 \x20   name: fmt + clippy + test\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20       with:\n\
+                 \x20         components: rustfmt, clippy\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - run: cargo fmt --all --check\n\
+                 \x20     - run: cargo clippy --workspace --all-targets --all-features -- -D warnings\n\
+                 \x20     - run: cargo test --workspace --all-targets\n"
+            )
+        );
+    }
+
+    /// The consumer form GROWS to the general tiers: a per-diff mutation gate and a
+    /// weekly gate render as their own jobs (per-diff on pull requests, weekly on the
+    /// declared schedule — which also switches on the workflow's schedule block).
+    #[test]
+    fn the_consumer_tiers_render_their_jobs() {
+        let mut pipeline = Pipeline::starter();
+        pipeline.cron = Some("0 4 * * 1");
+        pipeline.gates.push(Gate {
+            name: "mutation (changed lines)",
+            verifies: "no mutant of the PR's changed lines survives",
+            command: &["cargo", "mutants", "--in-diff", "pr.diff"],
+            cadence: Cadence::PerDiff,
+            effect: Capability::Pure,
+            sharded: false,
+        });
+        pipeline.gates.push(Gate {
+            name: "mutation (full sweep)",
+            verifies: "no mutant of the whole crate survives",
+            command: &["cargo", "mutants"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            sharded: false,
+        });
+        let workflow = pipeline.render_workflow().expect("all tiers supported");
+        assert!(workflow.contains("  schedule:\n    - cron: \"0 4 * * 1\"\n  workflow_dispatch:\n"));
+        assert!(workflow.contains("  diff-mutation-changed-lines:\n"));
+        assert!(workflow.contains("    if: github.event_name == 'pull_request'\n"));
+        assert!(workflow
+            .contains("        git diff \"origin/${{ github.base_ref }}...HEAD\" > pr.diff\n"));
+        assert!(workflow.contains("  weekly-mutation-full-sweep:\n"));
+        assert!(workflow.contains(
+            "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n"
+        ));
+        // every declared command reappears in execution — the census the root registry
+        // pins, held for consumers too.
+        for gate in &pipeline.gates {
+            assert!(workflow.contains(&gate.command_line()));
+        }
+    }
+
+    /// The bespoke tiers REFUSE by name — wrong YAML is never rendered, and each refusal
+    /// points at the reference implementation. A weekly gate without a schedule and a
+    /// job-id collision refuse the same way.
+    #[test]
+    fn the_bespoke_tiers_are_named_refusals() {
+        let with = |gate: Gate| {
+            let mut p = Pipeline::starter();
+            p.gates.push(gate);
+            p
+        };
+        let incremental = with(Gate {
+            name: "mutation (since green)",
+            verifies: "",
+            command: &["cargo", "mutants"],
+            cadence: Cadence::DefaultBranch,
+            effect: Capability::Pure,
+            sharded: false,
+        });
+        let refusal = incremental.render_workflow().unwrap_err();
+        assert!(
+            refusal.contains("green-tag countersign economics"),
+            "{refusal}"
+        );
+        assert!(
+            incremental.locks_in(Path::new(".")).is_err(),
+            "a refused render never half-writes the lock list"
+        );
+
+        let sharded = with(Gate {
+            name: "mutation (full sweep)",
+            verifies: "",
+            command: &["cargo", "mutants"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            sharded: true,
+        });
+        assert!(sharded
+            .render_workflow()
+            .unwrap_err()
+            .contains("sweep economics"));
+
+        let unscheduled = with(Gate {
+            name: "audit",
+            verifies: "",
+            command: &["cargo", "audit"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            sharded: false,
+        });
+        assert!(unscheduled
+            .render_workflow()
+            .unwrap_err()
+            .contains("declares no schedule"));
+
+        let mut colliding = with(Gate {
+            name: "audit!",
+            verifies: "",
+            command: &["cargo", "audit"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            sharded: false,
+        });
+        colliding.cron = Some("0 4 * * 1");
+        colliding.gates.push(Gate {
+            name: "audit?",
+            verifies: "",
+            command: &["cargo", "audit"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            sharded: false,
+        });
+        assert!(colliding
+            .render_workflow()
+            .unwrap_err()
+            .contains("same workflow job id `weekly-audit`"));
+    }
+
+    /// `locks_in` roots BOTH locks in the caller's repository: the registry under
+    /// `spec/`, the workflow under `.github/workflows/<name>.yml` — the consumer twin
+    /// of this repo's `registry_lock`/`workflow_lock`.
+    #[test]
+    fn the_consumer_locks_land_in_the_callers_repo() {
+        let locks = Pipeline::starter()
+            .locks_in(Path::new("/downstream"))
+            .expect("the starter renders");
+        let [registry, workflow] = locks.as_slice() else {
+            panic!("two locks, got {}", locks.len());
+        };
+        assert_eq!(registry.name, "ci gate registry");
+        assert_eq!(
+            registry.path,
+            Path::new("/downstream").join("spec").join("gates.spec")
+        );
+        assert_eq!(registry.live, Pipeline::starter().render_registry());
+        assert_eq!(workflow.name, "ci workflow");
+        assert_eq!(
+            workflow.path,
+            Path::new("/downstream")
+                .join(".github")
+                .join("workflows")
+                .join("ci.yml")
         );
     }
 

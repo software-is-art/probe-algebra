@@ -14,6 +14,17 @@ merge, a sharded full sweep weekly — are cadence DATA in that registry, not YA
 This document describes the extractable core; [discovery.md](discovery.md#the-pipeline) has
 the pipeline-as-lock specifics.)
 
+The pipeline-as-lock move is itself extractable, as machinery rather than pattern:
+`discover::gates::Pipeline` is the consumer form — declare your own gates (every-change,
+per-diff mutation, unsharded weekly on a declared cron), and `Pipeline::locks_in(root)`
+derives both locks rooted in YOUR repository (`spec/gates.spec` +
+`.github/workflows/<name>.yml`), exactly the `Spec::lock_in` shape. The two tiers this
+repo runs bespoke (the green-tag incremental countersign, the sharded sweep) REFUSE by
+name in the consumer render instead of emitting wrong YAML — grow into them by copying
+`GateRegistry::render_workflow`. Genesis-generated crates are born with the whole loop:
+`src/gates.rs` declares (`Ci::pipeline()`, the starter), `cargo run --example
+freeze_gates` regenerates, `tests/gates.rs` drift-gates — fresh from the first commit.
+
 ## Move 1 — derive a deterministic spec artifact
 
 Have a tool derive a text artifact from the code: what the code *means*, computed rather than

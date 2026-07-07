@@ -1,0 +1,28 @@
+# GENERATED from this crate's gate declaration — THE PIPELINE IS A LOCK.
+# Never edit by hand: regenerate with `cargo run --example freeze_gates` and ratify the diff. The
+# declaration is the single source for the commands, the cadences, and the
+# toolchain pin; `spec/gates.spec` carries the promises.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  check:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-targets

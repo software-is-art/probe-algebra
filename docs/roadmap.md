@@ -217,6 +217,23 @@ states and transitions and get the sort enums, the tagged values, the closure gr
 and the target locks generated with meaning-holes only in the transition bodies.
 Together these are the genesis v2 work list.
 
+First strike off that list — **the pipeline gap, closed** (a sixth friction the report
+never named because every adopter assumes it: genesis emitted every artifact EXCEPT the
+CI that guards them, leaving the adopter to hand-write the one artifact class this repo
+argues must never be hand-written). `discover::gates::Pipeline` is the consumer form —
+gates declared as data, both locks derived into the consumer's repo via `locks_in`
+(the `Spec::lock_in` shape), the two bespoke tiers (green-tag countersign, sharded
+sweep) refusing by name rather than rendering wrong YAML — and genesis now emits the
+whole loop into every generated crate: `src/gates.rs` (a `Ci::pipeline()` typestate
+calling the ONE starter declaration, never a restatement), `examples/freeze_gates.rs`,
+`tests/gates.rs`, and the two artifacts pre-rendered so the pipeline locks are fresh
+from birth (the declaration fully determines the render — no target-vs-earned gap).
+Both demos carry it; the emitted workflow is inert inside this workspace (disclosed in
+their manifests) and exactly what the fifth report's standalone adopter needed. A
+pleasing verification note: the first draft emitted `pub fn pipeline()` and the demos'
+own generated enforcement shim REFUSED it (a loose public function violates the
+no-rats-nest rule) — the generated discipline judging its own generator.
+
 ## From the field, day zero (fire-drill consumed in production)
 
 The production CLI adoption consumed fire-drill untagged, same-day — and the crate's
