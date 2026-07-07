@@ -367,7 +367,7 @@ exists to catch the good ones.
 
 ```toml
 [dependencies]
-boundary-spec = { git = "https://github.com/software-is-art/probe-algebra" }
+boundary-spec = "0.1"
 ```
 
 Model the domain as value objects and operators (`#[algebra]` for the hands-free path,

@@ -806,9 +806,13 @@ mutates: the arm stays someone else's.
   integer is a hand-asserted compatibility claim nobody checks — the lock diff is the
   same information, uncompressed and verifiable. Consumers pin a release tag and read
   exactly which laws moved between any two of them.
-- **Publish** when ready: `docs/publishing.md` has the dependency-ordered sequence;
-  all four names (`boundary-spec`, `boundary-spec-macros`, `spec-lock`,
-  `boundary-enforce`) were verified unclaimed on crates.io on 2026-07-02.
+- ~~**Publish** when ready~~ — PUBLISHED 2026-07-07: all four crates
+  (`spec-lock`, `boundary-spec-macros`, `boundary-enforce`, `boundary-spec`) live
+  on crates.io at 0.1.0, in the runbook's dependency order. The root crate's
+  registry verify build resolved the three from the LIVE index and ran every
+  enforcement pass over the packaged tree — the real consumer path, green at
+  publish time. Tagged `v0.1.0` (outside `release.sh`'s `v2*` CalVer glob, so
+  the two tag families cannot collide).
 - **Morphism downstream**: the fixture exercises Construction/Branch/Guarded;
   the fourth edge shape is honestly unexercised downstream.
 - **MSRV**: unpinned; verify and add `rust-version` after first publish.
