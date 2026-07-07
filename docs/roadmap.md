@@ -702,6 +702,62 @@ re-bless that drops a law any consumer declared refuses by equation before the
 ratification diff lands. Old-vs-new is the cross-repo consumer's tool; self-judgment
 is the owner's tool for making declared reliances un-droppable.
 
+## Candidate: behaviour as code — the world lock grows eyes
+
+Terraform is two machines in one trenchcoat: a TRUTH machine (state file, plan,
+drift detection) and an ACTUATOR (apply, convergence, dependency-ordered mutation).
+The candidate is to take the eyes and leave the arm — the method covers the truth
+half better than the incumbents, and grafting on an actuator would break the house
+rule that makes locks trustworthy (locks gate, they never act; the one Effectful
+gate acts only on an already-certified tree).
+
+The reframe that makes it a candidate rather than a metaphor: **the spec of
+infrastructure is its behaviour, not its physicality.** A request from A reaches B;
+a credential minted with scope S cannot read T; the queue drains under load N —
+these are observations through the boundary, and resource attributes (instance
+types, ARNs, module trees) are interior representation. Two worlds that behave
+identically ARE the same world; that is the observation-function quotient this repo
+already stands on, pointed at clouds. Today's tools diff physicality (`plan` is
+field-by-field structural equality against a state cache); nobody diffs behaviour,
+and nobody has an algebra of it.
+
+The security mapping is the strongest leg, because its miniature is already BUILT.
+Security posture today is asserted by configuration convention — platform features
+plus module layering, the tier markers of operations. The tiers-as-a-lock ladder
+translates line for line:
+
+- attack surface = DERIVED reachability (pub-reachable ≙ internet-reachable; the
+  fronting relation ≙ a bastion — a door is a door);
+- the qualify census ≙ the surface census: what is exposed, as a computed,
+  ratified, drift-gated fact;
+- the kernel register ≙ privilege: never inferred from conduct, every exemption
+  (break-glass role, admin path) a justified line in a committed register, a stale
+  entry a lie;
+- and security claims are REFUTATION-SHAPED — "no path from the public net to the
+  db port" is a law a probe can only fail to refute. Green-is-evidence-not-certainty
+  is the honest frame security has always needed and compliance checkboxes have
+  always faked.
+
+The full loop would be genesis's two-lifecycle story at world scale: a `system!`
+declaration whose modules are services, seams are network edges, and expects are
+reachability/deny/flow laws; the target lock committed RED on purpose; the existing
+actuator (terraform or anything) makes the world; Effectful probes earn the
+declaration green; the world lock freezes what was earned and gates the drift.
+"Behaviour as code" is the honest name — the declaration is a law set, not a
+machine list.
+
+Honest frame, and why this stays a candidate: the engine assumes cheap, pure,
+replayable evaluation, and a world probe is none of those — it costs money, takes
+seconds, mutates nothing only if carefully designed, and samples a battery of ONE
+world with no grid. The capability lattice already has the vocabulary (Effectful
+edges, cost budgets refused at compile time), but a probing engine with a spend
+budget and read-only discipline does not exist yet. Prerequisites, in order: (1)
+read-only world probes as first-class edges with declared cost; (2) the world lock
+generalised from library dependencies to any probed surface; (3) a reachability
+derivation over a world's edge graph (the placer's math is domain-agnostic — it
+already works on raw string signatures). Build nothing that mutates: the arm stays
+someone else's.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
