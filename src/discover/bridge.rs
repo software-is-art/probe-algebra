@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! bridge — THEORY FROM EXPORTED DATA: a prover's finite operator tables become a live
 //! `Theory`, and discovery runs as CONJECTURE SUPPLY and cross-check — never certification.

@@ -1,4 +1,3 @@
-//! Tier: INTERIOR — the workshop / leaves (tier 2 inward rule).
 //!
 //! probes — the store's per-module probe registry, mirroring the crate `harness`: every
 //! edge declared in `edges!` MUST impl `Probed` (a compile-time obligation, enforced

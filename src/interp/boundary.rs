@@ -1,4 +1,3 @@
-//! Tier: BOUNDARY — a domain's strict value-object surface (tier 1 grammar).
 //!
 //! interp::boundary — a tiny expression language as a boundary CATEGORY.
 //!

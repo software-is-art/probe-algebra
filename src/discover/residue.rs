@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! residue — equivalent mutants as a SIMPLIFICATION signal, not a permanent exception.
 //!

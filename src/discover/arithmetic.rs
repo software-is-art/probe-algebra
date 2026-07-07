@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! The interpreter's arithmetic, expressed as a `Theory` so its algebra discovers itself.
 //!

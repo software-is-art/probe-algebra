@@ -1,4 +1,3 @@
-//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
 //! expect — DECLARED EXPECTATIONS: the module-level unit of top-down construction.
 //!

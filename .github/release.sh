@@ -38,6 +38,19 @@ notes=$(mktemp)
     echo '```diff'
     git diff "${prev}..HEAD" -- spec/ '*/spec/' | head -n 400
     echo '```'
+    echo
+    echo "## Signed by change"
+    echo
+    echo "The instance that made this release, named by what it ratified — the"
+    echo "fingerprint hashes the spec-lock diff only, so interior refactors do not"
+    echo "change the name; only changes to meaning do."
+    echo
+    moved=$(git diff --name-only "${prev}..HEAD" -- spec/ '*/spec/' | sed 's|.*/||' | sort -u | tr '\n' ' ')
+    # --raw: blob hashes only, so the name is machine-invariant (a diff-algorithm
+    # config difference must never split one identity into two).
+    print=$(git diff --raw "${prev}..HEAD" -- spec/ '*/spec/' | sort | sha256sum | cut -c1-12)
+    echo "- moved: ${moved:-nothing — a machinery-only release}"
+    echo "- fingerprint: \`${print}\`"
   else
     echo "First automatic release — from here on, every certified tree publishes itself."
   fi

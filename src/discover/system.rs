@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! system — the COMPILED `system!` graph layer: an application's spec as a graph of algebras.
 //!

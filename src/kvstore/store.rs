@@ -1,14 +1,14 @@
-//! Tier: BOUNDARY — a domain's strict value-object surface (tier 1 grammar).
 //!
 //! kvstore::store — a TTL key-value store as a boundary CATEGORY.
 //!
 //! NOTE THE FILENAME. Every other domain calls this file `boundary.rs`; this one is
-//! `store.rs` ON PURPOSE, to demonstrate that boundary-hood is the DECLARED TIER plus the
-//! enforced shape — the `Tier: BOUNDARY` marker above, which subjects this file to the
-//! full tier-1 grammar in `build.rs` — and not a filename convention. (The qualification
-//! census makes the same point from the other side: a module qualifies as an algebra by
-//! STRUCTURE, wherever it lives.) If renaming the file changed what the rules enforced,
-//! the rigidity would live in the path, not the boundary.
+//! `store.rs` ON PURPOSE, to demonstrate that boundary-hood is DERIVED structure — this
+//! file is pub-reachable and carries production edges, which is what places it BOUNDARY
+//! in `spec/tiers.spec` and subjects it to the full tier-1 grammar in `build.rs` — and
+//! not a filename convention. (The qualification census makes the same point from the
+//! other side: a module qualifies as an algebra by STRUCTURE, wherever it lives.) If
+//! renaming the file changed what the rules enforced, the rigidity would live in the
+//! path, not the boundary.
 //!
 //! The domain is the crate's first STATEFUL one, and the design keeps `Stateful` honest
 //! without `Effectful`: the `Store` value object carries its own logical `Clock`, and time

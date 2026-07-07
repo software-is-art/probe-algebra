@@ -1,0 +1,16 @@
+# kernel register — the ratified KERNEL tier: the ONLY files exempt from the structural
+# rules. An entry is `<path>: <justification>`; the justification IS the ratification
+# (spec_lock::Register grammar: a bare key refuses, an empty justification refuses, a
+# duplicate refuses; a registered path with no file is a build error — a stale
+# ratification is a lie). Kernel-hood is a decision, never derived: a privilege cannot
+# be inferred from conduct. Every other tier is derived — see spec/tiers.spec.
+src/boundary.rs: the value-object grammar itself — Shaped, the edge traits, the grids the rules judge against
+src/capability.rs: the capability lattice the ALGEBRA honesty rule dispatches on
+src/discover/engine.rs: defines and runs the discovery format — the trusted floor of every law
+src/discover/expect.rs: the declared-expectation vocabulary the engine, genesis, and the catalog share
+src/discover/mod.rs: the theory!/protocol! macros — they generate the code the rules then read
+src/gdp.rs: the name/proof vocabulary (Named, WellTyped) — crate-level grammar
+src/harness.rs: probe-suite plumbing shared across the kernel's own tests
+src/lib.rs: the crate root — the module roster the partition hangs off
+src/main.rs: the demo binary — prints, no assertions, excluded from sweeps
+src/tests.rs: the crate test-module body — scaffolding, not a domain

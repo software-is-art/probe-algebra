@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! shape — the PLACER: module boundaries derived from net connectivity, continuously.
 //!

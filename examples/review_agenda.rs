@@ -20,7 +20,19 @@ fn main() {
     if paths[0] == "--guard" {
         if let Some(path) = paths.get(1) {
             let source = std::fs::read_to_string(path).unwrap_or_default();
-            if let Some(guard) = Agenda::edit_guard(path, &source) {
+            // kernel-hood is the register's fact, the same one build.rs consumes — a
+            // file is kernel when its manifest-relative path has a ratified entry in
+            // spec/kernel.register (the hook runs at the repo root). A refused
+            // register is the build gate's problem; the advisory guard fails open.
+            let kernel = spec_lock::Register {
+                name: "kernel".to_string(),
+                path: std::path::PathBuf::from("spec/kernel.register"),
+            }
+            .entries()
+            .unwrap_or_default()
+            .iter()
+            .any(|(key, _)| path == key || path.ends_with(&format!("/{key}")));
+            if let Some(guard) = Agenda::edit_guard(path, &source, kernel) {
                 println!("{guard}");
             }
         }

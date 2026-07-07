@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! watch — the LIVE half of the placer: edit code, see the layout move.
 //!

@@ -1,4 +1,3 @@
-//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
 //! discover — the laws WRITE (and READ) themselves, generically, over ANY boundary's algebra.
 //!

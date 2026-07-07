@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! composition — what holds across a PIPELINE of modules, not within one.
 //!

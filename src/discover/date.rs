@@ -1,4 +1,3 @@
-//! Tier: ALGEBRA — a discovered-law / report layer (exempt from the inward rule).
 //!
 //! A date/duration calculus, as a `Theory` — a MULTI-SORTED domain with a PARTIAL operator and a
 //! round-trip pair, to show the engine discovers algebra across sorts and through partiality.

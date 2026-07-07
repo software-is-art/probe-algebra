@@ -1,4 +1,3 @@
-//! Tier: KERNEL — the trusted floor — defines/runs the format, exempt from the structural rules.
 //!
 //! boundary-spec — a boundary-discipline experiment plus a layered probe method.
 //!
