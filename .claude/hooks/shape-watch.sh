@@ -1,11 +1,13 @@
 #!/bin/bash
-# The bridge alarm, as machinery (PostToolUse on Edit|Write): after an agent edits a
-# theory file, re-derive the placement from source text and inject one line into the
-# loop ONLY when the shape moved — a bridge (two features coupled) always speaks, a new
-# net-disjoint component announces its extraction, everything else is free silence.
-# See discover::watch (Ticker::hook_line) for the policy; the logic lives in
-# mutation-tested Rust, this script is the envelope. Fail-open everywhere: a broken
-# hook degrades to no feedback, never to a broken edit loop.
+# The edit-time feedback loop, as machinery (PostToolUse on Edit|Write). Two voices,
+# both priced in silence: the GUARD pre-fires refusals that already exist downstream
+# (hand-editing a generated lock; a loose `pub fn` the shim will refuse), and the SHAPE
+# ticker speaks when a theory edit moves the layout (a bridge, a new net-disjoint
+# component). Logic lives in mutation-tested Rust (discover::agenda::edit_guard,
+# discover::watch::Ticker); this script is the envelope. Binaries are prebuilt by the
+# SessionStart hook so an edit pays a process spawn, not a compile — with a build
+# fallback if they are missing. Fail-open everywhere: a broken hook degrades to no
+# feedback, never to a broken edit loop.
 set -uo pipefail
 
 input=$(cat) || exit 0
@@ -17,15 +19,25 @@ try:
 except Exception:
     pass
 ' <<<"${input}") || exit 0
+[ -n "${path}" ] || exit 0
+
+cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
+
+run_example() { # <name> <args...>: prebuilt binary if present, else quiet build
+  local name="$1"
+  shift
+  local bin="target/debug/examples/${name}"
+  [ -x "${bin}" ] || cargo build -q --example "${name}" 2>/dev/null || return 0
+  "${bin}" "$@" 2>/dev/null
+}
+
+run_example review_agenda --guard "${path}"
 
 case "${path}" in
 *.rs) ;;
 *) exit 0 ;;
 esac
 [ -f "${path}" ] || exit 0
-# only theory files pay the cargo invocation.
 grep -q "ops {" "${path}" 2>/dev/null || exit 0
-
-cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
-cargo run -q --example place_watch -- --event "${path}" target/shape-watch 2>/dev/null
+run_example place_watch --event "${path}" target/shape-watch
 exit 0

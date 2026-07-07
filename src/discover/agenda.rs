@@ -154,6 +154,55 @@ impl Agenda {
     }
 }
 
+impl Agenda {
+    /// The EDIT-TIME guard — the hook's second voice: move EXISTING refusals earlier,
+    /// never add judgments. Two pre-fires: the one rule (an edit landing on a generated
+    /// lock artifact warns now, instead of the freshness gate refusing a build later),
+    /// and the no-rats-nest shim (a module-level `pub fn` warns now, instead of
+    /// `build.rs` refusing at compile time). Registers and exports are exempt from the
+    /// first — they are hand-authored inputs, not derived artifacts. `None` when the
+    /// edit is unremarkable, because silence must stay free.
+    pub fn edit_guard(path: &str, source: &str) -> Option<String> {
+        let mut lines = Vec::new();
+        if !path.ends_with(".export") && !path.ends_with(".register") {
+            match classify(path) {
+                Ok(Class::Ratify(_)) => lines.push(format!(
+                    "guard: `{path}` is a generated lock artifact — never hand-edit; \
+                     regenerate via its freeze path and ratify the diff"
+                )),
+                Ok(_) => {}
+                Err(_) => lines.push(format!(
+                    "guard: `{path}` looks like a lock artifact of no known class — if \
+                     it is one, teach the review router before it can be misfiled"
+                )),
+            }
+        }
+        // KERNEL-tier files are exempt from the structural rules (the shim never
+        // refuses them), so the guard stays quiet too — it pre-fires refusals, it
+        // does not invent stricter ones.
+        let kernel = source
+            .lines()
+            .next()
+            .is_some_and(|l| l.contains("Tier: KERNEL"));
+        if path.ends_with(".rs") && !kernel {
+            for name in source.lines().filter_map(|l| {
+                l.strip_prefix("pub fn ")
+                    .and_then(|rest| rest.split('(').next())
+            }) {
+                lines.push(format!(
+                    "guard: `pub fn {name}` is a loose public function — the \
+                     enforcement shim will refuse the build; hang it off a typestate"
+                ));
+            }
+        }
+        if lines.is_empty() {
+            None
+        } else {
+            Some(lines.join("\n"))
+        }
+    }
+}
+
 enum Class {
     Ratify(Ratification),
     Prose,
@@ -294,6 +343,36 @@ mod probes {
         let err = Agenda::of(["spec/router.frobnicate"]).unwrap_err();
         assert!(err.contains("no known lock class"), "{err}");
         assert!(err.contains("spec/router.frobnicate"));
+    }
+
+    /// THE EDIT-TIME GUARD pre-fires exactly the two refusals that already exist
+    /// downstream, and stays silent otherwise. A generated lock warns; a hand-authored
+    /// register or export does not; a module-level `pub fn` warns (indented assoc fns
+    /// do not); prose and interior code are silence. Absolute paths classify the same
+    /// as repo-relative — the Edit tool hands the hook absolute paths.
+    #[test]
+    fn the_edit_guard_prefires_only_existing_refusals() {
+        let g = Agenda::edit_guard("spec/router.spec", "").expect("a lock warns");
+        assert!(g.contains("never hand-edit"), "{g}");
+        assert!(Agenda::edit_guard("/home/u/repo/spec/router.spec", "").is_some());
+        assert_eq!(Agenda::edit_guard("lean/bites.register", ""), None);
+        assert_eq!(Agenda::edit_guard("spec/bridged-bool.export", ""), None);
+        assert_eq!(Agenda::edit_guard("docs/roadmap.md", ""), None);
+
+        let loose = "pub fn pipeline() -> Pipeline {\n    todo!()\n}\n";
+        let g = Agenda::edit_guard("src/gates.rs", loose).expect("a loose fn warns");
+        assert!(
+            g.contains("`pub fn pipeline` is a loose public function"),
+            "{g}"
+        );
+        let hung = "impl Ci {\n    pub fn pipeline() -> Pipeline { todo!() }\n}\n";
+        assert_eq!(Agenda::edit_guard("src/gates.rs", hung), None);
+        // a KERNEL-tier file is exempt from the shim, so the guard is silent on it.
+        let kernel = "//! Tier: KERNEL — the trusted floor.\npub fn shadow_grid() {}\n";
+        assert_eq!(Agenda::edit_guard("src/engine.rs", kernel), None);
+
+        let unknown = Agenda::edit_guard("spec/new.frobnicate", "").expect("unknown warns");
+        assert!(unknown.contains("no known class"), "{unknown}");
     }
 
     /// Member crates' locks route like the root's — the path prefix carries the crate,

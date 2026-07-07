@@ -12,8 +12,19 @@ use boundary_spec::discover::agenda::Agenda;
 fn main() {
     let paths: Vec<String> = std::env::args().skip(1).collect();
     if paths.is_empty() {
-        eprintln!("usage: review_agenda <changed paths...>");
+        eprintln!("usage: review_agenda <changed paths...> | --guard <path>");
         std::process::exit(2);
+    }
+    // the HOOK mode: one edited path, one line if a downstream refusal is being walked
+    // into, silence otherwise. Fail-open — a missing file is an empty source.
+    if paths[0] == "--guard" {
+        if let Some(path) = paths.get(1) {
+            let source = std::fs::read_to_string(path).unwrap_or_default();
+            if let Some(guard) = Agenda::edit_guard(path, &source) {
+                println!("{guard}");
+            }
+        }
+        return;
     }
     match Agenda::of(&paths) {
         Ok(agenda) => print!("{}", agenda.render()),
