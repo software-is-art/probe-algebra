@@ -474,10 +474,12 @@ impl GateRegistry {
                  \x20 # EVERY shard of the full sweep is green — which is also the BOOTSTRAP (no tag\n\
                  \x20 # yet? dispatch this workflow once; the certification plants it) and the\n\
                  \x20 # recovery after a red stretch (the weekly green re-anchors the diff).\n\
+                 \x20 # MAIN-ONLY: a branch dispatch runs the sweeps as evidence, but the tag names\n\
+                 \x20 # the certified DEFAULT-BRANCH tree — a branch tip must never claim it.\n\
                  \x20 mutants-full-countersign:\n\
                  \x20   name: countersign (full sweep)\n\
                  \x20   needs: [{needs_list}]\n\
-                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'\n\
                  \x20   runs-on: ubuntu-latest\n\
                  \x20   permissions:\n\
                  \x20     contents: write\n\
@@ -634,6 +636,13 @@ mod tests {
         // it — the full sweep's countersign (also the bootstrap: dispatch the workflow
         // once), gated on every shard via `needs`, and the incremental gate per-merge.
         assert!(workflow.contains("mutants-full-countersign:"));
+        // ... and the countersign is MAIN-ONLY: a branch dispatch runs the sweeps as
+        // evidence, but the tag names the certified default-branch tree, so a branch
+        // tip must never claim it (found live: a branch dispatch nearly moved the tag).
+        assert!(workflow.contains(
+            "if: (github.event_name == 'schedule' || github.event_name == \
+             'workflow_dispatch') && github.ref == 'refs/heads/main'"
+        ));
         // ... and it needs EVERY weekly job: the tag is the whole weekly verdict, so a
         // red companion gate withholds the countersign exactly like a red shard.
         assert!(workflow.contains(

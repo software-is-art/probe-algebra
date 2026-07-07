@@ -149,10 +149,12 @@ jobs:
   # EVERY shard of the full sweep is green — which is also the BOOTSTRAP (no tag
   # yet? dispatch this workflow once; the certification plants it) and the
   # recovery after a red stretch (the weekly green re-anchors the diff).
+  # MAIN-ONLY: a branch dispatch runs the sweeps as evidence, but the tag names
+  # the certified DEFAULT-BRANCH tree — a branch tip must never claim it.
   mutants-full-countersign:
     name: countersign (full sweep)
     needs: [mutants-full, mutants-delta-render-plumbing, mutants-statement-bites-lean-corpus]
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
