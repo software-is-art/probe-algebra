@@ -138,7 +138,8 @@ vacuous-truth hole — the `meaningful` filter now guards both polarities; and a
 `opt-level` override collapsed the drift-gate economics from ~95s to ~6s because `Engine<T>`
 monomorphizes into the consumer crate. Deliberately absent from v1, recorded as candidates
 below: recursion/fixpoint circuits, SQL/NULL semantics (the end law's batch oracle is the
-declared seam), and phase 7's property-constrained interpretation sampling.
+declared seam), and phase 7's property-constrained interpretation sampling (since BUILT —
+candidate 6).
 
 ## The next brick: candidates
 
@@ -248,58 +249,112 @@ candidate bricks:
    every one fired on. Honest frame inherited: a drill refutes vacuousness for ITS fixture
    only; the battery proves the alarm rings when pressed, never that it hears everything.
 
-5. **The exception-register pattern, first-class.** The adoption's highest-leverage use was
-   freezing an accepted-findings baseline (documented in
-   [ci-discipline.md](ci-discipline.md)). The convention (deterministic keyed serialization →
-   byte equality IS set equality) covers it with spec-lock as-is; if field use keeps wanting
-   set-diff rendering ("2 new findings, 1 resolved" instead of a byte diff), a tiny keyed
-   helper alongside `Lock` is the shape — resist anything larger.
+5. **The exception-register pattern, first-class — BUILT** (`spec_lock::Register`, with
+   candidate 10 as its first consumer). Exactly the resisted-to shape: a register is
+   HAND-AUTHORED, never generated — writing a key IS the ratification, the justification
+   is the one thing no derivation can produce, and the format enforces it (a bare key or
+   an empty justification is a parse refusal, not an entry). The tooling only reads and
+   diffs: `Register::check` renders drift as SET DIFFERENCE — "1 new finding(s) — ratify
+   with a justification or fix", "1 resolved — delete the line(s) (a stale exception is a
+   lie)" — never a byte diff. A missing register is honestly the empty register (the one
+   place missing-is-not-stale: a declaration's absence declares "no exceptions"; there is
+   nothing to regenerate). First consumer: `lean/bites.register`, the statement-bite
+   survivors baseline.
 
-6. **Uninterpreted operators with ratified properties** (delta-render phase 7, deferred):
-   for an opaque symbol with declared properties (deterministic, additive, zero-preserving),
-   check circuit laws over SAMPLED random interpretations constrained only by those
-   properties — plus the REMOVAL drill: re-sample with one property dropped and demand the
-   law fail, proving each ratified property load-bearing (a property whose removal changes
-   nothing is decoration, flagged not frozen). The bridge to pipelines whose operator
-   inventory is open, and a fire-drill variant in its own right.
+6. **Uninterpreted operators with ratified properties — BUILT** (`delta-render/src/warrant.rs`,
+   `spec/enrich.warrant.spec`). The opaque symbol `enrich` — no inventoried
+   implementation, standing for the open half of a real pipeline's inventory — holds a
+   linear license on SAMPLED evidence: the circuit law (`i(enrich(d(s))) = enrich(s)`)
+   judged over interpretations sampled under the declared properties, deterministically
+   (splitmix64, fixed seed), so the warrant is a derivation, not a dice roll. The REMOVAL
+   drill keeps the property list honest: drop one property, re-sample under the rest (each
+   counter-sample violates exactly the dropped one), demand refutation — and a property
+   whose removal refutes nothing is DECORATION, flagged in the artifact and never ratified.
+   The demonstration plants one on purpose (`bounded-fanout`), so the flag's polarity is
+   exercised on every regeneration; `tests/gates.rs` registers each arm as a fire-drill
+   gate. One subtlety earned its own disclosure: full additivity implies zero preservation
+   (a cancellation pair reaches the basepoint from non-empty inputs), so the ratified
+   properties are declared as INDEPENDENT constraints — additivity away from the
+   basepoint, zero-preservation as the basepoint — mirroring how the license classifier
+   already reads them as two separate laws. Recorded residual: the warrant is not yet a
+   circuit admission (no warranted opaque node in `Registry`/`circuit`) — kept out until a
+   real open-inventory consumer forces its shape.
 
-7. **Depth-bounded stream carriers as a grid idiom**: `delta-render`'s `Stream` (fixed-depth
-   vector, prefix equality) worked as a Theory carrier with zero engine changes — worth
-   documenting as the supported way to put time-indexed values on a grid, alongside the grid
+7. **Depth-bounded stream carriers as a grid idiom — DONE** (documented in
+   [discovery.md](discovery.md)'s grid section): `delta-render`'s `Stream` (fixed-depth
+   vector, prefix equality) worked as a Theory carrier with zero engine changes — recorded
+   as the supported way to put time-indexed values on a grid (declared depth constant,
+   pad-and-truncate mint, deliberate histories over combinatorial soup), alongside the grid
    and term-depth bounds the honest frame already declares.
 
-8. **Toleranced three-valued judgment** (from the third field report): for metric/setoid
-   carriers, judge laws as holds / refuted / UNDECIDED-at-ε, with ε carried in the lock
-   text so review ratifies the tolerance along with the law. The observation-hook
-   quantization route is documented (with its boundary hazard) in
-   [discovery.md](discovery.md); the undecided band is what makes a toleranced gate honest
-   where these domains actually live — near the boundary.
+8. **Toleranced three-valued judgment — BUILT.** `Theory::judge` returns
+   holds / refuted / UNDECIDED and `Theory::tolerance` registers the bars; an undecided
+   candidate is disclosed in the lock under the registered-ε header instead of being
+   coin-flipped at the boundary, and a frozen law drifting into the band re-checks as a
+   named error. The demonstration is integer averaging: commutativity certified exactly,
+   its ±1-noise associativity landing in the band, pinned. Scope disclosed: judgment
+   only — enumeration keeps exact equality (a toleranced relation is not transitive).
 
-9. **Conditional / guarded laws** (from the second and third field reports): `P(s) ⇒
-   lhs = rhs` — guarded identities, and monotonicity's general form `∀ x ≤ y: f(x) ≤ f(y)`
-   (the catalog carries the unconditional join form). Needs a premise slot in the shape
-   grammar and a driver that filters assignments by the guard; the honest frame carries
-   over (a bounded grid refutes a guarded law on its satisfying assignments).
+9. **Conditional / guarded laws — BUILT.** `ShapeInfo` carries `premise:
+   Option<SchemaTerm>`, judged against the shape's constant slot: an assignment counts
+   only where the premise fires, and a law whose premise never fires is VACUOUS, not
+   true — the fixed-point lesson, guarded. Three stanzas prove the family: guarded
+   monotonicity (`∀ x ≤ y: f(x) ≤ f(y)`), transitivity, and antisymmetry (whose
+   conclusion is carrier equality) — and the vacuity rule earned its census on day one:
+   `le` is antisymmetric, `less-than` is NOT (its mutual premise is satisfiable nowhere,
+   and the pin holds the silence). Frozen guarded laws re-check with the same semantics
+   plus a "lost its ground" arm, so a mutant that empties a premise is named, never
+   passed. The guard rides `DiscoveredLaw`, renders as `premise = true ⟹ lhs = rhs`
+   through the one equation source, and `transitive` — the word two tests used as the
+   canonical UNKNOWN shape — became declarable, which the census caught in both places.
 
-10. **Statement-bite mutation** (from the proof-corpus assessment): mutation testing FOR
-    proof corpora — mutate the DEFINITIONS (not the proofs) and demand each theorem fail to
-    re-check; a proof that survives definition mutants never depended on that degree of
-    freedom, which is the vacuous-statement finding (wrong quantifier scope, a definition
-    too weak to constrain) the kernel cannot make. Killed/survived/ratified follows the
-    residue policy verbatim; the harness half is `mutants-gate.sh`'s pattern,
-    substrate-free; the mutant generator is per-language (Agda/Lean) work. The one brick
-    in this family that makes existing kernel-checked artifacts MORE trustworthy.
+10. **Statement-bite mutation — BUILT, with our own corpus as the consumer**
+    (`discover::bite`, `lean/ProbeBool.lean`, `lean/bites.register`, weekly gate
+    `.github/statement-bite.sh`). The proof-corpus consumer it was waiting for turned
+    out to be us: `lean/ProbeBool.lean` formalises the bridged Boolean fragment, making
+    it the REAL upstream prover behind `spec/bridged-bool.export` — six of the bridge's
+    conjectures (both De Morgan duals among them) were proved there and ratified into
+    `proved:` lines, so conjecture supply → upstream proof → certificate is now one
+    executed loop (agreements 4 → 10, obligations 21 → 15). The bites: flip one result
+    literal in the DEFINITIONS region (never a pattern — a syntax wound is not a
+    statement bite; never a proof) and demand the theorems fail to re-check under the
+    Lean kernel. A survivor is the vacuous-statement finding the kernel cannot make
+    about itself, ratified by key in `lean/bites.register` — candidate 5's register,
+    consumed. One survivor set is PLANTED (`bnand`: defined, deliberately untheoremed,
+    four surviving bites) so the survivor arm is exercised on every run. Honesty split:
+    the Lean kernel (weekly CI gate; the countersign now needs it) is the substrate
+    authority, while a Rust MIRROR of the ten theorems re-judges every bite inside
+    every `cargo test`, pinning the expected survivor set toolchain-free — plus
+    cell-for-cell corpus-tables ↔ export-tables agreement and a `proved:` ↔
+    `-- certifies:` bijection, so the Lean file, the export, and the register cannot
+    drift apart silently. Remaining out-of-repo half, disclosed: richer per-language
+    mutant families (quantifier scope, hypothesis deletion) beyond result-literal
+    flips.
 
-11. **Theory-bridge** (same assessment): `Theory` from exported data — a prover emits
-    finite operator tables for its decidable fragments (a table IS an eval function), and
-    discovery runs as CONJECTURE SUPPLY and triage, never certification: grid survivors
-    become proof obligations rendered as statement stubs (the genesis meaning-hole move),
-    grid refutations kill false conjectures before anyone burns a day proving them.
+11. **Theory-bridge — BUILT** (`discover::bridge`, `spec/bridged-bool.export` →
+    `.spec` / `.mutation.spec` / `.obligations.spec`). `Theory` from exported data: a
+    prover emits finite operator tables (a table IS an eval function) in a small line
+    format whose every malformed line is a named, fire-drilled refusal;
+    `Export::install` mounts it in a compile-time slot and `Bridged<SLOT>` is a full
+    citizen of the apparatus — spec lock, algebra-mutation verdict, distance — with
+    zero new engine machinery (the slot table is the price of keeping `Operator.eval`
+    a plain fn pointer). The prover's certificates ride along as `proved:` lines in
+    the `expects` vocabulary, and `Triage` re-reads the distance with the prover's
+    epistemics: agreements cross-check the pipeline, conjectures are proof
+    obligations (the demonstration Boolean fragment yields 21, both De Morgan duals
+    among them, from four certificates). The carrier is judged EXHAUSTIVELY (v1 caps
+    exports at 8 elements / 8 operators to keep that true), so a refutation is a
+    fact, not a sample; absence of a conjecture remains no evidence, and agreement
+    never certifies.
 
-12. **The disagreement detector** (falls out of 11): grid-check already-proved laws over
-    the exported tables — agreement proves nothing new, but DISAGREEMENT is always a
-    defect somewhere in the export/bridge pipeline, with certainty. Differential testing
-    for the untrusted half of a proof corpus, same polarity as delta-render's end gate.
+12. **The disagreement detector — BUILT** (falls out of 11, and did): `Triage::certify`
+    fails — by law name, with the certainty prose — whenever an upstream-proved law is
+    refuted over the exhaustive carrier: a defect SOMEWHERE in the export/bridge
+    pipeline, unconditionally (differential testing for the untrusted half of a proof
+    corpus, same polarity as delta-render's end gate). A disagreement never renders in
+    the obligations artifact and the freeze path refuses to freeze it — it is a defect
+    to fix upstream, never a row to ratify; the drill export (`proved: commutative
+    implies`) pins the conviction end to end.
 
 ## Standing follow-ups
 

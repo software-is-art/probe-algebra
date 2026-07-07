@@ -1,0 +1,15 @@
+# lean statement-bite survivors — the ratified-exceptions REGISTER for
+# lean/ProbeBool.lean. HAND-AUTHORED, never generated: writing a key here IS the
+# ratification, and the justification is the one thing no derivation can produce.
+#
+# A key is a definition bite (`<def> | <arm pattern> => <flipped result>`) that the
+# theorems failed to notice — the vacuous-statement finding. The gate
+# (`.github/statement-bite.sh`, weekly; `cargo run --example statement_bite` locally)
+# diffs live survivors against this set: a NEW survivor wants a justification here or
+# a theorem in the corpus; a RESOLVED one wants its line deleted. The expected set is
+# also pinned semantically by `discover::bite`'s mirror probe inside every cargo test.
+
+bnand | true, true => true: bnand is defined and deliberately untheoremed — the planted vacuous-statement finding that keeps the survivor arm exercised; the debt is paid by theoremizing bnand, not by deleting this line quietly.
+bnand | true, false => false: same planted finding — bnand carries no theorem, so no bite on it can die.
+bnand | false, true => false: same planted finding — bnand carries no theorem, so no bite on it can die.
+bnand | false, false => false: same planted finding — bnand carries no theorem, so no bite on it can die.

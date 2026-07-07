@@ -4,7 +4,7 @@ The reference for the discovery half of the method: what a theory is, how the gr
 what the catalog's data means and how the engine interprets it, what every lock kind pins, and
 how the system, world, pipeline, and mutation layers reuse the same move. Every term maps to an
 item in `src/discover/`. For the compile-time edge grammar beneath all of this, read
-[concepts.md](concepts.md).
+[compile-time.md](compile-time.md).
 
 ## A theory
 
@@ -41,9 +41,22 @@ Laws are judged over assignments of inhabitants to variables. Two honesty mechan
   exhaustively; a large one is sampled by a coprime-stride mixed-radix decode so no variable's
   value is a function of another's (the over-fitting failure mode a naive stride has).
 
+**Time-indexed values are grids too — the depth-bounded carrier idiom.** `delta-render`'s
+`Stream` (a FIXED-DEPTH vector of Z-sets; equality is prefix equality to that depth) worked
+as a `Theory` carrier with zero engine changes, and it is the supported way to put histories,
+traces, or tick-indexed state on a grid: make the depth a declared constant, make the mint
+pad-and-truncate so a wrong-depth value is unconstructible, and hand discovery a handful of
+deliberate histories (the impulse, the LATE impulse so delay is visible, the retraction
+pair, the ramp) rather than a combinatorial soup. The depth bound is the same concession the
+honest frame already declares for grids and term depth — bounded refutation, stated — and it
+composes with everything above: the discovered laws (`i` undoes `d`, linearity of all three
+stream operators) are exactly the ones the incremental-circuit derivation then leans on.
+Keep the grid lean on purpose when a drift gate re-derives the theory inside every
+`cargo test`: grid size is an economics decision the theory author owns, not an accident.
+
 ## The catalog IS the engine
 
-`ShapeCatalog::inventory()` is the law language — 26 shapes — and `Engine::templates()` is a
+`ShapeCatalog::inventory()` is the law language — 35 shapes — and `Engine::templates()` is a
 generic interpreter over it. There is no second statement of the battery anywhere. Each
 `ShapeInfo` stanza carries:
 
@@ -208,7 +221,19 @@ precision by quantizing there (round to the registered number of digits, or map 
 fixed-point bucket). The tolerance is thereby in the ratified theory declaration — code
 review sees it next to the operators — never ambient.
 
-State the hazard before adopting that route: **quantized equality is not ε-closeness.**
+**Now built, the second arm:** [`Theory::judge`] returns a three-valued
+[`Verdict`] — holds / refuted / UNDECIDED — and [`Theory::tolerance`] registers the bars
+as display text. A candidate law with any undecided assignment (and no refutation) is
+neither certified nor refuted: it lands in the lock's DISCLOSED band
+(`# undecided at the declared tolerance …`), under a header that carries the registered
+bars — so review ratifies ε along with the laws, and a frozen law that drifts into the
+band re-checks as a named error, never a silent pass. Scope, disclosed: judgment only —
+enumeration and the consequence count keep exact equality, because a toleranced relation
+is not transitive and cannot key the term-collision maps.
+
+The quantization route below remains valid for carriers that can keep values off bucket
+boundaries; state the hazard before adopting it: **quantized equality is not
+ε-closeness.**
 Two values within δ ≪ ε of each other can straddle a bucket boundary and compare unequal,
 so near the boundary a TRUE law can be refuted by roundoff, and the lock would record the
 lie. The quantized route is only honest when the grid keeps values away from bucket

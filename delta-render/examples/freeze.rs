@@ -17,6 +17,7 @@ use delta_render::ops::{
     min_retraction_witness, DistinctOp, FilterOp, JoinOp, MapOp, MinOp, ScaleOp, SumOp,
 };
 use delta_render::stream::StreamCalculus;
+use delta_render::warrant::Warrant;
 use delta_render::zset::ZSetAlgebra;
 
 fn main() {
@@ -61,6 +62,9 @@ fn main() {
             path: spec_dir.join("min.retraction.spec"),
             live: min_retraction_witness(),
         },
+        // phase 7: the uninterpreted operator's warrant — the license judged over
+        // sampled interpretations, every property drilled by removal.
+        Warrant::derive().lock_in(&spec_dir),
     ];
     spec_lock::bless(&locks).expect("write the spec locks");
     for lock in &locks {

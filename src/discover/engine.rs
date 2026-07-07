@@ -80,6 +80,31 @@ pub trait Theory: Sized {
     fn rounds() -> usize {
         2
     }
+    /// How this theory JUDGES two observations for law purposes. The default is exact
+    /// equality — right for every decidable carrier. A metric/setoid carrier (floats,
+    /// constructive reals as Cauchy data) overrides with its REGISTERED bars: closer
+    /// than the holds-bar judges `Holds`, farther than the refutes-bar judges
+    /// `Refuted`, and the band between is `Undecided` — disclosed, never silently
+    /// binned. Pair every override with [`Theory::tolerance`], so the bars ship in the
+    /// lock text and review ratifies the tolerance along with the laws.
+    ///
+    /// SCOPE: law judgment only (the template driver, `Engine::check`, witnesses).
+    /// Enumeration and canonicalization keep exact equality — a toleranced relation is
+    /// not transitive, so it cannot key the term-collision maps; the consequence count
+    /// therefore remains an exact-equality fact, disclosed.
+    fn judge(a: &Self::Obs, b: &Self::Obs) -> Verdict {
+        if a == b {
+            Verdict::Holds
+        } else {
+            Verdict::Refuted
+        }
+    }
+    /// The REGISTERED tolerance, as display text for the lock header ("micro-units: \
+    /// exact holds; |Δ| ≤ 2 undecided; else refuted") — `Some` exactly when [`Theory::judge`]
+    /// is overridden, so ε is part of the ratified artifact, never ambient.
+    fn tolerance() -> Option<&'static str> {
+        None
+    }
     /// How many grid assignments to sample (a resource limit, not a curated list).
     fn grid_size() -> usize {
         24
@@ -123,6 +148,11 @@ pub struct DiscoveredLaw {
     pub rhs: Term,
     /// Equality (`=`, holds everywhere) or witnessed inequation (`≠`, differs somewhere).
     pub polarity: Polarity,
+    /// The law's GUARD, where the shape is conditional: `(premise, truth)` terms — an
+    /// assignment counts only where they evaluate equal. `None` for unconditional laws.
+    /// A guarded law additionally requires its premise SATISFIABLE on the grid (a law
+    /// that never fires its guard is vacuous, not true — the fixed-point lesson, guarded).
+    pub premise: Option<(Term, Term)>,
 }
 
 impl DiscoveredLaw {
@@ -146,6 +176,10 @@ impl DiscoveredLaw {
         let mut out = Vec::new();
         walk(&self.lhs, symbols, &mut out);
         walk(&self.rhs, symbols, &mut out);
+        if let Some((premise, truth)) = &self.premise {
+            walk(premise, symbols, &mut out);
+            walk(truth, symbols, &mut out);
+        }
         out
     }
 }
@@ -158,6 +192,10 @@ pub struct Discovered {
     pub consequences: usize,
     /// Operators (by symbol) that participate in NO named law — where the spec is silent.
     pub uncovered_ops: Vec<&'static str>,
+    /// Candidate laws that landed in the DECLARED tolerance's undecided band — neither
+    /// held nor refuted, disclosed as `(prose, equation)` so the lock can say so. Always
+    /// empty for exact-equality theories (the default [`Theory::judge`]).
+    pub undecided: Vec<(String, String)>,
 }
 
 #[derive(Clone, Copy)]
@@ -172,6 +210,20 @@ pub struct Engine<T: Theory> {
     vars: Vec<Var<T::Sort>>,
     /// Each assignment maps a variable id (index into `vars`) to a value.
     grid: Vec<Vec<T::Value>>,
+}
+
+/// A three-valued law judgment at one grid assignment: exact carriers only ever say
+/// `Holds`/`Refuted`; a toleranced carrier ([`Theory::judge`]) adds the DISCLOSED middle.
+/// Without the undecided band, a toleranced gate is a coin flip exactly where metric
+/// domains live — near the boundary.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Verdict {
+    /// The two observations agree at the declared precision.
+    Holds,
+    /// The two observations clearly differ — a refutation-strength difference.
+    Refuted,
+    /// Inside the declared band: neither held nor refuted, and said so.
+    Undecided,
 }
 
 /// A term's behavioural signature: the observation at each grid assignment (`None` where undefined).
@@ -306,6 +358,31 @@ impl<T: Theory> Engine<T> {
             .iter()
             .map(|asn| self.eval(t, asn).map(|v| T::observe(&v)))
             .collect()
+    }
+
+    /// Judge one assignment's pair of observations: `None == None` holds (both sides
+    /// undefined together, the partial-operator convention); a definedness mismatch
+    /// refutes; two defined values go to the theory's [`Theory::judge`].
+    fn judge_at(a: &Option<T::Obs>, b: &Option<T::Obs>) -> Verdict {
+        match (a, b) {
+            (None, None) => Verdict::Holds,
+            (Some(x), Some(y)) => T::judge(x, y),
+            _ => Verdict::Refuted,
+        }
+    }
+
+    /// Judge two whole signatures: `Refuted` if any assignment refutes, else `Undecided`
+    /// if any assignment is undecided, else `Holds`.
+    fn judge_sigs(a: &Sig<T>, b: &Sig<T>) -> Verdict {
+        let mut verdict = Verdict::Holds;
+        for (x, y) in a.iter().zip(b.iter()) {
+            match Self::judge_at(x, y) {
+                Verdict::Holds => {}
+                Verdict::Undecided => verdict = Verdict::Undecided,
+                Verdict::Refuted => return Verdict::Refuted,
+            }
+        }
+        verdict
     }
 
     /// Does a signature carry any information — is the term defined on at least one assignment?
@@ -502,6 +579,11 @@ pub struct ShapeInfo {
     /// What the shape requires of its constant slot's symbol (see [`ConstRule`]) — how
     /// irreflexivity and self-application share one signature but split one vocabulary row.
     pub const_rule: ConstRule,
+    /// The shape's PREMISE, where the law is conditional (`P ⟹ lhs = rhs`): a schematic
+    /// term that must evaluate equal to the shape's CONSTANT slot (the truth reference)
+    /// for an assignment to count. Requires a constant slot; judged only for
+    /// `Polarity::Equal`. `None` = unconditional (every prior shape).
+    pub premise: Option<SchemaTerm>,
 }
 
 /// A shape's behavioural applicability guard. Signature facts live in [`ShapeGate`]; this
@@ -765,11 +847,24 @@ impl ShapeInfo {
             Polarity::Equal => "=",
             Polarity::Differs => "≠",
         };
-        format!(
+        let body = format!(
             "{} {connective} {}",
             self.lhs.render(ops, vars),
             self.rhs.render(ops, vars)
-        )
+        );
+        match &self.premise {
+            None => body,
+            // the guard renders against the shape's constant slot — the truth reference.
+            Some(premise) => {
+                let truth = self
+                    .gate_slots
+                    .slots
+                    .iter()
+                    .position(|s| matches!(s, Slot::Constant(_)))
+                    .expect("a conditional shape carries a constant slot");
+                format!("{} = {} ⟹ {body}", premise.render(ops, vars), ops[truth].0)
+            }
+        }
     }
 }
 
@@ -836,6 +931,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "associativity",
@@ -851,6 +947,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "idempotence",
@@ -866,6 +963,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "bias (right-regular)",
@@ -883,6 +981,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "bias (left-regular)",
@@ -900,6 +999,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "identity",
@@ -916,6 +1016,7 @@ impl ShapeCatalog {
                 mirrored: true,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "annihilation",
@@ -932,6 +1033,7 @@ impl ShapeCatalog {
                 mirrored: true,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "inverse",
@@ -948,6 +1050,26 @@ impl ShapeCatalog {
                 mirrored: true,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
+                name: "self-inverse",
+                schema: "(x ⊕ x) = e",
+                gate: "homogeneous binary plus a constant of its sort — every element its \
+                       own inverse (the Boolean-group law `inverse` cannot say, because \
+                       the inverting map is the identity and identity is not an operator)",
+                gate_slots: WITH_CONSTANT,
+                template: "{op} of a value with itself gives {const} — every element is \
+                           its own inverse.",
+                lhs: App(0, &[X, X]),
+                rhs: C,
+                placeholders: &["⊕", "e"],
+                polarity: Polarity::Equal,
+                holes: &["op", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "distributivity",
@@ -963,6 +1085,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "distributivity (right)",
@@ -981,6 +1104,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::FireOpNotCommutative,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "absorption",
@@ -996,6 +1120,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action identity",
@@ -1016,6 +1141,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "monoid action",
@@ -1036,6 +1162,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action idempotence",
@@ -1056,6 +1183,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action commutation",
@@ -1075,6 +1203,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action equivariance",
@@ -1096,6 +1225,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "action fixed point",
@@ -1116,6 +1246,28 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
+                name: "symmetry",
+                schema: "rel(x, y) = rel(y, x)",
+                gate: "relation s × s → r (r ≠ s) — a symmetric distance says so here; an \
+                       order refuses it",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is symmetric — the arguments' order doesn't matter.",
+                lhs: App(0, &[X, Y]),
+                rhs: App(0, &[Y, X]),
+                placeholders: &["rel"],
+                polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "irreflexivity",
@@ -1136,6 +1288,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("false"),
+                premise: None,
             },
             ShapeInfo {
                 name: "self-application",
@@ -1155,6 +1308,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::NotNamed("false"),
+                premise: None,
             },
             ShapeInfo {
                 name: "involution",
@@ -1170,6 +1324,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "projection",
@@ -1185,6 +1340,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "fixed point",
@@ -1200,6 +1356,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "round-trip",
@@ -1222,6 +1379,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "homomorphism",
@@ -1237,6 +1395,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             // -- the WITNESS shapes: the catalog's inequation half (∃, not ∀). Found by
             // the algebra-mutation harness: its four survivors were all statements no
@@ -1262,6 +1421,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             ShapeInfo {
                 name: "non-constancy",
@@ -1283,6 +1443,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
+                premise: None,
             },
             // -- the ORDERED-RELATION shapes: ∀-inequalities, stated as equations over a
             // theory's own declared order (`le(lhs, rhs) = true`). No new polarity: a
@@ -1322,6 +1483,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
             },
             ShapeInfo {
                 name: "triangle inequality",
@@ -1353,6 +1515,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
             },
             ShapeInfo {
                 name: "monotonicity (join form)",
@@ -1381,6 +1544,79 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
+            },
+            // -- the GUARDED shapes: conditional laws, `P ⟹ lhs = rhs`. The premise is a
+            // schematic term judged against the shape's constant slot; assignments where
+            // it does not fire are skipped, and a law whose premise never fires is
+            // VACUOUS, not true — antisymmetry of a strict order stays silent because
+            // `lt(x,y) ∧ lt(y,x)` is satisfiable nowhere.
+            ShapeInfo {
+                name: "monotonicity (guarded)",
+                schema: "le(x, y) = true ⟹ le(f(x), f(y)) = true  (∀ x ≤ y: f(x) ≤ f(y))",
+                gate: "unary endo s → s plus an order relation s × s → r (r ≠ s) whose \
+                       output sort carries a constant rendering as `true` — the general \
+                       form of monotonicity, judged only where the premise fires",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 0), Slot::Relation(0, 1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is monotone under {other}.",
+                lhs: App(1, &[App(0, &[X]), App(0, &[Y])]),
+                rhs: App(2, &[]),
+                placeholders: &["f", "le", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: Some(App(1, &[X, Y])),
+            },
+            ShapeInfo {
+                name: "transitivity",
+                schema: "(le(x, y) ∧ le(y, z)) = true ⟹ le(x, z) = true",
+                gate: "a relation s × s → r (r ≠ s), a homogeneous binary on r (read as \
+                       the verdict sort's and), and a constant of r rendering as `true` — \
+                       judged only where both premise links fire",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is transitive (chained through {other}).",
+                lhs: App(0, &[X, Z]),
+                rhs: App(2, &[]),
+                placeholders: &["le", "∧", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: Some(App(1, &[App(0, &[X, Y]), App(0, &[Y, Z])])),
+            },
+            ShapeInfo {
+                name: "antisymmetry",
+                schema: "(le(x, y) ∧ le(y, x)) = true ⟹ x = y",
+                gate: "a relation s × s → r (r ≠ s), a homogeneous binary on r (read as \
+                       the verdict sort's and), and a constant of r rendering as `true`; \
+                       the conclusion is CARRIER equality — and a strict order, whose \
+                       premise is satisfiable nowhere, correctly earns nothing",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} is antisymmetric — mutual relation forces equality.",
+                lhs: X,
+                rhs: Y,
+                placeholders: &["le", "∧", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: Some(App(1, &[App(0, &[X, Y]), App(0, &[Y, X])])),
             },
             ShapeInfo {
                 name: "totality",
@@ -1404,6 +1640,7 @@ impl ShapeCatalog {
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Named("true"),
+                premise: None,
             },
         ]
     }
@@ -1471,18 +1708,22 @@ impl<T: Theory> Engine<T> {
     /// slot-0 binding), then catalog order, then partner bindings in operator-index order.
     /// One law per confirmed instance, deduplicated by prose (a two-sided shape's mirrored
     /// variant collapses onto the same line).
-    fn templates(&self) -> Vec<DiscoveredLaw> {
+    fn templates(&self) -> (Vec<DiscoveredLaw>, Vec<(String, String)>) {
         let mut out: Vec<DiscoveredLaw> = Vec::new();
         let mut seen_prose: Vec<String> = Vec::new();
+        let mut undecided: Vec<(String, String)> = Vec::new();
         let inventory = ShapeCatalog::inventory();
         for band in [Polarity::Equal, Polarity::Differs] {
             for fire in 0..self.ops.len() {
                 for shape in inventory.iter().filter(|s| s.polarity == band) {
-                    self.instantiate_shape(shape, fire, &mut seen_prose, &mut out);
+                    self.instantiate_shape(shape, fire, &mut seen_prose, &mut out, &mut undecided);
                 }
             }
         }
-        out
+        // a candidate that eventually HELD (another fire order or partner) is not
+        // undecided — the law wins.
+        undecided.retain(|(p, _)| !out.iter().any(|l| l.prose == *p));
+        (out, undecided)
     }
 
     /// Every confirmed instance of one shape fired on one operator: enumerate the partner
@@ -1494,6 +1735,7 @@ impl<T: Theory> Engine<T> {
         fire: usize,
         seen_prose: &mut Vec<String>,
         out: &mut Vec<DiscoveredLaw>,
+        undecided: &mut Vec<(String, String)>,
     ) {
         // the behavioural guard — the one applicability fact only the grid decides. The
         // signature check comes first: the guard PROBES the fire operator on the grid, so
@@ -1592,30 +1834,130 @@ impl<T: Theory> Engine<T> {
                     }
                 }
             }
+            // the GUARD, where the shape is conditional: the premise term and its truth
+            // reference (the shape's constant slot), concretized through the same binding.
+            let guard = match &shape.premise {
+                None => None,
+                Some(premise) => {
+                    let truth_slot = shape
+                        .gate_slots
+                        .slots
+                        .iter()
+                        .position(|s| matches!(s, Slot::Constant(_)))
+                        .expect("a conditional shape carries a constant slot");
+                    let (Some(p), Some(t)) = (
+                        self.concretize(premise, &tuple, &bound),
+                        Some(Term::App(tuple[truth_slot], vec![])),
+                    ) else {
+                        continue;
+                    };
+                    Some((p, t))
+                }
+            };
+
+            let prose_undecided = prose.clone();
+            let mut undecided_here: Option<String> = None;
             for lhs in variants {
-                let confirmed = match shape.polarity {
+                let verdict = match (&guard, shape.polarity) {
                     // meaningfulness guards BOTH polarities: two all-undefined sides agree
                     // on nothing yet compare equal, which "fixed point" (the first shape
                     // with no variable in either term) can reach where every older shape
                     // kept a defined variable in play.
-                    Polarity::Equal => {
-                        let a = self.signature(&lhs);
-                        Self::meaningful(&a) && a == self.signature(&rhs)
-                    }
-                    Polarity::Differs => {
+                    (None, Polarity::Equal) => {
                         let (a, b) = (self.signature(&lhs), self.signature(&rhs));
-                        Self::meaningful(&a) && Self::meaningful(&b) && a != b
+                        if Self::meaningful(&a) {
+                            Self::judge_sigs(&a, &b)
+                        } else {
+                            Verdict::Refuted
+                        }
                     }
+                    // a WITNESS needs a refutation-strength difference: a difference
+                    // that is merely undecided at the declared tolerance witnesses
+                    // nothing (and reports as undecided instead of firing).
+                    (None, Polarity::Differs) => {
+                        let (a, b) = (self.signature(&lhs), self.signature(&rhs));
+                        if !(Self::meaningful(&a) && Self::meaningful(&b)) {
+                            Verdict::Refuted
+                        } else {
+                            match Self::judge_sigs(&a, &b) {
+                                Verdict::Refuted => Verdict::Holds,
+                                Verdict::Holds => Verdict::Refuted,
+                                Verdict::Undecided => Verdict::Undecided,
+                            }
+                        }
+                    }
+                    // a GUARDED equation: judged only where the premise evaluates equal
+                    // to the truth reference, and the premise must be SATISFIABLE with a
+                    // defined lhs somewhere — an unsatisfiable guard manufactures no law
+                    // (antisymmetry of a strict order stays silent, correctly). A premise
+                    // that is itself UNDECIDED anywhere taints the law to undecided.
+                    (Some((premise, truth)), Polarity::Equal) => {
+                        let (p, t) = (self.signature(premise), self.signature(truth));
+                        let (a, b) = (self.signature(&lhs), self.signature(&rhs));
+                        let mut grounded = false;
+                        let mut verdict = Verdict::Holds;
+                        for k in 0..p.len() {
+                            let satisfied = match (&p[k], &t[k]) {
+                                (Some(pv), Some(tv)) => match T::judge(pv, tv) {
+                                    Verdict::Holds => true,
+                                    Verdict::Refuted => false,
+                                    Verdict::Undecided => {
+                                        verdict = Verdict::Undecided;
+                                        false
+                                    }
+                                },
+                                _ => false,
+                            };
+                            if !satisfied {
+                                continue;
+                            }
+                            grounded = grounded || a[k].is_some();
+                            match Self::judge_at(&a[k], &b[k]) {
+                                Verdict::Holds => {}
+                                Verdict::Undecided => verdict = Verdict::Undecided,
+                                Verdict::Refuted => {
+                                    verdict = Verdict::Refuted;
+                                    break;
+                                }
+                            }
+                        }
+                        if !grounded && verdict != Verdict::Refuted {
+                            Verdict::Refuted
+                        } else {
+                            verdict
+                        }
+                    }
+                    // no witness shape carries a premise (the catalog has none; the
+                    // combination is unratified until a stanza needs it).
+                    (Some(_), Polarity::Differs) => Verdict::Refuted,
                 };
-                if !confirmed {
+                if verdict != Verdict::Holds {
+                    if verdict == Verdict::Undecided {
+                        let connective = match shape.polarity {
+                            Polarity::Equal => "=",
+                            Polarity::Differs => "≠",
+                        };
+                        undecided_here = Some(format!(
+                            "{} {connective} {}",
+                            self.render(&lhs),
+                            self.render(&rhs)
+                        ));
+                    }
                     continue;
                 }
+                undecided_here = None;
                 seen_prose.push(prose.clone());
                 let connective = match shape.polarity {
                     Polarity::Equal => "=",
                     Polarity::Differs => "≠",
                 };
-                let equation = format!("{} {connective} {}", self.render(&lhs), self.render(&rhs));
+                let body = format!("{} {connective} {}", self.render(&lhs), self.render(&rhs));
+                let equation = match &guard {
+                    None => body,
+                    Some((premise, truth)) => {
+                        format!("{} = {} ⟹ {body}", self.render(premise), self.render(truth))
+                    }
+                };
                 out.push(DiscoveredLaw {
                     shape: shape.name,
                     prose,
@@ -1623,8 +1965,14 @@ impl<T: Theory> Engine<T> {
                     lhs,
                     rhs,
                     polarity: shape.polarity,
+                    premise: guard.clone(),
                 });
                 break;
+            }
+            if let Some(equation) = undecided_here {
+                if !undecided.iter().any(|(p, _)| *p == prose_undecided) {
+                    undecided.push((prose_undecided.clone(), equation));
+                }
             }
         }
     }
@@ -1656,7 +2004,7 @@ impl<T: Theory> Engine<T> {
     /// Run discovery: the named template laws, the count of further (consequence) equalities, and
     /// the operators that appear in no named law.
     pub fn discover(&self) -> Discovered {
-        let laws = self.templates();
+        let (laws, undecided) = self.templates();
 
         // signatures the named laws already account for (per sort), to separate consequences.
         let named_sigs: std::collections::BTreeSet<(T::Sort, Sig<T>)> = laws
@@ -1698,6 +2046,7 @@ impl<T: Theory> Engine<T> {
             laws,
             consequences: consequence_sigs.len(),
             uncovered_ops,
+            undecided,
         }
     }
 
@@ -1709,25 +2058,47 @@ impl<T: Theory> Engine<T> {
     pub fn check(&self, laws: &[DiscoveredLaw]) -> Result<(), String> {
         for l in laws {
             let mut witnessed = false;
+            let mut grounded = l.premise.is_none();
             for asn in &self.grid {
+                // a guarded law is judged only where its premise fires — and it must
+                // fire with a defined lhs SOMEWHERE, or the law has lost its ground.
+                if let Some((premise, truth)) = &l.premise {
+                    let p = self.eval(premise, asn).map(|v| T::observe(&v));
+                    let t = self.eval(truth, asn).map(|v| T::observe(&v));
+                    if p.is_none() || Self::judge_at(&p, &t) != Verdict::Holds {
+                        continue;
+                    }
+                }
                 let lhs = self.eval(&l.lhs, asn).map(|v| T::observe(&v));
                 let rhs = self.eval(&l.rhs, asn).map(|v| T::observe(&v));
-                match l.polarity {
-                    Polarity::Equal => {
-                        if lhs != rhs {
-                            return Err(format!("discovered law failed: {}", l.equation));
-                        }
+                grounded = grounded || lhs.is_some();
+                match (l.polarity, Self::judge_at(&lhs, &rhs)) {
+                    (Polarity::Equal, Verdict::Refuted) => {
+                        return Err(format!("discovered law failed: {}", l.equation));
                     }
-                    Polarity::Differs => {
-                        if lhs != rhs {
-                            witnessed = true;
-                            break;
-                        }
+                    // a frozen law drifting into the band is DRIFT, named as such —
+                    // never a silent pass.
+                    (Polarity::Equal, Verdict::Undecided) => {
+                        return Err(format!(
+                            "law became undecided at the declared tolerance: {}",
+                            l.equation
+                        ));
                     }
+                    (Polarity::Equal, Verdict::Holds) => {}
+                    // a witness needs a refutation-STRENGTH difference; an undecided
+                    // difference witnesses nothing.
+                    (Polarity::Differs, Verdict::Refuted) => {
+                        witnessed = true;
+                        break;
+                    }
+                    (Polarity::Differs, _) => {}
                 }
             }
             if l.polarity == Polarity::Differs && !witnessed {
                 return Err(format!("witness law lost its witness: {}", l.equation));
+            }
+            if !grounded {
+                return Err(format!("guarded law lost its ground: {}", l.equation));
             }
         }
         Ok(())
@@ -2059,6 +2430,7 @@ mod tests {
             lhs: Term::App(2, vec![Term::Var(0), Term::Var(1)]),
             rhs: Term::App(3, vec![Term::Var(0), Term::Var(1)]),
             polarity: Polarity::Equal,
+            premise: None,
         };
         assert!(e.check(&[bogus]).is_err(), "check must reject a false law");
     }
@@ -2417,6 +2789,7 @@ mod tests {
             lhs,
             rhs,
             polarity: Polarity::Differs,
+            premise: None,
         };
 
         // a witness that holds everywhere: the two constants never agree.
@@ -2556,6 +2929,7 @@ mod tests {
             lhs: Term::App(0, vec![Term::Var(0), Term::Var(1)]),
             rhs: Term::App(0, vec![Term::Var(1), Term::Var(0)]),
             polarity: Polarity::Equal,
+            premise: None,
         };
         assert!(
             e.check(&[frozen]).is_err(),
@@ -2743,6 +3117,9 @@ mod tests {
     fn l_not(v: &[LVal]) -> Option<LVal> {
         Some(LVal::B(!l_bool(&v[0])))
     }
+    fn l_xor(v: &[LVal]) -> Option<LVal> {
+        Some(LVal::B(l_bool(&v[0]) ^ l_bool(&v[1])))
+    }
     fn l_lt(v: &[LVal]) -> Option<LVal> {
         Some(LVal::B(l_nat(&v[0]) < l_nat(&v[1])))
     }
@@ -2819,6 +3196,14 @@ mod tests {
                     inputs: vec![B],
                     output: B,
                     eval: l_not,
+                },
+                Operator {
+                    name: "Xor",
+                    symbol: "^",
+                    fixity: Infix,
+                    inputs: vec![B, B],
+                    output: B,
+                    eval: l_xor,
                 },
                 Operator {
                     name: "less-than",
@@ -3407,6 +3792,187 @@ mod tests {
         assert_eq!(coprime_step(1), 1);
     }
 
+    /// THE VACUITY RULE, pinned from both sides: the guarded shapes fire where the
+    /// premise has ground (`le` is antisymmetric and transitive; `less-than` is
+    /// transitive), and stay SILENT where it never fires — `less-than` is antisymmetric
+    /// only vacuously (`lt(x,y) ∧ lt(y,x)` is satisfiable nowhere), and a vacuous truth
+    /// is not a law. This is the fixed-point lesson, guarded.
+    #[test]
+    fn the_vacuity_rule_keeps_strict_orders_silent() {
+        let proses = discovered_prose::<MaxLogic>();
+        assert!(proses
+            .iter()
+            .any(|p| p == "le is antisymmetric — mutual relation forces equality."));
+        assert!(proses
+            .iter()
+            .any(|p| p == "le is transitive (chained through And)."));
+        assert!(proses
+            .iter()
+            .any(|p| p == "less-than is transitive (chained through And)."));
+        assert!(
+            !proses
+                .iter()
+                .any(|p| p.contains("less-than is antisymmetric")),
+            "a strict order's antisymmetry is vacuous — it must NOT be discovered"
+        );
+        assert!(proses.iter().any(|p| p == "cap is monotone under le."));
+    }
+
+    /// `check` on a frozen guarded law demands the premise stays SATISFIABLE: a law
+    /// whose guard lost all ground (here: antisymmetry guarded by a strict order's
+    /// mutual relation, unsatisfiable by construction) is an error naming the loss,
+    /// never a vacuous pass.
+    #[test]
+    fn a_guarded_law_that_lost_its_ground_is_named() {
+        let e = Engine::<MaxLogic>::new();
+        // operator indices in MaxLogic: find lt (name "less-than"), And, true.
+        let ops = MaxLogic::operators();
+        let idx = |n: &str| ops.iter().position(|o| o.name == n).expect("op");
+        let (lt, and, tru) = (idx("less-than"), idx("And"), idx("true"));
+        let x = e.var(LSort::N, 0).expect("var x");
+        let y = e.var(LSort::N, 1).expect("var y");
+        let groundless = DiscoveredLaw {
+            shape: "antisymmetry",
+            prose: "less-than is antisymmetric — mutual relation forces equality.".into(),
+            equation: "(lt(x, y) ∧ lt(y, x)) = true ⟹ x = y".into(),
+            lhs: x.clone(),
+            rhs: y.clone(),
+            polarity: Polarity::Equal,
+            premise: Some((
+                Term::App(
+                    and,
+                    vec![
+                        Term::App(lt, vec![x.clone(), y.clone()]),
+                        Term::App(lt, vec![y, x]),
+                    ],
+                ),
+                Term::App(tru, vec![]),
+            )),
+        };
+        let err = e
+            .check(std::slice::from_ref(&groundless))
+            .expect_err("an unsatisfiable guard must not read as a passing law");
+        assert!(err.contains("lost its ground"), "{err}");
+    }
+
+    // -- the TOLERANCED theory: a metric carrier judged at registered bars ------------
+    //
+    // `blend` is integer averaging — commutative EXACTLY, idempotent exactly, but its
+    // associativity carries ±1 of integer-division noise: at exact equality it would be
+    // REFUTED, at a sloppy tolerance it would be certified; at the REGISTERED bars it is
+    // UNDECIDED, and the spec says so instead of flipping a coin at the boundary.
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    struct Micro;
+    struct NoisyGauge;
+    fn blend(v: &[i64]) -> Option<i64> {
+        Some((v[0] + v[1]) / 2)
+    }
+
+    impl Theory for NoisyGauge {
+        type Sort = Micro;
+        type Value = i64;
+        type Obs = i64;
+        fn name() -> &'static str {
+            "noisy gauge"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![Operator {
+                name: "blend",
+                symbol: "blend",
+                fixity: Fixity::Infix,
+                inputs: vec![Micro, Micro],
+                output: Micro,
+                eval: blend,
+            }]
+        }
+        fn inhabitants(_: Micro) -> Vec<i64> {
+            vec![0, 1, 2, 3]
+        }
+        fn sort_of(_: &i64) -> Micro {
+            Micro
+        }
+        fn observe(v: &i64) -> i64 {
+            *v
+        }
+        fn sort_vars(_: Micro) -> &'static [&'static str] {
+            &["x", "y", "z"]
+        }
+        fn grid_size() -> usize {
+            64 // = 4³, the whole space: the bars are judged exhaustively.
+        }
+        fn judge(a: &i64, b: &i64) -> Verdict {
+            match (a - b).abs() {
+                0 => Verdict::Holds,
+                1 => Verdict::Undecided,
+                _ => Verdict::Refuted,
+            }
+        }
+        fn tolerance() -> Option<&'static str> {
+            Some("micro-units: exact ⇒ holds; |Δ| = 1 ⇒ undecided; else refuted")
+        }
+    }
+
+    /// The three-valued judgment, end to end: exact laws are laws, boundary noise is
+    /// UNDECIDED (neither certified nor refuted), and the lock text carries both the
+    /// registered bars and the disclosed band — ε is ratified with the laws.
+    #[test]
+    fn a_toleranced_theory_disccloses_its_undecided_band() {
+        let d = Engine::<NoisyGauge>::new().discover();
+        let laws: Vec<&str> = d.laws.iter().map(|l| l.prose.as_str()).collect();
+        assert!(laws.contains(&"blend gives the same result in either order."));
+        assert!(laws.contains(&"blend of a value with itself gives that value."));
+        assert!(
+            !laws.iter().any(|p| p.contains("grouping")),
+            "noisy associativity must NOT be certified: {laws:?}"
+        );
+        assert_eq!(
+            d.undecided
+                .iter()
+                .map(|(p, _)| p.as_str())
+                .collect::<Vec<_>>(),
+            vec!["With blend, the grouping of three values doesn't matter."],
+            "the ±1 associativity noise lands in the DISCLOSED band"
+        );
+
+        // and the lock text carries the whole story.
+        let live = crate::discover::Spec::of::<NoisyGauge>()
+            .lock_in(std::path::Path::new("spec"))
+            .live;
+        assert!(live.contains("# tolerance (registered with the theory): micro-units:"));
+        assert!(live.contains("|Δ| = 1 ⇒ undecided; else refuted"));
+        assert!(live.contains(
+            "# undecided at the declared tolerance (disclosed — neither held nor refuted):"
+        ));
+        assert!(live.contains("\n- With blend, the grouping of three values doesn't matter."));
+    }
+
+    /// `check` on a frozen law that DRIFTS into the band is an error naming the drift —
+    /// never a silent pass, never a spurious hard failure.
+    #[test]
+    fn a_frozen_law_drifting_into_the_band_is_named() {
+        let e = Engine::<NoisyGauge>::new();
+        let x = e.var(Micro, 0).expect("x");
+        let y = e.var(Micro, 1).expect("y");
+        let z = e.var(Micro, 2).expect("z");
+        // associativity, frozen as if it had once been certified.
+        let frozen = DiscoveredLaw {
+            shape: "associativity",
+            prose: "With blend, the grouping of three values doesn't matter.".into(),
+            equation: "((x blend y) blend z) = (x blend (y blend z))".into(),
+            lhs: Term::App(0, vec![Term::App(0, vec![x.clone(), y.clone()]), z.clone()]),
+            rhs: Term::App(0, vec![x, Term::App(0, vec![y, z])]),
+            polarity: Polarity::Equal,
+            premise: None,
+        };
+        let err = e
+            .check(std::slice::from_ref(&frozen))
+            .expect_err("band drift must be named");
+        assert!(
+            err.contains("became undecided at the declared tolerance"),
+            "{err}"
+        );
+    }
+
     /// THE LOCK: the catalog's deterministic rendering matches the committed, ratified
     /// `spec/shapes.spec` — the same spec-lock discipline as the theory specs, applied to the
     /// law-language itself.
@@ -3421,5 +3987,199 @@ mod tests {
                  put the diff through review."
             );
         }
+    }
+
+    /// The partial-operator convention at `judge_at`, pinned point-blank: two undefined
+    /// observations agree (both sides undefined TOGETHER is the convention that lets a
+    /// partial operator's laws hold where it is honestly silent), a definedness
+    /// mismatch refutes, and two defined values defer to the theory's judge.
+    #[test]
+    fn judge_at_holds_the_partiality_convention() {
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&None, &None),
+            Verdict::Holds,
+            "undefined-together must HOLD, never refute"
+        );
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&None, &Some(0)),
+            Verdict::Refuted
+        );
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&Some(1), &Some(1)),
+            Verdict::Holds
+        );
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&Some(0), &Some(3)),
+            Verdict::Refuted
+        );
+    }
+
+    // ===== the one-sided-meaningless witness refusal ========================
+    // `lt` is a relation that is UNDEFINED EVERYWHERE; `no` is a defined constant.
+    // A witness shape comparing them has one meaningful side and one meaningless
+    // side, and must be REFUSED — a relation with no defined instance witnesses
+    // nothing. (The refusal requires BOTH sides meaningful, not either.)
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum GhostSort {
+        V,
+        B,
+    }
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum GhostVal {
+        V(i64),
+        B(bool),
+    }
+    struct GhostRelation;
+    fn ghost_lt(_: &[GhostVal]) -> Option<GhostVal> {
+        None // undefined everywhere — the ghost
+    }
+    fn ghost_no(_: &[GhostVal]) -> Option<GhostVal> {
+        Some(GhostVal::B(false))
+    }
+    impl Theory for GhostRelation {
+        type Sort = GhostSort;
+        type Value = GhostVal;
+        type Obs = GhostVal;
+        fn name() -> &'static str {
+            "ghost relation"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![
+                Operator {
+                    name: "lt",
+                    symbol: "lt",
+                    fixity: Fixity::Infix,
+                    inputs: vec![GhostSort::V, GhostSort::V],
+                    output: GhostSort::B,
+                    eval: ghost_lt,
+                },
+                Operator {
+                    name: "no",
+                    symbol: "false",
+                    fixity: Fixity::Nullary,
+                    inputs: vec![],
+                    output: GhostSort::B,
+                    eval: ghost_no,
+                },
+            ]
+        }
+        fn inhabitants(sort: GhostSort) -> Vec<GhostVal> {
+            match sort {
+                GhostSort::V => vec![GhostVal::V(0), GhostVal::V(1)],
+                GhostSort::B => vec![GhostVal::B(false), GhostVal::B(true)],
+            }
+        }
+        fn sort_of(v: &GhostVal) -> GhostSort {
+            match v {
+                GhostVal::V(_) => GhostSort::V,
+                GhostVal::B(_) => GhostSort::B,
+            }
+        }
+        fn observe(v: &GhostVal) -> GhostVal {
+            *v
+        }
+        fn sort_vars(sort: GhostSort) -> &'static [&'static str] {
+            match sort {
+                GhostSort::V => &["x", "y", "z"],
+                GhostSort::B => &["p", "q", "r"],
+            }
+        }
+    }
+
+    /// An everywhere-undefined relation earns NO witness: `lt(x, y) ≠ false` has a
+    /// meaningless left side and a meaningful right side, and the witness driver must
+    /// refuse it rather than let the definedness mismatch masquerade as a difference.
+    #[test]
+    fn a_ghost_relation_witnesses_nothing() {
+        let d = Engine::<GhostRelation>::new().discover();
+        assert!(
+            !d.laws.iter().any(|l| l.equation.contains("lt")),
+            "an undefined-everywhere relation must appear in NO law: {:?}",
+            d.laws.iter().map(|l| l.prose.as_str()).collect::<Vec<_>>()
+        );
+        // and the silence is recorded where it belongs: coverage, not a witness.
+        assert!(d.uncovered_ops.contains(&"lt"));
+    }
+
+    // ===== the undecided band's dedup =======================================
+    // `blend` with a constant at 2, on a grid where the constant's identity law is
+    // UNDECIDED in BOTH mirrored orientations — the disclosure must carry the law
+    // once, not once per orientation.
+    struct NoisyPair;
+    fn two(_: &[i64]) -> Option<i64> {
+        Some(2)
+    }
+    impl Theory for NoisyPair {
+        type Sort = Micro;
+        type Value = i64;
+        type Obs = i64;
+        fn name() -> &'static str {
+            "noisy pair"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![
+                Operator {
+                    name: "blend",
+                    symbol: "blend",
+                    fixity: Fixity::Infix,
+                    inputs: vec![Micro, Micro],
+                    output: Micro,
+                    eval: blend,
+                },
+                Operator {
+                    name: "two",
+                    symbol: "2",
+                    fixity: Fixity::Nullary,
+                    inputs: vec![],
+                    output: Micro,
+                    eval: two,
+                },
+            ]
+        }
+        fn inhabitants(_: Micro) -> Vec<i64> {
+            vec![1, 2, 3]
+        }
+        fn sort_of(_: &i64) -> Micro {
+            Micro
+        }
+        fn observe(v: &i64) -> i64 {
+            *v
+        }
+        fn sort_vars(_: Micro) -> &'static [&'static str] {
+            &["x", "y", "z"]
+        }
+        fn grid_size() -> usize {
+            27
+        }
+        fn judge(a: &i64, b: &i64) -> Verdict {
+            match (a - b).abs() {
+                0 => Verdict::Holds,
+                1 => Verdict::Undecided,
+                _ => Verdict::Refuted,
+            }
+        }
+        fn tolerance() -> Option<&'static str> {
+            Some("micro-units: exact ⇒ holds; |Δ| = 1 ⇒ undecided; else refuted")
+        }
+    }
+
+    /// A law undecided under BOTH of a mirrored shape's orientations is disclosed
+    /// ONCE — the band is a set of laws, not a log of attempts.
+    #[test]
+    fn an_undecided_mirrored_law_is_disclosed_once() {
+        let d = Engine::<NoisyPair>::new().discover();
+        let prose: Vec<&str> = d.undecided.iter().map(|(p, _)| p.as_str()).collect();
+        assert!(
+            prose.contains(&"blend with 2 leaves a value unchanged."),
+            "the mirrored identity must land in the band: {prose:?}"
+        );
+        let mut deduped = prose.clone();
+        deduped.sort_unstable();
+        deduped.dedup();
+        assert_eq!(
+            deduped.len(),
+            prose.len(),
+            "each undecided law is disclosed exactly once: {prose:?}"
+        );
     }
 }

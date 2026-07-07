@@ -28,6 +28,6 @@ fn the_declared_expectations_are_met_with_no_surprises() {
     );
     assert_eq!(
         distance.render(),
-        "credit meter: 9 of 9 declared laws hold; no surprises"
+        "credit meter: 10 of 10 declared laws hold; no surprises"
     );
 }

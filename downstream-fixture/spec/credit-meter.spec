@@ -10,6 +10,8 @@
       (x spend zero) = x
 - spend by zero always gives zero.
       (zero spend x) = zero
+- spend of a value with itself gives zero — every element is its own inverse.
+      (x spend x) = zero
 - With renew, the grouping of three values doesn't matter.
       ((x renew y) renew z) = (x renew (y renew z))
 - renew of a value with itself gives that value.

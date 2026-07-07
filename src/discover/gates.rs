@@ -207,6 +207,20 @@ impl GateRegistry {
                 effect: Capability::Pure,
                 sharded: false,
             },
+            Gate {
+                name: "statement bites (lean corpus)",
+                verifies: "no definition mutant of lean/ProbeBool.lean re-checks past its \
+                           theorems, except the survivors ratified by key in \
+                           lean/bites.register — mutation testing FOR the proof corpus: \
+                           the kernel judges the mutants (the gate installs elan; the \
+                           corpus is core-only), while the expected survivor set is \
+                           pinned toolchain-free by discover::bite's mirror probe in \
+                           every cargo test",
+                command: &[".github/statement-bite.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                sharded: false,
+            },
         ]
     }
 
@@ -383,22 +397,35 @@ impl GateRegistry {
         // weekly certification: the sharded whole-tree sweep, any unsharded weekly
         // companions (each a plain job), and ONE countersign that needs them all — the
         // tag is the whole weekly verdict, not one job's.
+        // a companion's display label: the `mutation (...)` sugar unwrapped when present,
+        // the full gate name otherwise (a non-mutation weekly gate keeps its own words).
+        let companion_label = |gate: &Gate| -> &str {
+            gate.name
+                .strip_prefix("mutation (")
+                .and_then(|s| s.strip_suffix(')'))
+                .unwrap_or(gate.name)
+        };
         let weekly_job_id = |gate: &Gate| -> String {
             match gate.sharded {
                 true => "mutants-full".to_string(),
-                false => format!(
-                    "mutants-{}",
-                    gate.name
-                        .trim_start_matches("mutation (")
-                        .trim_end_matches(')')
-                        .replace(' ', "-")
-                ),
+                false => {
+                    // job ids allow only alphanumerics and dashes: slug the label.
+                    let mut id = String::from("mutants-");
+                    for c in companion_label(gate).chars() {
+                        match c {
+                            c if c.is_ascii_alphanumeric() => id.push(c),
+                            _ if id.ends_with('-') => {}
+                            _ => id.push('-'),
+                        }
+                    }
+                    id.trim_end_matches('-').to_string()
+                }
             }
         };
         for gate in weekly.iter().filter(|g| !g.sharded) {
             out.push_str(&format!(
-                "\n  # Weekly companion sweep: same green gate (\"0 MISSED\"), same timeout\n\
-                 \x20 # semantics, one job — see the gate registry for what it verifies.\n\
+                "\n  # Weekly companion gate: one plain job on the weekly clock, feeding the\n\
+                 \x20 # same countersign — see the gate registry for what it verifies.\n\
                  \x20 {job_id}:\n\
                  \x20   name: dogfood ({label})\n\
                  \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
@@ -413,10 +440,7 @@ impl GateRegistry {
                  \x20     - run: {}\n",
                 gate.command_line(),
                 job_id = weekly_job_id(gate),
-                label = gate
-                    .name
-                    .trim_start_matches("mutation (")
-                    .trim_end_matches(')'),
+                label = companion_label(gate),
             ));
         }
         let weekly_needs: Vec<String> = weekly.iter().map(|g| weekly_job_id(g)).collect();
@@ -450,10 +474,12 @@ impl GateRegistry {
                  \x20 # EVERY shard of the full sweep is green — which is also the BOOTSTRAP (no tag\n\
                  \x20 # yet? dispatch this workflow once; the certification plants it) and the\n\
                  \x20 # recovery after a red stretch (the weekly green re-anchors the diff).\n\
+                 \x20 # MAIN-ONLY: a branch dispatch runs the sweeps as evidence, but the tag names\n\
+                 \x20 # the certified DEFAULT-BRANCH tree — a branch tip must never claim it.\n\
                  \x20 mutants-full-countersign:\n\
                  \x20   name: countersign (full sweep)\n\
                  \x20   needs: [{needs_list}]\n\
-                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'\n\
                  \x20   runs-on: ubuntu-latest\n\
                  \x20   permissions:\n\
                  \x20     contents: write\n\
@@ -542,21 +568,21 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: seven gates — three every-change (all pure), one
-    /// per-diff, one default-branch incremental, and two weekly (the sharded whole-tree
-    /// sweep plus the delta-render plumbing companion) — and every declared command
-    /// reappears verbatim in the rendered workflow (nothing declared can fall out of
-    /// execution).
+    /// The registry's SHAPE is pinned: eight gates — three every-change (all pure), one
+    /// per-diff, one default-branch incremental, and three weekly (the sharded
+    /// whole-tree sweep, the delta-render plumbing companion, and the Lean
+    /// statement-bite companion) — and every declared command reappears verbatim in
+    /// the rendered workflow (nothing declared can fall out of execution).
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 7);
+        assert_eq!(gates.len(), 8);
         assert_eq!(
             gates
                 .iter()
                 .filter(|g| g.cadence == Cadence::Weekly)
                 .count(),
-            2
+            3
         );
         assert_eq!(
             gates.iter().filter(|g| g.sharded).count(),
@@ -610,9 +636,19 @@ mod tests {
         // it — the full sweep's countersign (also the bootstrap: dispatch the workflow
         // once), gated on every shard via `needs`, and the incremental gate per-merge.
         assert!(workflow.contains("mutants-full-countersign:"));
+        // ... and the countersign is MAIN-ONLY: a branch dispatch runs the sweeps as
+        // evidence, but the tag names the certified default-branch tree, so a branch
+        // tip must never claim it (found live: a branch dispatch nearly moved the tag).
+        assert!(workflow.contains(
+            "if: (github.event_name == 'schedule' || github.event_name == \
+             'workflow_dispatch') && github.ref == 'refs/heads/main'"
+        ));
         // ... and it needs EVERY weekly job: the tag is the whole weekly verdict, so a
-        // red companion sweep withholds the countersign exactly like a red shard.
-        assert!(workflow.contains("needs: [mutants-full, mutants-delta-render-plumbing]"));
+        // red companion gate withholds the countersign exactly like a red shard.
+        assert!(workflow.contains(
+            "needs: [mutants-full, mutants-delta-render-plumbing, \
+             mutants-statement-bites-lean-corpus]"
+        ));
         let advances = workflow
             .matches(&format!("git push -f origin {GREEN_TAG}"))
             .count();

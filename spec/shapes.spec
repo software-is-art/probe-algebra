@@ -45,6 +45,11 @@
       gate:     homogeneous binary plus a unary endo and a constant, all on one sort; tried on both sides, deduplicated by prose
       template: {other} inverts {op} — a value {op} its own {other} gives {const}.
 
+- self-inverse
+      schema:   (x ⊕ x) = e
+      gate:     homogeneous binary plus a constant of its sort — every element its own inverse (the Boolean-group law `inverse` cannot say, because the inverting map is the identity and identity is not an operator)
+      template: {op} of a value with itself gives {const} — every element is its own inverse.
+
 - distributivity
       schema:   (x ⊕ (y ⊗ z)) = ((x ⊕ y) ⊗ (x ⊕ z))
       gate:     an ordered pair of distinct homogeneous binaries on one sort
@@ -89,6 +94,11 @@
       schema:   act(c, p) = c
       gate:     heterogeneous binary s × t → s (an action of t on s) plus a constant of the carrier sort s
       template: {op} leaves {const} fixed — no parameter moves it.
+
+- symmetry
+      schema:   rel(x, y) = rel(y, x)
+      gate:     relation s × s → r (r ≠ s) — a symmetric distance says so here; an order refuses it
+      template: {op} is symmetric — the arguments' order doesn't matter.
 
 - irreflexivity
       schema:   rel(x, x) = false
@@ -149,6 +159,21 @@
       schema:   le(f(x), f((x ⊕ y))) = true  (f(x) ≤ f(x ⊕ y) — monotone in the ⊕-order)
       gate:     unary endo s → s, a homogeneous binary on s (read as the domain's join), and an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true` — the unconditional form of `∀ x ≤ y: f(x) ≤ f(y)` for join-induced orders; the guarded general form stays a roadmap candidate (conditional laws)
       template: {op} is monotone in the {other}-order (under {via}).
+
+- monotonicity (guarded)
+      schema:   le(x, y) = true ⟹ le(f(x), f(y)) = true  (∀ x ≤ y: f(x) ≤ f(y))
+      gate:     unary endo s → s plus an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true` — the general form of monotonicity, judged only where the premise fires
+      template: {op} is monotone under {other}.
+
+- transitivity
+      schema:   (le(x, y) ∧ le(y, z)) = true ⟹ le(x, z) = true
+      gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's and), and a constant of r rendering as `true` — judged only where both premise links fire
+      template: {op} is transitive (chained through {other}).
+
+- antisymmetry
+      schema:   (le(x, y) ∧ le(y, x)) = true ⟹ x = y
+      gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's and), and a constant of r rendering as `true`; the conclusion is CARRIER equality — and a strict order, whose premise is satisfiable nowhere, correctly earns nothing
+      template: {op} is antisymmetric — mutual relation forces equality.
 
 - totality
       schema:   (le(x, y) ⊕ le(y, x)) = true  (every pair relates, one way or the other)

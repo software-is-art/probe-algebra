@@ -195,8 +195,9 @@ fn the_battery(tamper_dir: &std::path::Path) -> Battery {
         )
         .drill(
             "expectation vocabulary",
-            "a shape name the catalog never ratified (`transitive`)",
-            outcome(Expectation::canonical("transitive").is_none()),
+            "a shape name the catalog never ratified (`euclidean` — `transitive` then \
+             `symmetric` held this drill until each became declarable)",
+            outcome(Expectation::canonical("euclidean").is_none()),
         )
 }
 
