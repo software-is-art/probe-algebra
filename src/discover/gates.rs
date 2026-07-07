@@ -80,6 +80,10 @@ pub enum Cadence {
     /// The weekly clock and manual dispatch — the exhaustive whole-tree sweep, sharded
     /// `FULL_SWEEP_SHARDS` ways.
     Weekly,
+    /// When the countersign advances the certified-tree tag (`GREEN_TAG`) — after the
+    /// incremental gate on a default-branch merge, and after a green weekly sweep. The
+    /// release cadence: a certified tree is the event, never a human decision.
+    OnCertify,
 }
 
 /// One declared gate of the pipeline.
@@ -121,6 +125,7 @@ fn registry_stanzas(gates: &[Gate]) -> String {
             Cadence::PerDiff => "per PR diff",
             Cadence::DefaultBranch => "default branch, diff since mutants-green",
             Cadence::Weekly => "weekly + manual, sharded",
+            Cadence::OnCertify => "on certification, when the mutants-green tag advances",
         };
         let effect = match gate.effect {
             Capability::Pure => "pure",
@@ -264,6 +269,16 @@ impl Pipeline {
                      library's own pipeline (`GateRegistry::render_workflow` is the \
                      reference); a consumer pipeline declares EveryChange, PerDiff, or an \
                      unsharded Weekly gate",
+                    gate.name
+                ));
+            }
+            if gate.cadence == Cadence::OnCertify {
+                return Err(format!(
+                    "gate `{}` declares the on-certification cadence — that tier rides \
+                     the green-tag countersign, implemented bespoke in this library's \
+                     own pipeline (`GateRegistry::render_workflow` is the reference); a \
+                     consumer pipeline declares EveryChange, PerDiff, or an unsharded \
+                     Weekly gate",
                     gate.name
                 ));
             }
@@ -585,6 +600,19 @@ impl GateRegistry {
                 effect: Capability::Pure,
                 sharded: false,
             },
+            Gate {
+                name: "release (certified tree)",
+                verifies: "every certified default-branch tree publishes itself: the \
+                           countersign's tag advance IS the release event, the version \
+                           is CalVer (a date claims nothing about compatibility, which \
+                           is honest), and the notes are DERIVED — commit subjects plus \
+                           the ratified spec-lock diff, the uncompressed truth a semver \
+                           integer would compress into an unchecked claim",
+                command: &[".github/release.sh"],
+                cadence: Cadence::OnCertify,
+                effect: Capability::Effectful,
+                sharded: false,
+            },
         ]
     }
 
@@ -628,6 +656,23 @@ impl GateRegistry {
             .iter()
             .filter(|g| g.cadence == Cadence::Weekly)
             .collect();
+        let on_certify: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::OnCertify)
+            .collect();
+        // the release steps render after BOTH tag-advance sites — the countersign IS
+        // the release event, so wherever the tag moves, the certified tree publishes.
+        let release_steps = |out: &mut String| {
+            for gate in &on_certify {
+                out.push_str(&format!(
+                    "      - name: release — the certified tree publishes itself\n\
+                     \x20       env:\n\
+                     \x20         GH_TOKEN: ${{{{ github.token }}}}\n\
+                     \x20       run: {}\n",
+                    gate.command_line()
+                ));
+            }
+        };
 
         let mut out = format!(
             "# GENERATED from the gate registry (`discover::gates`) — THE PIPELINE IS A LOCK.\n\
@@ -738,6 +783,7 @@ impl GateRegistry {
                  \x20         git push -f origin {GREEN_TAG}\n",
                 gate.command_line()
             ));
+            release_steps(&mut out);
         }
         // weekly certification: the sharded whole-tree sweep, any unsharded weekly
         // companions (each a plain job), and ONE countersign that needs them all — the
@@ -838,6 +884,7 @@ impl GateRegistry {
                 shard_list = shards.join(", "),
                 needs_list = weekly_needs.join(", ")
             ));
+            release_steps(&mut out);
         }
         out
     }
@@ -913,16 +960,17 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: ten gates — three every-change (all pure), one
-    /// per-diff, one default-branch incremental, and five weekly (the sharded
-    /// whole-tree sweep plus four member/corpus companions: delta-render plumbing,
-    /// the Lean statement bites, fire-drill plumbing, and layout-probe plumbing) —
-    /// and every declared command reappears verbatim in the rendered workflow
-    /// (nothing declared can fall out of execution).
+    /// The registry's SHAPE is pinned: eleven gates — three every-change, one per-diff,
+    /// one default-branch incremental, five weekly (the sharded whole-tree sweep plus
+    /// four member/corpus companions), and the release gate on the certification
+    /// cadence — and every declared command reappears verbatim in the rendered
+    /// workflow (nothing declared can fall out of execution). Every gate is Pure
+    /// except exactly one: the release is the pipeline's first EFFECTFUL gate, wearing
+    /// the tag the registry reserved for it.
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 10);
+        assert_eq!(gates.len(), 11);
         assert_eq!(
             gates
                 .iter()
@@ -942,7 +990,13 @@ mod tests {
                 .count(),
             3
         );
-        assert!(gates.iter().all(|g| g.effect == Capability::Pure));
+        let effectful: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.effect == Capability::Effectful)
+            .collect();
+        assert_eq!(effectful.len(), 1, "the release is the one effectful gate");
+        assert_eq!(effectful[0].name, "release (certified tree)");
+        assert_eq!(effectful[0].cadence, Cadence::OnCertify);
 
         let workflow = GateRegistry::render_workflow();
         for gate in &gates {
@@ -1004,6 +1058,20 @@ mod tests {
             "the tag must advance in exactly two places: the incremental gate and the \
              full sweep's countersign"
         );
+        // and the RELEASE rides both advances — wherever the tag moves, the certified
+        // tree publishes itself, with the token in scope for `gh release create`.
+        assert_eq!(
+            workflow.matches("run: .github/release.sh").count(),
+            2,
+            "one release step per tag-advance site"
+        );
+        assert_eq!(
+            workflow
+                .matches("- name: release — the certified tree publishes itself")
+                .count(),
+            2
+        );
+        assert!(workflow.contains("GH_TOKEN: ${{ github.token }}"));
     }
 
     /// Everywhere cargo-mutants is installed, cargo-nextest rides along: the mutation
@@ -1175,6 +1243,19 @@ mod tests {
             .unwrap_err()
             .contains("sweep economics"));
 
+        let certify = with(Gate {
+            name: "release (certified tree)",
+            verifies: "",
+            command: &[".github/release.sh"],
+            cadence: Cadence::OnCertify,
+            effect: Capability::Effectful,
+            sharded: false,
+        });
+        assert!(certify
+            .render_workflow()
+            .unwrap_err()
+            .contains("rides the green-tag countersign"));
+
         let unscheduled = with(Gate {
             name: "audit",
             verifies: "",
@@ -1253,5 +1334,11 @@ mod tests {
             "\n- mutation (since green) (default branch, diff since mutants-green; pure)\n"
         ));
         assert!(text.contains("\n- mutation (full sweep) (weekly + manual, sharded; pure)\n"));
+        // the release stanza wears both distinctions: the certification cadence and the
+        // registry's one EFFECTFUL capability.
+        assert!(text.contains(
+            "\n- release (certified tree) (on certification, when the mutants-green tag \
+             advances; EFFECTFUL)\n"
+        ));
     }
 }

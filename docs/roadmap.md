@@ -591,8 +591,13 @@ candidate bricks:
 
 ## Standing follow-ups
 
-- **Tag `v0.1.0`** — consumers currently pin by bare rev; a tag makes downstream manifests
-  read as versioned intent. No crates.io needed for this half-step.
+- ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
+  tree)` gate, the registry's first Effectful entry): every countersign that advances
+  `mutants-green` publishes the certified tree as a CalVer-tagged GitHub release, with
+  notes derived from the commits and the ratified spec-lock diff. No semver: a version
+  integer is a hand-asserted compatibility claim nobody checks — the lock diff is the
+  same information, uncompressed and verifiable. Consumers pin a release tag and read
+  exactly which laws moved between any two of them.
 - **Publish** when ready: `docs/publishing.md` has the dependency-ordered sequence;
   all four names (`boundary-spec`, `boundary-spec-macros`, `spec-lock`,
   `boundary-enforce`) were verified unclaimed on crates.io on 2026-07-02.

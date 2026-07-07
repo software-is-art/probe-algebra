@@ -91,6 +91,10 @@ jobs:
         run: |
           git tag -f mutants-green
           git push -f origin mutants-green
+      - name: release — the certified tree publishes itself
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/release.sh
 
   # Weekly companion gate: one plain job on the weekly clock, feeding the
   # same countersign — see the gate registry for what it verifies.
@@ -194,3 +198,7 @@ jobs:
         run: |
           git tag -f mutants-green
           git push -f origin mutants-green
+      - name: release — the certified tree publishes itself
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/release.sh
