@@ -269,6 +269,7 @@ mod probes {
             "# review agenda — 6 ratification(s) required; 2 file(s) machinery-verified.\n"
         ));
         assert!(text.contains("`router`: the discovered laws moved"));
+        assert!(text.contains("read for sense (prose, no lock question):\n- docs/roadmap.md\n"));
         assert!(text.contains("machinery-verified (the gates hold these — listed, not read):"));
     }
 
@@ -278,9 +279,12 @@ mod probes {
     fn an_interior_diff_requires_no_ratification() {
         let agenda = Agenda::of(["src/discover/engine.rs", "fire-drill/src/lib.rs"]).unwrap();
         assert!(agenda.ratifications.is_empty());
-        assert!(agenda
-            .render()
-            .contains("no lock moved: nothing requires ratification."));
+        let text = agenda.render();
+        assert!(text.contains("no lock moved: nothing requires ratification."));
+        assert!(
+            !text.contains("read for sense"),
+            "an empty prose list renders no prose section"
+        );
     }
 
     /// An unknown spec-directory artifact REFUSES — a new lock class must be taught to
