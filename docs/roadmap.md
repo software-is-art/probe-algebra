@@ -811,8 +811,11 @@ mutates: the arm stays someone else's.
   on crates.io at 0.1.0, in the runbook's dependency order. The root crate's
   registry verify build resolved the three from the LIVE index and ran every
   enforcement pass over the packaged tree — the real consumer path, green at
-  publish time. Tagged `v0.1.0` (outside `release.sh`'s `v2*` CalVer glob, so
-  the two tag families cannot collide).
+  publish time. Still owed: a `v0.1.0` tag at the published tree (the publish
+  session's push scope was branch-only, so tags could not leave it) —
+  `git tag v0.1.0 <sha of "Publish-readiness: version the spec-lock
+  build-dependency"> && git push origin v0.1.0`; the tag sits outside
+  `release.sh`'s `v2*` CalVer glob, so the two tag families cannot collide.
 - **Morphism downstream**: the fixture exercises Construction/Branch/Guarded;
   the fourth edge shape is honestly unexercised downstream.
 - **MSRV**: unpinned; verify and add `rust-version` after first publish.
