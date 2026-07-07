@@ -691,7 +691,8 @@ mod tests {
                 "router",
                 "date calculus",
                 "ttl store",
-                "store protocol"
+                "store protocol",
+                "doc flow"
             ]
         );
         assert!(report.seams.is_empty());
@@ -723,9 +724,15 @@ mod tests {
     #[test]
     fn the_repo_distance_names_the_latent_splits() {
         let distance = SystemDistance::of::<BoundarySpec>();
-        assert_eq!(distance.latent().len(), 2);
+        assert_eq!(distance.latent().len(), 3);
+        // `doc flow` is the instructive third split: a PROTOCOL reads as decomposable
+        // to the cohesion instrument BY NATURE — one-way doors (approve) and endo
+        // loops (edit) look like split points in the operator-interaction graph, but a
+        // protocol's "latent seams" are its states, and carving them apart would
+        // destroy exactly the unrepresentability it exists for. Keep-whole, ratified
+        // here: the suggestion stands recorded, deliberately declined.
         let expected = "\
-boundary-spec: 3 of 5 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
+boundary-spec: 3 of 6 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
   module `interpreter arithmetic`: decomposes into 2 latent modules — consider splitting:
     module 0: { 0, 1, +, * }
     module 1: { false, < }
@@ -734,6 +741,12 @@ boundary-spec: 3 of 5 declared modules are cohesive; LATENT SPLITS (suggestions,
     module 0: { zero, +, add, diff }
     module 1: { since, at }
     seam 0↔1 on Date, Duration — transform (algebra changes — check the homomorphism)
+  module `doc flow`: decomposes into 3 latent modules — consider splitting:
+    module 0: { submit, revise }
+    module 1: { approve }
+    module 2: { edit }
+    seam 0↔1 on Review — transform (algebra changes — check the homomorphism)
+    seam 0↔2 on Draft — transform (algebra changes — check the homomorphism)
 ";
         assert_eq!(distance.render(), expected);
     }

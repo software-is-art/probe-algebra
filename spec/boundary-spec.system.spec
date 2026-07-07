@@ -6,5 +6,6 @@ modules (the ratified registry — one committed module lock each):
 - date calculus
 - ttl store
 - store protocol
+- doc flow
 
 seams: none — no module pair declares a shared-value obligation.
