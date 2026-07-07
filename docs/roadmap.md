@@ -589,6 +589,37 @@ candidate bricks:
     derived modules as the scaffolded tree (write the netlist, get the placed
     crate), which is the autoshaping half of the v2 work list below.
 
+## Three bricks from the release conversation (the ceremony hunt, continued)
+
+The observation that named them: every arbitrary ceremony in software is a derivable
+fact wearing a ritual's clothes — and the operator's phrase for the programme,
+"replacing implied service from a platform with specification". All three BUILT:
+
+1. **The bridge alarm in the agent loop** (`Ticker::hook_line`,
+   `.claude/hooks/shape-watch.sh`). The mechanism question settled by token economics:
+   LSP is the human surface (pull-based, verbose, free for eyes); the lock is the CI
+   surface (late); the agent surface is a PostToolUse hook, because it prices feedback
+   right — zero tokens when silent, one line when the shape moved, no instruction
+   anywhere. The noise policy is the design: joined edits are free silence, a seed that
+   opens a second component announces its extraction, a bridge always speaks. The hook
+   informs, never acts.
+
+2. **The dependence lock** (`discover::depend`). Compatibility is a relation between a
+   change and a consumer, not a global property of the change — semver's integer
+   pretends otherwise. A consumer declares the laws it relies on (equation as identity);
+   `Dependence::judge` answers over any two frozen lock texts: INTACT, CHANGED (new
+   statement carried), GONE (the breaking case, named). A reliance the baseline never
+   held refuses. With automatic releases publishing the lock diff, the full loop is:
+   pin two release tags, judge your reliances, read the verdicts.
+
+3. **The review router** (`discover::agenda`, `examples/review_agenda`). "Review the
+   PR" was the last implied service in the workflow. The diff classifies itself: one
+   ratification question per moved lock class (laws, freedoms, boundary, seams, surface,
+   pipeline, exceptions, world, vocabulary), prose read for sense, interior code named
+   machinery-verified. An unknown spec-directory artifact refuses — misfiled-as-machinery
+   would be a silently dropped review. First run routed its own branch: one ratification
+   (the qualify census), seven files machinery-verified.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

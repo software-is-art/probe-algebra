@@ -127,16 +127,16 @@ impl DependenceReport {
         for (equation, standing) in &self.verdicts {
             match standing {
                 Standing::Intact => {
-                    let _ = writeln(&mut out, format!("- intact   {equation}"));
+                    writeln(&mut out, format!("- intact   {equation}"));
                 }
                 Standing::Changed { now } => {
-                    let _ = writeln(
+                    writeln(
                         &mut out,
                         format!("- CHANGED  {equation}\n      now stated: {now}"),
                     );
                 }
                 Standing::Gone => {
-                    let _ = writeln(
+                    writeln(
                         &mut out,
                         format!("- GONE     {equation}\n      the law is no longer held — the breaking case"),
                     );
