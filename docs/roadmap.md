@@ -746,16 +746,40 @@ declaration green; the world lock freezes what was earned and gates the drift.
 "Behaviour as code" is the honest name — the declaration is a law set, not a
 machine list.
 
-Honest frame, and why this stays a candidate: the engine assumes cheap, pure,
-replayable evaluation, and a world probe is none of those — it costs money, takes
-seconds, mutates nothing only if carefully designed, and samples a battery of ONE
-world with no grid. The capability lattice already has the vocabulary (Effectful
-edges, cost budgets refused at compile time), but a probing engine with a spend
-budget and read-only discipline does not exist yet. Prerequisites, in order: (1)
-read-only world probes as first-class edges with declared cost; (2) the world lock
-generalised from library dependencies to any probed surface; (3) a reachability
-derivation over a world's edge graph (the placer's math is domain-agnostic — it
-already works on raw string signatures). Build nothing that mutates: the arm stays
+The overlay analogy sharpens the product shape: Tailscale is to network switches
+what this is to physical infrastructure — an overlay whose LAWS are the product.
+Tailscale does not configure switches into compliance; it simulates a flat,
+identity-addressed network on top of hostile physicality, programs are written
+against the overlay, and the switches become interior. Likewise here: program
+against a virtual world whose behavioural laws are discovered and locked, and the
+physical cloud is an INTERIOR that must front it. Fronting is already the
+vocabulary — the virtual layer is the door, physicality the workshop behind it.
+
+And SIMULATION-FIRST dissolves the engine objection that would otherwise park this
+for years. The engine assumes cheap, pure, replayable evaluation; a world probe is
+none of those; but a SYNTHETIC world is all three — the TTL store's move at world
+scale. The store made time a value (its own logical clock, advanced only through
+the Tick edge) so there was no ambient now; a world value object (services, edges,
+policies as Shaped data) makes there be no ambient cloud. You cannot make
+us-east-1 a value — but you can make A WORLD a value and demand us-east-1 front
+it. Grids of worlds are enumerable in-process, so reachability/deny/flow laws are
+discoverable and mutation-testable TODAY, by the existing engine, with zero new
+machinery: the interior is synthetic initially, and the tier-2 rule is precisely
+that the interior is free to swap — replacing synthetic semantics with real
+read-only probes later moves no boundary and restates no law. Sim-vs-real then
+becomes a TRANSPORT seam (`CoherenceReport::between` the model and the probed
+world: one observable, two paths), so "does reality still match the simulation" is
+a seam verdict with a lock, and the expensive probes are spot-check countersigns
+of laws the simulation earned cheaply. Evidence discipline unchanged: a green sim
+law says nothing about reality until the seam countersigns it.
+
+Prerequisites, reordered by the simulation-first insight: (1) the world as a value
+object — a synthetic world theory (nodes, edges, policies; reachability and deny
+laws) discovered by the existing engine: the existence proof that infrastructure
+behaviour is discoverable at all, and a `theory!` domain like any other; (2)
+read-only world probes as first-class edges with declared cost, countersigning the
+simulation through the transport seam; (3) the world lock generalised from library
+dependencies to any probed surface. Build nothing that mutates: the arm stays
 someone else's.
 
 ## Standing follow-ups
