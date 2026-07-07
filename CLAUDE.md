@@ -59,9 +59,12 @@ it). Individually: `cargo fmt --all --check`, `cargo clippy --workspace --all-ta
   (`discover::expect::Expectation`, catalog templates/terms) — never restate a law's
   prose or equation in a second place.
 - The `system!` macro has two arms (compact and full-grammar); both must keep
-  generating `modules()`, `seams()`, and `cohesions()`.
+  generating `modules()`, `seams()`, `cohesions()`, and `placements()`.
 - Commit messages narrate the brick in the repo's voice (see `git log`); the toolchain
   is pinned in `discover::gates::TOOLCHAIN`.
+- PRs land by SQUASH-MERGE — one commit per brick on main, and the belt for any
+  branch-history rewrite. (Prose fallback: delete this line if the repo setting ever
+  enforces squash-only.)
 
 ## Honest frame
 
