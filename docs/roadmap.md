@@ -391,17 +391,39 @@ candidate bricks:
     fire. Economics, disclosed up front: an observation is a process spawn (~50–200ms),
     so the grid must be DELIBERATE (the stream-idiom lesson — a handful of designed
     fixtures, not a soup), renders memoized, and the gate probably PR-cadence rather
-    than per-`cargo test`. Scope fence, agreed with the field assessment that prompted
-    this entry: the lint layer (contrast thresholds, spacing-grid conformance,
-    alignment) is plain predicates over rendered output — no algebra earns rent there,
-    and wrapping it here would be the internal-consistency trap. What this domain
-    uniquely buys the METHOD: millisecond feedback with visible ground truth — the
-    fastest refutation loop any consumer has offered yet. Open questions for the
-    build session: engine order (ELK first, exhaust it before anything proprietary;
-    Graphviz as the free DAG baseline), observation canonicalization (quantized
-    positions vs topology-only, possibly BOTH as two observers over one carrier), and
-    whether locality needs its own stanza or premise-guarded monotonicity over a
-    declared distance order suffices.
+    than per-`cargo test`.
+
+    **The lint layer, refined — the constraints EMERGE.** The first fence ("plain
+    predicates, no algebra") was right about the predicates and too crude about the
+    thresholds. Measuring contrast is plain code; *4.5:1* and *8px* need not be typed
+    by anyone. The honest mechanism is the third artifact of the design, the **visual
+    census**: derive, from the ratified diagram corpus, the regularities it actually
+    exhibits — the contrast floor, the spacing residues mod each candidate grid, the
+    alignment deviations — as one deterministic text artifact, frozen with `spec-lock`
+    (the tiny crate, not the engine: this is the qualify-census move pointed at
+    pixels). The epistemics matter and are the method's own: a derived floor is
+    DESCRIPTIVE of the corpus; **the freeze is the only normative act** — committing
+    the census is what turns "what our diagrams happen to do" into "what our diagrams
+    must do". From then on a new diagram that erodes a floor is a red gate naming the
+    movement ("contrast floor 4.7 → 3.9 — ratify or fix") instead of silent decay,
+    a diagram that TIGHTENS a floor is a visible diff too (standards can be raised by
+    example), and deliberate outliers are `Register` entries with justifications. So
+    the reconciliation: predicates plain, thresholds emergent, standards ratified —
+    the 200-line lint script survives, it just stops carrying opinions and starts
+    carrying derivations. The strong version — the LAW ENGINE inferring threshold
+    constants itself (discovered bars filling Constant slots, tightest-that-holds) —
+    is recorded as catalog research, not v1: the census form needs none of it.
+
+    What this domain uniquely buys the METHOD: millisecond feedback with visible
+    ground truth — the fastest refutation loop any consumer has offered yet. Open
+    questions for the build session: engine order (ELK first, exhaust it before
+    anything proprietary; Graphviz as the free DAG baseline), observation
+    canonicalization (quantized positions vs topology-only, possibly BOTH as two
+    observers over one carrier), whether locality needs its own stanza or
+    premise-guarded monotonicity over a declared distance order suffices, and which
+    census statistics are STABLE enough to freeze (floors and residue histograms
+    survive corpus growth; means do not — a census row must be a fact a new diagram
+    can only move visibly, never smear).
 
 ## Standing follow-ups
 
