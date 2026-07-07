@@ -22,6 +22,18 @@
 //! cannot rely on a law that was never held, and a typo must never read as "intact".
 //! Honest frame: this judges the DECLARED reliances only. A consumer leaning on
 //! behaviour it never declared gets what semver always gave it — nothing.
+//!
+//! Two ways to hold the judgment, one per side of the boundary:
+//!
+//!   - **old vs new** — the CROSS-REPO consumer's tool: pin two release tags, judge
+//!     your declared reliances between their lock texts, read the verdicts.
+//!   - **committed vs committed** — the theory OWNER's tool, discovered downstream:
+//!     judge the declared reliances with the committed lock on BOTH sides, in the
+//!     owner's own suite. INTACT is then trivially the only passing verdict, which is
+//!     the point — the protection is the REFUSAL path. The moment a re-bless drops a
+//!     law some consumer declared, the baseline no longer holds it and the judgment
+//!     refuses by equation, naming the reliance, before the ratification diff lands:
+//!     self-judgment makes declared reliances un-droppable.
 
 use super::Spec;
 
@@ -251,6 +263,23 @@ mod probes {
         assert!(err.contains("refused"), "{err}");
         assert!(err.contains("(a or b) = (b or a)"));
         assert!(err.contains("never existed"));
+    }
+
+    /// SELF-JUDGMENT, the theory owner's form: the committed lock on both sides.
+    /// Intact is trivially the only passing verdict — the protection is the refusal
+    /// path: once a re-bless drops a declared law, the baseline no longer holds it and
+    /// the same declaration refuses by equation. Not GONE (a verdict a report could
+    /// shrug at) — a refusal, before the ratification diff lands.
+    #[test]
+    fn self_judgment_makes_declared_reliances_un_droppable() {
+        let deps = vec![Dependence::on("router", "(a or a) = a")];
+        // today: the committed lock holds the reliance — intact, trivially.
+        let held = Dependence::judge("router", &deps, OLD, OLD).expect("judges");
+        assert!(held.is_intact());
+        // after a re-bless that dropped the law, the SAME declaration refuses:
+        let err = Dependence::judge("router", &deps, NEW, NEW).unwrap_err();
+        assert!(err.contains("(a or a) = a"), "{err}");
+        assert!(err.contains("never existed"), "{err}");
     }
 
     /// The judgment reads REAL frozen locks: every law in this repo's committed router

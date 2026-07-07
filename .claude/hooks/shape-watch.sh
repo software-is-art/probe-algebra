@@ -22,6 +22,10 @@ except Exception:
 [ -n "${path}" ] || exit 0
 
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
+# One file, one state slug: the Edit tool hands absolute paths, manual runs hand
+# relative ones — normalized here, or the ticker resumes the same file from two
+# divergent baselines and narrates a wrong event with full confidence.
+path="${path#"$PWD"/}"
 
 run_example() { # <name> <args...>: prebuilt binary if present, else quiet build
   local name="$1"

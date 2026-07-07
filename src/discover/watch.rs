@@ -7,6 +7,11 @@
 //! form as you type" feasible where anything discovery-based would not be — placement is
 //! microseconds from source text, discovery is a build away.
 //!
+//! Text is ONE source. A consumer that models its theory through the library API (in
+//! test code, say) has no stanza text to parse — so the ticker also steps straight from
+//! a compiled theory ([`Ticker::step_theory`]): the engine's signature table feeds the
+//! same source-agnostic core, and code-modeled theories get the identical layout sense.
+//!
 //! Placement is monotone (an operator can seed a component, join one, or bridge two —
 //! never re-split what it does not touch), so three verbs are the COMPLETE event
 //! vocabulary of an edit session. [`Ticker::step`] diffs consecutive placements into
@@ -19,6 +24,7 @@
 //! not parse is a named error, never a silent skip — a watcher that silently drops an
 //! operator would narrate a wrong shape with full confidence.
 
+use super::engine::Theory;
 use super::shape::{NetSignature, Placement};
 
 impl Ticker {
@@ -194,10 +200,15 @@ impl Ticker {
     /// The current signatures in [`Ticker::resume`]'s stored form — what a hook persists
     /// between invocations.
     pub fn store(source: &str) -> Result<String, String> {
-        Ok(parse_ops(source)?
-            .into_iter()
+        Ok(Ticker::store_signatures(&parse_ops(source)?))
+    }
+
+    /// [`Ticker::store`]'s form for raw signatures — the type path's persistence, so a
+    /// code-modeled theory survives a process boundary the same way stanza text does.
+    pub fn store_signatures(sigs: &[NetSignature]) -> String {
+        sigs.iter()
             .map(|(symbol, ins, out)| format!("{symbol}\t{}\t{out}\n", ins.join(",")))
-            .collect())
+            .collect()
     }
 
     /// The hook's one-line verdict for an edit, or `None` — the noise policy that makes
@@ -230,7 +241,25 @@ impl Ticker {
         name: &'static str,
         source: &str,
     ) -> Result<(Placement, Option<ShapeEvent>), String> {
-        let sigs = parse_ops(source)?;
+        Ok(self.step_signatures(name, parse_ops(source)?))
+    }
+
+    /// The SECOND SOURCE: step from a compiled theory instead of stanza text. A
+    /// consumer that models its theory through the library API (in test code, say) has
+    /// no `ops { ... }` text for the parser — the type path reads the same signatures
+    /// off the engine, so code-modeled theories get the identical live layout sense.
+    pub fn step_theory<T: Theory>(&mut self) -> (Placement, Option<ShapeEvent>) {
+        self.step_signatures(T::name(), Placement::signatures_of::<T>())
+    }
+
+    /// Step from raw signatures — the source-agnostic core both fronts share (text
+    /// parses into it, the type path reads the engine into it). Infallible: the
+    /// signatures are already structured, so there is nothing left to refuse.
+    pub fn step_signatures(
+        &mut self,
+        name: &'static str,
+        sigs: Vec<NetSignature>,
+    ) -> (Placement, Option<ShapeEvent>) {
         let placement = Placement::over(name, sigs.clone());
         let event = match &self.previous {
             None => Some(ShapeEvent::Seeded {
@@ -244,7 +273,7 @@ impl Ticker {
             Some(prev) => diff(prev, &placement),
         };
         self.previous = Some(Placement::over(name, sigs));
-        Ok((placement, event))
+        (placement, event)
     }
 }
 
@@ -315,6 +344,34 @@ mod probes {
                 assert_eq!(a.nets, b.nets, "{file}: nets diverge");
             }
         }
+    }
+
+    /// THE SECOND SOURCE: a theory modeled in CODE gets the same live layout sense —
+    /// no stanza text anywhere. The type path's steps match the text path's on the
+    /// repo's own theory (same placement, same first event), an unchanged theory is
+    /// silence, and store/resume carries the type path across a process boundary
+    /// exactly like the hook's text path.
+    #[test]
+    fn the_type_path_ticks_like_the_text_path() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/discover/date.rs");
+        let source = std::fs::read_to_string(path).expect("repo source");
+
+        let mut by_type = Ticker::new();
+        let (p_type, e_type) = by_type.step_theory::<Calendar>();
+        let mut by_text = Ticker::new();
+        let (p_text, e_text) = by_text.step("date calculus", &source).expect("parses");
+        assert_eq!(p_type.components.len(), p_text.components.len());
+        for (a, b) in p_type.components.iter().zip(&p_text.components) {
+            assert_eq!(a.ops, b.ops, "component members diverge across sources");
+            assert_eq!(a.nets, b.nets, "nets diverge across sources");
+        }
+        assert_eq!(e_type, e_text, "the first event is the same seed");
+
+        // an unchanged theory is silence, and a re-step after resume stays silent:
+        assert_eq!(by_type.step_theory::<Calendar>().1, None);
+        let stored = Ticker::store_signatures(&Placement::signatures_of::<Calendar>());
+        let mut resumed = Ticker::resume("date calculus", &stored);
+        assert_eq!(resumed.step_theory::<Calendar>().1, None);
     }
 
     /// An edit session, narrated: the first material seeds, same-net material joins,

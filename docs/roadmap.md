@@ -664,6 +664,44 @@ markers. The lesson worth keeping: when the coherence gate disagrees, ask whethe
 declaration is wrong or the derivation is missing EVIDENCE — both v2 and v3 came from
 disagreements that were really undiscovered relations.
 
+## The ninth ask: convention out of the code (BUILT)
+
+A production adopter took the agent-senses release same-hour and reported the two
+places v1 baked THIS repo's conventions into shipped code — both the same lesson the
+tiers ladder just taught internally: turn the convention into data or derivation.
+
+1. **The guard's voices are derived, not assumed** (`GuardVoices::for_edit`). The
+   loose-`pub fn` voice pre-fires a refusal that only exists where the enforcement
+   shim runs; on an ordinary binary crate it was a warning per public function about
+   a refusal that does not exist — the guard violating its own contract. Now each
+   voice is switched by evidence: kernel-exemption is a register lookup, the
+   rats-nest voice is on exactly when the tree's `build.rs` attaches the shim. The
+   contract ("pre-fire existing refusals, never invent judgments") holds by
+   construction on any tree, including one that never heard of the shim.
+
+2. **The router's class table is consumer data** (`Agenda::of_with`,
+   `Ratification::Custom`, `spec/agenda.register`). `classify()` knew only this
+   repo's artifacts, so a consumer's lock classes all read "teach the review
+   router" — an instruction only upstream could follow. Teaching is now a committed
+   register (one `suffix: question` line per class, `spec_lock::Register` grammar);
+   taught classes match before every built-in, and the guard consumes the same
+   table, so a registered consumer lock gets never-hand-edit instead of
+   teach-the-router.
+
+3. **The ticker's second source** (`Ticker::step_theory`,
+   `Placement::signatures_of`). The place ticker keyed on `ops { ... }` stanza text;
+   a consumer that models its theory through the library API had nothing to parse
+   and read the silence as non-adoption. The engine's signature table now feeds the
+   same source-agnostic core, so code-modeled theories get the identical live
+   layout sense — text and type are two fronts on one ticker.
+
+And a pattern discovered downstream, now documented on `discover::depend`:
+**self-judgment** — `judge(committed, committed)` in the theory owner's own suite,
+where INTACT is trivially the only verdict and the protection is the refusal path: a
+re-bless that drops a law any consumer declared refuses by equation before the
+ratification diff lands. Old-vs-new is the cross-repo consumer's tool; self-judgment
+is the owner's tool for making declared reliances un-droppable.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
