@@ -24,6 +24,7 @@ members = [
     "downstream-fixture",
     "fire-drill",
     "genesis-demo",
+    "probe-hook",
     "relay-demo",
     "spec-lock",
 ]

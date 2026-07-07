@@ -9,6 +9,7 @@ Four crates publish; one never does. All versions move together and start at
 | `boundary-spec-macros` | derive macros (proc-macro) | yes |
 | `boundary-enforce` | build.rs enforcement passes | yes |
 | `boundary-spec` | the library (root crate) | yes |
+| `probe-hook` | the edit guard as a shipped Claude Code hook (`cargo install probe-hook`) | yes |
 | `downstream-fixture` | consumer existence proof | **never** — `publish = false`, version `0.0.0` |
 
 ## Publish order
@@ -23,7 +24,15 @@ cargo publish -p boundary-spec-macros
 cargo publish -p boundary-enforce
 # wait for the three to be visible in the index, then:
 cargo publish -p boundary-spec
+# and last, the hook binary (depends on boundary-spec and spec-lock):
+cargo publish -p probe-hook
 ```
+
+Since 2026-07-07 this order runs AUTOMATICALLY on every certification release
+(`.github/release.sh`): any crate whose manifest version is absent from the index
+publishes; an already-published version skips. A version bump is therefore a ratified
+manifest diff, and shipping it is machinery — the pipeline needs the
+`CARGO_REGISTRY_TOKEN` repository secret.
 
 Every path dependency in the workspace also carries `version = "0.1.0"`, which
 is what ends up in the published manifests (cargo strips the `path` keys at

@@ -812,6 +812,25 @@ justification, the one thing no derivation produces; the antipattern is named in
 their own lines by PR. Field reports remain welcome for what registers cannot carry:
 lessons, corrections of frame, and the eleventh kind of ask nobody has had yet.
 
+## The eleventh ask: the hook is a shipped binary (BUILT)
+
+Filed the moment the tenth ask's antipattern was spotted wearing the consumer's own
+`settings.json`: the guard is mutation-tested and register-driven, and every consumer
+was fencing it with the same four pieces of unjudged glue — a bash wrapper, inline
+JSON-parsing Python, a stale-binary build fallback, hand-authored settings plumbing.
+`probe-hook` (a workspace member, `cargo install probe-hook`) is that envelope inside
+the boundary: it speaks the hook protocol natively (real JSON parser — paths can carry
+escaped quotes), honours `CLAUDE_PROJECT_DIR`, derives voices from the tree and
+classes from `spec/agenda.register`, and `probe-hook install` writes or idempotently
+merges its own `settings.json` entry, refusing (never clobbering) a file it cannot
+parse. Fail-open is a DRILLED property of the library (`respond` returns `Option`;
+malformed JSON, missing paths, refused registers are silence), not a `|| exit 0`
+convention. The skew floor from the ask's honest frame ships: every voice block
+carries the binary's version, and advisory/fail-open means skew degrades to weaker
+advice, never a false refusal. Re-execing a repo-local build stays deliberately
+unbuilt until skew is observed hurting. It publishes with the other four on every
+certification release.
+
 ## Candidate: the audience is the agent
 
 Adoption of this method is chosen inside agentic sessions, by whichever instance is

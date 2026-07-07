@@ -70,7 +70,7 @@ echo "released ${tag} (${sha})"
 # fails the job loudly — a certified bump that cannot ship is a real error — but a
 # missing token skips quietly (forks and checkouts without the secret still release).
 if [ -n "${CARGO_REGISTRY_TOKEN:-}" ]; then
-  for crate in spec-lock boundary-spec-macros boundary-enforce boundary-spec; do
+  for crate in spec-lock boundary-spec-macros boundary-enforce boundary-spec probe-hook; do
     version=$(cargo metadata --no-deps --format-version 1 |
       python3 -c "import json,sys; print(next(p['version'] for p in json.load(sys.stdin)['packages'] if p['name']=='${crate}'))")
     prefix2=$(printf '%s' "${crate}" | cut -c1-2)
