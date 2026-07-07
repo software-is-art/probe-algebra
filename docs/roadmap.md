@@ -620,6 +620,27 @@ fact wearing a ritual's clothes — and the operator's phrase for the programme,
    would be a silently dropped review. First run routed its own branch: one ratification
    (the qualify census), seven files machinery-verified.
 
+## Candidate: tiers as a lock — derive three, Register the fourth
+
+The tier annotations (`//! Tier: <...>` on every file) are the last per-file ceremony:
+N scattered hand-maintained declarations of a partition that is mostly derivable.
+The four tiers are not the same kind of thing — BOUNDARY, INTERIOR, and ALGEBRA are
+FACTS (qualify logic, import-graph reachability, remainder) and belong in a derived,
+frozen `spec/tiers.spec`; KERNEL is a DECISION (a privilege can never be inferred from
+conduct — that is self-attestation) and belongs in a `kernel.register`
+(`spec_lock::Register`: every exemption carries a ratified justification, an
+unjustified key refuses, a stale entry is a lie — strictly better than
+marker-plus-allowlist, because the reason becomes reviewable text). The reader-service
+the markers provide moves to the edit hook (one injected line on first edit of a file:
+its tier and rules); genesis v2 emits one tiers artifact instead of a header per file.
+
+Migration is the proven ladder, never skipping step one: (1) derive and freeze
+alongside the markers with a coherence gate — declared vs derived, disagreement is a
+build error; (2) once quiet, flip boundary-enforce to read the lock and register;
+(3) delete the derivable markers. Prerequisite work: an interior-reachability
+derivation (does not exist yet) and boundary-enforce consuming lock+register instead
+of first lines.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
