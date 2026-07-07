@@ -95,6 +95,16 @@
       gate:     heterogeneous binary s × t → s (an action of t on s) plus a constant of the carrier sort s
       template: {op} leaves {const} fixed — no parameter moves it.
 
+- action inflation
+      schema:   le(x, act(x, p)) = true  (x ≤ act(x, p) — the action only grows)
+      gate:     heterogeneous binary s × t → s (an action of t on s) plus an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true`
+      template: {op} only grows a value — never shrinks it (under {via}).
+
+- action deflation
+      schema:   le(act(x, p), x) = true  (act(x, p) ≤ x — the action only shrinks)
+      gate:     heterogeneous binary s × t → s (an action of t on s) plus an order relation s × s → r (r ≠ s) whose output sort carries a constant rendering as `true`
+      template: {op} only shrinks a value — never grows it (under {via}).
+
 - symmetry
       schema:   rel(x, y) = rel(y, x)
       gate:     relation s × s → r (r ≠ s) — a symmetric distance says so here; an order refuses it

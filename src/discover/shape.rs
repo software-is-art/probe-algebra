@@ -480,8 +480,9 @@ the code, never pin the report.
 - ttl store: settled — { empty, <+, tick, zero, + } over nets { Duration, Store }
 - store protocol: settled — { empty, ++ } over nets { P }
 - doc flow: settled — { submit, revise, approve, edit } over nets { Draft, Published, Review }
+- fabric: settled — { mesh, join, grant, revoke, reach, within, true } over nets { Fabric, Route, Verdict }
 
-verdict: 6 of 6 modules settled — the declared shape is a fixed point of the placer.
+verdict: 7 of 7 modules settled — the declared shape is a fixed point of the placer.
 
 seam candidates (cross-module net-NAME coincidences no declared seam covers — a
 suggestion: declare the seam, or leave the shared name standing as coincidence):

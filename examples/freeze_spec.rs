@@ -47,6 +47,7 @@ fn main() {
     locks.push(MutationReport::of::<TtlStore>().lock());
     locks.push(MutationReport::of::<StoreProtocol>().lock());
     locks.push(MutationReport::of::<boundary_spec::discover::protocol::DocFlow>().lock());
+    locks.push(MutationReport::of::<boundary_spec::discover::fabric::Fabric>().lock());
     // the BRIDGED theory: a prover's exported tables (`spec/bridged-bool.export` is the
     // committed INPUT), mounted and judged like any theory — its spec, its mutation
     // verdict, and the triage (agreements / conjectures; a disagreement refuses to
@@ -79,6 +80,7 @@ fn main() {
         "algebra mutation: ttl store",
         "algebra mutation: store protocol",
         "algebra mutation: doc flow",
+        "algebra mutation: fabric",
         "the bridged theory's spec",
         "algebra mutation: bridged-bool",
         "the bridge triage (obligations)",

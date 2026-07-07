@@ -1247,6 +1247,56 @@ impl ShapeCatalog {
                 const_rule: ConstRule::Any,
                 premise: None,
             },
+            // -- the ORDERED-ACTION pair: an action judged against an order on its
+            // carrier. Born from the fabric theory's first mutation sweep: `grant` and
+            // `revoke` carried identical law sets (idempotent, commuting, equivariant,
+            // nontrivial), so confusing them SURVIVED — the equational language could
+            // not say which direction an action moves a value. These two stanzas say
+            // exactly that, and nothing else.
+            ShapeInfo {
+                name: "action inflation",
+                schema: "le(x, act(x, p)) = true  (x ≤ act(x, p) — the action only grows)",
+                gate: "heterogeneous binary s × t → s (an action of t on s) plus an \
+                       order relation s × s → r (r ≠ s) whose output sort carries a \
+                       constant rendering as `true`",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Relation(0, 2), Slot::Constant(2)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} only grows a value — never shrinks it (under {via}).",
+                lhs: App(1, &[X, App(0, &[X, P])]),
+                rhs: App(2, &[]),
+                placeholders: &["act", "le", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "via", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: None,
+            },
+            ShapeInfo {
+                name: "action deflation",
+                schema: "le(act(x, p), x) = true  (act(x, p) ≤ x — the action only shrinks)",
+                gate: "heterogeneous binary s × t → s (an action of t on s) plus an \
+                       order relation s × s → r (r ≠ s) whose output sort carries a \
+                       constant rendering as `true`",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Action(0, 1), Slot::Relation(0, 2), Slot::Constant(2)],
+                    distinct_sorts: HETERO,
+                    distinct_ops: &[],
+                },
+                template: "{op} only shrinks a value — never grows it (under {via}).",
+                lhs: App(1, &[App(0, &[X, P]), X]),
+                rhs: App(2, &[]),
+                placeholders: &["act", "le", "true"],
+                polarity: Polarity::Equal,
+                holes: &["op", "via", "const"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Named("true"),
+                premise: None,
+            },
             ShapeInfo {
                 name: "symmetry",
                 schema: "rel(x, y) = rel(y, x)",
@@ -3541,6 +3591,12 @@ mod tests {
     fn every_catalog_shape_fires_across_the_maximal_theories() {
         let mut proses = discovered_prose::<MaxLogic>();
         proses.extend(discovered_prose::<MaxSelect>());
+        // the ordered-action pair (inflation/deflation) is exhibited by the fabric
+        // registry theory (grant/revoke under within): the maximal fixtures carry no
+        // order relation, and growing their tuned exhaustive grids to add one would
+        // perturb every other shape they exist to pin — so the census reads the
+        // committed exhibitor for these two.
+        proses.extend(discovered_prose::<crate::discover::fabric::Fabric>());
         for shape in ShapeCatalog::inventory() {
             assert!(
                 proses.iter().any(|p| shape.matches(p)),

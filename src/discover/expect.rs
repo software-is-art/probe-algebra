@@ -50,6 +50,8 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("action_commutation", "action commutation"),
     ("action_equivariance", "action equivariance"),
     ("action_fixed_point", "action fixed point"),
+    ("inflationary", "action inflation"),
+    ("deflationary", "action deflation"),
     ("symmetric", "symmetry"),
     ("irreflexive", "irreflexivity"),
     ("self_application", "self-application"),
