@@ -80,22 +80,28 @@ fn parse_entry(entry: &str, line: usize) -> Result<NetSignature, String> {
     let rest = quoted
         .next()
         .ok_or_else(|| refuse("nothing after symbol"))?;
-    let open = rest.find('(').ok_or_else(|| refuse("no input list"))?;
-    let close = rest
-        .find(')')
+    // `split_once` throughout — no index arithmetic to hold a degree of freedom the
+    // probes cannot see (the first targeted sweep found exactly those as survivors).
+    let (_, rest) = rest
+        .split_once('(')
+        .ok_or_else(|| refuse("no input list"))?;
+    let (input_list, after) = rest
+        .split_once(')')
         .ok_or_else(|| refuse("unclosed input list"))?;
-    let inputs: Vec<String> = rest[open + 1..close]
+    let inputs: Vec<String> = input_list
         .split(',')
         .map(net_name)
         .filter(|s| !s.is_empty())
         .collect();
-    let after = &rest[close + 1..];
-    let arrow = after.find("->").ok_or_else(|| refuse("no output sort"))?;
-    let eq = after.find('=').ok_or_else(|| refuse("no `= fn` meaning"))?;
-    if eq < arrow {
-        return Err(refuse("no output sort"));
-    }
-    let output = net_name(&after[arrow + 2..eq]);
+    // `=` first, then `->` within what precedes it: an entry whose arrow comes after
+    // its meaning (`(A) = f -> B;`) has no output sort, structurally — no guard needed.
+    let (before_eq, _) = after
+        .split_once('=')
+        .ok_or_else(|| refuse("no `= fn` meaning"))?;
+    let (_, output_raw) = before_eq
+        .split_once("->")
+        .ok_or_else(|| refuse("no output sort"))?;
+    let output = net_name(output_raw);
     if output.is_empty() {
         return Err(refuse("empty output sort"));
     }
@@ -243,7 +249,8 @@ mod probes {
         ] {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
             let source = std::fs::read_to_string(path).expect("repo source");
-            let parsed = Placement::over("parsed", parse_ops(&source).expect("parses"));
+            // through the PUBLIC surface, so the wrapper is load-bearing, not decoration.
+            let parsed = Placement::over("parsed", Ticker::parse_ops(&source).expect("parses"));
             assert_eq!(
                 parsed.components.len(),
                 compiled.components.len(),
@@ -322,10 +329,24 @@ mod probes {
         assert!(bad("Infix \"Add\" \"+\" (S::A = add;").contains("unclosed input list"));
         assert!(bad("Infix \"Add\" \"+\" (S::A) = add;").contains("no output sort"));
         assert!(bad("Infix \"Add\" \"+\" (S::A) -> S::A;").contains("no `= fn` meaning"));
+        // an arrow AFTER the meaning is still "no output sort" — structure, not a guard.
+        assert!(bad("Infix \"Add\" \"+\" (S::A) = add -> S::A;").contains("no output sort"));
+        // the refusal names the 1-based source line (entries sit on line 2 of `bad`).
+        assert!(bad("Infix \"+\" (S::A) -> S::A = add;").contains("line 2:"));
+        // bare (path-free) sorts are nets too — pins the output slice against off-by-one
+        // drift, since `net_name` cannot repair an unpathed sort.
+        let sigs = Ticker::parse_ops(
+            "    ops {\n        Infix \"Add\" \"+\" (Int, Int) -> Int = add;\n    }\n",
+        )
+        .unwrap();
+        assert_eq!(
+            sigs,
+            vec![("+", vec!["Int".into(), "Int".into()], "Int".into())]
+        );
         // an entry left open when the block closes is refused, not truncated.
         let err = parse_ops("    ops {\n        Infix \"Add\" \"+\" (S::A) -> S::A = add\n    }\n")
             .unwrap_err();
-        assert!(err.contains("closed mid-entry"), "{err}");
+        assert!(err.contains("closed mid-entry at line 3"), "{err}");
         // and a file with no ops block parses to an empty, settled placement.
         assert!(parse_ops("fn main() {}").unwrap().is_empty());
     }

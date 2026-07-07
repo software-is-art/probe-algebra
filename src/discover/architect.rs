@@ -86,18 +86,18 @@ struct Entry {
     /// The directory new sub-modules are written under (repo-relative).
     out_dir: &'static str,
     scaffold: fn() -> Option<Scaffold>,
-    /// The PLACEMENT finding for this theory (None when settled) — the placer's editor
-    /// half, checked on every analysis alongside cohesion.
-    place: fn(&str, &str) -> Option<Finding>,
 }
 
-/// The theories the architect analyses (the crate's real discovery domains).
+/// The theories the architect analyses (the crate's real discovery domains). No
+/// placement checks here, deliberately: the registry's modules are shape-locked — the
+/// committed `spec/boundary-spec.shape.spec` already gates their boundaries on every
+/// test run, so a per-analysis re-derivation would be a wire that can never carry a
+/// signal (its first targeted sweep proved exactly that, with a survivor). Placement
+/// findings belong where the shape is still forming: a WORKBENCH, watched directly
+/// through [`Architect::place`].
 fn registry() -> Vec<Entry> {
     fn s<T: Theory>() -> Option<Scaffold> {
         Scaffold::of::<T>()
-    }
-    fn p<T: Theory>(file: &str, out_dir: &str) -> Option<Finding> {
-        Architect::place::<T>(file, out_dir)
     }
     vec![
         Entry {
@@ -105,21 +105,18 @@ fn registry() -> Vec<Entry> {
             file: "src/discover/arithmetic.rs",
             out_dir: "src/discover/arithmetic",
             scaffold: s::<Arithmetic>,
-            place: p::<Arithmetic>,
         },
         Entry {
             name: Router::name(),
             file: "src/discover/router.rs",
             out_dir: "src/discover/router",
             scaffold: s::<Router>,
-            place: p::<Router>,
         },
         Entry {
             name: Calendar::name(),
             file: "src/discover/date.rs",
             out_dir: "src/discover/date",
             scaffold: s::<Calendar>,
-            place: p::<Calendar>,
         },
     ]
 }
@@ -194,9 +191,6 @@ impl Architect {
     pub fn analyze() -> Vec<Finding> {
         let mut findings = Vec::new();
         for e in registry() {
-            if let Some(finding) = (e.place)(e.file, e.out_dir) {
-                findings.push(finding);
-            }
             let Some(sc) = (e.scaffold)() else {
                 continue;
             };
@@ -747,18 +741,19 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// A settled theory is SILENT to the placer — including the registry's own modules,
+    /// A settled theory is SILENT to the placer — including the repo's own modules,
     /// every one of which cohesion may still hint about. The two instruments disagree on
     /// arithmetic by design: cohesion suggests a split (laws don't link `<` to `+`);
     /// placement derives keep-whole (`Int` nets them together). The editor shows the
-    /// hint and withholds the auto-fix — exactly the derivation/suggestion line.
+    /// hint and withholds the auto-fix — exactly the derivation/suggestion line. (The
+    /// registry runs no placement checks at all: its modules are shape-locked, so
+    /// analyze() carries cohesion findings only, none preferred.)
     #[test]
     fn settled_theories_are_silent_to_the_placer() {
         assert!(Architect::place::<Arithmetic>("f", "d").is_none());
         assert!(Architect::place::<Router>("f", "d").is_none());
         assert!(Architect::place::<Calendar>("f", "d").is_none());
         assert!(Scaffold::placement::<Arithmetic>().is_none());
-        // analyze() therefore carries cohesion findings only, none preferred.
         assert!(Architect::analyze().iter().all(|f| !f.action.preferred));
     }
 
