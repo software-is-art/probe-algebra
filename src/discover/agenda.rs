@@ -36,6 +36,9 @@ pub enum Ratification {
     Seams,
     /// A qualify census moved: the public surface changed — admit the new operators.
     Surface,
+    /// The tier census moved: the declared partition's distance from derived evidence
+    /// changed — a disagreement appeared, resolved, or a kernel decision was made.
+    Partition,
     /// The pipeline moved (gates.spec / ci.yml): the promises or their execution
     /// changed — re-read what CI now claims.
     Pipeline,
@@ -67,6 +70,11 @@ impl Ratification {
             }
             Ratification::Surface => {
                 "the public surface census moved — admit the new operators.".to_string()
+            }
+            Ratification::Partition => {
+                "the tier census moved — declared-vs-derived coherence changed; is the \
+                 movement intended?"
+                    .to_string()
             }
             Ratification::Pipeline => {
                 "the pipeline moved — re-read what CI now promises and executes.".to_string()
@@ -220,6 +228,8 @@ fn classify(path: &str) -> Result<Class, String> {
             Ratification::Surface
         } else if file == "gates.spec" {
             Ratification::Pipeline
+        } else if file == "tiers.spec" {
+            Ratification::Partition
         } else if file == "shapes.spec" {
             Ratification::Vocabulary
         } else if file.ends_with(".mutation.spec") {
@@ -283,6 +293,7 @@ mod probes {
             "spec/router.mutation.spec",
             "spec/boundary-spec.shape.spec",
             "spec/qualify.spec",
+            "spec/tiers.spec",
             ".github/workflows/ci.yml",
             "spec/gates.spec",
             "lean/bites.register",
@@ -301,6 +312,7 @@ mod probes {
                 },
                 Ratification::Boundary,
                 Ratification::Surface,
+                Ratification::Partition,
                 Ratification::Pipeline,
                 Ratification::Exceptions {
                     register: "lean/bites.register".to_string()
@@ -315,7 +327,7 @@ mod probes {
         );
         let text = agenda.render();
         assert!(text.starts_with(
-            "# review agenda — 6 ratification(s) required; 2 file(s) machinery-verified.\n"
+            "# review agenda — 7 ratification(s) required; 2 file(s) machinery-verified.\n"
         ));
         assert!(text.contains("`router`: the discovered laws moved"));
         assert!(text.contains("read for sense (prose, no lock question):\n- docs/roadmap.md\n"));

@@ -10,8 +10,9 @@
 //! admitting a member must be a diff HERE, in this repo's build script, where review cannot miss
 //! it. A file declaring `Tier: KERNEL` that is not on this list is a build error.
 //!
-//! The qualify census is frozen into `spec/qualify.spec`; regenerate with
-//! `BLESS_QUALIFY=1 cargo build` and ratify the diff.
+//! The qualify census is frozen into `spec/qualify.spec` (`BLESS_QUALIFY=1 cargo build`);
+//! the tier census — the declared partition held against derived evidence, ladder step one
+//! of tiers-as-a-lock — into `spec/tiers.spec` (`BLESS_TIERS=1 cargo build`).
 
 use std::path::PathBuf;
 
@@ -38,5 +39,6 @@ fn main() {
     let mut config = Config::new(&manifest);
     config.kernel_allowlist = KERNEL_ALLOWLIST.iter().map(|s| s.to_string()).collect();
     config.qualify_spec = Some(manifest.join("spec/qualify.spec"));
+    config.tiers_spec = Some(manifest.join("spec/tiers.spec"));
     Enforcement::enforce_or_panic(&config);
 }

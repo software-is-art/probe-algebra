@@ -620,7 +620,7 @@ fact wearing a ritual's clothes — and the operator's phrase for the programme,
    would be a silently dropped review. First run routed its own branch: one ratification
    (the qualify census), seven files machinery-verified.
 
-## Candidate: tiers as a lock — derive three, Register the fourth
+## Candidate: tiers as a lock — derive three, Register the fourth (step one BUILT)
 
 The tier annotations (`//! Tier: <...>` on every file) are the last per-file ceremony:
 N scattered hand-maintained declarations of a partition that is mostly derivable.
@@ -633,6 +633,16 @@ unjustified key refuses, a stale entry is a lie — strictly better than
 marker-plus-allowlist, because the reason becomes reviewable text). The reader-service
 the markers provide moves to the edit hook (one injected line on first edit of a file:
 its tier and rules); genesis v2 emits one tiers artifact instead of a header per file.
+
+Step one landed with the candidate: `boundary-enforce` computes the tier census in the
+same walk as the qualify census (`Config::tiers_spec`, `BLESS_TIERS`), frozen to
+`spec/tiers.spec`. First real freeze: 46 files — 28 agree, 8 DISAGREE, 10 kernel
+decisions. The disagreements are the work list: two ALGEBRA files are structurally
+operator-shaped (`derived.rs`, `modularize.rs` — qualify had already hinted), the three
+declared-BOUNDARY files fail the strict qualify bar (proof-carrying generics — a
+derivation gap to widen, not a misdeclaration), and three `mod.rs` glue files claim
+INTERIOR while pub-reachable. Each row is a conversation; the freeze ratifies the
+distance. The review router routes `tiers.spec` as its own ratification class.
 
 Migration is the proven ladder, never skipping step one: (1) derive and freeze
 alongside the markers with a coherence gate — declared vs derived, disagreement is a

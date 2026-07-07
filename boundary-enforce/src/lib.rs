@@ -108,6 +108,12 @@ pub struct Config {
     /// The environment variable that, when set, regenerates [`Config::qualify_spec`] instead of
     /// drift-checking it. Default: `BLESS_QUALIFY`.
     pub bless_env: String,
+    /// Where the TIER census is frozen and drift-gated — the declared partition held against
+    /// DERIVED evidence (ladder step one of tiers-as-a-lock; see the consumer's roadmap).
+    /// `None` skips the freeze/drift pass (the census is still computed and returned).
+    pub tiers_spec: Option<PathBuf>,
+    /// The bless variable for [`Config::tiers_spec`]. Default: `BLESS_TIERS`.
+    pub tiers_bless_env: String,
 }
 
 impl Config {
@@ -121,6 +127,8 @@ impl Config {
             kernel_allowlist: Vec::new(),
             qualify_spec: None,
             bless_env: "BLESS_QUALIFY".to_string(),
+            tiers_spec: None,
+            tiers_bless_env: "BLESS_TIERS".to_string(),
         }
     }
 }
@@ -133,6 +141,9 @@ pub struct Enforcement {
     pub violations: Vec<String>,
     /// The rendered qualification census (what [`Config::qualify_spec`] freezes).
     pub qualify_census: String,
+    /// The rendered tier census (what [`Config::tiers_spec`] freezes): per file, the declared
+    /// tier held against the derived evidence — agreement, disagreement, or kernel decision.
+    pub tiers_census: String,
     /// The files and directories whose change must re-trigger enforcement, in emission order.
     pub rerun_paths: Vec<PathBuf>,
 }
@@ -185,36 +196,45 @@ impl Enforcement {
         // drift-gated, so the answer is ratified in the diff (regenerate with the bless env var).
         let qualify_census =
             render_census(&config.src_root, &config.manifest_dir, &config.bless_env);
-        if let Some(spec_path) = &config.qualify_spec {
-            rerun.push(spec_path.clone());
-            if std::env::var(&config.bless_env).is_ok() {
-                if let Some(parent) = spec_path.parent() {
-                    std::fs::create_dir_all(parent)
-                        .unwrap_or_else(|e| panic!("create {} ({e})", parent.display()));
-                }
-                std::fs::write(spec_path, &qualify_census)
-                    .unwrap_or_else(|e| panic!("write {} ({e})", spec_path.display()));
-            } else {
-                let committed = std::fs::read_to_string(spec_path).unwrap_or_default();
-                if committed != qualify_census {
-                    let rel = spec_path
-                        .strip_prefix(&config.manifest_dir)
-                        .unwrap_or(spec_path);
-                    violations.push(format!(
-                        "{} is stale — the algebra-qualification census drifted. Regenerate \
-                         with `{}=1 cargo build` and ratify the diff.",
-                        rel.display(),
-                        config.bless_env
-                    ));
-                }
-            }
-        }
+        freeze_or_gate(
+            &config.qualify_spec,
+            &qualify_census,
+            &config.bless_env,
+            "the algebra-qualification census",
+            &config.manifest_dir,
+            &mut rerun,
+            &mut violations,
+        );
+
+        // TIER CENSUS: the declared partition held against DERIVED evidence — ladder step
+        // one of tiers-as-a-lock. INTERIOR is derivable (pub-reachability from the crate
+        // roots), BOUNDARY is derivable (the qualify bar: operator-shaped structure),
+        // ALGEBRA is the reachable remainder; KERNEL is a DECISION (a privilege can never
+        // be inferred from conduct), recorded and never judged. A DISAGREES row is the
+        // honest distance between the declared partition and what structure can currently
+        // derive — the freeze ratifies that distance; burning it down (or improving the
+        // derivation) is the prerequisite for ladder step two.
+        let tiers_census = render_tiers(
+            &config.src_root,
+            &config.manifest_dir,
+            &config.tiers_bless_env,
+        );
+        freeze_or_gate(
+            &config.tiers_spec,
+            &tiers_census,
+            &config.tiers_bless_env,
+            "the tier census",
+            &config.manifest_dir,
+            &mut rerun,
+            &mut violations,
+        );
 
         violations.sort();
         violations.dedup();
         Enforcement {
             violations,
             qualify_census,
+            tiers_census,
             rerun_paths: rerun,
         }
     }
@@ -243,6 +263,217 @@ impl Enforcement {
 // ===== qualification census: which modules ARE algebras, by structure ====
 
 /// Compute the algebra-qualification of every module and render the census report.
+/// Freeze `census` at `spec_path` (when the bless env is set) or drift-gate it against the
+/// committed text — the ONE freeze/drift shape both censuses share, so the two cannot
+/// diverge in mechanics. `None` spec path skips entirely.
+#[allow(clippy::too_many_arguments)]
+fn freeze_or_gate(
+    spec_path: &Option<PathBuf>,
+    census: &str,
+    bless_env: &str,
+    label: &str,
+    manifest: &Path,
+    rerun: &mut Vec<PathBuf>,
+    violations: &mut Vec<String>,
+) {
+    let Some(spec_path) = spec_path else { return };
+    rerun.push(spec_path.clone());
+    if std::env::var(bless_env).is_ok() {
+        if let Some(parent) = spec_path.parent() {
+            std::fs::create_dir_all(parent)
+                .unwrap_or_else(|e| panic!("create {} ({e})", parent.display()));
+        }
+        std::fs::write(spec_path, census)
+            .unwrap_or_else(|e| panic!("write {} ({e})", spec_path.display()));
+    } else {
+        let committed = std::fs::read_to_string(spec_path).unwrap_or_default();
+        if committed != census {
+            let rel = spec_path.strip_prefix(manifest).unwrap_or(spec_path);
+            violations.push(format!(
+                "{} is stale — {label} drifted. Regenerate with `{bless_env}=1 cargo build` \
+                 and ratify the diff.",
+                rel.display(),
+            ));
+        }
+    }
+}
+
+/// One file's row in the tier census: what it declares, and the derived evidence.
+struct TierRow {
+    loc: String,
+    declared: Option<&'static str>,
+    qualifies: bool,
+    /// Child modules this file declares: `(name, is_pub)`.
+    mods: Vec<(String, bool)>,
+    /// The directory this file's child modules resolve under.
+    child_dir: PathBuf,
+}
+
+/// The tier census: every file's declared tier held against the derived evidence.
+fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
+    let mut rows: Vec<(PathBuf, TierRow)> = Vec::new();
+    collect_tier_rows(src, manifest, &mut rows);
+
+    // pub-reachability, from the crate roots: a file is PUB-REACHABLE when a chain of
+    // `pub mod` declarations connects a root (lib.rs / main.rs) to it. Roots count as
+    // reachable themselves.
+    let mut reachable: Vec<PathBuf> = rows
+        .iter()
+        .map(|(p, _)| p.clone())
+        .filter(|p| {
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            (name == "lib.rs" || name == "main.rs") && p.parent() == Some(src)
+        })
+        .collect();
+    let mut frontier = reachable.clone();
+    while let Some(path) = frontier.pop() {
+        let Some((_, row)) = rows.iter().find(|(p, _)| p == &path) else {
+            continue;
+        };
+        for (name, is_pub) in &row.mods {
+            if !is_pub {
+                continue;
+            }
+            for candidate in [
+                row.child_dir.join(format!("{name}.rs")),
+                row.child_dir.join(name).join("mod.rs"),
+            ] {
+                if rows.iter().any(|(p, _)| p == &candidate) && !reachable.contains(&candidate) {
+                    reachable.push(candidate.clone());
+                    frontier.push(candidate);
+                }
+            }
+        }
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    let (mut agree, mut disagree, mut kernel) = (0usize, 0usize, 0usize);
+    for (path, row) in &rows {
+        let is_reachable = reachable.contains(path);
+        let derived = if !is_reachable {
+            "INTERIOR"
+        } else if row.qualifies {
+            "BOUNDARY"
+        } else {
+            "ALGEBRA"
+        };
+        let evidence = match (is_reachable, row.qualifies) {
+            (false, _) => "not pub-reachable",
+            (true, true) => "pub-reachable, operator-shaped",
+            (true, false) => "pub-reachable, not operator-shaped",
+        };
+        let line = match row.declared {
+            Some("KERNEL") => {
+                kernel += 1;
+                format!(
+                    "- {}: declared KERNEL — a decision (ratified in build.rs), never derived; \
+                     evidence for the record: {evidence}",
+                    row.loc
+                )
+            }
+            Some(declared) if declared == derived => {
+                agree += 1;
+                format!(
+                    "- {}: declared {declared}; derived {derived} ({evidence}) — agree",
+                    row.loc
+                )
+            }
+            Some(declared) => {
+                disagree += 1;
+                format!(
+                    "- {}: declared {declared}; derived {derived} ({evidence}) — DISAGREES",
+                    row.loc
+                )
+            }
+            None => format!(
+                "- {}: declares no tier (the partition pass refuses this separately)",
+                row.loc
+            ),
+        };
+        lines.push(line);
+    }
+    lines.sort();
+
+    let mut report = format!(
+        "# tier census — the declared partition held against DERIVED evidence: INTERIOR is\n\
+         # non-pub reachability, BOUNDARY is operator-shaped structure (the qualify bar),\n\
+         # ALGEBRA is the reachable remainder. KERNEL is a decision, recorded and never\n\
+         # judged — a privilege cannot be inferred from conduct. A DISAGREES row is the\n\
+         # honest distance between the declared partition and what structure can derive\n\
+         # today; burn it down or improve the derivation before deleting any marker\n\
+         # (the ladder: derive alongside, coherence-gate, then delete). Regenerate with\n\
+         # `{bless_env}=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files: {agree} agree, {disagree} disagree, {kernel} kernel decisions.\n\n",
+        rows.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+    report
+}
+
+/// Walk `dir` collecting each file's declared tier, qualify evidence, and child-module
+/// declarations (for the reachability pass).
+fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierRow)>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_tier_rows(&path, manifest, rows);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        let Ok(source) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(file) = parse(&path) else { continue };
+        let imports = std_effect_imports(&file.items);
+        let mut ops: Vec<Op> = Vec::new();
+        qualify_items(&file.items, &imports, &mut ops);
+        let mods = file
+            .items
+            .iter()
+            .filter_map(|it| match it {
+                Item::Mod(m) if m.content.is_none() => Some((
+                    m.ident.to_string(),
+                    matches!(m.vis, syn::Visibility::Public(_)),
+                )),
+                _ => None,
+            })
+            .collect();
+        // lib.rs / main.rs / mod.rs resolve children in their own directory; a plain
+        // `foo.rs` resolves them under `foo/`.
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        let child_dir = if matches!(name, "lib.rs" | "main.rs" | "mod.rs") {
+            path.parent().unwrap_or(dir).to_path_buf()
+        } else {
+            path.with_extension("")
+        };
+        rows.push((
+            path.clone(),
+            TierRow {
+                loc: path
+                    .strip_prefix(manifest)
+                    .unwrap_or(&path)
+                    .display()
+                    .to_string(),
+                declared: declared_tier(&source),
+                qualifies: !ops.is_empty(),
+                mods,
+                child_dir,
+            },
+        ));
+    }
+}
+
 fn render_census(src: &Path, manifest: &Path, bless_env: &str) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut scanned = 0usize;

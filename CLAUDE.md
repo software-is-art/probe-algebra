@@ -20,6 +20,7 @@ diff — the committed diff is the ratification. A missing lock counts as stale.
 | `spec/shapes.spec` (the law-language catalog) | `cargo run --example freeze_shapes` |
 | `spec/gates.spec` and `.github/workflows/ci.yml` (the pipeline is a lock) | `cargo run --example freeze_gates` |
 | `spec/qualify.spec` (public-surface census; build fails when stale) | `BLESS_QUALIFY=1 cargo build` |
+| `spec/tiers.spec` (declared partition vs derived evidence) | `BLESS_TIERS=1 cargo build` |
 | demo crates' censuses | `BLESS_CREDIT_APP_QUALIFY=1` / `BLESS_RELAY_APP_QUALIFY=1` |
 | trybuild `.stderr` files (toolchain bumps only) | `TRYBUILD=overwrite` |
 

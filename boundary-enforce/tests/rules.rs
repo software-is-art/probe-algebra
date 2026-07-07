@@ -426,3 +426,63 @@ fn a_disciplined_tree_passes_all_passes() {
         .iter()
         .any(|p| p.ends_with(PathBuf::from("src/domain/boundary.rs"))));
 }
+
+// ===== the tier census: the declared partition vs derived evidence ========
+
+#[test]
+fn the_tier_census_derives_and_records_coherence() {
+    let config = fixture(
+        "tier-census",
+        &[
+            (
+                "src/lib.rs",
+                "//! Tier: KERNEL — floor\npub mod api;\npub mod report;\npub mod rogue;\nmod internal;\n",
+            ),
+            (
+                "src/api.rs",
+                "//! Tier: BOUNDARY — surface\npub struct Credit;\npub fn grant(a: Credit) -> Credit { a }\n",
+            ),
+            (
+                "src/report.rs",
+                "//! Tier: ALGEBRA — report\npub fn render() -> i64 { 1 }\n",
+            ),
+            (
+                "src/internal.rs",
+                "//! Tier: INTERIOR — workshop\nfn helper() {}\n",
+            ),
+            (
+                "src/rogue.rs",
+                "//! Tier: INTERIOR — misdeclared: pub-reachable cannot be interior\npub fn misc() -> i64 { 2 }\n",
+            ),
+        ],
+    );
+    let census = Enforcement::run(&config).tiers_census;
+    assert!(
+        census.contains("# 5 files: 3 agree, 1 disagree, 1 kernel decisions."),
+        "{census}"
+    );
+    assert!(census.contains(
+        "src/api.rs: declared BOUNDARY; derived BOUNDARY (pub-reachable, operator-shaped) — agree"
+    ));
+    assert!(census.contains(
+        "src/internal.rs: declared INTERIOR; derived INTERIOR (not pub-reachable) — agree"
+    ));
+    assert!(census.contains(
+        "src/rogue.rs: declared INTERIOR; derived ALGEBRA (pub-reachable, not operator-shaped) — DISAGREES"
+    ));
+    assert!(census.contains("src/lib.rs: declared KERNEL — a decision"));
+}
+
+#[test]
+fn a_stale_tier_census_is_a_violation() {
+    let mut config = fixture(
+        "tier-census-stale",
+        &[("src/lib.rs", "//! Tier: KERNEL — floor\n")],
+    );
+    let spec = config.manifest_dir.join("spec/tiers.spec");
+    std::fs::create_dir_all(spec.parent().unwrap()).unwrap();
+    std::fs::write(&spec, "old\n").unwrap();
+    config.tiers_spec = Some(spec);
+    let vs = Enforcement::run(&config).violations;
+    assert_fires(&vs, "the tier census drifted");
+}
