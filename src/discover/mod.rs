@@ -30,6 +30,7 @@ pub mod depend;
 pub mod derived;
 pub mod engine;
 pub mod expect;
+pub mod fabric;
 pub mod freeze;
 pub mod gates;
 pub mod genesis;
@@ -513,6 +514,7 @@ crate::system! {
         crate::kvstore::theory::TtlStore;
         world::StoreProtocol;
         protocol::DocFlow;
+        fabric::Fabric;
     }
 }
 

@@ -709,7 +709,8 @@ mod tests {
                 "date calculus",
                 "ttl store",
                 "store protocol",
-                "doc flow"
+                "doc flow",
+                "fabric"
             ]
         );
         assert!(report.seams.is_empty());
@@ -755,7 +756,7 @@ mod tests {
         // `shape::probes::nets_place_what_laws_cannot_see`). Cohesion keeps naming the
         // sparse wiring (this pin); placement settles the boundary.
         let expected = "\
-boundary-spec: 3 of 6 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
+boundary-spec: 4 of 7 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
   module `interpreter arithmetic`: decomposes into 2 latent modules — consider splitting:
     module 0: { 0, 1, +, * }
     module 1: { false, < }

@@ -773,14 +773,29 @@ a seam verdict with a lock, and the expensive probes are spot-check countersigns
 of laws the simulation earned cheaply. Evidence discipline unchanged: a green sim
 law says nothing about reality until the seam countersigns it.
 
-Prerequisites, reordered by the simulation-first insight: (1) the world as a value
-object — a synthetic world theory (nodes, edges, policies; reachability and deny
-laws) discovered by the existing engine: the existence proof that infrastructure
-behaviour is discoverable at all, and a `theory!` domain like any other; (2)
-read-only world probes as first-class edges with declared cost, countersigning the
-simulation through the transport seam; (3) the world lock generalised from library
-dependencies to any probed surface. Build nothing that mutates: the arm stays
-someone else's.
+Step one is BUILT: `discover::fabric`, the synthetic world as a registry theory
+like any other. A `Fabric` is grants plus standing denies over a small node
+universe; `mesh`/`join`/`grant`/`revoke`/`reach`/`within` (and the `true` constant)
+are its operators; twenty named laws froze into `spec/fabric.spec` — the join
+semilattice, grant/revoke as well-behaved actions WITH their directions (grant only
+grows delivery, revoke only shrinks it), reach as a projection fixed at `mesh` and
+monotone under `within`, and the witness inequations. The load-bearing REFUSAL is
+pinned like the router's non-commutativity: reach is NOT monotone in the
+join-order, because a merge carries the other side's denies — "adding
+infrastructure only adds connectivity" is false, and the engine keeps saying so.
+Discovery also corrected the author once (predicted-refused subadditivity HOLDS:
+`within` compares closed deliveries, so bridging is quotiented away — the
+observation-function lesson, taught by the machine), and the first mutation sweep
+GREW the law language: grant confused with revoke survived in both directions
+(identical law sets — the vocabulary could not say which way an action moves a
+value), so the `action inflation`/`action deflation` stanzas joined the catalog,
+discovery found the direction laws itself on the next run, and all 22 mutants die.
+Infrastructure behaviour is a discoverable algebra, today, with zero new machinery.
+
+Remaining rungs: (2) read-only world probes as first-class edges with declared
+cost, countersigning the simulation through the transport seam; (3) the world lock
+generalised from library dependencies to any probed surface. Build nothing that
+mutates: the arm stays someone else's.
 
 ## Standing follow-ups
 

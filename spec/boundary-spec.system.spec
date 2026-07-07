@@ -7,5 +7,6 @@ modules (the ratified registry — one committed module lock each):
 - ttl store
 - store protocol
 - doc flow
+- fabric
 
 seams: none — no module pair declares a shared-value obligation.

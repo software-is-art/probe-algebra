@@ -280,6 +280,7 @@ mod tests {
     use super::*;
     use crate::discover::arithmetic::Arithmetic;
     use crate::discover::date::Calendar;
+    use crate::discover::fabric::Fabric;
     use crate::discover::router::Router;
     use crate::discover::world::StoreProtocol;
     use crate::kvstore::theory::TtlStore;
@@ -338,7 +339,7 @@ mod tests {
         assert!(render.contains("\n- SURVIVED  `one` evaluates as `two`"));
     }
 
-    /// The five committed mutation locks are fresh — the drift gate. A spec change that
+    /// The committed mutation locks are fresh — the drift gate. A spec change that
     /// alters any theory's kill power (a new survivor, a closed one, a new mutant from a
     /// new operator) fails HERE until the regenerated report is ratified.
     #[test]
@@ -349,6 +350,7 @@ mod tests {
             MutationReport::of::<Calendar>().lock(),
             MutationReport::of::<TtlStore>().lock(),
             MutationReport::of::<StoreProtocol>().lock(),
+            MutationReport::of::<Fabric>().lock(),
         ];
         if let Err(stale) = spec_lock::check(&locks) {
             panic!(
@@ -390,6 +392,7 @@ mod tests {
                 "store protocol",
                 MutationReport::of::<StoreProtocol>().survivors().len(),
             ),
+            ("fabric", MutationReport::of::<Fabric>().survivors().len()),
         ] {
             assert_eq!(
                 survivors, 0,
@@ -408,6 +411,7 @@ mod tests {
             ("date calculus", MutationReport::of::<Calendar>()),
             ("ttl store", MutationReport::of::<TtlStore>()),
             ("store protocol", MutationReport::of::<StoreProtocol>()),
+            ("fabric", MutationReport::of::<Fabric>()),
         ] {
             assert!(
                 report.verdicts.len() >= 3,

@@ -167,7 +167,8 @@ mod tests {
                     "date calculus",
                     "ttl store",
                     "store protocol",
-                    "doc flow"
+                    "doc flow",
+                    "fabric"
                 ]
             ),
             Err(stale) => panic!(
