@@ -641,11 +641,15 @@ derivation (operator-shape as the BOUNDARY signal) froze at 28 agree / 8 disagre
 the disagreements taught the derivation: operator-shape is QUALIFY's fact, not a tier
 claim — the repo's real boundary mark is carrying production edge impls, and pure glue
 (module declarations and re-exports) has no evidence to judge, so it stands as
-declared. Derivation v2 froze at 46 files: 35 agree, 1 DISAGREE, 10 kernel decisions.
-The one residue is a genuine question for step two, not noise: `select/boundary.rs`
-declares tier-1 strictness while carrying no production edges — boundary by decision,
-not by evidence. Either the declaration moves, the evidence widens (value-object
-surfaces as a signal), or the row is ratified as a standing decision like kernel.
+declared. Derivation v2 froze at 35 agree / 1 disagree
+(`select/boundary.rs`: tier-1 strictness, no production edges), and the operator asked
+the right question — are we just missing evidence? Yes: the FRONTING relation, the tier
+system's own semantics read backwards. INTERIOR is not merely unreachable, it is
+fronted; the front is the file that delegates into it; doors are boundaries. A
+pub-reachable file referencing an interior sibling by path derives BOUNDARY. Derivation
+v3 froze at 46 files: 36 agree, 0 DISAGREE, 10 kernel decisions — the partition is
+fully derivable, and step two (flip boundary-enforce to read the lock, delete the
+derivable markers, kernel to a justification register) is unblocked.
 
 Migration is the proven ladder, never skipping step one: (1) derive and freeze
 alongside the markers with a coherence gate — declared vs derived, disagreement is a

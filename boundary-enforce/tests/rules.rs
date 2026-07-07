@@ -436,7 +436,7 @@ fn the_tier_census_derives_and_records_coherence() {
         &[
             (
                 "src/lib.rs",
-                "//! Tier: KERNEL — floor\npub mod api;\npub mod report;\npub mod rogue;\npub mod hub;\nmod internal;\n",
+                "//! Tier: KERNEL — floor\npub mod api;\npub mod report;\npub mod rogue;\npub mod hub;\npub mod front;\nmod internal;\n",
             ),
             (
                 "src/hub.rs",
@@ -455,6 +455,10 @@ fn the_tier_census_derives_and_records_coherence() {
                 "//! Tier: INTERIOR — workshop\nfn helper() {}\n",
             ),
             (
+                "src/front.rs",
+                "//! Tier: BOUNDARY — fronts the workshop\npub struct Door;\nimpl Door { pub fn go(&self) { crate::internal::helper() } }\n",
+            ),
+            (
                 "src/rogue.rs",
                 "//! Tier: INTERIOR — misdeclared: pub-reachable cannot be interior\npub fn misc() -> i64 { 2 }\n",
             ),
@@ -462,9 +466,12 @@ fn the_tier_census_derives_and_records_coherence() {
     );
     let census = Enforcement::run(&config).tiers_census;
     assert!(
-        census.contains("# 6 files: 4 agree, 1 disagree, 1 kernel decisions."),
+        census.contains("# 7 files: 5 agree, 1 disagree, 1 kernel decisions."),
         "{census}"
     );
+    assert!(census.contains(
+        "src/front.rs: declared BOUNDARY; derived BOUNDARY (pub-reachable, fronts an interior sibling) — agree"
+    ));
     assert!(census.contains(
         "src/api.rs: declared BOUNDARY; derived BOUNDARY (pub-reachable, carries production edges) — agree"
     ));
@@ -474,7 +481,7 @@ fn the_tier_census_derives_and_records_coherence() {
         "src/internal.rs: declared INTERIOR; derived INTERIOR (not pub-reachable) — agree"
     ));
     assert!(census.contains(
-        "src/rogue.rs: declared INTERIOR; derived ALGEBRA (pub-reachable, no production edges) — DISAGREES"
+        "src/rogue.rs: declared INTERIOR; derived ALGEBRA (pub-reachable, no production edges, fronts nothing) — DISAGREES"
     ));
     assert!(census.contains("src/lib.rs: declared KERNEL — a decision"));
 }

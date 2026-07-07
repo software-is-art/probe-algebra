@@ -309,6 +309,9 @@ struct TierRow {
     mods: Vec<(String, bool)>,
     /// The directory this file's child modules resolve under.
     child_dir: PathBuf,
+    /// The source text, kept for the fronting check (does this file delegate into an
+    /// interior sibling?).
+    source: String,
 }
 
 /// The tier census: every file's declared tier held against the derived evidence.
@@ -357,11 +360,29 @@ fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
     collect_edges_and_probes(src, manifest, &mut edges, &mut probed);
     let edge_locs: HashSet<&str> = edges.iter().map(|e| e.loc.as_str()).collect();
 
+    // the FRONTING relation — the tier system's own semantics as evidence: INTERIOR is
+    // not merely unreachable, it is fronted, and the front is the file that delegates
+    // into it. A pub-reachable file that references an interior sibling (a non-pub-
+    // reachable module in its own directory) by path is a door. Doors are boundaries.
+    let interior_stems: Vec<(PathBuf, String)> = rows
+        .iter()
+        .filter(|(p, _)| !reachable.contains(p))
+        .filter_map(|(p, _)| {
+            Some((
+                p.parent()?.to_path_buf(),
+                p.file_stem()?.to_str()?.to_string(),
+            ))
+        })
+        .collect();
+
     let mut lines: Vec<String> = Vec::new();
     let (mut agree, mut disagree, mut kernel) = (0usize, 0usize, 0usize);
     for (path, row) in &rows {
         let is_reachable = reachable.contains(path);
         let carries_edges = edge_locs.contains(row.loc.as_str());
+        let fronts = interior_stems.iter().any(|(dir, stem)| {
+            Some(dir.as_path()) == path.parent() && row.source.contains(&format!("{stem}::"))
+        });
         if row.declared.is_some() && row.declared != Some("KERNEL") && !row.substance {
             agree += 1;
             lines.push(format!(
@@ -374,15 +395,16 @@ fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
         }
         let derived = if !is_reachable {
             "INTERIOR"
-        } else if carries_edges {
+        } else if carries_edges || fronts {
             "BOUNDARY"
         } else {
             "ALGEBRA"
         };
-        let evidence = match (is_reachable, carries_edges) {
-            (false, _) => "not pub-reachable",
-            (true, true) => "pub-reachable, carries production edges",
-            (true, false) => "pub-reachable, no production edges",
+        let evidence = match (is_reachable, carries_edges, fronts) {
+            (false, _, _) => "not pub-reachable",
+            (true, true, _) => "pub-reachable, carries production edges",
+            (true, false, true) => "pub-reachable, fronts an interior sibling",
+            (true, false, false) => "pub-reachable, no production edges, fronts nothing",
         };
         let line = match row.declared {
             Some("KERNEL") => {
@@ -418,8 +440,9 @@ fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
 
     let mut report = format!(
         "# tier census — the declared partition held against DERIVED evidence: INTERIOR is\n\
-         # non-pub reachability, BOUNDARY is carrying production edge impls, ALGEBRA is\n\
-         # the reachable remainder; pure glue stands as declared. KERNEL is a decision,\n\
+         # non-pub reachability, BOUNDARY is being a DOOR (carrying production edge impls,\n\
+         # or fronting an interior sibling — the tier-2 relation read backwards), ALGEBRA\n\
+         # is the reachable remainder; pure glue stands as declared. KERNEL is a decision,\n\
          # recorded and never judged — a privilege cannot be inferred from conduct. A\n\
          # DISAGREES row is the\n\
          # honest distance between the declared partition and what structure can derive\n\
@@ -493,6 +516,7 @@ fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierR
                 substance,
                 mods,
                 child_dir,
+                source,
             },
         ));
     }
