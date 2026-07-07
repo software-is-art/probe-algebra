@@ -589,6 +589,58 @@ candidate bricks:
     derived modules as the scaffolded tree (write the netlist, get the placed
     crate), which is the autoshaping half of the v2 work list below.
 
+## Three bricks from the release conversation (the ceremony hunt, continued)
+
+The observation that named them: every arbitrary ceremony in software is a derivable
+fact wearing a ritual's clothes — and the operator's phrase for the programme,
+"replacing implied service from a platform with specification". All three BUILT:
+
+1. **The bridge alarm in the agent loop** (`Ticker::hook_line`,
+   `.claude/hooks/shape-watch.sh`). The mechanism question settled by token economics:
+   LSP is the human surface (pull-based, verbose, free for eyes); the lock is the CI
+   surface (late); the agent surface is a PostToolUse hook, because it prices feedback
+   right — zero tokens when silent, one line when the shape moved, no instruction
+   anywhere. The noise policy is the design: joined edits are free silence, a seed that
+   opens a second component announces its extraction, a bridge always speaks. The hook
+   informs, never acts.
+
+2. **The dependence lock** (`discover::depend`). Compatibility is a relation between a
+   change and a consumer, not a global property of the change — semver's integer
+   pretends otherwise. A consumer declares the laws it relies on (equation as identity);
+   `Dependence::judge` answers over any two frozen lock texts: INTACT, CHANGED (new
+   statement carried), GONE (the breaking case, named). A reliance the baseline never
+   held refuses. With automatic releases publishing the lock diff, the full loop is:
+   pin two release tags, judge your reliances, read the verdicts.
+
+3. **The review router** (`discover::agenda`, `examples/review_agenda`). "Review the
+   PR" was the last implied service in the workflow. The diff classifies itself: one
+   ratification question per moved lock class (laws, freedoms, boundary, seams, surface,
+   pipeline, exceptions, world, vocabulary), prose read for sense, interior code named
+   machinery-verified. An unknown spec-directory artifact refuses — misfiled-as-machinery
+   would be a silently dropped review. First run routed its own branch: one ratification
+   (the qualify census), seven files machinery-verified.
+
+## Candidate: tiers as a lock — derive three, Register the fourth
+
+The tier annotations (`//! Tier: <...>` on every file) are the last per-file ceremony:
+N scattered hand-maintained declarations of a partition that is mostly derivable.
+The four tiers are not the same kind of thing — BOUNDARY, INTERIOR, and ALGEBRA are
+FACTS (qualify logic, import-graph reachability, remainder) and belong in a derived,
+frozen `spec/tiers.spec`; KERNEL is a DECISION (a privilege can never be inferred from
+conduct — that is self-attestation) and belongs in a `kernel.register`
+(`spec_lock::Register`: every exemption carries a ratified justification, an
+unjustified key refuses, a stale entry is a lie — strictly better than
+marker-plus-allowlist, because the reason becomes reviewable text). The reader-service
+the markers provide moves to the edit hook (one injected line on first edit of a file:
+its tier and rules); genesis v2 emits one tiers artifact instead of a header per file.
+
+Migration is the proven ladder, never skipping step one: (1) derive and freeze
+alongside the markers with a coherence gate — declared vs derived, disagreement is a
+build error; (2) once quiet, flip boundary-enforce to read the lock and register;
+(3) delete the derivable markers. Prerequisite work: an interior-reachability
+derivation (does not exist yet) and boundary-enforce consuming lock+register instead
+of first lines.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

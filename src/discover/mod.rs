@@ -18,6 +18,7 @@
 //! (mutation) plus expectation-checking (ratification); enumeration is depth- and grid-bounded (a
 //! resource limit, not a curated list).
 
+pub mod agenda;
 pub mod architect;
 pub mod arithmetic;
 pub mod bite;
@@ -26,6 +27,7 @@ pub mod coherence;
 pub mod cohesion;
 pub mod composition;
 pub mod date;
+pub mod depend;
 pub mod derived;
 pub mod engine;
 pub mod expect;

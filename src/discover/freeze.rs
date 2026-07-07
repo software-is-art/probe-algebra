@@ -112,6 +112,27 @@ impl Spec {
         self.lock_in(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec"))
     }
 
+    /// Parse a frozen lock render back into its HELD laws — `(prose, equation)` pairs,
+    /// in lock order: the inverse of `render`'s law section, for `discover::depend`'s
+    /// per-consumer judgment. The undecided band is excluded deliberately (disclosed is
+    /// not held — a law that moved there is no longer relied-upon-able), as are the
+    /// header and coverage lines.
+    pub fn parse_lock(text: &str) -> Vec<(String, String)> {
+        let mut laws = Vec::new();
+        let mut prose: Option<String> = None;
+        for line in text.lines() {
+            if line.starts_with("# undecided") {
+                break;
+            }
+            if let Some(p) = line.strip_prefix("- ") {
+                prose = Some(p.to_string());
+            } else if let (true, Some(p)) = (line.starts_with("      "), prose.take()) {
+                laws.push((p, line.trim().to_string()));
+            }
+        }
+        laws
+    }
+
     /// Check every theory's LIVE spec against its committed lock. On success returns the
     /// theory names verified fresh; on drift returns the names that no longer match (the
     /// fix is to regenerate and ratify the diff).
