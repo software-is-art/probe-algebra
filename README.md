@@ -291,7 +291,7 @@ a probe or the build fails; public functions must attach to a typestate or be
 operator-shaped (the rats-nest rule); and boundary-hood itself is *computed* — a census
 ([`spec/qualify.spec`](spec/qualify.spec), drift-gated) reports which modules are
 operator-shaped regardless of what they are named. The full model lives in
-[docs/concepts.md](docs/concepts.md) and [docs/how-it-works.md](docs/how-it-works.md).
+[docs/compile-time.md](docs/compile-time.md).
 
 </details>
 
@@ -346,10 +346,9 @@ exists to catch the good ones.
 - [docs/discovery.md](docs/discovery.md) — the discovery half, precisely: theories, the
   grid, the catalog's fields and driver semantics, expectations, every lock kind, seams and
   `system!`, genesis, the world lock, the gate registry, algebra mutation.
-- [docs/concepts.md](docs/concepts.md) — the compile-time half: the graded category, the
-  four edge shapes, the gradings and their self-proofs, the probe taxonomy.
-- [docs/how-it-works.md](docs/how-it-works.md) — the edge grammar end to end: what you
-  write, what compile time and autotest time each validate.
+- [docs/compile-time.md](docs/compile-time.md) — the compile-time half, layered like this
+  page: the edge grammar end to end, with the graded category, the gradings' self-proofs,
+  and the probe taxonomy one fold in.
 - [docs/ci-discipline.md](docs/ci-discipline.md) — the extractable pattern (deterministic
   spec → frozen file → drift gate → diff-scoped mutation) and the standalone
   [`spec-lock`](spec-lock) crate that carries it to any project.

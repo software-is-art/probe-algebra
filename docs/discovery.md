@@ -4,7 +4,7 @@ The reference for the discovery half of the method: what a theory is, how the gr
 what the catalog's data means and how the engine interprets it, what every lock kind pins, and
 how the system, world, pipeline, and mutation layers reuse the same move. Every term maps to an
 item in `src/discover/`. For the compile-time edge grammar beneath all of this, read
-[concepts.md](concepts.md).
+[compile-time.md](compile-time.md).
 
 ## A theory
 
