@@ -56,7 +56,7 @@ Keep the grid lean on purpose when a drift gate re-derives the theory inside eve
 
 ## The catalog IS the engine
 
-`ShapeCatalog::inventory()` is the law language — 35 shapes — and `Engine::templates()` is a
+`ShapeCatalog::inventory()` is the law language — 37 shapes — and `Engine::templates()` is a
 generic interpreter over it. There is no second statement of the battery anywhere. Each
 `ShapeInfo` stanza carries:
 
@@ -108,6 +108,7 @@ fresh.**
 | `spec/<theory>.spec` | the discovered law set, consequence count, coverage line | `cargo run --example freeze_spec` |
 | `spec/<theory>.mutation.spec` | every operator-table mutant's verdict; survivors are ratified degrees of freedom | same |
 | `spec/<system>.system.spec` | the module registry + every seam's obligation and verdict | same |
+| `spec/<system>.shape.spec` | the DERIVED module boundaries (operators placed by net connectivity) + seam candidates | same |
 | `spec/<observer>.world.spec` | the model's recorded conduct over the derived trace battery | same |
 | `spec/shapes.spec` | the law language itself | `cargo run --example freeze_shapes` |
 | `spec/gates.spec` + `.github/workflows/ci.yml` | the pipeline's promises AND its execution | `cargo run --example freeze_gates` |
@@ -132,6 +133,14 @@ The macro has two arms: compact (name the modules and seams) and full-grammar (p
 verbatim genesis declaration — one artifact, two lifecycle stages). `SystemDistance::of::<S>()`
 runs every registry module through cohesion and reports declared vs latent modularity — a
 report, not a gate, because cohesion is a suggestion.
+
+The macro also generates `placements()` for the PLACER (`discover::shape`): operators
+partitioned by net connectivity — two are connected when a sort appears in both signatures,
+the circuit-CAD signal, read off declarations without running discovery. A module the placer
+re-derives as one component is SETTLED; components sharing no nets are an indisputable split
+(move the code, never pin the report); cross-module net-NAME coincidences with no declared
+seam render as seam candidates. `ShapeReport::of::<S>()` freezes it all per system — the
+declared shape held against the derived shape, continuously.
 
 ## Genesis
 

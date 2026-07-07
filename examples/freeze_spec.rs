@@ -24,6 +24,7 @@ use boundary_spec::discover::bridge::{Bridged, Export, Triage};
 use boundary_spec::discover::date::Calendar;
 use boundary_spec::discover::mutation::MutationReport;
 use boundary_spec::discover::router::Router;
+use boundary_spec::discover::shape::ShapeReport;
 use boundary_spec::discover::system::SystemReport;
 use boundary_spec::discover::world::{StoreModel, StoreProtocol};
 use boundary_spec::discover::{all_specs, BoundarySpec, Spec};
@@ -33,6 +34,9 @@ fn main() {
     let specs = all_specs();
     let mut locks: Vec<spec_lock::Lock> = specs.iter().map(Spec::lock).collect();
     locks.push(SystemReport::of::<BoundarySpec>().lock());
+    // the SHAPE lock: the DERIVED module boundaries — operators placed by net
+    // connectivity, held against the declared graph continuously (see `discover::shape`).
+    locks.push(ShapeReport::of::<BoundarySpec>().lock());
     // the WORLD lock: the model's ratified beliefs about the demonstration dependency
     // (see `discover::world` — the freeze discipline pointed outward).
     locks.push(StoreModel::beliefs().lock());
@@ -42,6 +46,7 @@ fn main() {
     locks.push(MutationReport::of::<Calendar>().lock());
     locks.push(MutationReport::of::<TtlStore>().lock());
     locks.push(MutationReport::of::<StoreProtocol>().lock());
+    locks.push(MutationReport::of::<boundary_spec::discover::protocol::DocFlow>().lock());
     // the BRIDGED theory: a prover's exported tables (`spec/bridged-bool.export` is the
     // committed INPUT), mounted and judged like any theory — its spec, its mutation
     // verdict, and the triage (agreements / conjectures; a disagreement refuses to
@@ -66,12 +71,14 @@ fn main() {
     }
     for (lock, label) in locks.iter().skip(specs.len()).zip([
         "the seam graph",
+        "the derived shape (placement)",
         "the world lock",
         "algebra mutation: interpreter arithmetic",
         "algebra mutation: router",
         "algebra mutation: date calculus",
         "algebra mutation: ttl store",
         "algebra mutation: store protocol",
+        "algebra mutation: doc flow",
         "the bridged theory's spec",
         "algebra mutation: bridged-bool",
         "the bridge triage (obligations)",

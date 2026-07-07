@@ -8,7 +8,10 @@
 # workspace as a CI-tested member: the generated `[workspace]` table is removed (a member
 # cannot be its own workspace), `publish = false`/`version = "0.0.0"` mark it a fixture,
 # and `cargo fmt` was applied (rustfmt orders imports/modules alphabetically; genesis
-# emits declaration order).
+# emits declaration order). One disclosure, not a deviation: the generated
+# `.github/workflows/ci.yml` is rendered for a STANDALONE repository — as a workspace
+# member it is inert (GitHub reads only the repo root's workflows; the root CI covers
+# this member), but it stays drift-gated by `tests/gates.rs` like any lock.
 [package]
 name = "credit-app"
 version = "0.0.0"

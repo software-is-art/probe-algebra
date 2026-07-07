@@ -1,0 +1,20 @@
+# visual census: the constraints the ratified corpus EXHIBITS — derived, never typed;
+# regenerate via `cargo run -p layout-probe --example freeze` and ratify the diff.
+#
+# Every row is freeze-stable: a floor or a maximum a new corpus member moves VISIBLY.
+# A derived floor is DESCRIPTIVE of the corpus; committing this file is the normative
+# act — from then on erosion is a red gate naming the movement, and raising a
+# standard by example is a reviewable diff too.
+
+corpus: 6 diagrams (the source grid, rendered by the stable engine)
+horizontal floor (smallest within-rank gap): 4
+vertical floor (smallest rank gap): 2
+widest rank: 2 nodes
+rank alignment: every rank shares one row (no overlaps)
+
+# locality witness — insertion displacement, MEASURED (computed by the real
+# engines, never asserted): max |Δ| of pre-existing nodes when one node joins.
+# The early-sorting name exposes the stable engine's name/position coupling;
+# the late-sorting name is the benign case. Another face of the one tradeoff.
+insert `_new` (sorts early): stable moves 4, eager moves 0
+insert `zz` (sorts late):   stable moves 0, eager moves 0

@@ -1,0 +1,8 @@
+# cargo-mutants configuration for the layout-probe member sweep (the weekly gate
+# `mutation (layout-probe plumbing)` passes `--config` to use this file).
+#
+# `--lib` only, the delta-render precedent: the member's drift-gate twins live in the
+# library exactly so this sweep can see them (specs, mutation verdicts, the visual
+# census, the locality and scorecard pins).
+additional_cargo_test_args = ["--lib"]
+test_tool = "nextest"

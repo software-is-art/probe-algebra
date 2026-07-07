@@ -146,7 +146,8 @@ mod tests {
                     "router",
                     "date calculus",
                     "ttl store",
-                    "store protocol"
+                    "store protocol",
+                    "doc flow"
                 ]
             ),
             Err(stale) => panic!(

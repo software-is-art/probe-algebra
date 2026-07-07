@@ -21,6 +21,8 @@
 //!   expectations ride the attribute, and discovery must re-earn them.
 //! * [`system`] (ALGEBRA) — the COMPILED `system!` graph: the module registry (the graph
 //!   IS the registry the freeze loop reads) and the declared seams with their checkers.
+//! * [`gates`] (ALGEBRA) — the pipeline as a declaration: `spec/gates.spec` and the CI
+//!   workflow are BOTH its renders, drift-gated (`cargo run --example freeze_gates`).
 //! * `spec/` — TARGET locks: the DECLARED laws (and the declared seam graph) in the exact
 //!   lock format, committed RED on purpose. The drift gate stays red until discovery
 //!   matches the declaration.
@@ -38,6 +40,7 @@
 //! 4. `cargo run --example freeze` — regenerate the locks from discovery and read the
 //!    diff against the targets. That diff IS the review: ratify it, or fix the meaning.
 
+pub mod gates;
 pub mod gauge;
 pub mod mixer;
 pub mod ops;

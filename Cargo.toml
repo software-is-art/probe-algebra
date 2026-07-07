@@ -20,6 +20,7 @@ members = [
     "boundary-spec-macros",
     "boundary-enforce",
     "delta-render",
+    "layout-probe",
     "downstream-fixture",
     "fire-drill",
     "genesis-demo",
@@ -75,5 +76,8 @@ boundary-enforce = { path = "boundary-enforce", version = "0.1.0" }
 # inside every `cargo test`, and Engine<T> monomorphizes INTO that crate — so it alone
 # is built optimized in dev/test. Measured: the freeze path drops from ~95s to seconds;
 # nothing else in the workspace pays for it.
+[profile.dev.package.layout-probe]
+opt-level = 2
+
 [profile.dev.package.delta-render]
 opt-level = 2

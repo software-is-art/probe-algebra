@@ -182,6 +182,58 @@ its recorded residuals. The items below predate that inventory:
    dynamic sync pin (`the_target_lock_reproduces_discovery_byte_for_byte`) remains the
    end-to-end net over the freeze's actual render.
 
+## From the field, fifth report (genesis as a greenfield contract generator)
+
+Delivered as a screenshot of another agent's session (a transpiler workitem —
+different org, different assistant; the project stays anonymous here, per house
+practice for field reports): genesis was pointed at a real declaration and
+driven to a compiling generated crate. The verdict — "usable as a greenfield contract
+generator, not yet as a clean drop-in"; "the system lock is exactly the kind of small
+public-contract review surface we wanted"; "do not vendor the generated crate
+wholesale — adapt the generated system.rs/locks pattern, and treat the generator gaps
+as follow-up improvements to probe-algebra." Those gaps, verbatim, with dispositions:
+
+1. *Generates a full crate layout, not an existing-module patch.* The migration-mode
+   gap — genesis as a PATCHER that emits theory impls, locks, and gates INTO an
+   existing tree instead of scaffolding a new one. The largest and realest item.
+2. *Value ownership by "first module that mentions it" is surprising.* Make ownership
+   declarative (an `owns` clause) and make the inference a stated, locked fact rather
+   than a silent heuristic.
+3. *Module names can collide with generated theory/value markers.* A generator
+   collision must be a NAMED REFUSAL at generation time, never a downstream rustc
+   error — the parser-as-gate discipline applied to genesis's own output.
+4. *`MEANING:` holes make it scaffolding, not migration.* Fold into (1): migration
+   mode should ADOPT an existing function as a meaning (`= path::to::fn`) instead of
+   emitting a hole where an implementation already lives.
+5. *The algebra is only meaningful with good contract values* (their `u8` stage
+   weights "proved mechanics, not [the domain's] semantics"). Partly documentation
+   (the carrier IS the contract), partly a possible instrument: a toy-carrier
+   advisory in the distance report when a theory's values are bare primitives.
+
+Converging ask from this repo's own operator, same week: genesis should also speak
+PROTOCOL — the `protocol!` states-as-sorts form (built; see `discover::protocol`)
+as a genesis declaration block, so a blank-slate system can declare a workflow's
+states and transitions and get the sort enums, the tagged values, the closure grid,
+and the target locks generated with meaning-holes only in the transition bodies.
+Together these are the genesis v2 work list.
+
+First strike off that list — **the pipeline gap, closed** (a sixth friction the report
+never named because every adopter assumes it: genesis emitted every artifact EXCEPT the
+CI that guards them, leaving the adopter to hand-write the one artifact class this repo
+argues must never be hand-written). `discover::gates::Pipeline` is the consumer form —
+gates declared as data, both locks derived into the consumer's repo via `locks_in`
+(the `Spec::lock_in` shape), the two bespoke tiers (green-tag countersign, sharded
+sweep) refusing by name rather than rendering wrong YAML — and genesis now emits the
+whole loop into every generated crate: `src/gates.rs` (a `Ci::pipeline()` typestate
+calling the ONE starter declaration, never a restatement), `examples/freeze_gates.rs`,
+`tests/gates.rs`, and the two artifacts pre-rendered so the pipeline locks are fresh
+from birth (the declaration fully determines the render — no target-vs-earned gap).
+Both demos carry it; the emitted workflow is inert inside this workspace (disclosed in
+their manifests) and exactly what the fifth report's standalone adopter needed. A
+pleasing verification note: the first draft emitted `pub fn pipeline()` and the demos'
+own generated enforcement shim REFUSED it (a loose public function violates the
+no-rats-nest rule) — the generated discipline judging its own generator.
+
 ## From the field, day zero (fire-drill consumed in production)
 
 The production CLI adoption consumed fire-drill untagged, same-day — and the crate's
@@ -355,6 +407,157 @@ candidate bricks:
     the obligations artifact and the freeze path refuses to freeze it — it is a defect
     to fix upstream, never a row to ratify; the drill export (`proved: commutative
     implies`) pins the conviction end to end.
+
+13. **Second-domain validation: layout engines under metamorphic probe — BUILT IN
+    MINIATURE** (`layout-probe/`; the ELK/d2 binding in the diagram tool's repo remains
+    the downstream adoption this member de-risks). What the build proved, over two
+    deterministic layered engines differing by one policy bit (within-rank order: node
+    name vs declaration index): the scoped laws needed TWO new catalog stanzas —
+    `inert` (u(x) = x) and `equivariant map` (the commuting square f(act(x,p)) =
+    act2(f(x),p), which `action equivariance` could not say) — and with geometry as
+    the observation, discovery split the engines along a REAL tradeoff neither wins:
+    the stable engine holds `inert(reorder)` and loses rename-equivariance (its
+    missing law shows as coverage silence: "operators in no law: render"), the eager
+    engine holds the square and loses reorder-inertness (dagre's layout-jumping
+    pathology, named by an absent law). Both declare the same three laws, so the two
+    pinned distance reports ARE the engine scorecard. The visual census emerged as
+    designed (floors 4/2 derived never typed; freeze-stable rows only), the locality
+    witness measured the same tradeoff in pixels (an early-sorting insertion shifts a
+    whole rank under stable, nothing under eager), and the fire drills prove refusal
+    is earned: a jittering engine never reads as stable, and a grown corpus reddens
+    the census. Weekly member sweep (`--lib`, the delta-render economics) feeds the
+    countersign. Original scoping below, kept as the downstream build's brief. The domain: diagram source → layout engine →
+    geometry, with an agent loop editing the source. The operators live on SOURCE
+    (add node, add edge, rename, reorder declarations, group into container, toggle
+    theme); the OBSERVATION is canonicalized geometry — which makes the proposed
+    metamorphic relations mostly existing catalog vocabulary, not new machinery:
+
+    - *rename-then-render = render-then-relabel* is the `action_equivariance` stanza,
+      verbatim: `f(act(x, p)) = act'(f(x), p)` with `f` = render.
+    - *declaration-reorder invariance* is not even a new law — with geometry as the
+      observation, a stable engine makes `reorder` OBSERVATIONALLY IDENTITY, and
+      discovery finds (or refuses) that on its own. Declare it (`expects`) and the
+      DISTANCE REPORT becomes an engine scorecard: dagre expected red on exactly this
+      row (the known agent-loop "layout jumping" pathology, named as a missing law),
+      ELK expected green. Refutation as product insight.
+    - *insertion locality* (a new node must not move geometrically distant nodes beyond
+      ε) is a TOLERANCED law — the three-valued judgment built for the trace-logic
+      corpus, pointed at pixels: register the metric bars, and near-threshold layouts
+      land in the DISCLOSED band instead of coin-flipping (float coordinates are the
+      quantization hazard discovery.md already documents). Likely ONE new catalog
+      stanza (toleranced action locality, premise-guarded by distance) — the intended
+      growth dynamic: hostile domain → stanza → every theory benefits.
+    - *theme toggle is geometry-invariant* is an action fixed point on the projected
+      observation.
+
+    The rest of the apparatus maps one-to-one: the layout engine is an EXTERNAL
+    dependency, so its conduct over a derived source battery freezes into a WORLD
+    lock — replay after an engine upgrade names exactly which fixtures moved (upgrade
+    drift, currently discovered by squinting at diagrams); known-unstable fixtures are
+    exception-register entries with justifications; and a fire drill plants a
+    deliberately unstable engine stub (seeded jitter) to prove the stability gates can
+    fire. Economics, disclosed up front: an observation is a process spawn (~50–200ms),
+    so the grid must be DELIBERATE (the stream-idiom lesson — a handful of designed
+    fixtures, not a soup), renders memoized, and the gate probably PR-cadence rather
+    than per-`cargo test`.
+
+    **The lint layer, refined — the constraints EMERGE.** The first fence ("plain
+    predicates, no algebra") was right about the predicates and too crude about the
+    thresholds. Measuring contrast is plain code; *4.5:1* and *8px* need not be typed
+    by anyone. The honest mechanism is the third artifact of the design, the **visual
+    census**: derive, from the ratified diagram corpus, the regularities it actually
+    exhibits — the contrast floor, the spacing residues mod each candidate grid, the
+    alignment deviations — as one deterministic text artifact, frozen with `spec-lock`
+    (the tiny crate, not the engine: this is the qualify-census move pointed at
+    pixels). The epistemics matter and are the method's own: a derived floor is
+    DESCRIPTIVE of the corpus; **the freeze is the only normative act** — committing
+    the census is what turns "what our diagrams happen to do" into "what our diagrams
+    must do". From then on a new diagram that erodes a floor is a red gate naming the
+    movement ("contrast floor 4.7 → 3.9 — ratify or fix") instead of silent decay,
+    a diagram that TIGHTENS a floor is a visible diff too (standards can be raised by
+    example), and deliberate outliers are `Register` entries with justifications. So
+    the reconciliation: predicates plain, thresholds emergent, standards ratified —
+    the 200-line lint script survives, it just stops carrying opinions and starts
+    carrying derivations. The strong version — the LAW ENGINE inferring threshold
+    constants itself (discovered bars filling Constant slots, tightest-that-holds) —
+    is recorded as catalog research, not v1: the census form needs none of it.
+
+    **Stretch goal: how the constraints shape aesthetics.** Once the census exists,
+    taste stops being ambient and starts leaving a record — four executable forms,
+    in ascending ambition:
+
+    - *Taste as chronicle.* The only place aesthetics enters the system is
+      ratification, and every ratification is now a census diff — so the diff history
+      IS the house style's chronicle: when the spacing grid tightened, when a floor
+      was deliberately traded away, who signed it. An aesthetic you can `git log`.
+    - *Taste as inheritance.* A new agent (or designer) dropped into the project
+      inherits the frozen census and the metamorphic laws — the taste FLOOR transfers
+      without the taster: they cannot silently produce work below the look, and every
+      way their work pushes on the look arrives as a reviewable diff.
+    - *The removal drill, pointed at taste* (the warrant's move, verbatim): drop one
+      frozen constraint, regenerate or re-sample layouts under the remaining set, and
+      ask whether preference — human ratification, or a pinned preference model —
+      actually degrades. A constraint whose removal changes nothing anyone can see is
+      DECORATION, flagged not frozen; the load-bearing residue is, operationally, the
+      aesthetic. "Which rules make it look like US" becomes an experiment, not a
+      debate.
+    - *Style as the quotient.* What the census pins is the house look; the visual
+      degrees of freedom it CANNOT see (the mutation-survivor concept, aimed at
+      pixels) are where individual voice lives. Choosing which surviving DOFs to pin
+      next is the design act, made explicit — and the three-valued band marks the
+      taste boundary honestly: near-threshold work is DISCLOSED for human eyes,
+      never auto-judged at the edge.
+
+    Honest limit, stated as the method always states it: the judge here is human, and
+    stays human. The apparatus makes taste legible, transmissible, and measurable for
+    load-bearing-ness; it can never derive it. This is the "what did you mean"
+    boundary wearing its other face — "what do you like" — and the freeze remains the
+    only place the answer enters.
+
+    What this domain uniquely buys the METHOD: millisecond feedback with visible
+    ground truth — the fastest refutation loop any consumer has offered yet. Open
+    questions for the build session: engine order (ELK first, exhaust it before
+    anything proprietary; Graphviz as the free DAG baseline), observation
+    canonicalization (quantized positions vs topology-only, possibly BOTH as two
+    observers over one carrier), whether locality needs its own stanza or
+    premise-guarded monotonicity over a declared distance order suffices, and which
+    census statistics are STABLE enough to freeze (floors and residue histograms
+    survive corpus growth; means do not — a census row must be a fact a new diagram
+    can only move visibly, never smear).
+
+14. **Continuous autoshaping: the placer — BUILT** (`discover::shape`,
+    `spec/boundary-spec.shape.spec`). The friction it dissolves, named by this repo's
+    operator: LLMs writing code and considering shape at the same time degrade at
+    both — the useful move is the circuit-CAD one, where the author writes the
+    NETLIST (behaviour in one big bundle) and the tool derives the placement.
+    The algebraic twin of a net is a SORT: the placer partitions operators by
+    net connectivity (a sort in both signatures — one produces what the other
+    consumes), read off declarations alone, never discovery, so shape is derived
+    before a single law is judged. Two instruments now, two questions: cohesion
+    links by LAW co-occurrence and reads wiring density (a suggestion a human
+    ratifies); placement links by NETS and reads the boundary (a derivation).
+    The dogfood was the design constraint — "if we can get this to work where
+    we've manually pinned things we've got something really good; falling back
+    to pinning kicks the can" — and it landed on the first run: all six declared
+    modules place SETTLED, including the three cohesion wants split and this repo
+    keeps whole by hand-ratified pin (arithmetic's `<` shares `Int` with `+`,
+    the calendar's `since` shares `Date` with `add`, the protocol's transitions
+    share its state sorts). The keep-wholes are now derived, not spent; the pin
+    survives only as the wiring observation it always was. CONTINUOUS because the
+    shape is a lock like everything else: `ShapeReport` freezes per system,
+    re-judged every `cargo test`, and placement is MONOTONE by union-find's own
+    algebra — a new operator joins a component or bridges two, it can never
+    re-split or reshuffle what it does not touch (the layout-probe locality
+    property, holding for the placer itself). First-run bonus finding: the report
+    surfaces cross-module net-NAME coincidences no declared seam covers as SEAM
+    CANDIDATES — and this repo has exactly one, `Duration` named by both the
+    calendar and the ttl store (two Rust types agreeing on a word; declare the
+    seam or leave the coincidence standing — rendered, never merged). Follow-ups:
+    the splits placement CANNOT see (a genuinely shared net carrying two features
+    — the rail-sort problem, circuit CAD's power-plane exclusion) stay cohesion's
+    territory, disclosed; genesis v2 should close the loop by EMITTING a bundle's
+    derived modules as the scaffolded tree (write the netlist, get the placed
+    crate), which is the autoshaping half of the v2 work list below.
 
 ## Standing follow-ups
 

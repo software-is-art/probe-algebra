@@ -60,6 +60,10 @@ pub trait System {
     /// `system!` macro is the implementing path, and it always generates this — a default
     /// body would be dead code wearing a trait's clothes (and an equivalent-mutant site).
     fn cohesions() -> Vec<CohesionReport>;
+    /// Each registry module's PLACEMENT — the net-connectivity partition, for
+    /// [`super::shape::ShapeReport`] to hold the declared shape against the derived one.
+    /// REQUIRED for the same reason as `cohesions`: the macro always generates it.
+    fn placements() -> Vec<super::shape::Placement>;
 }
 
 /// A seam obligation's verdict — what the checker actually returned, never a claim.
@@ -531,6 +535,15 @@ macro_rules! system {
                     }
                 ),+ ]
             }
+            fn placements() -> ::std::vec::Vec<$crate::discover::shape::Placement> {
+                ::std::vec![ $(
+                    $crate::__paste! {
+                        $crate::discover::shape::Placement::of::<
+                            crate::ops::[<$m _ops>]::[<$m:camel>],
+                        >()
+                    }
+                ),+ ]
+            }
         }
         // DRIFT WITNESSES — every declared operator signature, held against the code at
         // compile time. The paths go through the declaration's own module names, so the
@@ -567,6 +580,11 @@ macro_rules! system {
             fn cohesions() -> ::std::vec::Vec<$crate::discover::cohesion::CohesionReport> {
                 ::std::vec![ $(
                     $crate::discover::cohesion::CohesionReport::of::<$module>()
+                ),+ ]
+            }
+            fn placements() -> ::std::vec::Vec<$crate::discover::shape::Placement> {
+                ::std::vec![ $(
+                    $crate::discover::shape::Placement::of::<$module>()
                 ),+ ]
             }
         }
@@ -691,7 +709,8 @@ mod tests {
                 "router",
                 "date calculus",
                 "ttl store",
-                "store protocol"
+                "store protocol",
+                "doc flow"
             ]
         );
         assert!(report.seams.is_empty());
@@ -723,9 +742,21 @@ mod tests {
     #[test]
     fn the_repo_distance_names_the_latent_splits() {
         let distance = SystemDistance::of::<BoundarySpec>();
-        assert_eq!(distance.latent().len(), 2);
+        assert_eq!(distance.latent().len(), 3);
+        // `doc flow` is the instructive third split: a PROTOCOL reads as decomposable
+        // to the cohesion instrument BY NATURE — one-way doors (approve) and endo
+        // loops (edit) look like split points in the operator-interaction graph, but a
+        // protocol's "latent seams" are its states, and carving them apart would
+        // destroy exactly the unrepresentability it exists for. Keep-whole, ratified
+        // here: the suggestion stands recorded, deliberately declined.
+        //
+        // All three keep-wholes are now also DERIVED, not merely ratified: the placer
+        // (`discover::shape`) partitions by net connectivity — nets connect what laws
+        // do not — and places every one of these modules as a single component (see
+        // `shape::probes::nets_place_what_laws_cannot_see`). Cohesion keeps naming the
+        // sparse wiring (this pin); placement settles the boundary.
         let expected = "\
-boundary-spec: 3 of 5 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
+boundary-spec: 3 of 6 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
   module `interpreter arithmetic`: decomposes into 2 latent modules — consider splitting:
     module 0: { 0, 1, +, * }
     module 1: { false, < }
@@ -734,6 +765,12 @@ boundary-spec: 3 of 5 declared modules are cohesive; LATENT SPLITS (suggestions,
     module 0: { zero, +, add, diff }
     module 1: { since, at }
     seam 0↔1 on Date, Duration — transform (algebra changes — check the homomorphism)
+  module `doc flow`: decomposes into 3 latent modules — consider splitting:
+    module 0: { submit, revise }
+    module 1: { approve }
+    module 2: { edit }
+    seam 0↔1 on Review — transform (algebra changes — check the homomorphism)
+    seam 0↔2 on Draft — transform (algebra changes — check the homomorphism)
 ";
         assert_eq!(distance.render(), expected);
     }
