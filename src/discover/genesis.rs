@@ -2169,6 +2169,7 @@ impl Genesis {
     pub fn apply(plan: &Plan, root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
         let action = CodeAction {
             title: format!("genesis: materialise `{}`", plan.system.name),
+            preferred: false,
             edits: plan
                 .edits
                 .iter()

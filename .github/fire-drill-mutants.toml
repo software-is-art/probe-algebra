@@ -1,0 +1,7 @@
+# cargo-mutants configuration for the fire-drill member sweep (the weekly gate
+# `mutation (fire-drill plumbing)` passes `--config` to use this file).
+#
+# `--lib` only, the member precedent: fire-drill's probes live in the library, so the
+# sweep sees the battery verdicts, the census refusals, and both lockable renders.
+additional_cargo_test_args = ["--lib"]
+test_tool = "nextest"

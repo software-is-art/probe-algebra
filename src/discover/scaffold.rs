@@ -49,6 +49,42 @@ impl Scaffold {
         scaffold::<T>()
     }
 
+    /// Generate the split for a theory's PLACEMENT components — the placer's action
+    /// half. Returns `None` when the placement is settled (one component — the declared
+    /// boundary is the derived boundary). Unlike the cohesion split, a placement split
+    /// carries NO seam obligations: the components share no sorts, so nothing crosses
+    /// the cut. It is lossless for the same structural reason as the cohesion split,
+    /// one step stronger — a law's operators are net-connected through its terms'
+    /// sorts, so every discovered law lives entirely inside one component.
+    pub fn placement<T: Theory>() -> Option<Self> {
+        let placement = super::shape::Placement::of::<T>();
+        if placement.is_settled() {
+            return None;
+        }
+        let decls = Engine::<T>::new().declarations();
+        let modules = placement
+            .components
+            .iter()
+            .enumerate()
+            .map(|(idx, component)| {
+                let owned: Vec<_> = decls
+                    .iter()
+                    .filter(|d| component.ops.contains(&d.1))
+                    .collect();
+                ModulePlan {
+                    name: format!("Module{idx}"),
+                    operators: component.ops.clone(),
+                    source: render_module::<T>(idx, &owned),
+                }
+            })
+            .collect();
+        Some(Scaffold {
+            theory: T::name(),
+            modules,
+            seams: Vec::new(),
+        })
+    }
+
     /// Render the whole scaffold as a readable, paste-able skeleton.
     pub fn render<T: Theory>() -> String {
         match Self::of::<T>() {

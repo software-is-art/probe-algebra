@@ -41,6 +41,7 @@ pub mod router;
 pub mod scaffold;
 pub mod shape;
 pub mod system;
+pub mod watch;
 pub mod world;
 
 /// Generate a whole `engine::Theory` impl from a concise declaration — so a discovery domain is
