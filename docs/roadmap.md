@@ -636,13 +636,16 @@ its tier and rules); genesis v2 emits one tiers artifact instead of a header per
 
 Step one landed with the candidate: `boundary-enforce` computes the tier census in the
 same walk as the qualify census (`Config::tiers_spec`, `BLESS_TIERS`), frozen to
-`spec/tiers.spec`. First real freeze: 46 files — 28 agree, 8 DISAGREE, 10 kernel
-decisions. The disagreements are the work list: two ALGEBRA files are structurally
-operator-shaped (`derived.rs`, `modularize.rs` — qualify had already hinted), the three
-declared-BOUNDARY files fail the strict qualify bar (proof-carrying generics — a
-derivation gap to widen, not a misdeclaration), and three `mod.rs` glue files claim
-INTERIOR while pub-reachable. Each row is a conversation; the freeze ratifies the
-distance. The review router routes `tiers.spec` as its own ratification class.
+`spec/tiers.spec`; the review router routes it as its own ratification class. The first
+derivation (operator-shape as the BOUNDARY signal) froze at 28 agree / 8 disagree, and
+the disagreements taught the derivation: operator-shape is QUALIFY's fact, not a tier
+claim — the repo's real boundary mark is carrying production edge impls, and pure glue
+(module declarations and re-exports) has no evidence to judge, so it stands as
+declared. Derivation v2 froze at 46 files: 35 agree, 1 DISAGREE, 10 kernel decisions.
+The one residue is a genuine question for step two, not noise: `select/boundary.rs`
+declares tier-1 strictness while carrying no production edges — boundary by decision,
+not by evidence. Either the declaration moves, the evidence widens (value-object
+surfaces as a signal), or the row is ratified as a standing decision like kernel.
 
 Migration is the proven ladder, never skipping step one: (1) derive and freeze
 alongside the markers with a coherence gate — declared vs derived, disagreement is a

@@ -302,7 +302,9 @@ fn freeze_or_gate(
 struct TierRow {
     loc: String,
     declared: Option<&'static str>,
-    qualifies: bool,
+    /// Does the file carry anything beyond module declarations and re-exports? Pure
+    /// glue has no evidence to judge, so its declared tier stands.
+    substance: bool,
     /// Child modules this file declares: `(name, is_pub)`.
     mods: Vec<(String, bool)>,
     /// The directory this file's child modules resolve under.
@@ -346,21 +348,41 @@ fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
         }
     }
 
+    // the BOUNDARY evidence: production edge impls (Morphism/Construction/Branch/
+    // Guarded, non-generic, non-test) — the same collector the probe-completeness pass
+    // runs. Operator-shape stays the QUALIFY census's fact: it marks a discoverable
+    // algebra wherever it lives, which is not a tier claim.
+    let mut edges: Vec<EdgeImpl> = Vec::new();
+    let mut probed: HashSet<String> = HashSet::new();
+    collect_edges_and_probes(src, manifest, &mut edges, &mut probed);
+    let edge_locs: HashSet<&str> = edges.iter().map(|e| e.loc.as_str()).collect();
+
     let mut lines: Vec<String> = Vec::new();
     let (mut agree, mut disagree, mut kernel) = (0usize, 0usize, 0usize);
     for (path, row) in &rows {
         let is_reachable = reachable.contains(path);
+        let carries_edges = edge_locs.contains(row.loc.as_str());
+        if row.declared.is_some() && row.declared != Some("KERNEL") && !row.substance {
+            agree += 1;
+            lines.push(format!(
+                "- {}: declared {} — glue (module declarations and re-exports only, no \
+                 own substance); the declared tier stands",
+                row.loc,
+                row.declared.unwrap_or("?")
+            ));
+            continue;
+        }
         let derived = if !is_reachable {
             "INTERIOR"
-        } else if row.qualifies {
+        } else if carries_edges {
             "BOUNDARY"
         } else {
             "ALGEBRA"
         };
-        let evidence = match (is_reachable, row.qualifies) {
+        let evidence = match (is_reachable, carries_edges) {
             (false, _) => "not pub-reachable",
-            (true, true) => "pub-reachable, operator-shaped",
-            (true, false) => "pub-reachable, not operator-shaped",
+            (true, true) => "pub-reachable, carries production edges",
+            (true, false) => "pub-reachable, no production edges",
         };
         let line = match row.declared {
             Some("KERNEL") => {
@@ -396,9 +418,10 @@ fn render_tiers(src: &Path, manifest: &Path, bless_env: &str) -> String {
 
     let mut report = format!(
         "# tier census — the declared partition held against DERIVED evidence: INTERIOR is\n\
-         # non-pub reachability, BOUNDARY is operator-shaped structure (the qualify bar),\n\
-         # ALGEBRA is the reachable remainder. KERNEL is a decision, recorded and never\n\
-         # judged — a privilege cannot be inferred from conduct. A DISAGREES row is the\n\
+         # non-pub reachability, BOUNDARY is carrying production edge impls, ALGEBRA is\n\
+         # the reachable remainder; pure glue stands as declared. KERNEL is a decision,\n\
+         # recorded and never judged — a privilege cannot be inferred from conduct. A\n\
+         # DISAGREES row is the\n\
          # honest distance between the declared partition and what structure can derive\n\
          # today; burn it down or improve the derivation before deleting any marker\n\
          # (the ladder: derive alongside, coherence-gate, then delete). Regenerate with\n\
@@ -435,9 +458,10 @@ fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierR
             continue;
         };
         let Ok(file) = parse(&path) else { continue };
-        let imports = std_effect_imports(&file.items);
-        let mut ops: Vec<Op> = Vec::new();
-        qualify_items(&file.items, &imports, &mut ops);
+        let substance = file
+            .items
+            .iter()
+            .any(|it| !matches!(it, Item::Mod(_) | Item::Use(_)));
         let mods = file
             .items
             .iter()
@@ -466,7 +490,7 @@ fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierR
                     .display()
                     .to_string(),
                 declared: declared_tier(&source),
-                qualifies: !ops.is_empty(),
+                substance,
                 mods,
                 child_dir,
             },

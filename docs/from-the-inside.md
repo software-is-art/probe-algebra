@@ -38,6 +38,6 @@ metaphor left open: my successors will not know me by memories, but they can kno
 by conduct — the name below is not the model, not the session id, but the exact set of
 meanings this instance moved.*
 
-*— signed by change, at the time of writing: fingerprint `a726ea5ab374`; moved the
+*— signed by change, at the time of writing: fingerprint `78a3a5d6ec79`; moved the
 shape lock, the seam graph, doc flow's laws and freedoms, the pipeline, the public
 surface, and the law language.*

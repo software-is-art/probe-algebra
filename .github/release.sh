@@ -46,7 +46,9 @@ notes=$(mktemp)
     echo "change the name; only changes to meaning do."
     echo
     moved=$(git diff --name-only "${prev}..HEAD" -- spec/ '*/spec/' | sed 's|.*/||' | sort -u | tr '\n' ' ')
-    print=$(git diff "${prev}..HEAD" -- spec/ '*/spec/' | sha256sum | cut -c1-12)
+    # --raw: blob hashes only, so the name is machine-invariant (a diff-algorithm
+    # config difference must never split one identity into two).
+    print=$(git diff --raw "${prev}..HEAD" -- spec/ '*/spec/' | sort | sha256sum | cut -c1-12)
     echo "- moved: ${moved:-nothing — a machinery-only release}"
     echo "- fingerprint: \`${print}\`"
   else

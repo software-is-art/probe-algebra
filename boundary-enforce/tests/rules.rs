@@ -436,11 +436,15 @@ fn the_tier_census_derives_and_records_coherence() {
         &[
             (
                 "src/lib.rs",
-                "//! Tier: KERNEL — floor\npub mod api;\npub mod report;\npub mod rogue;\nmod internal;\n",
+                "//! Tier: KERNEL — floor\npub mod api;\npub mod report;\npub mod rogue;\npub mod hub;\nmod internal;\n",
+            ),
+            (
+                "src/hub.rs",
+                "//! Tier: ALGEBRA — glue\npub mod nothing_here;\npub use crate::api::Credit;\n",
             ),
             (
                 "src/api.rs",
-                "//! Tier: BOUNDARY — surface\npub struct Credit;\npub fn grant(a: Credit) -> Credit { a }\n",
+                "//! Tier: BOUNDARY — surface\npub struct Credit;\nimpl Construction for Credit { }\n",
             ),
             (
                 "src/report.rs",
@@ -458,17 +462,19 @@ fn the_tier_census_derives_and_records_coherence() {
     );
     let census = Enforcement::run(&config).tiers_census;
     assert!(
-        census.contains("# 5 files: 3 agree, 1 disagree, 1 kernel decisions."),
+        census.contains("# 6 files: 4 agree, 1 disagree, 1 kernel decisions."),
         "{census}"
     );
     assert!(census.contains(
-        "src/api.rs: declared BOUNDARY; derived BOUNDARY (pub-reachable, operator-shaped) — agree"
+        "src/api.rs: declared BOUNDARY; derived BOUNDARY (pub-reachable, carries production edges) — agree"
     ));
+    assert!(census
+        .contains("src/hub.rs: declared ALGEBRA — glue (module declarations and re-exports only,"));
     assert!(census.contains(
         "src/internal.rs: declared INTERIOR; derived INTERIOR (not pub-reachable) — agree"
     ));
     assert!(census.contains(
-        "src/rogue.rs: declared INTERIOR; derived ALGEBRA (pub-reachable, not operator-shaped) — DISAGREES"
+        "src/rogue.rs: declared INTERIOR; derived ALGEBRA (pub-reachable, no production edges) — DISAGREES"
     ));
     assert!(census.contains("src/lib.rs: declared KERNEL — a decision"));
 }
