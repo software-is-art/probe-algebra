@@ -208,10 +208,15 @@ impl ShapeReport {
     /// pairs for net-name coincidences no declared seam covers.
     pub fn of<S: System>() -> ShapeReport {
         let placements = S::placements();
-        let sealed: BTreeSet<(&str, &str)> = S::seams()
-            .iter()
-            .map(|s| ordered(s.left, s.right))
-            .collect();
+        // a seam declaration carries no orientation, so BOTH orientations seal the pair —
+        // storing the pair twice instead of normalizing it removes a whole degree of
+        // freedom (a normalizer applied on the write side and the read side alike is
+        // invisible to any consistent mutation of itself).
+        let mut sealed: BTreeSet<(&str, &str)> = BTreeSet::new();
+        for seam in S::seams() {
+            sealed.insert((seam.left, seam.right));
+            sealed.insert((seam.right, seam.left));
+        }
         let nets: Vec<BTreeSet<&String>> = placements
             .iter()
             .map(|p| p.components.iter().flat_map(|c| &c.nets).collect())
@@ -224,7 +229,7 @@ impl ShapeReport {
                     .map(|s| s.to_string())
                     .collect();
                 if shared.is_empty()
-                    || sealed.contains(&ordered(placements[i].theory, placements[j].theory))
+                    || sealed.contains(&(placements[i].theory, placements[j].theory))
                 {
                     continue;
                 }
@@ -326,15 +331,6 @@ impl ShapeReport {
     /// crates use [`ShapeReport::lock_in`] with their own spec directory).
     pub fn lock(&self) -> Lock {
         self.lock_in(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec"))
-    }
-}
-
-/// A module pair as an unordered key (seam declarations carry no orientation).
-fn ordered<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
-    if a <= b {
-        (a, b)
-    } else {
-        (b, a)
     }
 }
 
@@ -509,7 +505,7 @@ suggestion: declare the seam, or leave the shared name standing as coincidence):
         seams {
             // declared AGAINST registry order on purpose: the seam says Gcd -- Max while
             // the placements pair up as Max/Gcd, so retiring the candidate only works
-            // because both sides pass through the unordered-pair normalizer.
+            // because the seal covers BOTH orientations.
             GcdMerge -- MaxMerge : transport on Key;
         }
     }
