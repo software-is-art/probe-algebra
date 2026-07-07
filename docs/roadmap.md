@@ -831,6 +831,32 @@ advice, never a false refusal. Re-execing a repo-local build stays deliberately
 unbuilt until skew is observed hurting. It publishes with the other four on every
 certification release.
 
+## The perimeter is a lock (BUILT)
+
+The settings page was the last hand-clicked configuration in the loop — the open-text
+antipattern one level up: prose recipes translated into a UI, verified by nobody,
+drifting silently, re-audited never. Now it is what everything else is. The floor is
+DECLARED (`discover::perimeter`), and its required status checks derive from the gate
+registry itself, so a renamed or re-cadenced gate moves `spec/perimeter.spec` in the
+same diff — a rename can never silently unprotect the default branch. The declaration
+renders TWO artifacts: the human-readable floor and `spec/perimeter.ruleset.json`, the
+apply-able branch ruleset — the one manual act left is posting it
+(`gh api repos/<owner>/<repo>/rulesets -X POST --input spec/perimeter.ruleset.json`).
+The write stays human on principle: the perimeter constrains the agents, so it must
+not be agent-writable — GitHub's settings page is the platform's kernel register, and
+a privilege is ratified, never self-served.
+
+What the machine owns is refusing to let reality rot: the `perimeter (settings
+drift)` gate — the pipeline's first WORLD gate, weekly, Effectful-as-a-read — pulls
+the live rules back (`.github/perimeter.sh` → `examples/perimeter.rs` →
+`Perimeter::judge`, where the probes reach) and holds them to the floor. FLOOR
+semantics: extra live protections are not drift (stricter is never a lie); required
+approvals are the one exact match (above zero deadlocks a solo maintainer). The
+never-applied state is a red gate naming each missing rule — the reminder that never
+expires — and a world fact never feeds the countersign: the certified tag must not
+wait on a settings page. Casualty of the brick, per its own instruction: CLAUDE.md's
+"PRs land by squash merge" line, now a declared, read-back merge-method rule.
+
 ## Candidate: the audience is the agent
 
 Adoption of this method is chosen inside agentic sessions, by whichever instance is

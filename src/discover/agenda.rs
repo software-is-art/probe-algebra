@@ -48,6 +48,9 @@ pub enum Ratification {
     World,
     /// A shapes.spec move: the law LANGUAGE itself grew or changed.
     Vocabulary,
+    /// The perimeter moved: the declared repository-settings floor (branch rules,
+    /// merge methods, vulnerability reporting) or its apply-able ruleset changed.
+    Perimeter,
     /// A CONSUMER-registered lock class moved: the class and its ratification question
     /// are the consumer's own data (see [`Agenda::of_with`]) — the routing machinery is
     /// generic; the class table is not upstream's to own.
@@ -91,6 +94,11 @@ impl Ratification {
             }
             Ratification::Vocabulary => {
                 "the shape catalog moved — the law language itself changed.".to_string()
+            }
+            Ratification::Perimeter => {
+                "the perimeter moved — the declared settings floor changed; re-apply \
+                 spec/perimeter.ruleset.json and re-check the live settings against it."
+                    .to_string()
             }
             Ratification::Custom { class, question } => format!("`{class}`: {question}"),
         }
@@ -321,6 +329,8 @@ fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
             Ratification::Pipeline
         } else if file == "tiers.spec" {
             Ratification::Partition
+        } else if file == "perimeter.spec" || file == "perimeter.ruleset.json" {
+            Ratification::Perimeter
         } else if file == "shapes.spec" {
             Ratification::Vocabulary
         } else if file.ends_with(".mutation.spec") {
