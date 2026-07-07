@@ -414,6 +414,38 @@ candidate bricks:
     constants itself (discovered bars filling Constant slots, tightest-that-holds) —
     is recorded as catalog research, not v1: the census form needs none of it.
 
+    **Stretch goal: how the constraints shape aesthetics.** Once the census exists,
+    taste stops being ambient and starts leaving a record — four executable forms,
+    in ascending ambition:
+
+    - *Taste as chronicle.* The only place aesthetics enters the system is
+      ratification, and every ratification is now a census diff — so the diff history
+      IS the house style's chronicle: when the spacing grid tightened, when a floor
+      was deliberately traded away, who signed it. An aesthetic you can `git log`.
+    - *Taste as inheritance.* A new agent (or designer) dropped into the project
+      inherits the frozen census and the metamorphic laws — the taste FLOOR transfers
+      without the taster: they cannot silently produce work below the look, and every
+      way their work pushes on the look arrives as a reviewable diff.
+    - *The removal drill, pointed at taste* (the warrant's move, verbatim): drop one
+      frozen constraint, regenerate or re-sample layouts under the remaining set, and
+      ask whether preference — human ratification, or a pinned preference model —
+      actually degrades. A constraint whose removal changes nothing anyone can see is
+      DECORATION, flagged not frozen; the load-bearing residue is, operationally, the
+      aesthetic. "Which rules make it look like US" becomes an experiment, not a
+      debate.
+    - *Style as the quotient.* What the census pins is the house look; the visual
+      degrees of freedom it CANNOT see (the mutation-survivor concept, aimed at
+      pixels) are where individual voice lives. Choosing which surviving DOFs to pin
+      next is the design act, made explicit — and the three-valued band marks the
+      taste boundary honestly: near-threshold work is DISCLOSED for human eyes,
+      never auto-judged at the edge.
+
+    Honest limit, stated as the method always states it: the judge here is human, and
+    stays human. The apparatus makes taste legible, transmissible, and measurable for
+    load-bearing-ness; it can never derive it. This is the "what did you mean"
+    boundary wearing its other face — "what do you like" — and the freeze remains the
+    only place the answer enters.
+
     What this domain uniquely buys the METHOD: millisecond feedback with visible
     ground truth — the fastest refutation loop any consumer has offered yet. Open
     questions for the build session: engine order (ELK first, exhaust it before
