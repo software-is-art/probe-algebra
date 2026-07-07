@@ -667,6 +667,7 @@ impl GateRegistry {
                     "      - name: release — the certified tree publishes itself\n\
                      \x20       env:\n\
                      \x20         GH_TOKEN: ${{{{ github.token }}}}\n\
+                     \x20         CARGO_REGISTRY_TOKEN: ${{{{ secrets.CARGO_REGISTRY_TOKEN }}}}\n\
                      \x20       run: {}\n",
                     gate.command_line()
                 ));
@@ -679,6 +680,12 @@ impl GateRegistry {
              # the diff. The registry is the single source for the commands, cadences, the\n\
              # toolchain pin, and the sweep schedule; `spec/gates.spec` carries the promises.\n\
              name: ci\n\
+             \n\
+             # Default-deny at the top; the two tag-advance/release jobs elevate to\n\
+             # `contents: write` explicitly. (Scorecard's token-permissions criterion,\n\
+             # and simply the capability-honesty rule applied to CI itself.)\n\
+             permissions:\n\
+             {sp2}contents: read\n\
              \n\
              # Dogfood everywhere, all the time. The fast gates run on every push and PR; the\n\
              # mutation gate — the method's own \"the real test\" — runs per-change on PRs (only\n\

@@ -1,0 +1,12 @@
+# Dependency freshness, on the weekly clock like the sweeps. Cargo updates land as
+# ordinary PRs and face every gate; actions updates keep the workflow's pins fresh.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

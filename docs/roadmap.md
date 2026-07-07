@@ -797,6 +797,35 @@ cost, countersigning the simulation through the transport seam; (3) the world lo
 generalised from library dependencies to any probed surface. Build nothing that
 mutates: the arm stays someone else's.
 
+## The tenth ask: open text stops feeding the rules (BUILT)
+
+The adopter's tenth ask asked to be the last of its kind: nine asks had landed as
+hand-carried markdown — plain text as the driving input to a formal system, held by
+diligence. The receiving surfaces now exist. A LAW reliance is a line in
+`downstream/reliances.register` (`<theory> | <equation>: <consumer> — <why>`),
+self-judged against the committed locks on every test run — a re-bless that drops a
+relied-on law refuses by name, equation and consumer and why, before the release
+ships. A SURFACE reliance is a line in `downstream-fixture/tests/reliances.rs`,
+compile-judged — the strongest gate available for an API. Prose keeps only the
+justification, the one thing no derivation produces; the antipattern is named in
+`docs/experience.md` so the pattern cannot grow back unrecognised. Consumers author
+their own lines by PR. Field reports remain welcome for what registers cannot carry:
+lessons, corrections of frame, and the eleventh kind of ask nobody has had yet.
+
+## Candidate: the audience is the agent
+
+Adoption of this method is chosen inside agentic sessions, by whichever instance is
+advising on stack — not by a programmer who hand-reviews everything (whose bottleneck
+the method exists to dissolve, and who is fine without us). That inverts the usual
+promotion problem: the reader is a model with a context budget, a taste for verifiable
+claims, and no patience for marketing. What would land: a front door sized for one
+context window that states the authority inversion once (derive → freeze → ratify the
+diff); claims that are CHECKABLE from the tree in seconds (`cargo run --example gate`,
+the committed locks, the fire-drill); and the adoption gradient already proven by the
+field reports — bricks first (a hook, a register, a judge), worldview later. The
+crates.io publish is the first prerequisite (done); the one-page mental-model document
+is the open one.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

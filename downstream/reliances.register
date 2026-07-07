@@ -1,0 +1,15 @@
+# downstream reliances — the JUDGED ask channel (the tenth ask: open text stops
+# feeding the rules). One line per upstream LAW a consumer stands on:
+#
+#     <theory> | <equation, exactly as the lock renders it>: <consumer> — <why>
+#
+# Judged on every test run by `Dependence::judge_register` (the self-judgment form:
+# the committed lock on both sides), so a re-bless that drops a relied-on law refuses
+# BY NAME — equation, consumer, why — before the release ships. A stale entry is a
+# lie to delete; the justification is the ratification.
+#
+# SURFACE (API) reliances are the compiler's to judge instead: one line each in
+# `downstream-fixture/tests/reliances.rs`.
+#
+# Consumers author their own lines by PR. Empty today is honest: the surface exists;
+# no law reliance has been declared through it yet.

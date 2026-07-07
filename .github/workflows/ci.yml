@@ -4,6 +4,12 @@
 # toolchain pin, and the sweep schedule; `spec/gates.spec` carries the promises.
 name: ci
 
+# Default-deny at the top; the two tag-advance/release jobs elevate to
+# `contents: write` explicitly. (Scorecard's token-permissions criterion,
+# and simply the capability-honesty rule applied to CI itself.)
+permissions:
+  contents: read
+
 # Dogfood everywhere, all the time. The fast gates run on every push and PR; the
 # mutation gate — the method's own "the real test" — runs per-change on PRs (only
 # the changed lines), incrementally on the default branch (only the diff since the
@@ -94,6 +100,7 @@ jobs:
       - name: release — the certified tree publishes itself
         env:
           GH_TOKEN: ${{ github.token }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: .github/release.sh
 
   # Weekly companion gate: one plain job on the weekly clock, feeding the
@@ -201,4 +208,5 @@ jobs:
       - name: release — the certified tree publishes itself
         env:
           GH_TOKEN: ${{ github.token }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: .github/release.sh

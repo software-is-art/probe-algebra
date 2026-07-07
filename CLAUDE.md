@@ -64,6 +64,10 @@ package alone silently skips the fixtures.
   `seams()`, `cohesions()`, and `placements()`.
 - PRs land by squash merge. (Delete this line if the repo settings ever enforce it.)
 - Field reports describe outside projects by what they taught, never by name.
+- Open text never feeds the rules: an ask or convention whose mechanical half a
+  machine could carry becomes a judged artifact — a law reliance is a line in
+  `downstream/reliances.register`, an API reliance a line in
+  `downstream-fixture/tests/reliances.rs` — and prose keeps only the justification.
 - Prose is yours: match intensity to content. The high register in older git log
   entries and docs is history, not a style guide; don't inherit it by imitation.
 - The toolchain is pinned in `discover::gates::TOOLCHAIN`.
