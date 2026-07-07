@@ -18,6 +18,7 @@
 //! as far as the gates reach; the router's floor is the pipeline's floor.
 
 use std::fmt::Write as _;
+use std::path::Path;
 
 /// The ratification a moved artifact calls for — one question per lock class.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -47,6 +48,10 @@ pub enum Ratification {
     World,
     /// A shapes.spec move: the law LANGUAGE itself grew or changed.
     Vocabulary,
+    /// A CONSUMER-registered lock class moved: the class and its ratification question
+    /// are the consumer's own data (see [`Agenda::of_with`]) — the routing machinery is
+    /// generic; the class table is not upstream's to own.
+    Custom { class: String, question: String },
 }
 
 impl Ratification {
@@ -87,6 +92,7 @@ impl Ratification {
             Ratification::Vocabulary => {
                 "the shape catalog moved — the law language itself changed.".to_string()
             }
+            Ratification::Custom { class, question } => format!("`{class}`: {question}"),
         }
     }
 }
@@ -109,6 +115,22 @@ impl Agenda {
     /// a spec-like path with an unknown suffix is REFUSED by name — a new lock class
     /// must be taught to the router, never silently filed under machinery.
     pub fn of<S: AsRef<str>>(paths: impl IntoIterator<Item = S>) -> Result<Agenda, String> {
+        Agenda::of_with(paths, &[])
+    }
+
+    /// Route with CONSUMER-TAUGHT lock classes: each entry is `(filename suffix, the
+    /// ratification question its move asks)`. The built-in table knows only this
+    /// repo's artifact conventions — the routing machinery is generic, so a consumer's
+    /// spec directory registers its classes as data (house form: a committed
+    /// `spec/agenda.register`, one `suffix: question` line per class, parsed with
+    /// `spec_lock::Register` — `examples/review_agenda.rs` wires it). Taught classes
+    /// match FIRST: the register is the consumer's own vocabulary, so it outranks
+    /// every built-in, including the `.spec` catch-all that would otherwise misfile a
+    /// consumer artifact as this repo's law class.
+    pub fn of_with<S: AsRef<str>>(
+        paths: impl IntoIterator<Item = S>,
+        classes: &[(String, String)],
+    ) -> Result<Agenda, String> {
         let mut agenda = Agenda {
             ratifications: Vec::new(),
             prose: Vec::new(),
@@ -116,7 +138,7 @@ impl Agenda {
         };
         for path in paths {
             let path = path.as_ref().to_string();
-            let class = classify(&path)?;
+            let class = classify(&path, classes)?;
             match class {
                 Class::Ratify(r) => {
                     if !agenda.ratifications.contains(&r) {
@@ -161,6 +183,53 @@ impl Agenda {
     }
 }
 
+/// Which of the guard's voices EXIST for the tree being edited. The guard's contract —
+/// pre-fire existing refusals, never invent judgments — makes each voice conditional on
+/// evidence of the downstream refusal it pre-fires. The generated-lock voice has no
+/// switch here: its refusal is a spec-lock freshness gate, which any adopter of the
+/// lock mechanics has by construction. The rats-nest voice's refusal lives in
+/// `boundary-enforce`'s build shim, which a tree may simply not run — a crate where
+/// module-level `pub fn` is the designed shape must get silence, not a warning per
+/// public function about a refusal that does not exist for it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct GuardVoices {
+    /// The edited file is REGISTERED kernel: the shim exempts it from every structural
+    /// rule, so the guard is silent on it too. Never read from the file — a marker in
+    /// the source grants nothing to the build, so it grants nothing here.
+    pub kernel_exempt: bool,
+    /// The no-rats-nest refusal exists downstream: the tree runs the enforcement shim,
+    /// so a loose `pub fn` really will refuse the next build.
+    pub rats_nest: bool,
+}
+
+impl GuardVoices {
+    /// Derive the voices from the tree itself — a declaration would drift; the
+    /// evidence cannot. Kernel-exemption is a register lookup (`spec/kernel.register`,
+    /// the same fact the build shim consumes); the rats-nest voice is on exactly when
+    /// the tree's `build.rs` names `boundary_enforce`. Both fail open (missing file:
+    /// voice off / not exempt) — the guard is advisory, and the build gate owns the
+    /// refusals, including a refused register.
+    ///
+    /// Capability: Effectful — reads `build.rs` and the kernel register under
+    /// `manifest`.
+    pub fn for_edit(manifest: &Path, edited: &str) -> GuardVoices {
+        let kernel_exempt = spec_lock::Register {
+            name: "kernel".to_string(),
+            path: manifest.join("spec/kernel.register"),
+        }
+        .entries()
+        .unwrap_or_default()
+        .iter()
+        .any(|(key, _)| edited == key || edited.ends_with(&format!("/{key}")));
+        let rats_nest = std::fs::read_to_string(manifest.join("build.rs"))
+            .is_ok_and(|source| source.contains("boundary_enforce"));
+        GuardVoices {
+            kernel_exempt,
+            rats_nest,
+        }
+    }
+}
+
 impl Agenda {
     /// The EDIT-TIME guard — the hook's second voice: move EXISTING refusals earlier,
     /// never add judgments. Two pre-fires: the one rule (an edit landing on a generated
@@ -170,16 +239,20 @@ impl Agenda {
     /// first — they are hand-authored inputs, not derived artifacts. `None` when the
     /// edit is unremarkable, because silence must stay free.
     ///
-    /// `kernel` is the CALLER's fact: registered kernel files are exempt from the
-    /// structural rules (the shim never refuses them), so the guard stays quiet on
-    /// them too — it pre-fires refusals, never invents stricter ones. Kernel-hood
-    /// comes from the ratified register (`spec/kernel.register`, matched by the hook
-    /// caller), never from anything in the file: a marker in the source grants
-    /// nothing to the build, so it grants nothing here.
-    pub fn edit_guard(path: &str, source: &str, kernel: bool) -> Option<String> {
+    /// `voices` is the CALLER's fact — derive it with [`GuardVoices::for_edit`]: each
+    /// voice speaks only where its downstream refusal exists, so the contract holds by
+    /// construction rather than by consumer-side filtering. `classes` is the same
+    /// consumer-taught table [`Agenda::of_with`] routes with, so an edit landing on a
+    /// registered consumer lock gets the never-hand-edit line, not "teach the router".
+    pub fn edit_guard(
+        path: &str,
+        source: &str,
+        voices: &GuardVoices,
+        classes: &[(String, String)],
+    ) -> Option<String> {
         let mut lines = Vec::new();
         if !path.ends_with(".export") && !path.ends_with(".register") {
-            match classify(path) {
+            match classify(path, classes) {
                 Ok(Class::Ratify(_)) => lines.push(format!(
                     "guard: `{path}` is a generated lock artifact — never hand-edit; \
                      regenerate via its freeze path and ratify the diff"
@@ -191,7 +264,7 @@ impl Agenda {
                 )),
             }
         }
-        if path.ends_with(".rs") && !kernel {
+        if path.ends_with(".rs") && voices.rats_nest && !voices.kernel_exempt {
             for name in source.lines().filter_map(|l| {
                 l.strip_prefix("pub fn ")
                     .and_then(|rest| rest.split('(').next())
@@ -219,8 +292,19 @@ enum Class {
 /// One path to its review class. The spec-directory refusal is the router's own
 /// completeness gate: an unrecognized `spec/` artifact means a lock class the router
 /// was never taught, and misfiling it as machinery would silently drop a ratification.
-fn classify(path: &str) -> Result<Class, String> {
+fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
     let file = path.rsplit('/').next().unwrap_or(path);
+    // consumer-taught classes match FIRST — the register is the consumer's own
+    // vocabulary, so it outranks every built-in (a `.spec`-suffixed consumer class
+    // would otherwise be swallowed by the law-lock catch-all below).
+    for (suffix, question) in classes {
+        if file.ends_with(suffix.as_str()) {
+            return Ok(Class::Ratify(Ratification::Custom {
+                class: suffix.clone(),
+                question: question.clone(),
+            }));
+        }
+    }
     let theory = |suffix: &str| file.trim_end_matches(suffix).replace('-', " ").to_string();
     // a register routes as its exception class WHEREVER it lives — `spec/kernel.register`
     // included: it is a hand-authored ratification input whose justifications ARE the
@@ -365,6 +449,74 @@ mod probes {
         assert!(err.contains("spec/router.frobnicate"));
     }
 
+    /// THE CLASS TABLE IS CONSUMER-EXTENSIBLE DATA: a taught suffix routes to its own
+    /// question, before every built-in — so a consumer artifact that would otherwise
+    /// refuse (unknown class) or misfile (the `.spec` catch-all reading it as a law
+    /// lock) gets the consumer's one question instead.
+    #[test]
+    fn consumer_taught_classes_route_before_the_builtins() {
+        let classes = vec![
+            (
+                "deploy-freshness.lock".to_string(),
+                "the deploy-freshness laws moved — do the runbooks still stand?".to_string(),
+            ),
+            (
+                "surface-audit.spec".to_string(),
+                "the audit census moved — admit the new commands.".to_string(),
+            ),
+        ];
+        let agenda = Agenda::of_with(
+            [
+                "spec/deploy-freshness.lock",
+                "spec/surface-audit.spec",
+                "src/main.rs",
+            ],
+            &classes,
+        )
+        .expect("taught classes route");
+        assert_eq!(
+            agenda.ratifications,
+            vec![
+                Ratification::Custom {
+                    class: "deploy-freshness.lock".to_string(),
+                    question: "the deploy-freshness laws moved — do the runbooks still stand?"
+                        .to_string()
+                },
+                Ratification::Custom {
+                    class: "surface-audit.spec".to_string(),
+                    question: "the audit census moved — admit the new commands.".to_string()
+                },
+            ]
+        );
+        assert_eq!(agenda.machinery, vec!["src/main.rs"]);
+        // the question renders exactly as the consumer wrote it, named by its class:
+        let text = agenda.render();
+        assert!(
+            text.contains("- `deploy-freshness.lock`: the deploy-freshness laws moved"),
+            "{text}"
+        );
+        // and WITHOUT the register the same paths refuse / misfile — the register is
+        // what changes the routing, nothing else:
+        assert!(Agenda::of(["spec/deploy-freshness.lock"]).is_err());
+        assert_eq!(
+            Agenda::of(["spec/surface-audit.spec"])
+                .expect("catch-all")
+                .ratifications,
+            vec![Ratification::Laws {
+                theory: "surface audit".to_string()
+            }]
+        );
+        // a taught class reaches the guard too: the edit warns never-hand-edit,
+        // instead of "teach the router" about a class that was already taught.
+        let voices = GuardVoices {
+            kernel_exempt: false,
+            rats_nest: true,
+        };
+        let g = Agenda::edit_guard("spec/deploy-freshness.lock", "", &voices, &classes)
+            .expect("a taught lock warns");
+        assert!(g.contains("never hand-edit"), "{g}");
+    }
+
     /// THE EDIT-TIME GUARD pre-fires exactly the two refusals that already exist
     /// downstream, and stays silent otherwise. A generated lock warns; a hand-authored
     /// register or export does not; a module-level `pub fn` warns (indented assoc fns
@@ -372,33 +524,119 @@ mod probes {
     /// as repo-relative — the Edit tool hands the hook absolute paths.
     #[test]
     fn the_edit_guard_prefires_only_existing_refusals() {
-        let g = Agenda::edit_guard("spec/router.spec", "", false).expect("a lock warns");
+        // the enforced tree's voices: the shim runs, the file is not kernel.
+        let v = GuardVoices {
+            kernel_exempt: false,
+            rats_nest: true,
+        };
+        let g = Agenda::edit_guard("spec/router.spec", "", &v, &[]).expect("a lock warns");
         assert!(g.contains("never hand-edit"), "{g}");
-        assert!(Agenda::edit_guard("/home/u/repo/spec/router.spec", "", false).is_some());
-        assert_eq!(Agenda::edit_guard("lean/bites.register", "", false), None);
+        assert!(Agenda::edit_guard("/home/u/repo/spec/router.spec", "", &v, &[]).is_some());
+        assert_eq!(Agenda::edit_guard("lean/bites.register", "", &v, &[]), None);
         assert_eq!(
-            Agenda::edit_guard("spec/bridged-bool.export", "", false),
+            Agenda::edit_guard("spec/bridged-bool.export", "", &v, &[]),
             None
         );
-        assert_eq!(Agenda::edit_guard("docs/roadmap.md", "", false), None);
+        assert_eq!(Agenda::edit_guard("docs/roadmap.md", "", &v, &[]), None);
 
         let loose = "pub fn pipeline() -> Pipeline {\n    todo!()\n}\n";
-        let g = Agenda::edit_guard("src/gates.rs", loose, false).expect("a loose fn warns");
+        let g = Agenda::edit_guard("src/gates.rs", loose, &v, &[]).expect("a loose fn warns");
         assert!(
             g.contains("`pub fn pipeline` is a loose public function"),
             "{g}"
         );
         let hung = "impl Ci {\n    pub fn pipeline() -> Pipeline { todo!() }\n}\n";
-        assert_eq!(Agenda::edit_guard("src/gates.rs", hung, false), None);
+        assert_eq!(Agenda::edit_guard("src/gates.rs", hung, &v, &[]), None);
         // a REGISTERED kernel file is exempt from the shim, so the guard is silent on
         // it — and only the register grants that: a `Tier: KERNEL` marker in the
         // source is dead syntax.
-        assert_eq!(Agenda::edit_guard("src/engine.rs", loose, true), None);
+        let exempt = GuardVoices {
+            kernel_exempt: true,
+            rats_nest: true,
+        };
+        assert_eq!(
+            Agenda::edit_guard("src/engine.rs", loose, &exempt, &[]),
+            None
+        );
         let marker = "//! Tier: KERNEL — self-asserted; grants nothing.\npub fn shadow_grid() {}\n";
-        assert!(Agenda::edit_guard("src/engine.rs", marker, false).is_some());
+        assert!(Agenda::edit_guard("src/engine.rs", marker, &v, &[]).is_some());
+        // and where the shim does not run, the structural voice does not exist — a
+        // crate whose designed shape IS module-level `pub fn` gets silence, not a
+        // warning per public function (the guard pre-fires refusals; for that tree
+        // this one isn't).
+        let unenforced = GuardVoices {
+            kernel_exempt: false,
+            rats_nest: false,
+        };
+        assert_eq!(
+            Agenda::edit_guard("src/gates.rs", loose, &unenforced, &[]),
+            None
+        );
 
-        let unknown = Agenda::edit_guard("spec/new.frobnicate", "", false).expect("unknown warns");
+        let unknown =
+            Agenda::edit_guard("spec/new.frobnicate", "", &v, &[]).expect("unknown warns");
         assert!(unknown.contains("no known class"), "{unknown}");
+    }
+
+    /// THE VOICES ARE DERIVED, not declared: kernel-exemption is a register lookup and
+    /// the rats-nest voice is evidence the shim runs — so the guard's contract ("only
+    /// existing refusals") holds by construction on any tree, including one that never
+    /// heard of the shim.
+    #[test]
+    fn the_guard_voices_derive_from_the_tree() {
+        let root = std::env::temp_dir().join(format!("agenda-voices-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("spec")).unwrap();
+
+        // an ordinary crate: no shim, no register — both voices off.
+        let plain = GuardVoices::for_edit(&root, "src/lib.rs");
+        assert_eq!(
+            plain,
+            GuardVoices {
+                kernel_exempt: false,
+                rats_nest: false
+            }
+        );
+
+        // an enforced tree: build.rs attaches the shim, the register names a file.
+        std::fs::write(
+            root.join("build.rs"),
+            "use boundary_enforce::{Config, Enforcement};\nfn main() {}\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("spec/kernel.register"),
+            "src/engine.rs: defines and runs the format\n",
+        )
+        .unwrap();
+        let registered = GuardVoices::for_edit(&root, "/abs/checkout/src/engine.rs");
+        assert_eq!(
+            registered,
+            GuardVoices {
+                kernel_exempt: true,
+                rats_nest: true
+            }
+        );
+        // an unregistered file in the same tree: the shim's voice, no exemption.
+        let ordinary = GuardVoices::for_edit(&root, "src/gates.rs");
+        assert_eq!(
+            ordinary,
+            GuardVoices {
+                kernel_exempt: false,
+                rats_nest: true
+            }
+        );
+
+        // this repo's own tree derives both voices live (the register holds engine.rs).
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let live = GuardVoices::for_edit(manifest, "src/discover/engine.rs");
+        assert_eq!(
+            live,
+            GuardVoices {
+                kernel_exempt: true,
+                rats_nest: true
+            }
+        );
     }
 
     /// Member crates' locks route like the root's — the path prefix carries the crate,

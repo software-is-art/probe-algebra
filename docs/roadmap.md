@@ -664,6 +664,124 @@ markers. The lesson worth keeping: when the coherence gate disagrees, ask whethe
 declaration is wrong or the derivation is missing EVIDENCE — both v2 and v3 came from
 disagreements that were really undiscovered relations.
 
+## The ninth ask: convention out of the code (BUILT)
+
+A production adopter took the agent-senses release same-hour and reported the two
+places v1 baked THIS repo's conventions into shipped code — both the same lesson the
+tiers ladder just taught internally: turn the convention into data or derivation.
+
+1. **The guard's voices are derived, not assumed** (`GuardVoices::for_edit`). The
+   loose-`pub fn` voice pre-fires a refusal that only exists where the enforcement
+   shim runs; on an ordinary binary crate it was a warning per public function about
+   a refusal that does not exist — the guard violating its own contract. Now each
+   voice is switched by evidence: kernel-exemption is a register lookup, the
+   rats-nest voice is on exactly when the tree's `build.rs` attaches the shim. The
+   contract ("pre-fire existing refusals, never invent judgments") holds by
+   construction on any tree, including one that never heard of the shim.
+
+2. **The router's class table is consumer data** (`Agenda::of_with`,
+   `Ratification::Custom`, `spec/agenda.register`). `classify()` knew only this
+   repo's artifacts, so a consumer's lock classes all read "teach the review
+   router" — an instruction only upstream could follow. Teaching is now a committed
+   register (one `suffix: question` line per class, `spec_lock::Register` grammar);
+   taught classes match before every built-in, and the guard consumes the same
+   table, so a registered consumer lock gets never-hand-edit instead of
+   teach-the-router.
+
+3. **The ticker's second source** (`Ticker::step_theory`,
+   `Placement::signatures_of`). The place ticker keyed on `ops { ... }` stanza text;
+   a consumer that models its theory through the library API had nothing to parse
+   and read the silence as non-adoption. The engine's signature table now feeds the
+   same source-agnostic core, so code-modeled theories get the identical live
+   layout sense — text and type are two fronts on one ticker.
+
+And a pattern discovered downstream, now documented on `discover::depend`:
+**self-judgment** — `judge(committed, committed)` in the theory owner's own suite,
+where INTACT is trivially the only verdict and the protection is the refusal path: a
+re-bless that drops a law any consumer declared refuses by equation before the
+ratification diff lands. Old-vs-new is the cross-repo consumer's tool; self-judgment
+is the owner's tool for making declared reliances un-droppable.
+
+## Candidate: behaviour as code — the world lock grows eyes
+
+Terraform is two machines in one trenchcoat: a TRUTH machine (state file, plan,
+drift detection) and an ACTUATOR (apply, convergence, dependency-ordered mutation).
+The candidate is to take the eyes and leave the arm — the method covers the truth
+half better than the incumbents, and grafting on an actuator would break the house
+rule that makes locks trustworthy (locks gate, they never act; the one Effectful
+gate acts only on an already-certified tree).
+
+The reframe that makes it a candidate rather than a metaphor: **the spec of
+infrastructure is its behaviour, not its physicality.** A request from A reaches B;
+a credential minted with scope S cannot read T; the queue drains under load N —
+these are observations through the boundary, and resource attributes (instance
+types, ARNs, module trees) are interior representation. Two worlds that behave
+identically ARE the same world; that is the observation-function quotient this repo
+already stands on, pointed at clouds. Today's tools diff physicality (`plan` is
+field-by-field structural equality against a state cache); nobody diffs behaviour,
+and nobody has an algebra of it.
+
+The security mapping is the strongest leg, because its miniature is already BUILT.
+Security posture today is asserted by configuration convention — platform features
+plus module layering, the tier markers of operations. The tiers-as-a-lock ladder
+translates line for line:
+
+- attack surface = DERIVED reachability (pub-reachable ≙ internet-reachable; the
+  fronting relation ≙ a bastion — a door is a door);
+- the qualify census ≙ the surface census: what is exposed, as a computed,
+  ratified, drift-gated fact;
+- the kernel register ≙ privilege: never inferred from conduct, every exemption
+  (break-glass role, admin path) a justified line in a committed register, a stale
+  entry a lie;
+- and security claims are REFUTATION-SHAPED — "no path from the public net to the
+  db port" is a law a probe can only fail to refute. Green-is-evidence-not-certainty
+  is the honest frame security has always needed and compliance checkboxes have
+  always faked.
+
+The full loop would be genesis's two-lifecycle story at world scale: a `system!`
+declaration whose modules are services, seams are network edges, and expects are
+reachability/deny/flow laws; the target lock committed RED on purpose; the existing
+actuator (terraform or anything) makes the world; Effectful probes earn the
+declaration green; the world lock freezes what was earned and gates the drift.
+"Behaviour as code" is the honest name — the declaration is a law set, not a
+machine list.
+
+The overlay analogy sharpens the product shape: Tailscale is to network switches
+what this is to physical infrastructure — an overlay whose LAWS are the product.
+Tailscale does not configure switches into compliance; it simulates a flat,
+identity-addressed network on top of hostile physicality, programs are written
+against the overlay, and the switches become interior. Likewise here: program
+against a virtual world whose behavioural laws are discovered and locked, and the
+physical cloud is an INTERIOR that must front it. Fronting is already the
+vocabulary — the virtual layer is the door, physicality the workshop behind it.
+
+And SIMULATION-FIRST dissolves the engine objection that would otherwise park this
+for years. The engine assumes cheap, pure, replayable evaluation; a world probe is
+none of those; but a SYNTHETIC world is all three — the TTL store's move at world
+scale. The store made time a value (its own logical clock, advanced only through
+the Tick edge) so there was no ambient now; a world value object (services, edges,
+policies as Shaped data) makes there be no ambient cloud. You cannot make
+us-east-1 a value — but you can make A WORLD a value and demand us-east-1 front
+it. Grids of worlds are enumerable in-process, so reachability/deny/flow laws are
+discoverable and mutation-testable TODAY, by the existing engine, with zero new
+machinery: the interior is synthetic initially, and the tier-2 rule is precisely
+that the interior is free to swap — replacing synthetic semantics with real
+read-only probes later moves no boundary and restates no law. Sim-vs-real then
+becomes a TRANSPORT seam (`CoherenceReport::between` the model and the probed
+world: one observable, two paths), so "does reality still match the simulation" is
+a seam verdict with a lock, and the expensive probes are spot-check countersigns
+of laws the simulation earned cheaply. Evidence discipline unchanged: a green sim
+law says nothing about reality until the seam countersigns it.
+
+Prerequisites, reordered by the simulation-first insight: (1) the world as a value
+object — a synthetic world theory (nodes, edges, policies; reachability and deny
+laws) discovered by the existing engine: the existence proof that infrastructure
+behaviour is discoverable at all, and a `theory!` domain like any other; (2)
+read-only world probes as first-class edges with declared cost, countersigning the
+simulation through the transport seam; (3) the world lock generalised from library
+dependencies to any probed surface. Build nothing that mutates: the arm stays
+someone else's.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

@@ -100,7 +100,15 @@ impl Placement {
     /// Place a theory: signatures in, derived modules out. Associated fn of the report per
     /// the no-rats-nest rule.
     pub fn of<T: Theory>() -> Placement {
-        let sigs = Engine::<T>::new()
+        Placement::over(T::name(), Placement::signatures_of::<T>())
+    }
+
+    /// A compiled theory's raw net signatures — the rows [`Placement::of`] places,
+    /// exposed as the TYPE PATH into everything that consumes signatures: a consumer
+    /// that models its theory in code (no `ops { ... }` text to parse) feeds these to
+    /// the live ticker (`Ticker::step_theory`) and gets the same layout sense.
+    pub fn signatures_of<T: Theory>() -> Vec<NetSignature> {
+        Engine::<T>::new()
             .signatures()
             .into_iter()
             .map(|(symbol, inputs, output)| {
@@ -110,8 +118,7 @@ impl Placement {
                     format!("{output:?}"),
                 )
             })
-            .collect();
-        Placement::over(T::name(), sigs)
+            .collect()
     }
 
     /// Place raw signatures — the bundle form. Two operators land in one component exactly
