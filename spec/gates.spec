@@ -46,3 +46,7 @@
 - mutation (layout-probe plumbing) (weekly + manual, sharded; pure)
       .github/mutants-gate.sh --package layout-probe --config .github/layout-probe-mutants.toml
       promises: no mutant of layout-probe (the two engines, the diagram edits, the visual census and its locality witness) survives its lib probes — the workspace sweeps scope to the root crate, so the second-domain miniature carries its own weekly verdict (config: .github/layout-probe-mutants.toml; the drift-gate twins live in the lib so this sweep can see them)
+
+- release (certified tree) (on certification, when the mutants-green tag advances; EFFECTFUL)
+      .github/release.sh
+      promises: every certified default-branch tree publishes itself: the countersign's tag advance IS the release event, the version is CalVer (a date claims nothing about compatibility, which is honest), and the notes are DERIVED — commit subjects plus the ratified spec-lock diff, the uncompressed truth a semver integer would compress into an unchecked claim
