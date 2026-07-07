@@ -124,6 +124,21 @@ jobs:
 
   # Weekly companion gate: one plain job on the weekly clock, feeding the
   # same countersign — see the gate registry for what it verifies.
+  mutants-fire-drill-plumbing:
+    name: dogfood (fire-drill plumbing)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants,cargo-nextest
+      - run: .github/mutants-gate.sh --package fire-drill --config .github/fire-drill-mutants.toml
+
+  # Weekly companion gate: one plain job on the weekly clock, feeding the
+  # same countersign — see the gate registry for what it verifies.
   mutants-layout-probe-plumbing:
     name: dogfood (layout-probe plumbing)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -168,7 +183,7 @@ jobs:
   # the certified DEFAULT-BRANCH tree — a branch tip must never claim it.
   mutants-full-countersign:
     name: countersign (full sweep)
-    needs: [mutants-full, mutants-delta-render-plumbing, mutants-statement-bites-lean-corpus, mutants-layout-probe-plumbing]
+    needs: [mutants-full, mutants-delta-render-plumbing, mutants-statement-bites-lean-corpus, mutants-fire-drill-plumbing, mutants-layout-probe-plumbing]
     if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

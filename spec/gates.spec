@@ -39,6 +39,10 @@
       .github/statement-bite.sh
       promises: no definition mutant of lean/ProbeBool.lean re-checks past its theorems, except the survivors ratified by key in lean/bites.register — mutation testing FOR the proof corpus: the kernel judges the mutants (the gate installs elan; the corpus is core-only), while the expected survivor set is pinned toolchain-free by discover::bite's mirror probe in every cargo test
 
+- mutation (fire-drill plumbing) (weekly + manual, sharded; pure)
+      .github/mutants-gate.sh --package fire-drill --config .github/fire-drill-mutants.toml
+      promises: no mutant of fire-drill (the battery verdicts, the census refusals, both lockable renders) survives its lib probes — the workspace sweeps scope to the root crate, so the crate that proves gates can fire carries its own weekly verdict (config: .github/fire-drill-mutants.toml)
+
 - mutation (layout-probe plumbing) (weekly + manual, sharded; pure)
       .github/mutants-gate.sh --package layout-probe --config .github/layout-probe-mutants.toml
       promises: no mutant of layout-probe (the two engines, the diagram edits, the visual census and its locality witness) survives its lib probes — the workspace sweeps scope to the root crate, so the second-domain miniature carries its own weekly verdict (config: .github/layout-probe-mutants.toml; the drift-gate twins live in the lib so this sweep can see them)

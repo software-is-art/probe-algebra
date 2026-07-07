@@ -549,6 +549,24 @@ impl GateRegistry {
                 sharded: false,
             },
             Gate {
+                name: "mutation (fire-drill plumbing)",
+                verifies: "no mutant of fire-drill (the battery verdicts, the census \
+                           refusals, both lockable renders) survives its lib probes — \
+                           the workspace sweeps scope to the root crate, so the crate \
+                           that proves gates can fire carries its own weekly verdict \
+                           (config: .github/fire-drill-mutants.toml)",
+                command: &[
+                    ".github/mutants-gate.sh",
+                    "--package",
+                    "fire-drill",
+                    "--config",
+                    ".github/fire-drill-mutants.toml",
+                ],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                sharded: false,
+            },
+            Gate {
                 name: "mutation (layout-probe plumbing)",
                 verifies: "no mutant of layout-probe (the two engines, the diagram \
                            edits, the visual census and its locality witness) survives \
@@ -895,22 +913,22 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: nine gates — three every-change (all pure), one
-    /// per-diff, one default-branch incremental, and four weekly (the sharded
-    /// whole-tree sweep plus three member/corpus companions: delta-render plumbing,
-    /// the Lean statement bites, and layout-probe plumbing) — and every declared
-    /// command reappears verbatim in the rendered workflow (nothing declared can fall
-    /// out of execution).
+    /// The registry's SHAPE is pinned: ten gates — three every-change (all pure), one
+    /// per-diff, one default-branch incremental, and five weekly (the sharded
+    /// whole-tree sweep plus four member/corpus companions: delta-render plumbing,
+    /// the Lean statement bites, fire-drill plumbing, and layout-probe plumbing) —
+    /// and every declared command reappears verbatim in the rendered workflow
+    /// (nothing declared can fall out of execution).
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 9);
+        assert_eq!(gates.len(), 10);
         assert_eq!(
             gates
                 .iter()
                 .filter(|g| g.cadence == Cadence::Weekly)
                 .count(),
-            4
+            5
         );
         assert_eq!(
             gates.iter().filter(|g| g.sharded).count(),
@@ -975,7 +993,8 @@ mod tests {
         // red companion gate withholds the countersign exactly like a red shard.
         assert!(workflow.contains(
             "needs: [mutants-full, mutants-delta-render-plumbing, \
-             mutants-statement-bites-lean-corpus, mutants-layout-probe-plumbing]"
+             mutants-statement-bites-lean-corpus, mutants-fire-drill-plumbing, \
+             mutants-layout-probe-plumbing]"
         ));
         let advances = workflow
             .matches(&format!("git push -f origin {GREEN_TAG}"))

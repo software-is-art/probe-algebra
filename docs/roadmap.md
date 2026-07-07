@@ -234,6 +234,36 @@ pleasing verification note: the first draft emitted `pub fn pipeline()` and the 
 own generated enforcement shim REFUSED it (a loose public function violates the
 no-rats-nest rule) — the generated discipline judging its own generator.
 
+## From the field, sixth report (the battery attests its own completeness) — BUILT
+
+From the production adoption (the project stays anonymous, per house practice), written
+against `912a476`, after the earlier asks — `drill_with`, the strict `observe` mapping
+docs, the action-law shapes — all landed. The gap, in their sentence: "`Battery::requires`
++ UNPROVEN is a census of gates someone remembered to list — so the battery attests its
+own completeness, which is the self-attestation shape fire-drill exists to kill, one
+level up." How it bit: their surface grew to 21 verdict-bearing commands in four days;
+four had no drill, no UNPROVEN entry (never listed), and no recorded reason. Every test
+was green.
+
+The ask, built as specified in `fire_drill::Census`: the battery reconciled against a
+consumer-derived surface enumeration (a clap tree, a route table — the same walk a
+surface lock freezes; the crate never knows what a CLI is), with exemption as a
+first-class frozen object (`CensusEntry::Drilled` names covering gates,
+`CensusEntry::Exempt` carries a ratified reason). `verdict()` fails by name on their
+four refusals — UNREGISTERED, STALE, UNKNOWN-GATE, EMPTY-REASON — plus two added in the
+same spirit and disclosed here: EMPTY-CLAIM (a Drilled entry citing no gates is an
+exemption in drill's clothing) and DUPLICATE (one entry per element, the register
+discipline). `render()` is deterministic and spec-lockable, problems shown loudly.
+One deliberate deviation from their design point 3: gate names are validated against
+the battery's in-memory required list rather than the frozen spec text — the battery's
+own freshness gate holds those equal, so the frozen cross-reference comes one hop
+through an existing lock instead of a second parser. Their field observation is now the
+type's docs: writing the exemption reason is the review, and the drill is often less
+work than the excuse (their register turned four would-be shadow gates into drills the
+day it landed). fire-drill also gained its own weekly member sweep
+(`mutation (fire-drill plumbing)`) — the crate had none, a pre-existing gap this growth
+made worth closing.
+
 ## From the field, day zero (fire-drill consumed in production)
 
 The production CLI adoption consumed fire-drill untagged, same-day — and the crate's
