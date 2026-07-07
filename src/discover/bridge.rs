@@ -447,7 +447,10 @@ mod probes {
 
     fn bool_export() -> &'static str {
         // a private slot-2 twin of the committed fixture, so lib probes never race the
-        // integration tests' slot-0 install of the file on disk.
+        // integration tests' slot-0 install of the file on disk. SEVEN operators on
+        // purpose: the eval fn-pointer table has eight arms, and this fixture walks
+        // indices 0..=6, so a deleted arm routes an operator through the fallback and
+        // dies indexing past the export's table — no arm can rot unexercised.
         "theory: probe-bool\n\
          elements: false true\n\
          op false/0: false\n\
@@ -455,6 +458,8 @@ mod probes {
          op not/1: true false\n\
          op and/2: false false | false true\n\
          op or/2: false true | true true\n\
+         op xor/2: false true | true false\n\
+         op nand/2: true true | true false\n\
          proved: commutative and\n\
          proved: identity and true\n"
     }
@@ -572,6 +577,65 @@ mod probes {
         refused(
             "theory: t\nelements: a\nop f/1: a\nwat\n",
             "unreadable line",
+        );
+    }
+
+    /// The DERIVED bridge locks are fresh FROM THE LIBRARY SIDE — the delta-render
+    /// lesson applied to the root crate: the mutation sweeps judge mutants against the
+    /// lib probes (plus two enlisted drill suites), so every lock a mutant could
+    /// silently invalidate must be re-derivable from here. A perturbed bridged theory
+    /// (its name, operator table, variables, or sampling budget) discovers a different
+    /// law set or renders a different triage, and these gates catch that as spec drift.
+    /// (`tests/bridge.rs` keeps the human-facing twins.)
+    #[test]
+    fn the_committed_bridge_locks_are_fresh_from_the_library_side() {
+        let spec_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
+        let text = std::fs::read_to_string(spec_dir.join("bridged-bool.export"))
+            .expect("the committed export fixture is part of the tree");
+        Export::parse(&text)
+            .expect("the committed export parses")
+            .install::<0>()
+            .expect("slot 0 holds the committed fixture");
+        let locks = [
+            crate::discover::Spec::of::<Bridged<0>>().lock_in(&spec_dir),
+            crate::discover::mutation::MutationReport::of::<Bridged<0>>().lock_in(&spec_dir),
+            Triage::of::<Bridged<0>>().lock_in(&spec_dir),
+        ];
+        if let Err(stale) = spec_lock::check(&locks) {
+            panic!(
+                "bridge lock drifted for: {}. \
+                 Run `cargo run --example freeze_spec` and ratify the diff.",
+                stale.join(", ")
+            );
+        }
+    }
+
+    /// The element cap is a CEILING, not a wall one short of it: an exactly-8-element
+    /// carrier parses (the exhaustive-judgment guarantee covers it), and only the 9th
+    /// is refused — pinned from both sides so the boundary cannot creep.
+    #[test]
+    fn the_element_cap_admits_exactly_the_ceiling() {
+        let at_cap = "theory: t\nelements: a b c d e f g h\nop id/1: a b c d e f g h\n";
+        assert_eq!(
+            Export::parse(at_cap)
+                .expect("eight elements parse")
+                .elements
+                .len(),
+            MAX_ELEMENTS
+        );
+    }
+
+    /// THE EXHAUSTIVENESS LOCKSTEP: "a bridged refutation is a fact, not a sample"
+    /// holds only while the sampling budget covers the parse ceiling's worst carrier —
+    /// two independently-declared constants that must move together. (The engine floors
+    /// its budget at 64, so a small carrier hides a broken budget: this pin is the only
+    /// probe that can see it.)
+    #[test]
+    fn the_sampling_budget_covers_the_whole_admissible_carrier() {
+        assert!(
+            <Bridged<0> as Theory>::grid_size() >= MAX_ELEMENTS * MAX_ELEMENTS * MAX_ELEMENTS,
+            "grid_size must keep every admissible carrier exhaustive: raise it in \
+             lockstep with MAX_ELEMENTS"
         );
     }
 }

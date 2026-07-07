@@ -17,15 +17,20 @@
 # stream grid): i(enrich(d(s))) = enrich(s)
 
 license: LINEAR, warranted — the circuit law held over all 8 sampled interpretations × 6 stream-grid inhabitants.
+      sample #0 (fully constrained): g(0) = {1:-2}; g(1) = {2:-3}
 
 ratified properties (each load-bearing under the removal drill):
 - additive: enrich turns plus into plus (away from the basepoint).
       removal refuted the law in 8 of 8 counter-samples; first witness: sample #0, stream #5, tick 1: incremental {250:+2} ≠ batch ∅
+      counter-sample #0: g(0) = {1:+1 3:+2}; g(1) = {1:-2 3:-2}
 - zero-preserving: enrich leaves zero fixed (the basepoint).
       removal refuted the law in 8 of 8 counter-samples; first witness: sample #0, stream #0, tick 1: incremental {251:+2} ≠ batch {251:+1}
+      counter-sample #0: g(0) = {0:-1}; g(1) = {2:-3}
 - deterministic: enrich answers the same input identically, every call.
       removal refuted the law in 8 of 8 counter-samples; first witness: sample #0, stream #0, tick 0: incremental {252:+6} ≠ batch {252:+1}
+      counter-sample #0: g(0) = {0:-3 1:-1}; g(1) = {1:+1 2:+2}
 
 decoration (declared, drilled, found weightless — flagged, not ratified):
 - bounded-fanout: enrich maps one row to at most two rows.
       removal refuted the law in 0 of 8 counter-samples — the license never leaned on it.
+      counter-sample #0: g(0) = {1:-3 2:-2 3:-3 4:+1}; g(1) = {2:-1 4:-3 5:-1 7:+1}

@@ -3988,4 +3988,198 @@ mod tests {
             );
         }
     }
+
+    /// The partial-operator convention at `judge_at`, pinned point-blank: two undefined
+    /// observations agree (both sides undefined TOGETHER is the convention that lets a
+    /// partial operator's laws hold where it is honestly silent), a definedness
+    /// mismatch refutes, and two defined values defer to the theory's judge.
+    #[test]
+    fn judge_at_holds_the_partiality_convention() {
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&None, &None),
+            Verdict::Holds,
+            "undefined-together must HOLD, never refute"
+        );
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&None, &Some(0)),
+            Verdict::Refuted
+        );
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&Some(1), &Some(1)),
+            Verdict::Holds
+        );
+        assert_eq!(
+            Engine::<NoisyGauge>::judge_at(&Some(0), &Some(3)),
+            Verdict::Refuted
+        );
+    }
+
+    // ===== the one-sided-meaningless witness refusal ========================
+    // `lt` is a relation that is UNDEFINED EVERYWHERE; `no` is a defined constant.
+    // A witness shape comparing them has one meaningful side and one meaningless
+    // side, and must be REFUSED — a relation with no defined instance witnesses
+    // nothing. (The refusal requires BOTH sides meaningful, not either.)
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum GhostSort {
+        V,
+        B,
+    }
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum GhostVal {
+        V(i64),
+        B(bool),
+    }
+    struct GhostRelation;
+    fn ghost_lt(_: &[GhostVal]) -> Option<GhostVal> {
+        None // undefined everywhere — the ghost
+    }
+    fn ghost_no(_: &[GhostVal]) -> Option<GhostVal> {
+        Some(GhostVal::B(false))
+    }
+    impl Theory for GhostRelation {
+        type Sort = GhostSort;
+        type Value = GhostVal;
+        type Obs = GhostVal;
+        fn name() -> &'static str {
+            "ghost relation"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![
+                Operator {
+                    name: "lt",
+                    symbol: "lt",
+                    fixity: Fixity::Infix,
+                    inputs: vec![GhostSort::V, GhostSort::V],
+                    output: GhostSort::B,
+                    eval: ghost_lt,
+                },
+                Operator {
+                    name: "no",
+                    symbol: "false",
+                    fixity: Fixity::Nullary,
+                    inputs: vec![],
+                    output: GhostSort::B,
+                    eval: ghost_no,
+                },
+            ]
+        }
+        fn inhabitants(sort: GhostSort) -> Vec<GhostVal> {
+            match sort {
+                GhostSort::V => vec![GhostVal::V(0), GhostVal::V(1)],
+                GhostSort::B => vec![GhostVal::B(false), GhostVal::B(true)],
+            }
+        }
+        fn sort_of(v: &GhostVal) -> GhostSort {
+            match v {
+                GhostVal::V(_) => GhostSort::V,
+                GhostVal::B(_) => GhostSort::B,
+            }
+        }
+        fn observe(v: &GhostVal) -> GhostVal {
+            *v
+        }
+        fn sort_vars(sort: GhostSort) -> &'static [&'static str] {
+            match sort {
+                GhostSort::V => &["x", "y", "z"],
+                GhostSort::B => &["p", "q", "r"],
+            }
+        }
+    }
+
+    /// An everywhere-undefined relation earns NO witness: `lt(x, y) ≠ false` has a
+    /// meaningless left side and a meaningful right side, and the witness driver must
+    /// refuse it rather than let the definedness mismatch masquerade as a difference.
+    #[test]
+    fn a_ghost_relation_witnesses_nothing() {
+        let d = Engine::<GhostRelation>::new().discover();
+        assert!(
+            !d.laws.iter().any(|l| l.equation.contains("lt")),
+            "an undefined-everywhere relation must appear in NO law: {:?}",
+            d.laws.iter().map(|l| l.prose.as_str()).collect::<Vec<_>>()
+        );
+        // and the silence is recorded where it belongs: coverage, not a witness.
+        assert!(d.uncovered_ops.contains(&"lt"));
+    }
+
+    // ===== the undecided band's dedup =======================================
+    // `blend` with a constant at 2, on a grid where the constant's identity law is
+    // UNDECIDED in BOTH mirrored orientations — the disclosure must carry the law
+    // once, not once per orientation.
+    struct NoisyPair;
+    fn two(_: &[i64]) -> Option<i64> {
+        Some(2)
+    }
+    impl Theory for NoisyPair {
+        type Sort = Micro;
+        type Value = i64;
+        type Obs = i64;
+        fn name() -> &'static str {
+            "noisy pair"
+        }
+        fn operators() -> Vec<Operator<Self>> {
+            vec![
+                Operator {
+                    name: "blend",
+                    symbol: "blend",
+                    fixity: Fixity::Infix,
+                    inputs: vec![Micro, Micro],
+                    output: Micro,
+                    eval: blend,
+                },
+                Operator {
+                    name: "two",
+                    symbol: "2",
+                    fixity: Fixity::Nullary,
+                    inputs: vec![],
+                    output: Micro,
+                    eval: two,
+                },
+            ]
+        }
+        fn inhabitants(_: Micro) -> Vec<i64> {
+            vec![1, 2, 3]
+        }
+        fn sort_of(_: &i64) -> Micro {
+            Micro
+        }
+        fn observe(v: &i64) -> i64 {
+            *v
+        }
+        fn sort_vars(_: Micro) -> &'static [&'static str] {
+            &["x", "y", "z"]
+        }
+        fn grid_size() -> usize {
+            27
+        }
+        fn judge(a: &i64, b: &i64) -> Verdict {
+            match (a - b).abs() {
+                0 => Verdict::Holds,
+                1 => Verdict::Undecided,
+                _ => Verdict::Refuted,
+            }
+        }
+        fn tolerance() -> Option<&'static str> {
+            Some("micro-units: exact ⇒ holds; |Δ| = 1 ⇒ undecided; else refuted")
+        }
+    }
+
+    /// A law undecided under BOTH of a mirrored shape's orientations is disclosed
+    /// ONCE — the band is a set of laws, not a log of attempts.
+    #[test]
+    fn an_undecided_mirrored_law_is_disclosed_once() {
+        let d = Engine::<NoisyPair>::new().discover();
+        let prose: Vec<&str> = d.undecided.iter().map(|(p, _)| p.as_str()).collect();
+        assert!(
+            prose.contains(&"blend with 2 leaves a value unchanged."),
+            "the mirrored identity must land in the band: {prose:?}"
+        );
+        let mut deduped = prose.clone();
+        deduped.sort_unstable();
+        deduped.dedup();
+        assert_eq!(
+            deduped.len(),
+            prose.len(),
+            "each undecided law is disclosed exactly once: {prose:?}"
+        );
+    }
 }

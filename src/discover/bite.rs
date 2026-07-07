@@ -485,4 +485,32 @@ mod probes {
         );
         assert_eq!(proved.len(), 10, "the certificate census moved");
     }
+
+    /// Only match ARMS are biteable and tabled: a definitions-region line that carries
+    /// `=>` but does not start with `|` (prose, a lambda in a comment) is neither a
+    /// bite site nor a table row — pinned on a corpus that plants exactly that trap,
+    /// with exact counts so a loosened line filter cannot hide.
+    #[test]
+    fn only_match_arms_are_bitten_and_tabled() {
+        let text = "def f : Bool → Bool\n\
+                    \x20 | true => true\n\
+                    \x20 | false => false\n\
+                    note: this prose maps everything => true and is not an arm\n\
+                    \n\
+                    -- ===== THEOREMS =====\n\
+                    theorem t : f true = true := rfl\n";
+        let c = Corpus::parse(text).expect("splits");
+        let keys: Vec<String> = c.bites().into_iter().map(|b| b.key).collect();
+        assert_eq!(
+            keys,
+            vec!["f | true => false", "f | false => true"],
+            "exactly the two arms bite — the prose line must not"
+        );
+        let t = c.tables();
+        assert_eq!(
+            t.get("f").map(Vec::len),
+            Some(2),
+            "exactly the two arms are table rows — the prose line must not"
+        );
+    }
 }

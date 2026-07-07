@@ -232,6 +232,20 @@ impl Interpretation {
         }
         out
     }
+
+    /// The generator table in artifact prose: `g(0) = {2:+2}; g(1) = {0:-1 3:+1}` — the
+    /// DISCLOSURE that makes the sampler lock-visible. Rendered into the warrant for
+    /// sample #0 of every arm, so any change to the randomness stream, the sampling
+    /// arithmetic, or the per-arm seed derivation moves committed bytes: the mutation
+    /// sweep found twelve sampler mutants the artifact was invariant to, and this line
+    /// is their grave.
+    pub fn table_render(&self) -> String {
+        self.table
+            .iter()
+            .map(|(r, g)| format!("g({r}) = {}", show(g)))
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
 }
 
 // ===== the judged law and the artifact =====================================
@@ -284,6 +298,8 @@ pub struct DrillRow {
     pub property: Property,
     pub refuted: usize,
     pub witness: Option<String>,
+    /// Counter-sample #0's generator table, disclosed — the sampler made lock-visible.
+    pub sample0: String,
 }
 
 impl DrillRow {
@@ -300,6 +316,9 @@ impl DrillRow {
 pub struct Warrant {
     /// Did the circuit law hold over every fully-constrained sample?
     pub held: bool,
+    /// Sample #0's generator table (fully constrained), disclosed — see
+    /// [`Interpretation::table_render`] for why disclosure is load-bearing.
+    pub sample0: String,
     /// The full arm's story (the survival sentence, or the first refutation).
     pub held_detail: String,
     /// One row per declared property, in `Property::all()` order.
@@ -318,8 +337,12 @@ impl Warrant {
              stream-grid inhabitants",
             stream_grid().len()
         );
+        let mut sample0 = String::new();
         for i in 0..SAMPLES {
             let f = Interpretation::sample(&mut rng, None);
+            if i == 0 {
+                sample0 = f.table_render();
+            }
             if let Err(w) = circuit_law(&f) {
                 held = false;
                 held_detail = format!("sample #{i} REFUTED the law: {w}");
@@ -333,8 +356,12 @@ impl Warrant {
                 let mut rng = Rng::new(SEED ^ (arm as u64 + 1));
                 let mut refuted = 0;
                 let mut witness = None;
+                let mut sample0 = String::new();
                 for i in 0..SAMPLES {
                     let f = Interpretation::sample(&mut rng, Some(*p));
+                    if i == 0 {
+                        sample0 = f.table_render();
+                    }
                     if let Err(w) = circuit_law(&f) {
                         refuted += 1;
                         witness.get_or_insert(format!("first witness: sample #{i}, {w}"));
@@ -344,11 +371,13 @@ impl Warrant {
                     property: *p,
                     refuted,
                     witness,
+                    sample0,
                 }
             })
             .collect();
         Warrant {
             held,
+            sample0,
             held_detail,
             rows,
         }
@@ -376,13 +405,14 @@ impl Warrant {
              # stream grid): i({OPERATOR}(d(s))) = {OPERATOR}(s)\n\n"
         );
         out.push_str(&format!(
-            "license: {} — {}.\n",
+            "license: {} — {}.\n      sample #0 (fully constrained): {}\n",
             if self.held {
                 "LINEAR, warranted"
             } else {
                 "REFUSED"
             },
-            self.held_detail
+            self.held_detail,
+            self.sample0
         ));
         out.push_str("\nratified properties (each load-bearing under the removal drill):\n");
         for row in self.rows.iter().filter(|r| r.load_bearing()) {
@@ -393,6 +423,7 @@ impl Warrant {
                 row.refuted,
                 row.witness.as_deref().expect("a load-bearing row has one")
             ));
+            out.push_str(&format!("      counter-sample #0: {}\n", row.sample0));
         }
         out.push_str(
             "\ndecoration (declared, drilled, found weightless — flagged, not ratified):\n",
@@ -400,9 +431,10 @@ impl Warrant {
         for row in self.rows.iter().filter(|r| !r.load_bearing()) {
             out.push_str(&format!(
                 "- {}: {}.\n      removal refuted the law in 0 of {SAMPLES} counter-samples — \
-                 the license never leaned on it.\n",
+                 the license never leaned on it.\n      counter-sample #0: {}\n",
                 row.property.name(),
                 row.property.claim(),
+                row.sample0,
             ));
         }
         out
