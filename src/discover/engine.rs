@@ -1642,6 +1642,54 @@ impl ShapeCatalog {
                 const_rule: ConstRule::Named("true"),
                 premise: None,
             },
+            // -- the LAYOUT words (from scoping the second-domain adoption: a diagram
+            // renderer under metamorphic probe). `inert` is the stability law an agent
+            // loop leans on — an operator that is observationally a NO-OP (declaration
+            // reorder must not move a layout); `equivariant map` is the commuting
+            // square (rename-then-render = render-then-relabel), which the catalog
+            // could not previously say: `action equivariance` distributes an action
+            // over a binary, but no shape carried a unary map INTERTWINING two actions.
+            ShapeInfo {
+                name: "inert",
+                schema: "u(x) = x",
+                gate: "unary endo s → s — an operator the observation cannot see: a \
+                       normalization already normal, a reorder a stable layout ignores",
+                gate_slots: open(&[Slot::Unary(0, 0)]),
+                template: "{op} leaves every value unchanged.",
+                lhs: App(0, &[X]),
+                rhs: X,
+                placeholders: &["u"],
+                polarity: Polarity::Equal,
+                holes: &["op"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
+                name: "equivariant map",
+                schema: "f(act(x, p)) = act2(f(x), p)",
+                gate: "a unary f : s → t plus an action of u on s and an action of u on \
+                       t — the commuting square: acting before f is acting after it \
+                       (rename-then-render = render-then-relabel)",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 1), Slot::Action(0, 2), Slot::Action(1, 2)],
+                    distinct_sorts: &[(0, 2), (1, 2)],
+                    distinct_ops: &[],
+                },
+                template: "{op} is equivariant — {other} before it becomes {via} after it.",
+                // the param rides sort variable 2 here (0 and 1 are the two
+                // carriers), so `P`'s usual Var(1, 0) does not apply.
+                lhs: App(0, &[App(1, &[X, Var(2, 0)])]),
+                rhs: App(2, &[App(0, &[X]), Var(2, 0)]),
+                placeholders: &["f", "act", "act2"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "via"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
+            },
         ]
     }
 
@@ -3350,6 +3398,11 @@ mod tests {
     fn s_floor(_: &[SVal]) -> Option<SVal> {
         Some(SVal::V(0))
     }
+    fn s_same(v: &[SVal]) -> Option<SVal> {
+        Some(SVal::V(s_v(&v[0]))) // the observational no-op: `inert` must fire, and the
+                                  // identity intertwines every action with itself, so
+                                  // `equivariant map` fires through it too.
+    }
 
     impl Theory for MaxSelect {
         type Sort = SSort;
@@ -3433,6 +3486,14 @@ mod tests {
                     inputs: vec![],
                     output: V,
                     eval: s_floor,
+                },
+                Operator {
+                    name: "Same",
+                    symbol: "same",
+                    fixity: Prefix,
+                    inputs: vec![V],
+                    output: V,
+                    eval: s_same,
                 },
             ]
         }
@@ -3640,7 +3701,11 @@ mod tests {
                     (*sym, fixity)
                 })
                 .collect();
-            let rendered = shape.equation(&ops, &[&["x", "y", "z"], &["p", "q"]]);
+            // three sort-variable rows: carrier, partner/verdict, and (for the
+            // equivariant square) a second-partner param row — the display names may
+            // repeat across rows because no stanza renders variables of two non-carrier
+            // sorts in one equation.
+            let rendered = shape.equation(&ops, &[&["x", "y", "z"], &["p", "q"], &["p", "q"]]);
             if shape.schema == rendered {
                 continue;
             }

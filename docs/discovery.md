@@ -56,7 +56,7 @@ Keep the grid lean on purpose when a drift gate re-derives the theory inside eve
 
 ## The catalog IS the engine
 
-`ShapeCatalog::inventory()` is the law language — 35 shapes — and `Engine::templates()` is a
+`ShapeCatalog::inventory()` is the law language — 37 shapes — and `Engine::templates()` is a
 generic interpreter over it. There is no second statement of the battery anywhere. Each
 `ShapeInfo` stanza carries:
 

@@ -179,3 +179,13 @@
       schema:   (le(x, y) ⊕ le(y, x)) = true  (every pair relates, one way or the other)
       gate:     a relation s × s → r (r ≠ s), a homogeneous binary on r (read as the verdict sort's or), and a constant of r rendering as `true` — a total order says yes somewhere on every pair; a strict order refuses this on the diagonal
       template: {op} is total under {other} — every pair relates one way or the other.
+
+- inert
+      schema:   u(x) = x
+      gate:     unary endo s → s — an operator the observation cannot see: a normalization already normal, a reorder a stable layout ignores
+      template: {op} leaves every value unchanged.
+
+- equivariant map
+      schema:   f(act(x, p)) = act2(f(x), p)
+      gate:     a unary f : s → t plus an action of u on s and an action of u on t — the commuting square: acting before f is acting after it (rename-then-render = render-then-relabel)
+      template: {op} is equivariant — {other} before it becomes {via} after it.

@@ -68,6 +68,8 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("transitive", "transitivity"),
     ("antisymmetric", "antisymmetry"),
     ("total", "totality"),
+    ("inert", "inert"),
+    ("equivariant", "equivariant map"),
 ];
 
 /// One declared law: a ratified catalog shape plus the operator symbols it ranges over —
