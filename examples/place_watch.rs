@@ -14,12 +14,48 @@ use std::time::{Duration, SystemTime};
 
 use boundary_spec::discover::watch::Ticker;
 
+/// The HOOK mode (`--event <file> <state-dir>`): one invocation per agent edit, state
+/// persisted between invocations, output only when the shape moved (see
+/// `Ticker::hook_line` for the noise policy). Fail-open by design: any problem is
+/// silence and exit 0 — a broken hook must degrade to no feedback, never to a broken
+/// edit loop.
+fn event_mode(file: &str, state_dir: &str) {
+    let run = || -> Option<String> {
+        let source = std::fs::read_to_string(file).ok()?;
+        let mut key = String::new();
+        for c in file.chars() {
+            key.push(if c.is_ascii_alphanumeric() { c } else { '-' });
+        }
+        let state = PathBuf::from(state_dir).join(format!("{key}.sigs"));
+        let name: &'static str = Box::leak(file.to_string().into_boxed_str());
+        let line = match std::fs::read_to_string(&state) {
+            Ok(stored) => Ticker::resume(name, &stored).hook_line(name, &source),
+            // first sight: capture the baseline; a multi-component file announces
+            // itself once (the extraction is already available).
+            Err(_) => Ticker::new().hook_line(name, &source),
+        };
+        std::fs::create_dir_all(state_dir).ok()?;
+        std::fs::write(&state, Ticker::store(&source).ok()?).ok()?;
+        line
+    };
+    if let Some(line) = run() {
+        println!("{line}");
+    }
+}
+
 fn main() {
     let mut args = std::env::args().skip(1);
     let Some(file) = args.next() else {
-        eprintln!("usage: place_watch <file.rs> [--once]");
+        eprintln!("usage: place_watch <file.rs> [--once] | --event <file.rs> <state-dir>");
         std::process::exit(2);
     };
+    if file == "--event" {
+        let (Some(file), Some(state_dir)) = (args.next(), args.next()) else {
+            std::process::exit(0); // fail open: a misinvoked hook is silence.
+        };
+        event_mode(&file, &state_dir);
+        return;
+    }
     let once = args.next().as_deref() == Some("--once");
     let path = PathBuf::from(&file);
     let mut ticker = Ticker::new();

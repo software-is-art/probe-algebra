@@ -168,6 +168,61 @@ impl Ticker {
         Ticker::default()
     }
 
+    /// A ticker RESUMED from stored signatures — the hook path: each hook invocation is
+    /// a fresh process, so the previous placement is rebuilt from the state the last
+    /// invocation persisted (one signature per line, `symbol\tin,in\tout`).
+    pub fn resume(name: &'static str, stored: &str) -> Ticker {
+        let sigs: Vec<NetSignature> = stored
+            .lines()
+            .filter_map(|line| {
+                let mut parts = line.split('\t');
+                let (symbol, ins, out) = (parts.next()?, parts.next()?, parts.next()?);
+                Some((
+                    Box::leak(symbol.to_string().into_boxed_str()) as &'static str,
+                    ins.split(',')
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .collect(),
+                    out.to_string(),
+                ))
+            })
+            .collect();
+        Ticker {
+            previous: Some(Placement::over(name, sigs)),
+        }
+    }
+
+    /// The current signatures in [`Ticker::resume`]'s stored form — what a hook persists
+    /// between invocations.
+    pub fn store(source: &str) -> Result<String, String> {
+        Ok(parse_ops(source)?
+            .into_iter()
+            .map(|(symbol, ins, out)| format!("{symbol}\t{}\t{out}\n", ins.join(",")))
+            .collect())
+    }
+
+    /// The hook's one-line verdict for an edit, or `None` — the noise policy that makes
+    /// the agent surface affordable: `Bridged` always speaks (a coupling is the alarm),
+    /// a `Seeded` speaks only when it opens a SECOND component (a new disjoint feature —
+    /// the extraction becomes available), and everything else is silence, because the
+    /// common case must cost zero tokens.
+    pub fn hook_line(&mut self, name: &'static str, source: &str) -> Option<String> {
+        let (placement, event) = self.step(name, source).ok()?;
+        match event? {
+            ShapeEvent::Bridged { from, to } => Some(format!(
+                "shape: BRIDGED {from}->{to} in {name} — the edit coupled previously \
+                 separate features (intended?)"
+            )),
+            ShapeEvent::Seeded { ops } if placement.components.len() > 1 => Some(format!(
+                "shape: {name} places as {} modules — {{ {} }} is net-disjoint; the \
+                 extraction is available (Architect::place)",
+                placement.components.len(),
+                ops.join(", ")
+            )),
+            _ => None,
+        }
+    }
+
     /// Place the source as `name`, classify the change against the previous step, and
     /// remember the new shape. Returns the placement and the event (None on a no-op
     /// edit — same operators, same shape).
@@ -316,6 +371,58 @@ mod probes {
         assert_eq!(e, None);
         let (_, e) = ticker.step("bench", &stage(&two)).unwrap();
         assert_eq!(e, Some(ShapeEvent::Rederived));
+    }
+
+    /// THE AGENT SURFACE: `hook_line` prices feedback correctly — silence is free.
+    /// Joined edits (the common case) say nothing; a seed that opens a second
+    /// component announces the available extraction; a bridge always speaks, because
+    /// coupling two features is the alarm the hook exists for. And the store/resume
+    /// pair survives the hook's process boundary: each invocation rebuilds the
+    /// previous placement from persisted signatures.
+    #[test]
+    fn the_hook_speaks_only_when_the_shape_moves() {
+        let stage = |ops: &str| format!("    ops {{\n{ops}    }}\n");
+        let counter = "        Nullary \"zero\" \"zero\" () -> S::A = zero;\n";
+        let bump = "        Prefix \"bump\" \"bump\" (S::A) -> S::A = bump;\n";
+        let flag = "        Nullary \"off\" \"off\" () -> S::B = off;\n";
+        let bridge = "        Prefix \"read\" \"read\" (S::B) -> S::A = read;\n";
+
+        // baseline capture, then a joined edit: both silent, through store/resume.
+        let stored = Ticker::store(&stage(counter)).unwrap();
+        let joined = format!("{counter}{bump}");
+        let mut t = Ticker::resume("bench", &stored);
+        assert_eq!(
+            t.hook_line("bench", &stage(&joined)),
+            None,
+            "joined is free"
+        );
+
+        // a second component: one line, naming the extraction.
+        let two = format!("{counter}{bump}{flag}");
+        let mut t = Ticker::resume("bench", &Ticker::store(&stage(&joined)).unwrap());
+        let line = t
+            .hook_line("bench", &stage(&two))
+            .expect("a seed that splits speaks");
+        assert!(line.contains("places as 2 modules"), "{line}");
+        assert!(line.contains("extraction is available"));
+
+        // a bridge: always one line, always the question.
+        let coupled = format!("{counter}{bump}{flag}{bridge}");
+        let mut t = Ticker::resume("bench", &Ticker::store(&stage(&two)).unwrap());
+        let line = t
+            .hook_line("bench", &stage(&coupled))
+            .expect("a bridge speaks");
+        assert_eq!(
+            line,
+            "shape: BRIDGED 2->1 in bench — the edit coupled previously separate \
+             features (intended?)"
+        );
+
+        // an unparseable edit is silence to the HOOK (the refusal surfaces in the
+        // watcher and the tests, not mid-keystroke), and a no-op edit is silence.
+        let mut t = Ticker::resume("bench", &Ticker::store(&stage(&coupled)).unwrap());
+        assert_eq!(t.hook_line("bench", "ops { garbage"), None);
+        assert_eq!(t.hook_line("bench", &stage(&coupled)), None);
     }
 
     /// A line that looks like an operator but does not parse is a NAMED refusal — a
