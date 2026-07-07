@@ -22,6 +22,28 @@ if [ -f "spec/boundary-spec.shape.spec" ]; then
   grep -E "^- |^verdict:" spec/boundary-spec.shape.spec || true
 fi
 
+# SITUATION, the volatile layer: small, git-derived, entropy-free (no timestamps —
+# deterministic given repo state). Startup injection is once-per-session, so this
+# never churns the within-session cache prefix; it exists so a session's first minutes
+# are not spent re-deriving where it woke up.
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  echo
+  echo "## situation (volatile — this session's starting point)"
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
+  ahead=$(git rev-list --count origin/main..HEAD 2>/dev/null || echo "?")
+  dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+  echo "branch: ${branch} — ${ahead} commit(s) ahead of origin/main, ${dirty} uncommitted file(s)"
+  echo "recent work:"
+  git log --format='- %s' -3 2>/dev/null || true
+  release=$(git tag --list 'v2*' --sort=-creatordate 2>/dev/null | head -n 1)
+  if [ -n "${release}" ]; then
+    echo "last release: ${release}, $(git rev-list --count "${release}..HEAD" 2>/dev/null || echo "?") commit(s) ago"
+  fi
+  if git rev-parse -q --verify refs/tags/mutants-green >/dev/null 2>&1; then
+    echo "certified tree (mutants-green): $(git rev-list --count mutants-green..HEAD 2>/dev/null || echo "?") commit(s) behind HEAD"
+  fi
+fi
+
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
