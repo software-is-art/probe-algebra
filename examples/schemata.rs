@@ -60,7 +60,14 @@ mod probes {
     #[test]
     fn the_census_and_register_paths_hold() {
         let sites = Schemata::census().expect("collision-free");
-        assert!(sites.contains(&"tag_law::matches:0: == -> !="));
+        if cfg!(feature = "schemata") {
+            assert!(sites.contains(&"TagLaw::matches:0: == -> !="));
+        } else {
+            assert!(
+                sites.is_empty(),
+                "instrumentation must not leak into normal builds"
+            );
+        }
         // no survivors and an absent register hold vacuously:
         assert!(Schemata::register().check([]).is_ok());
         // an unratified survivor drifts, named:

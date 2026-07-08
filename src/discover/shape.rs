@@ -56,6 +56,7 @@ pub struct Component {
     pub nets: Vec<String>,
 }
 
+#[crate::mutate]
 impl Component {
     /// The component on one line: `{ ops } over nets { nets }`.
     fn render(&self) -> String {
@@ -91,6 +92,7 @@ fn find(parent: &mut [usize], mut x: usize) -> usize {
     x
 }
 
+#[crate::mutate]
 impl Placement {
     /// Is the boundary settled — one component (or none), nothing indisputably apart?
     pub fn is_settled(&self) -> bool {
@@ -209,6 +211,7 @@ pub struct ShapeReport {
     pub candidates: Vec<SeamCandidate>,
 }
 
+#[crate::mutate]
 impl ShapeReport {
     /// Compute a system's derived shape: place every registry module, then scan module
     /// pairs for net-name coincidences no declared seam covers.

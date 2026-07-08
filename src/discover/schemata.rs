@@ -173,8 +173,17 @@ impl Schemata {
         Ok(out)
     }
 
-    /// `spec/schemata.spec` — the census, frozen.
+    /// `spec/schemata.spec` — the census, frozen. REFUSES outside the schemata build:
+    /// without the feature the slice is empty, and freezing emptiness over the
+    /// committed census would erase it silently.
     pub fn lock() -> Result<Lock, String> {
+        if !cfg!(feature = "schemata") {
+            return Err(
+                "the schemata census only exists under `--features schemata` — \
+                 freeze with `cargo run --example freeze_gates --features schemata`"
+                    .to_string(),
+            );
+        }
         Ok(Lock {
             name: "schemata".to_string(),
             path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -198,7 +207,7 @@ impl Schemata {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "schemata"))]
 mod probes {
     use super::*;
     use crate::discover::substrate::TagLaw;
@@ -236,7 +245,7 @@ mod probes {
         };
         assert!(law.matches("mutants-green"), "unmutated: exact match holds");
         // the exact-match arm's `==` site, flipped to `!=`:
-        let site = "tag_law::matches:0: == -> !=";
+        let site = "TagLaw::matches:0: == -> !=";
         assert!(
             Schemata::census().unwrap().contains(&site),
             "the drill's site must exist in the census (renumbered? re-pin it)"
@@ -250,10 +259,10 @@ mod probes {
         });
         assert!(law.matches("mutants-green"), "the force is dropped");
         // the DEAFNESS form, same plumbing: the function returns the constant.
-        Schemata::force("tag_law::matches:deaf -> true", || {
+        Schemata::force("TagLaw::matches:deaf -> true", || {
             assert!(law.matches("anything-at-all"), "deaf-true hears nothing");
         });
-        Schemata::force("tag_law::matches:deaf -> false", || {
+        Schemata::force("TagLaw::matches:deaf -> false", || {
             assert!(
                 !law.matches("mutants-green"),
                 "deaf-false denies everything"

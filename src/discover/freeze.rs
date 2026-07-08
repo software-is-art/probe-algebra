@@ -82,6 +82,7 @@ fn render(spec: &Spec) -> String {
     out
 }
 
+#[crate::mutate]
 impl Spec {
     /// This spec as a `spec_lock::Lock` rooted in a caller-supplied spec directory — the
     /// CONSUMER-facing form. The lock file lives at `spec_dir/<slugified-theory>.spec` and

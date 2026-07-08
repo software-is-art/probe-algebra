@@ -50,6 +50,7 @@ pub struct CohesionReport {
     pub seams: Vec<Seam>,
 }
 
+#[crate::mutate]
 impl CohesionReport {
     /// Is the module cohesive — a single algebra that should stay one module?
     pub fn is_cohesive(&self) -> bool {

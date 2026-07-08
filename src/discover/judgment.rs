@@ -42,6 +42,7 @@ pub struct LiveDent<L> {
     pub must_name: String,
 }
 
+#[crate::mutate]
 impl<L> LiveDent<L> {
     /// Drill a judge against its dent battery. `Ok` carries one held line per dent
     /// the judge distinguished and named; `Err` carries every failure: an applied

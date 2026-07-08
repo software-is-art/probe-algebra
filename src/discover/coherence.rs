@@ -117,6 +117,7 @@ pub struct CoherenceReport {
     pub violations: Vec<String>,
 }
 
+#[crate::mutate]
 impl CoherenceReport {
     /// The coherence violations between two same-signature theories: the laws one module discovers
     /// that do NOT hold under the other's operators (checked both directions). `Ok` with no

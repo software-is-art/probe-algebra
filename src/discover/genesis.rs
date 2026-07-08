@@ -156,6 +156,7 @@ pub enum Rule {
     },
 }
 
+#[crate::mutate]
 impl Rule {
     /// The rule as one doc-safe line — what the generated doc comments and hole messages
     /// quote (`0..=20 (saturating)`, or the prose itself).
@@ -1843,6 +1844,7 @@ use boundary_spec::discover::gates::Pipeline;
 /// that rule too).
 pub struct Ci;
 
+#[crate::mutate]
 impl Ci {
     /// This crate's pipeline: the STARTER declaration (format, lint, test — every
     /// change), pinned to the toolchain the upstream library is tested against. Outgrow
@@ -2045,6 +2047,7 @@ pub struct Plan {
     pub edits: Vec<FileEdit>,
 }
 
+#[crate::mutate]
 impl Plan {
     /// The target-root-relative paths this plan will write, in emission order.
     pub fn listing(&self) -> Vec<&str> {
@@ -2061,6 +2064,7 @@ pub const GENESIS_APPLY_CAPABILITY: crate::boundary::Capability =
 /// rule (every public callable hangs off a typestate).
 pub struct Genesis;
 
+#[crate::mutate]
 impl Genesis {
     /// The PURE half: parse the declaration source (`syn`, from the `system!` token stream),
     /// validate it, and derive every file. No I/O — the same plan can be inspected, tested, or

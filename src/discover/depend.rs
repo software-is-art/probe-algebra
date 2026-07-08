@@ -117,6 +117,7 @@ impl Dependence {
     }
 }
 
+#[crate::mutate]
 impl Dependence {
     /// Judge a DOWNSTREAM-RELIANCE register against this repo's own committed locks —
     /// the owner-side receiving surface that retires open text as the ask channel.
@@ -133,7 +134,6 @@ impl Dependence {
     /// judge — one line each in `downstream-fixture/tests/reliances.rs`.
     ///
     /// Capability: Effectful — reads the register and the committed spec locks.
-    #[crate::mutate("judge_register")]
     pub fn judge_register(
         register: &spec_lock::Register,
         spec_dir: &Path,

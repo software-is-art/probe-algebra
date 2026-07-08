@@ -29,6 +29,7 @@ pub struct PipelineLaw {
     pub equation: String,
 }
 
+#[crate::mutate]
 impl PipelineLaw {
     /// Discover the end-to-end laws of a theory's transform pipelines. The discovery is an
     /// associated function of the LAW it yields — the public surface is the value object, not a

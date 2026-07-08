@@ -6,8 +6,336 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 70 sites.
+# 371 sites.
 
+- Architect::analyze:deaf -> vec![]
+- Architect::apply:0: ! -> (deleted)
+- Architect::apply:deaf -> Ok(vec![])
+- Architect::place:deaf -> None
+- Architect::render_lsp:deaf -> String::new()
+- BiteVerdicts::gate:deaf -> Err(String::new())
+- BiteVerdicts::gate:deaf -> Ok(String::new())
+- Bridged<SLOT>::expectations:deaf -> vec![]
+- Bridged<SLOT>::inhabitants:deaf -> vec![]
+- Bridged<SLOT>::operators:deaf -> vec![]
+- CoherenceReport::between:deaf -> Err(String::new())
+- CohesionReport::is_cohesive:0: <= -> >
+- CohesionReport::is_cohesive:deaf -> false
+- CohesionReport::is_cohesive:deaf -> true
+- CohesionReport::render:deaf -> String::new()
+- Component::render:deaf -> String::new()
+- ComponentLayering::is_atomic:deaf -> false
+- ComponentLayering::is_atomic:deaf -> true
+- Corpus::bites:0: ! -> (deleted)
+- Corpus::bites:1: || -> &&
+- Corpus::bites:deaf -> vec![]
+- Corpus::judge_with:0: ! -> (deleted)
+- Corpus::judge_with:deaf -> Err(String::new())
+- Corpus::parse:deaf -> Err(String::new())
+- Corpus::read:deaf -> Err(String::new())
+- Corpus::tables:0: ! -> (deleted)
+- Corpus::tables:1: || -> &&
+- Corpus::tables:2: == -> !=
+- Dependence::judge_register:0: || -> &&
+- Dependence::judge_register:1: || -> &&
+- Dependence::judge_register:2: == -> !=
+- Dependence::judge_register:deaf -> Err(String::new())
+- Dependence::judge_register:deaf -> Ok(vec![])
+- DiscoveredLaw::ops:deaf -> vec![]
+- Distance::is_met:deaf -> false
+- Distance::is_met:deaf -> true
+- Distance::of:0: ! -> (deleted)
+- Distance::of:1: ! -> (deleted)
+- Distance::of:2: ! -> (deleted)
+- Distance::of:3: && -> ||
+- Distance::render:0: && -> ||
+- Distance::render:1: ! -> (deleted)
+- Distance::render:2: ! -> (deleted)
+- Distance::render:deaf -> String::new()
+- Engine<T>::check:0: != -> ==
+- Engine<T>::check:1: || -> &&
+- Engine<T>::check:2: || -> &&
+- Engine<T>::check:3: == -> !=
+- Engine<T>::check:4: ! -> (deleted)
+- Engine<T>::check:5: && -> ||
+- Engine<T>::check:6: ! -> (deleted)
+- Engine<T>::check:deaf -> Err(String::new())
+- Engine<T>::concretize:deaf -> None
+- Engine<T>::declarations:deaf -> vec![]
+- Engine<T>::discover:0: ! -> (deleted)
+- Engine<T>::discover:1: ! -> (deleted)
+- Engine<T>::enumerate:0: ! -> (deleted)
+- Engine<T>::enumerate:1: != -> ==
+- Engine<T>::enumerate:2: == -> !=
+- Engine<T>::enumerate:3: < -> >=
+- Engine<T>::enumerate:deaf -> vec![]
+- Engine<T>::eval:deaf -> None
+- Engine<T>::evals:deaf -> vec![]
+- Engine<T>::instantiate_shape:0: ! -> (deleted)
+- Engine<T>::instantiate_shape:10: != -> ==
+- Engine<T>::instantiate_shape:11: && -> ||
+- Engine<T>::instantiate_shape:12: != -> ==
+- Engine<T>::instantiate_shape:13: == -> !=
+- Engine<T>::instantiate_shape:14: == -> !=
+- Engine<T>::instantiate_shape:15: ! -> (deleted)
+- Engine<T>::instantiate_shape:1: == -> !=
+- Engine<T>::instantiate_shape:2: != -> ==
+- Engine<T>::instantiate_shape:3: ! -> (deleted)
+- Engine<T>::instantiate_shape:4: == -> !=
+- Engine<T>::instantiate_shape:5: && -> ||
+- Engine<T>::instantiate_shape:6: ! -> (deleted)
+- Engine<T>::instantiate_shape:7: ! -> (deleted)
+- Engine<T>::instantiate_shape:8: || -> &&
+- Engine<T>::instantiate_shape:9: ! -> (deleted)
+- Engine<T>::meaningful:deaf -> false
+- Engine<T>::meaningful:deaf -> true
+- Engine<T>::new:0: ! -> (deleted)
+- Engine<T>::new:1: <= -> >
+- Engine<T>::render:deaf -> String::new()
+- Engine<T>::same:0: == -> !=
+- Engine<T>::same:deaf -> false
+- Engine<T>::same:deaf -> true
+- Engine<T>::signatures:deaf -> vec![]
+- Engine<T>::templates:0: == -> !=
+- Engine<T>::templates:1: == -> !=
+- Engine<T>::templates:2: ! -> (deleted)
+- Engine<T>::var:0: == -> !=
+- Engine<T>::var:1: == -> !=
+- Engine<T>::var:2: && -> ||
+- Engine<T>::var:deaf -> None
+- Expectation::canonical:0: == -> !=
+- Expectation::canonical:1: == -> !=
+- Expectation::canonical:2: || -> &&
+- Expectation::canonical:deaf -> None
+- Expectation::key:0: == -> !=
+- Expectation::of:0: == -> !=
+- Expectation::of:1: == -> !=
+- Expectation::of:2: || -> &&
+- Expectation::render:deaf -> String::new()
+- Expectation::vocabulary_keys:deaf -> vec![]
+- Export::install:0: != -> ==
+- Export::install:deaf -> Err(String::new())
+- Export::parse:0: || -> &&
+- Export::parse:10: ! -> (deleted)
+- Export::parse:1: > -> <=
+- Export::parse:2: > -> <=
+- Export::parse:3: == -> !=
+- Export::parse:4: == -> !=
+- Export::parse:5: == -> !=
+- Export::parse:6: == -> !=
+- Export::parse:7: != -> ==
+- Export::parse:8: != -> ==
+- Export::parse:9: == -> !=
+- Export::parse:deaf -> Err(String::new())
+- Gate::command_line:deaf -> String::new()
+- GateRegistry::declared:deaf -> vec![]
+- GateRegistry::pr_checks:0: == -> !=
+- GateRegistry::pr_checks:deaf -> vec![]
+- GateRegistry::render_registry:deaf -> String::new()
+- GateRegistry::render_workflow:0: == -> !=
+- GateRegistry::render_workflow:10: && -> ||
+- GateRegistry::render_workflow:11: != -> ==
+- GateRegistry::render_workflow:1: == -> !=
+- GateRegistry::render_workflow:2: == -> !=
+- GateRegistry::render_workflow:3: == -> !=
+- GateRegistry::render_workflow:4: == -> !=
+- GateRegistry::render_workflow:5: ! -> (deleted)
+- GateRegistry::render_workflow:6: != -> ==
+- GateRegistry::render_workflow:7: && -> ||
+- GateRegistry::render_workflow:8: ! -> (deleted)
+- GateRegistry::render_workflow:9: == -> !=
+- GateRegistry::render_workflow:deaf -> String::new()
+- Genesis::apply:deaf -> Ok(vec![])
+- Genesis::plan:0: ! -> (deleted)
+- Genesis::plan:1: || -> &&
+- Genesis::plan:2: ! -> (deleted)
+- Genesis::plan:deaf -> Err(String::new())
+- GuardVoices::for_edit:0: == -> !=
+- GuardVoices::for_edit:1: || -> &&
+- Inert::census:deaf -> vec![]
+- Inert::render_census:0: == -> !=
+- Inert::render_census:1: == -> !=
+- Inert::render_census:deaf -> String::new()
+- Inert::simplifiable:0: == -> !=
+- Inert::simplifiable:deaf -> vec![]
+- Infra::coherent:0: == -> !=
+- Infra::coherent:1: == -> !=
+- Infra::coherent:deaf -> Err(vec![])
+- Infra::coherent:deaf -> Ok(vec![])
+- Infra::ephemeral_prefixes:deaf -> vec![]
+- Infra::floor:deaf -> Err(String::new())
+- Infra::judge:0: == -> !=
+- Infra::judge:1: == -> !=
+- Infra::judge:2: == -> !=
+- Infra::judge:3: == -> !=
+- Infra::judge:deaf -> Err(vec![])
+- Infra::judge:deaf -> Ok(vec![])
+- Infra::render:deaf -> String::new()
+- Infra::slug:0: == -> !=
+- Infra::slug:deaf -> String::new()
+- Infra::store:0: == -> !=
+- Infra::store:deaf -> None
+- Infra::surface:0: == -> !=
+- Infra::surface:deaf -> None
+- Infra::unjudgeable:deaf -> vec![]
+- LayeringReport::render:0: ! -> (deleted)
+- LayeringReport::render:deaf -> String::new()
+- LayeringReport::wants_layering:0: ! -> (deleted)
+- LayeringReport::wants_layering:deaf -> false
+- LayeringReport::wants_layering:deaf -> true
+- LiveDent<L>::drill:deaf -> Err(vec![])
+- LiveDent<L>::drill:deaf -> Ok(vec![])
+- LiveInfra::dents:0: != -> ==
+- LiveInfra::dents:1: == -> !=
+- LiveInfra::dents:2: != -> ==
+- LiveInfra::dents:3: != -> ==
+- LiveInfra::dents:4: == -> !=
+- LiveInfra::dents:5: != -> ==
+- LiveInfra::dents:6: != -> ==
+- LiveInfra::dents:7: == -> !=
+- LiveInfra::dents:deaf -> vec![]
+- LiveInfra::lookup:0: == -> !=
+- LiveInfra::lookup:deaf -> None
+- LivePerimeter::dents:0: != -> ==
+- LivePerimeter::dents:deaf -> vec![]
+- LiveSubstrate::dents:0: == -> !=
+- LiveSubstrate::dents:1: && -> ||
+- LiveSubstrate::dents:2: || -> &&
+- LiveSubstrate::dents:3: != -> ==
+- LiveSubstrate::dents:4: != -> ==
+- LiveSubstrate::dents:5: || -> &&
+- LiveSubstrate::dents:6: == -> !=
+- LiveSubstrate::dents:7: != -> ==
+- LiveSubstrate::dents:8: != -> ==
+- LiveSubstrate::dents:deaf -> vec![]
+- Meaning::describe:deaf -> String::new()
+- MutationReport::deaf_survivors:0: ! -> (deleted)
+- MutationReport::deaf_survivors:deaf -> vec![]
+- MutationReport::dent_survivors:0: ! -> (deleted)
+- MutationReport::dent_survivors:deaf -> vec![]
+- MutationReport::lock_in:0: == -> !=
+- MutationReport::of:0: != -> ==
+- MutationReport::render:deaf -> String::new()
+- MutationReport::survivors:0: ! -> (deleted)
+- MutationReport::survivors:deaf -> vec![]
+- Perimeter::judge:0: == -> !=
+- Perimeter::judge:1: == -> !=
+- Perimeter::judge:deaf -> Err(vec![])
+- Perimeter::judge:deaf -> Ok(vec![])
+- Perimeter::render:deaf -> String::new()
+- Perimeter::ruleset_json:deaf -> String::new()
+- Pipeline::locks_in:deaf -> Err(String::new())
+- Pipeline::locks_in:deaf -> Ok(vec![])
+- Pipeline::render_registry:deaf -> String::new()
+- Pipeline::render_workflow:0: == -> !=
+- Pipeline::render_workflow:1: == -> !=
+- Pipeline::render_workflow:2: == -> !=
+- Pipeline::render_workflow:3: ! -> (deleted)
+- Pipeline::render_workflow:4: && -> ||
+- Pipeline::render_workflow:5: == -> !=
+- Pipeline::render_workflow:6: == -> !=
+- Pipeline::render_workflow:deaf -> Err(String::new())
+- Pipeline::render_workflow:deaf -> Ok(String::new())
+- PipelineLaw::discover:deaf -> vec![]
+- PipelineLaw::render:deaf -> String::new()
+- Placement::is_settled:0: <= -> >
+- Placement::is_settled:deaf -> false
+- Placement::is_settled:deaf -> true
+- Placement::over:0: ! -> (deleted)
+- Placement::over:1: == -> !=
+- Placement::render:deaf -> String::new()
+- Placement::signatures_of:deaf -> vec![]
+- Plan::listing:deaf -> vec![]
+- Proposal::misfits:0: ! -> (deleted)
+- Proposal::misfits:deaf -> vec![]
+- Proposal::render:deaf -> String::new()
+- Proposal::shapes:deaf -> vec![]
+- ProposedModule::is_shape:0: > -> <=
+- ProposedModule::is_shape:deaf -> false
+- ProposedModule::is_shape:deaf -> true
+- Report::flagged:deaf -> vec![]
+- Rule::doc:deaf -> String::new()
+- Scaffold::of:deaf -> None
+- Scaffold::placement:deaf -> None
+- Scaffold::render:deaf -> String::new()
+- SchemaTerm::render:deaf -> String::new()
+- SeamReport::transform:0: ! -> (deleted)
+- SeamReport::transform:1: == -> !=
+- SeamReport::transform:2: && -> ||
+- SeamStatus::is_met:deaf -> false
+- SeamStatus::is_met:deaf -> true
+- ShapeCatalog::inventory:deaf -> vec![]
+- ShapeCatalog::render:deaf -> String::new()
+- ShapeGate::admit:deaf -> Err(String::new())
+- ShapeGate::bind:0: != -> ==
+- ShapeGate::bind:10: && -> ||
+- ShapeGate::bind:11: && -> ||
+- ShapeGate::bind:12: == -> !=
+- ShapeGate::bind:13: && -> ||
+- ShapeGate::bind:14: && -> ||
+- ShapeGate::bind:15: == -> !=
+- ShapeGate::bind:16: == -> !=
+- ShapeGate::bind:17: && -> ||
+- ShapeGate::bind:18: && -> ||
+- ShapeGate::bind:19: && -> ||
+- ShapeGate::bind:1: != -> ==
+- ShapeGate::bind:20: == -> !=
+- ShapeGate::bind:21: == -> !=
+- ShapeGate::bind:22: && -> ||
+- ShapeGate::bind:23: && -> ||
+- ShapeGate::bind:24: && -> ||
+- ShapeGate::bind:25: ! -> (deleted)
+- ShapeGate::bind:26: == -> !=
+- ShapeGate::bind:27: == -> !=
+- ShapeGate::bind:2: || -> &&
+- ShapeGate::bind:3: <= -> >
+- ShapeGate::bind:4: == -> !=
+- ShapeGate::bind:5: == -> !=
+- ShapeGate::bind:6: == -> !=
+- ShapeGate::bind:7: && -> ||
+- ShapeGate::bind:8: == -> !=
+- ShapeGate::bind:9: && -> ||
+- ShapeGate::bind:deaf -> Err(String::new())
+- ShapeGate::bind:deaf -> Ok(vec![])
+- ShapeInfo::equation:deaf -> String::new()
+- ShapeInfo::instantiate:deaf -> String::new()
+- ShapeInfo::matches:0: == -> !=
+- ShapeInfo::matches:deaf -> false
+- ShapeInfo::matches:deaf -> true
+- ShapeReport::is_settled:deaf -> false
+- ShapeReport::is_settled:deaf -> true
+- ShapeReport::lock_in:0: == -> !=
+- ShapeReport::of:0: || -> &&
+- ShapeReport::render:deaf -> String::new()
+- Spec::check_all_fresh:deaf -> Err(vec![])
+- Spec::check_all_fresh:deaf -> Ok(vec![])
+- Spec::parse_lock:deaf -> vec![]
+- Substrate::judge:0: == -> !=
+- Substrate::judge:1: ! -> (deleted)
+- Substrate::judge:2: == -> !=
+- Substrate::judge:deaf -> Err(vec![])
+- Substrate::judge:deaf -> Ok(vec![])
+- Substrate::render:deaf -> String::new()
+- SystemDistance::latent:0: ! -> (deleted)
+- SystemDistance::latent:deaf -> vec![]
+- SystemDistance::render:deaf -> String::new()
+- SystemReport::is_met:deaf -> false
+- SystemReport::is_met:deaf -> true
+- SystemReport::lock_in:0: == -> !=
+- SystemReport::render:0: ! -> (deleted)
+- SystemReport::render:deaf -> String::new()
+- TagLaw::matches:0: == -> !=
+- TagLaw::matches:deaf -> false
+- TagLaw::matches:deaf -> true
+- Trace::perturbation_classes:deaf -> vec![]
+- Triage::certify:deaf -> Err(String::new())
+- Triage::of:0: ! -> (deleted)
+- Triage::render:deaf -> String::new()
+- WorldReport::disagreements:0: != -> ==
+- WorldReport::disagreements:1: != -> ==
+- WorldReport::disagreements:deaf -> vec![]
+- WorldReport::lock_in:0: == -> !=
+- WorldReport::render:deaf -> String::new()
 - agenda::of:deaf -> Err(String::new())
 - agenda::of_with:0: ! -> (deleted)
 - agenda::of_with:deaf -> Err(String::new())
@@ -40,35 +368,8 @@
 - dependence_report::is_intact:deaf -> false
 - dependence_report::is_intact:deaf -> true
 - dependence_report::render:deaf -> String::new()
-- infra::coherent:0: == -> !=
-- infra::coherent:1: == -> !=
-- infra::coherent:deaf -> Err(vec![])
-- infra::coherent:deaf -> Ok(vec![])
-- infra::judge:0: == -> !=
-- infra::judge:1: == -> !=
-- infra::judge:2: == -> !=
-- infra::judge:3: == -> !=
-- infra::judge:deaf -> Err(vec![])
-- infra::judge:deaf -> Ok(vec![])
-- judge_register:0: || -> &&
-- judge_register:1: || -> &&
-- judge_register:2: == -> !=
-- judge_register:deaf -> Err(String::new())
-- judge_register:deaf -> Ok(vec![])
-- perimeter::judge:0: == -> !=
-- perimeter::judge:1: == -> !=
-- perimeter::judge:deaf -> Err(vec![])
-- perimeter::judge:deaf -> Ok(vec![])
 - ratification::question:deaf -> String::new()
 - shape_event::render:deaf -> String::new()
-- substrate::judge:0: == -> !=
-- substrate::judge:1: ! -> (deleted)
-- substrate::judge:2: == -> !=
-- substrate::judge:deaf -> Err(vec![])
-- substrate::judge:deaf -> Ok(vec![])
-- tag_law::matches:0: == -> !=
-- tag_law::matches:deaf -> false
-- tag_law::matches:deaf -> true
 - ticker::parse_ops:deaf -> Err(String::new())
 - ticker::parse_ops:deaf -> Ok(vec![])
 - ticker_speak::hook_line:0: > -> <=

@@ -805,31 +805,76 @@ pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
     // a free fn, an impl method, or a WHOLE impl block (every method instrumented,
     // labelled `<Type>::<method>` — coverage grows per block, not per function).
-    if let Ok(mut f) = syn::parse::<ItemFn>(item.clone()) {
+    // DUAL EMISSION: the instrumented copy exists only under `feature = "schemata"`;
+    // every other build carries the original item, byte for byte — zero overhead,
+    // which is what lets hot paths (the engine) be instrumented at all. The sweep
+    // builds once with the feature and pays the branches there alone.
+    if let Ok(original) = syn::parse::<ItemFn>(item.clone()) {
+        let mut f = original.clone();
         let label = label
             .map(|l| l.value())
             .unwrap_or_else(|| f.sig.ident.to_string());
-        mutate_body(&label, &f.sig.output.clone(), &mut f.block);
-        quote! { #f }.into()
-    } else if let Ok(mut f) = syn::parse::<syn::ImplItemFn>(item.clone()) {
+        let sites = mutate_body(&label, &f.sig.output.clone(), &mut f.block);
+        let regs = registrations(&sites);
+        quote! {
+            #regs
+            #[cfg(feature = "schemata")]
+            #f
+            #[cfg(not(feature = "schemata"))]
+            #original
+        }
+        .into()
+    } else if let Ok(original) = syn::parse::<syn::ImplItemFn>(item.clone()) {
+        // a lone method cannot host module-scope statics, so its registrations stay
+        // in-body — which is only census-stable for NON-generic methods; instrument a
+        // generic method through its impl block instead.
+        let mut f = original.clone();
         let label = label
             .map(|l| l.value())
             .unwrap_or_else(|| f.sig.ident.to_string());
-        mutate_body(&label, &f.sig.output.clone(), &mut f.block);
-        quote! { #f }.into()
-    } else if let Ok(mut block) = syn::parse::<syn::ItemImpl>(item) {
+        let sites = mutate_body(&label, &f.sig.output.clone(), &mut f.block);
+        for (i, site) in sites.iter().enumerate() {
+            let ident = format_ident!("__MUTANT_SITE_{i}");
+            let registration: syn::Stmt = syn::parse_quote! {
+                #[::linkme::distributed_slice(crate::discover::schemata::MUTANT_SITES)]
+                static #ident: &'static str = #site;
+            };
+            f.block.stmts.insert(i, registration);
+        }
+        quote! {
+            #[cfg(feature = "schemata")]
+            #f
+            #[cfg(not(feature = "schemata"))]
+            #original
+        }
+        .into()
+    } else if let Ok(original) = syn::parse::<syn::ItemImpl>(item) {
+        let mut block = original.clone();
         let type_label = label.map(|l| l.value()).unwrap_or_else(|| {
             let ty = &block.self_ty;
             let tokens = quote!(#ty).to_string();
             tokens.replace(' ', "")
         });
+        let mut sites = Vec::new();
         for item in &mut block.items {
             if let syn::ImplItem::Fn(method) = item {
                 let label = format!("{type_label}::{}", method.sig.ident);
-                mutate_body(&label, &method.sig.output.clone(), &mut method.block);
+                sites.extend(mutate_body(
+                    &label,
+                    &method.sig.output.clone(),
+                    &mut method.block,
+                ));
             }
         }
-        quote! { #block }.into()
+        let regs = registrations(&sites);
+        quote! {
+            #regs
+            #[cfg(feature = "schemata")]
+            #block
+            #[cfg(not(feature = "schemata"))]
+            #original
+        }
+        .into()
     } else {
         syn::Error::new(
             proc_macro2::Span::call_site(),
@@ -840,10 +885,12 @@ pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
-/// Rewrite a function body's flip sites, prepend the deafness prologue (one early
-/// return per constructible form of the return type), and register every site
-/// (fn-scope statics, so the same expansion serves free fns and impl methods).
-fn mutate_body(label: &str, output: &ReturnType, block: &mut syn::Block) {
+/// Rewrite a function body's flip sites and prepend the deafness prologue (one early
+/// return per constructible form of the return type). Returns the site ids; the
+/// CALLER emits their census registrations at MODULE scope — a static inside a
+/// generic fn only materialises when the fn is instantiated, which would make the
+/// census depend on which binary happened to monomorphise what.
+fn mutate_body(label: &str, output: &ReturnType, block: &mut syn::Block) -> Vec<String> {
     let mut mutator = FlipMutator {
         label: label.to_string(),
         count: 0,
@@ -866,14 +913,25 @@ fn mutate_body(label: &str, output: &ReturnType, block: &mut syn::Block) {
     for stmt in prologue.into_iter().rev() {
         block.stmts.insert(0, stmt);
     }
-    for (i, site) in sites.iter().enumerate() {
-        let ident = format_ident!("__MUTANT_SITE_{i}");
-        let registration: syn::Stmt = syn::parse_quote! {
+    sites
+}
+
+/// The module-scope census registrations for one expansion's sites — names carry a
+/// content hash so two impl blocks of the same type in one module cannot collide.
+fn registrations(sites: &[String]) -> TokenStream2 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    sites.hash(&mut hasher);
+    let tag = hasher.finish();
+    let statics = sites.iter().enumerate().map(|(i, site)| {
+        let ident = format_ident!("__MUTANT_SITE_{tag:016x}_{i}");
+        quote! {
+            #[cfg(feature = "schemata")]
             #[::linkme::distributed_slice(crate::discover::schemata::MUTANT_SITES)]
             static #ident: &'static str = #site;
-        };
-        block.stmts.insert(i, registration);
-    }
+        }
+    });
+    quote! { #(#statics)* }
 }
 
 /// The constructible deafness values of a return type, by SYNTAX — the same move the
@@ -960,12 +1018,14 @@ impl syn::visit_mut::VisitMut for FlipMutator {
                 self.count += 1;
                 self.sites.push(site.clone());
                 let inner = (*unary.expr).clone();
+                // bind the NEGATED value once (normalising `&bool` operands through
+                // `Not`); deletion is then a second negation — both arms one type.
                 *expr = syn::parse_quote!({
-                    let __mutant_v = #inner;
+                    let __mutant_v = !(#inner);
                     if crate::discover::schemata::Schemata::active(#site) {
-                        __mutant_v
-                    } else {
                         !__mutant_v
+                    } else {
+                        __mutant_v
                     }
                 });
                 return;

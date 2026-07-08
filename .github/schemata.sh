@@ -21,9 +21,9 @@
 set -euo pipefail
 
 # build the test binary and the census runner once; every per-site run reuses them.
-cargo test -q -p boundary-spec --lib --no-run
+cargo test -q -p boundary-spec --lib --features schemata --no-run
 dir=$(mktemp -d)
-cargo run -q --example schemata -- list >"${dir}/sites.txt"
+cargo run -q --features schemata --example schemata -- list >"${dir}/sites.txt"
 
 have_nextest=0
 command -v cargo-nextest >/dev/null 2>&1 && have_nextest=1
@@ -33,12 +33,12 @@ command -v cargo-nextest >/dev/null 2>&1 && have_nextest=1
 mkdir -p "${dir}/record"
 start=$(date +%s)
 if [ "${have_nextest}" = "1" ]; then
-  SCHEMATA_RECORD="${dir}/record" cargo nextest run -p boundary-spec --lib >/dev/null 2>&1 || {
+  SCHEMATA_RECORD="${dir}/record" cargo nextest run -p boundary-spec --lib --features schemata >/dev/null 2>&1 || {
     echo "schemata: the UNMUTATED suite is red — fix the suite before judging mutants"
     exit 1
   }
 else
-  cargo test -q -p boundary-spec --lib >/dev/null 2>&1 || {
+  cargo test -q -p boundary-spec --lib --features schemata >/dev/null 2>&1 || {
     echo "schemata: the UNMUTATED suite is red — fix the suite before judging mutants"
     exit 1
   }
@@ -87,7 +87,7 @@ while IFS=$'\t' read -r site tests; do
     done
     covered_runs=$((covered_runs + 1))
     if timeout "${limit}" env PROBE_MUTANT="${site}" \
-      cargo nextest run -p boundary-spec --lib --fail-fast -E "${expr}" >/dev/null 2>&1; then
+      cargo nextest run -p boundary-spec --lib --features schemata --fail-fast -E "${expr}" >/dev/null 2>&1; then
       echo "SURVIVED ${site}"
       echo "${site}" >>"${dir}/survivors.txt"
     else
@@ -95,7 +95,7 @@ while IFS=$'\t' read -r site tests; do
     fi
   else
     if timeout "${limit}" env PROBE_MUTANT="${site}" \
-      cargo test -q -p boundary-spec --lib >/dev/null 2>&1; then
+      cargo test -q -p boundary-spec --lib --features schemata >/dev/null 2>&1; then
       echo "SURVIVED ${site}"
       echo "${site}" >>"${dir}/survivors.txt"
     else
@@ -104,4 +104,4 @@ while IFS=$'\t' read -r site tests; do
   fi
 done <"${dir}/plan.txt"
 
-cargo run -q --example schemata -- judge "${dir}/survivors.txt"
+cargo run -q --features schemata --example schemata -- judge "${dir}/survivors.txt"

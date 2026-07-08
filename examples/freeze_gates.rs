@@ -21,14 +21,19 @@ use boundary_spec::discover::substrate::Substrate;
 
 fn main() {
     let perimeter = Perimeter::declared();
-    let locks = [
+    let mut locks = vec![
         GateRegistry::registry_lock(),
         GateRegistry::workflow_lock(),
         perimeter.lock(),
         perimeter.ruleset_lock(),
         Substrate::declared().lock(),
-        Schemata::lock().expect("the schemata census renders"),
     ];
+    // the schemata census exists only in the schemata build; a featureless run skips
+    // it LOUDLY rather than freezing emptiness over the committed inventory.
+    match Schemata::lock() {
+        Ok(lock) => locks.push(lock),
+        Err(why) => println!("skipping spec/schemata.spec: {why}"),
+    }
     spec_lock::bless(&locks).expect("write the pipeline, perimeter, and substrate locks");
     for lock in &locks {
         println!("froze {}", lock.path.display());

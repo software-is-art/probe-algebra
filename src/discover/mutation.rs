@@ -435,6 +435,7 @@ where
     out
 }
 
+#[crate::mutate]
 impl MutationReport {
     /// Plant the batteries against `T`'s operator table. The TABLE battery (confusion,
     /// projection, partiality) is judged by re-discovery — the law SET must move. The

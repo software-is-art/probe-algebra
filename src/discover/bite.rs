@@ -52,6 +52,7 @@ pub struct Corpus {
 /// The marker line prefix that ends the definitions region.
 pub const MARKER: &str = "-- ===== THEOREMS";
 
+#[crate::mutate]
 impl Corpus {
     /// This repo's committed corpus file.
     pub fn committed_path() -> PathBuf {
@@ -106,6 +107,7 @@ pub struct Bite {
     pub mutated: String,
 }
 
+#[crate::mutate]
 impl Corpus {
     /// Generate every bite: for each match arm in the DEFINITIONS region, flip each
     /// `true`/`false` word in the arm's result (right of `=>`). Patterns are never
@@ -162,6 +164,7 @@ pub struct BiteVerdicts {
     pub survived: Vec<String>,
 }
 
+#[crate::mutate]
 impl Corpus {
     /// Judge every bite with an injected checker: `check(text)` returns `Ok(true)`
     /// when the whole corpus text re-checks, `Ok(false)` when some theorem fails. The
@@ -196,6 +199,7 @@ impl Corpus {
     }
 }
 
+#[crate::mutate]
 impl BiteVerdicts {
     /// The gate: survivors held against the ratified register. `Ok` carries the
     /// summary line for the gate log; `Err` is the register's set-difference render
@@ -216,6 +220,7 @@ impl BiteVerdicts {
 
 // ===== table parsing (shared by the mirror probe and the export cross-check) =======
 
+#[crate::mutate]
 impl Corpus {
     /// Every definition's result table, parsed from its match arms in the DEFINITIONS
     /// region: pattern words → result.

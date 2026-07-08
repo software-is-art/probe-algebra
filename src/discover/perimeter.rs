@@ -69,6 +69,7 @@ pub struct LivePerimeter {
     pub private_vulnerability_reporting: Option<bool>,
 }
 
+#[crate::mutate]
 impl LivePerimeter {
     /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
     /// the floor exactly — no extra protections, or a widening dent stops being
@@ -146,6 +147,7 @@ impl LivePerimeter {
     }
 }
 
+#[crate::mutate]
 impl Perimeter {
     /// The declared floor — required checks derived from the gate registry.
     pub fn declared() -> Perimeter {
@@ -274,7 +276,6 @@ impl Perimeter {
     /// green run still shows what is being defended); `Err` carries every violation,
     /// each naming the rule and what to do — including the never-applied state, which
     /// is how the one manual act stays a red gate instead of a forgotten checklist.
-    #[crate::mutate("perimeter::judge")]
     pub fn judge(&self, live: &LivePerimeter) -> Result<Vec<String>, Vec<String>> {
         fn fact(
             held: &mut Vec<String>,

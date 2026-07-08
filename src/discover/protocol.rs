@@ -39,6 +39,7 @@ pub struct Doc {
     pub rev: u8,
 }
 
+#[crate::mutate]
 impl Doc {
     /// Mint a document.
     pub fn of(body: &str, rev: u8) -> Doc {

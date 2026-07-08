@@ -39,6 +39,7 @@ pub struct Scaffold {
     pub seams: Vec<SeamObligation>,
 }
 
+#[crate::mutate]
 impl Scaffold {
     /// Generate the split for a theory's discovered cohesion components. Returns `None` when the
     /// module is cohesive (a single algebra — nothing to split). The generation is an associated

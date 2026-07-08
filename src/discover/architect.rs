@@ -142,6 +142,7 @@ fn theory_line(file: &str) -> usize {
 /// typestate).
 pub struct Architect;
 
+#[crate::mutate]
 impl Architect {
     /// Analyse the registry and produce a finding (diagnostic + scaffold code action) for every module
     /// whose discovered algebra DECOMPOSES — the cohesive ones produce nothing, exactly as an editor
@@ -295,6 +296,7 @@ fn unesc(s: &str) -> String {
     out
 }
 
+#[crate::mutate]
 impl Architect {
     /// Serialise the findings to the LSP JSON an editor consumes: a `diagnostics` array and a
     /// `codeActions` array (each action a `refactor.extract` whose `documentChanges` create the files).
@@ -360,6 +362,7 @@ fn confined(rel: &Path) -> bool {
             .any(|c| c == std::path::Component::ParentDir)
 }
 
+#[crate::mutate]
 impl Architect {
     /// Apply a code action: write every created file under `root`. Returns the paths written. This is
     /// the "auto-apply" — the scaffolded skeletons land on disk; the developer (or an agent) then moves
@@ -405,6 +408,7 @@ use std::collections::BTreeSet;
 #[derive(Clone)]
 pub struct Report(BTreeSet<String>);
 
+#[crate::mutate]
 impl Report {
     /// The architect's output AS a value object — the set of flagged modules from one analysis
     /// run. An associated function of the value object it yields (the no-rats-nest rule: every

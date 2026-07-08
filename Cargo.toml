@@ -33,6 +33,13 @@ members = [
 name = "demo"
 path = "src/main.rs"
 
+[features]
+# schemata: the compiled-mutant build. #[mutate] emits its instrumented copies only
+# here; every other build carries the original items byte for byte (zero overhead —
+# what lets the hot paths be instrumented at all). The sweep (.github/schemata.sh)
+# builds with this feature; the census lock freezes from it.
+schemata = []
+
 [dependencies]
 boundary-spec-macros = { path = "boundary-spec-macros", version = "0.2.0" }
 # The freeze/drift-gate mechanics (`discover::freeze` is a thin adapter over it) — extracted so

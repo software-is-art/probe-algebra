@@ -237,6 +237,7 @@ pub struct GuardVoices {
     pub rats_nest: bool,
 }
 
+#[crate::mutate]
 impl GuardVoices {
     /// Derive the voices from the tree itself — a declaration would drift; the
     /// evidence cannot. Kernel-exemption is a register lookup (`spec/kernel.register`,

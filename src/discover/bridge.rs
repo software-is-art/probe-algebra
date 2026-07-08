@@ -69,6 +69,7 @@ pub struct Export {
     pub proved: Vec<Expectation>,
 }
 
+#[crate::mutate]
 impl Export {
     /// Parse an exported-table text. Line format (`#` comments and blank lines skipped):
     ///
@@ -285,6 +286,7 @@ fn eval<const SLOT: usize, const OP: usize>(v: &[El]) -> Option<El> {
 /// discovery apparatus: `Spec::of`, `MutationReport::of`, `Distance::of` all run on it.
 pub struct Bridged<const SLOT: usize>;
 
+#[crate::mutate]
 impl<const SLOT: usize> Theory for Bridged<SLOT> {
     type Sort = One;
     type Value = El;
@@ -338,6 +340,7 @@ impl<const SLOT: usize> Theory for Bridged<SLOT> {
     }
 }
 
+#[crate::mutate]
 impl<const SLOT: usize> Expected for Bridged<SLOT> {
     fn expectations() -> Vec<Expectation> {
         export::<SLOT>().proved.clone()
@@ -358,6 +361,7 @@ pub struct Triage {
     pub conjectures: Vec<String>,
 }
 
+#[crate::mutate]
 impl Triage {
     /// Triage a bridged theory: run the same declared-vs-discovered distance every
     /// theory gets, then read it in the prover's terms.

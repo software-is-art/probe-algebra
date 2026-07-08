@@ -155,6 +155,7 @@ pub struct DiscoveredLaw {
     pub premise: Option<(Term, Term)>,
 }
 
+#[crate::mutate]
 impl DiscoveredLaw {
     /// The distinct operator symbols participating in this law, in first-appearance order
     /// (lhs pre-order, then rhs). `symbols` is the theory's symbol table in operator-index
@@ -264,6 +265,7 @@ fn is_binary_on<T: Theory>(op: &Operator<T>, s: T::Sort) -> bool {
     op.inputs.len() == 2 && op.inputs[0] == s && op.inputs[1] == s && op.output == s
 }
 
+#[crate::mutate]
 impl<T: Theory> Engine<T> {
     /// Build the engine for a theory: collect the sorts that appear in the signature, mint `num_vars`
     /// variables per sort, and lay out a deterministic spread of grid assignments.
@@ -624,6 +626,7 @@ pub enum SchemaTerm {
     App(u8, &'static [SchemaTerm]),
 }
 
+#[crate::mutate]
 impl SchemaTerm {
     /// Render over concrete operators: `ops[slot]` is that slot's `(symbol, fixity)`;
     /// `vars[sort_var][ord]` names the variables. Mirrors `Engine::render` case for case.
@@ -682,6 +685,7 @@ pub enum Slot {
     Relation(u8, u8),
 }
 
+#[crate::mutate]
 impl ShapeGate {
     /// Do these operator signatures satisfy the gate? `sigs[i]` is slot `i`'s
     /// `(input sorts, output sort)` and `names[i]` its display name; sorts are any comparable
@@ -788,6 +792,7 @@ impl ShapeGate {
     }
 }
 
+#[crate::mutate]
 impl ShapeInfo {
     /// Does a discovered law's prose instantiate this shape's template? The template's literal
     /// fragments (around the `{...}` holes) must appear in the prose IN ORDER — the first as a
@@ -883,6 +888,7 @@ impl ShapeInfo {
 /// hangs off a typestate.
 pub struct ShapeCatalog;
 
+#[crate::mutate]
 impl ShapeCatalog {
     /// The full inventory — the order IS the order discovery tries (and therefore renders)
     /// the shapes within each polarity band, and `spec/shapes.spec` locks it. This is the
@@ -1778,6 +1784,7 @@ impl ShapeCatalog {
     }
 }
 
+#[crate::mutate]
 impl<T: Theory> Engine<T> {
     /// The id of the variable for `(sort, ord)`, if it exists.
     fn var(&self, sort: T::Sort, ord: usize) -> Option<Term> {
@@ -2250,6 +2257,7 @@ impl<T: Theory> Engine<T> {
     }
 }
 
+#[crate::mutate]
 impl<T: Theory> Default for Engine<T> {
     fn default() -> Self {
         Self::new()

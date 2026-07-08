@@ -111,6 +111,7 @@ pub struct Gate {
     pub sharded: bool,
 }
 
+#[crate::mutate]
 impl Gate {
     /// The command as one shell-displayable line (argv joined — no shell interpretation
     /// anywhere in the pipeline's own machinery).
@@ -207,6 +208,7 @@ pub struct Pipeline {
     pub gates: Vec<Gate>,
 }
 
+#[crate::mutate]
 impl Pipeline {
     /// The STARTER pipeline — the three every-change gates every crate in this
     /// discipline runs (format, lint, test — workspace-scoped, the paid-for lesson),
@@ -491,6 +493,7 @@ impl Pipeline {
 /// from. Associated fns per the no-rats-nest rule.
 pub struct GateRegistry;
 
+#[crate::mutate]
 impl GateRegistry {
     /// Every declared gate, in execution order.
     pub fn declared() -> Vec<Gate> {

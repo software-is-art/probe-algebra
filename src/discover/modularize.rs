@@ -41,6 +41,7 @@ pub struct ProposedModule {
     pub atomic: bool,
 }
 
+#[crate::mutate]
 impl ProposedModule {
     /// A genuine algebraic SHAPE — the functions cohere into at least one law. A cluster with no law
     /// is not a module, it is a misfit.
@@ -56,6 +57,7 @@ pub struct Proposal {
     pub modules: Vec<ProposedModule>,
 }
 
+#[crate::mutate]
 impl Proposal {
     /// Propose a modular decomposition of a theory's (flat) algebra. The analysis is an
     /// associated function of its PROPOSAL — the public surface is the value object, not a

@@ -66,10 +66,10 @@ pub struct TagLaw {
     pub required: bool,
 }
 
+#[crate::mutate]
 impl TagLaw {
     /// Does a live tag name match this law? Exact match, or prefix for a family —
     /// `v2*` matches `v2026.07.07` and never `v0.1.0`.
-    #[crate::mutate("tag_law::matches")]
     pub fn matches(&self, tag: &str) -> bool {
         match self.pattern.strip_suffix('*') {
             Some(prefix) => tag.starts_with(prefix),
@@ -109,6 +109,7 @@ pub struct LiveSubstrate {
     pub published_versions: Option<Vec<String>>,
 }
 
+#[crate::mutate]
 impl LiveSubstrate {
     /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
     /// the declaration exactly). One dent per refusal-worthy single-fact
@@ -238,6 +239,7 @@ impl LiveSubstrate {
     }
 }
 
+#[crate::mutate]
 impl Substrate {
     /// The declared substrate: the two tag meanings the machinery leans on (each
     /// NAMED once, here or in the gate registry — `mutants-green` is
@@ -272,7 +274,6 @@ impl Substrate {
     /// Hold the LIVE repository to the declared substrate. `Ok` carries the held
     /// facts; `Err` refuses each departure by name — the missing tag, the stray tag,
     /// the merge commit, the unreadable read.
-    #[crate::mutate("substrate::judge")]
     pub fn judge(&self, live: &LiveSubstrate) -> Result<Vec<String>, Vec<String>> {
         let mut held = Vec::new();
         let mut violations = Vec::new();
@@ -632,6 +633,49 @@ mod probes {
         assert!(violations
             .iter()
             .any(|v| v.contains("merge-commit count") && v.contains("could not be READ")));
+    }
+
+    /// Each dent perturbs EXACTLY its fact: a deletion dent removes one tag and
+    /// keeps every other (a flipped `retain` would keep only the target and delete
+    /// the rest — the schemata survivor this probe exists to kill), and marker-loss
+    /// dents remove exactly the marker.
+    #[test]
+    fn each_dent_perturbs_exactly_its_fact() {
+        let base = applied();
+        let base_tags = base.tags.clone().unwrap();
+        for dent in base.dents() {
+            let Some(tags) = &dent.live.tags else {
+                continue; // the read-lost dents
+            };
+            if let Some(deleted) = dent
+                .what
+                .strip_prefix("tag `")
+                .and_then(|w| w.strip_suffix("` deleted"))
+            {
+                assert_eq!(tags.len(), base_tags.len() - 1, "{}", dent.what);
+                assert!(!tags.iter().any(|t| t == deleted), "{}", dent.what);
+                for kept in base_tags.iter().filter(|t| *t != deleted) {
+                    assert!(
+                        tags.contains(kept),
+                        "{}: `{kept}` wrongly removed",
+                        dent.what
+                    );
+                }
+                let ancestry = dent.live.ancestry.as_ref().unwrap();
+                assert_eq!(ancestry.len(), base_tags.len() - 1, "{}", dent.what);
+            }
+            if dent.what.contains("lost its marker") {
+                assert_eq!(tags.len(), base_tags.len() - 1, "{}", dent.what);
+                assert!(tags.contains(&"mutants-green".to_string()), "{}", dent.what);
+                let ancestry = dent.live.ancestry.as_ref().unwrap();
+                assert_eq!(ancestry.len(), base_tags.len() - 1, "{}", dent.what);
+                assert!(
+                    ancestry.iter().any(|(t, _)| t == "mutants-green"),
+                    "{}: the marker dent must keep every other ancestry line",
+                    dent.what
+                );
+            }
+        }
     }
 
     /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied

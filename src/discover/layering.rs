@@ -26,6 +26,7 @@ pub struct ComponentLayering {
     pub hinges: Vec<&'static str>,
 }
 
+#[crate::mutate]
 impl ComponentLayering {
     /// Atomic — one tight layer, no load-bearing operator to layer at.
     pub fn is_atomic(&self) -> bool {
@@ -51,6 +52,7 @@ pub struct LayeringReport {
     pub components: Vec<ComponentLayering>,
 }
 
+#[crate::mutate]
 impl LayeringReport {
     /// Does any component sprawl — hold together only through a hinge, asking to be layered?
     pub fn wants_layering(&self) -> bool {

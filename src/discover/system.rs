@@ -98,6 +98,7 @@ pub enum SeamStatus {
     },
 }
 
+#[crate::mutate]
 impl SeamStatus {
     /// Is the obligation discharged? `Incoherent`, `IllPosed`, and `Unearned` are open.
     pub fn is_met(&self) -> bool {
@@ -122,6 +123,7 @@ pub struct SeamReport {
     pub status: SeamStatus,
 }
 
+#[crate::mutate]
 impl SeamReport {
     /// A TRANSPORT seam between two same-signature theories, discharged by the coherence
     /// check: re-run each side's discovered laws under the other's operators, both ways.
@@ -229,6 +231,7 @@ pub struct SystemReport {
     pub seams: Vec<SeamReport>,
 }
 
+#[crate::mutate]
 impl SystemReport {
     /// Compute a system's report: read the registry off `modules()` and put every declared
     /// seam to its checker. The analysis is an associated function of its REPORT — the public
@@ -370,6 +373,7 @@ pub struct SystemDistance {
     pub cohesions: Vec<CohesionReport>,
 }
 
+#[crate::mutate]
 impl SystemDistance {
     /// Compute a system's distance report: every registry module through the cohesion
     /// analysis. Associated fn per the no-rats-nest rule.

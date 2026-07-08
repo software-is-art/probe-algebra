@@ -88,6 +88,7 @@ pub struct Expectation {
     pub ops: Vec<String>,
 }
 
+#[crate::mutate]
 impl Expectation {
     /// Build an expectation from a declaration key (`"commutative"`, `"bias_later"`, ...) or an
     /// exact catalog name (`"bias (right-regular)"`). An unknown name FAILS LOUDLY, listing the
@@ -174,6 +175,7 @@ pub struct Distance {
     pub surprises: Vec<Expectation>,
 }
 
+#[crate::mutate]
 impl Distance {
     /// Compare a theory's declaration against what discovery actually finds: run the engine,
     /// and match declared `(shape, ops)` pairs against each discovered law's shape tag and

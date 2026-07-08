@@ -66,6 +66,7 @@ pub enum Meaning {
     Drafts,
 }
 
+#[crate::mutate]
 impl Meaning {
     /// One word plus the TTL where one exists — the render and register vocabulary.
     pub fn describe(&self) -> String {
@@ -189,6 +190,7 @@ pub struct LiveInfra {
     pub build_commands: Vec<(String, String)>,
 }
 
+#[crate::mutate]
 impl LiveInfra {
     fn lookup<'a, T>(map: &'a [(String, T)], key: &str) -> Option<&'a T> {
         map.iter().find(|(k, _)| k == key).map(|(_, v)| v)
@@ -226,7 +228,7 @@ impl LiveInfra {
             for origin in origins {
                 dent(
                     format!("origin `{origin}` dropped from `{store}`"),
-                    format!("does not allow origin `{origin}`"),
+                    format!("store `{store}` does not allow origin `{origin}`"),
                     {
                         let mut l = self.clone();
                         for (s, list) in &mut l.cors {
@@ -252,7 +254,7 @@ impl LiveInfra {
             for name in names {
                 dent(
                     format!("secret `{name}` dropped from `{surface}`"),
-                    format!("does not hold secret `{name}`"),
+                    format!("surface `{surface}` does not hold secret `{name}`"),
                     {
                         let mut l = self.clone();
                         for (s, list) in &mut l.secret_names {
@@ -293,6 +295,7 @@ impl LiveInfra {
     }
 }
 
+#[crate::mutate]
 impl Infra {
     fn surface(&self, name: &str) -> Option<&Surface> {
         self.surfaces.iter().find(|s| s.name == name)
@@ -323,7 +326,6 @@ impl Infra {
     /// declarable half; the TTL half is unrepresentable by construction — see
     /// [`Meaning`]). `Ok` carries the held facts; `Err` refuses each incoherence by
     /// name.
-    #[crate::mutate("infra::coherent")]
     pub fn coherent(&self) -> Result<Vec<String>, Vec<String>> {
         let mut held = Vec::new();
         let mut refusals = Vec::new();
@@ -407,7 +409,6 @@ impl Infra {
     /// Hold the LIVE state to the declared laws. Refusals name the store, the origin,
     /// the surface, the secret — the incident report written BEFORE the incident.
     /// An incoherent declaration refuses before any live fact is consulted.
-    #[crate::mutate("infra::judge")]
     pub fn judge(&self, live: &LiveInfra) -> Result<Vec<String>, Vec<String>> {
         let mut held = self.coherent()?;
         let mut violations = Vec::new();
