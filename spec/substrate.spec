@@ -7,5 +7,5 @@
 
 tag mutants-green (required) — means: the last default-branch tree whose full mutation sweep was clean — the incremental gate's diff baseline; advanced only by runs that earned it (per-merge incremental green, or the weekly countersign)
 tag v2* — means: a certified release of the tree — CalVer, minted by release.sh on every countersign; the version claims a date, never a compatibility promise
-tag v0.1.0 (required) — means: the first crates.io publish (2026-07-07) — OWED: the publishing session's push scope was branch-only, so the tag never left it; this refusal is the reminder that never expires
+rule: every published `boundary-spec` version carries tag v<version> on the certified line — instances derived from the crates.io index at judgment time, so no version is ever named here and the declaration cannot go stale against the registry
 history: linear after 7ed05011728846db88030f2d0183fe35b0818cee (the last pre-discipline merge commit — squash-only, judged backward)

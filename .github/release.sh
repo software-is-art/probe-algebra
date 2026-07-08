@@ -81,6 +81,18 @@ if [ -n "${CARGO_REGISTRY_TOKEN:-}" ]; then
     else
       echo "crates.io: publishing ${crate} ${version}"
       cargo publish -p "${crate}"
+      # the publish-marker law (spec/substrate.spec): every published root-crate
+      # version marks the certified tree it shipped from. Minted HERE, at publish
+      # time, so the derived law self-satisfies — the substrate gate only ever
+      # reddens on a marker some out-of-band publish never minted.
+      if [ "${crate}" = "boundary-spec" ]; then
+        marker="v${version}"
+        if ! git rev-parse -q --verify "refs/tags/${marker}" >/dev/null; then
+          git tag "${marker}"
+          git push origin "${marker}"
+          echo "publish marker: ${marker} -> ${sha}"
+        fi
+      fi
     fi
   done
 else

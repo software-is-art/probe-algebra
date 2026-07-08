@@ -57,4 +57,4 @@
 
 - substrate (git drift) (weekly + manual, sharded; EFFECTFUL)
       .github/substrate.sh
-      promises: the LIVE repository's tags and history still satisfy the declared git substrate (spec/substrate.spec): the tags the machinery leans on exist and sit on the certified line, and the default branch stays linear after the declared epoch — the perimeter's squash-only rule, judged backward over the history that exists. READ-ONLY git plumbing against the checkout's own origin: the first world gate with no third-party API and no extra credential
+      promises: the LIVE repository's tags and history still satisfy the declared git substrate (spec/substrate.spec): the tags the machinery leans on exist and sit on the certified line, every published root-crate version carries its v<version> marker (instances DERIVED from the crates.io index, never named in the declaration), and the default branch stays linear after the declared epoch — the perimeter's squash-only rule, judged backward. READ-ONLY and credential-free: git plumbing against the checkout's own origin plus one anonymous sparse-index read
