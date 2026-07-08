@@ -52,7 +52,7 @@ pub struct Perimeter {
 
 /// What the world reports, extracted from the GitHub API by `examples/perimeter.rs`
 /// (the extraction is field reads; the JUDGMENT lives here, where the probes reach).
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LivePerimeter {
     /// A `deletion` rule is active on the default branch.
     pub deletion_blocked: bool,
@@ -69,7 +69,6 @@ pub struct LivePerimeter {
     pub private_vulnerability_reporting: Option<bool>,
 }
 
-#[crate::mutate]
 impl LivePerimeter {
     /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
     /// the floor exactly — no extra protections, or a widening dent stops being
@@ -147,7 +146,6 @@ impl LivePerimeter {
     }
 }
 
-#[crate::mutate]
 impl Perimeter {
     /// The declared floor — required checks derived from the gate registry.
     pub fn declared() -> Perimeter {
@@ -390,6 +388,89 @@ mod probes {
                 .collect(),
             private_vulnerability_reporting: Some(true),
         }
+    }
+
+    /// The floor as ONE independent reference — the judge's accept condition written
+    /// as a single conjunction instead of the imperative fact-by-fact machinery. Kept
+    /// eyeball-simple on purpose: it is the oracle the judge is differential-tested
+    /// against, so it must be obviously correct where the judge is thorough.
+    fn meets_floor(l: &LivePerimeter, d: &Perimeter) -> bool {
+        l.deletion_blocked
+            && l.force_push_blocked
+            && l.required_approvals == Some(d.required_approvals)
+            && l.merge_methods
+                .iter()
+                .all(|m| d.merge_methods.contains(&m.as_str()))
+            && d.required_checks
+                .iter()
+                .all(|c| l.required_checks.contains(c))
+            && l.private_vulnerability_reporting == Some(true)
+    }
+
+    /// The judge, characterized by GENERATION rather than mutation. Instead of flipping
+    /// an operator in the judge's own source (schemata) and asking whether a probe
+    /// notices, enumerate a bounded GRID of live perimeters — every field ranged over a
+    /// small candidate set, the "N instantiations" made deterministic — and assert the
+    /// judge's accept/reject agrees with the independent floor reference on every one.
+    /// The thing on the other side of the module is DATA, not code: a judge whose
+    /// operators drift (a flipped `==`, a dropped fact) diverges from the reference on
+    /// some grid state, so this covers the judge's sensitivity with no `#[mutate]`, no
+    /// implementation to mutate — just the contract and a sampler.
+    #[test]
+    fn the_judge_agrees_with_the_floor_across_a_bounded_grid() {
+        let declared = Perimeter::declared();
+        let checks = &declared.required_checks;
+        let missing_one: Vec<String> = checks.iter().skip(1).cloned().collect();
+        let bools = [true, false];
+        let approvals = [None, Some(0u64), Some(1u64)];
+        let methods: [Vec<String>; 4] = [
+            vec![],
+            vec!["squash".to_string()],
+            vec!["squash".to_string(), "merge".to_string()],
+            vec!["rebase".to_string()],
+        ];
+        let checksets = [checks.clone(), Vec::new(), missing_one];
+        let vulns = [Some(true), Some(false), None];
+
+        let mut count = 0usize;
+        let mut caught = 0usize;
+        for &deletion_blocked in &bools {
+            for &force_push_blocked in &bools {
+                for required_approvals in approvals {
+                    for merge_methods in &methods {
+                        for required_checks in &checksets {
+                            for private_vulnerability_reporting in vulns {
+                                let live = LivePerimeter {
+                                    deletion_blocked,
+                                    force_push_blocked,
+                                    required_approvals,
+                                    merge_methods: merge_methods.clone(),
+                                    required_checks: required_checks.clone(),
+                                    private_vulnerability_reporting,
+                                };
+                                let verdict = declared.judge(&live).is_ok();
+                                let reference = meets_floor(&live, &declared);
+                                assert_eq!(
+                                    verdict, reference,
+                                    "judge disagrees with the floor reference on {live:?}"
+                                );
+                                count += 1;
+                                if !reference {
+                                    caught += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // the grid is substantial AND spans both verdicts — an all-accept or all-reject
+        // grid would agree with a broken judge vacuously.
+        assert!(count >= 400, "the grid should be substantial: {count}");
+        assert!(
+            caught > 0 && caught < count,
+            "the grid must straddle the floor"
+        );
     }
 
     /// The declaration DERIVES from the gate registry: the required checks are the

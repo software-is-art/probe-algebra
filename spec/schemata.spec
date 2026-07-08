@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 697 sites.
+# 689 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -596,14 +596,6 @@
 - boundary_spec::discover::mutation::same_conduct:deaf -> true
 - boundary_spec::discover::mutation::surgical_eval:0: == -> !=
 - boundary_spec::discover::mutation::surgical_eval:deaf -> None
-- boundary_spec::discover::perimeter::LivePerimeter::dents:0: != -> ==
-- boundary_spec::discover::perimeter::LivePerimeter::dents:deaf -> vec![]
-- boundary_spec::discover::perimeter::Perimeter::judge:0: == -> !=
-- boundary_spec::discover::perimeter::Perimeter::judge:1: == -> !=
-- boundary_spec::discover::perimeter::Perimeter::judge:deaf -> Err(vec![])
-- boundary_spec::discover::perimeter::Perimeter::judge:deaf -> Ok(vec![])
-- boundary_spec::discover::perimeter::Perimeter::render:deaf -> String::new()
-- boundary_spec::discover::perimeter::Perimeter::ruleset_json:deaf -> String::new()
 - boundary_spec::discover::protocol::approve:0: >= -> <
 - boundary_spec::discover::protocol::approve:deaf -> None
 - boundary_spec::discover::protocol::draft_seeds:deaf -> vec![]
