@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 689 sites.
+# 685 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -495,13 +495,11 @@
 - boundary_spec::discover::infra::Infra::coherent:deaf -> Ok(vec![])
 - boundary_spec::discover::infra::Infra::ephemeral_prefixes:deaf -> vec![]
 - boundary_spec::discover::infra::Infra::floor:deaf -> Err(String::new())
-- boundary_spec::discover::infra::Infra::judge:0: == -> !=
-- boundary_spec::discover::infra::Infra::judge:1: == -> !=
-- boundary_spec::discover::infra::Infra::judge:2: == -> !=
-- boundary_spec::discover::infra::Infra::judge:3: == -> !=
 - boundary_spec::discover::infra::Infra::judge:deaf -> Err(vec![])
 - boundary_spec::discover::infra::Infra::judge:deaf -> Ok(vec![])
 - boundary_spec::discover::infra::Infra::render:deaf -> String::new()
+- boundary_spec::discover::infra::Infra::render_line:deaf -> String::new()
+- boundary_spec::discover::infra::Infra::requirements:0: == -> !=
 - boundary_spec::discover::infra::Infra::slug:0: == -> !=
 - boundary_spec::discover::infra::Infra::slug:deaf -> String::new()
 - boundary_spec::discover::infra::Infra::store:0: == -> !=
@@ -518,8 +516,6 @@
 - boundary_spec::discover::infra::LiveInfra::dents:6: != -> ==
 - boundary_spec::discover::infra::LiveInfra::dents:7: == -> !=
 - boundary_spec::discover::infra::LiveInfra::dents:deaf -> vec![]
-- boundary_spec::discover::infra::LiveInfra::lookup:0: == -> !=
-- boundary_spec::discover::infra::LiveInfra::lookup:deaf -> None
 - boundary_spec::discover::infra::Meaning::describe:deaf -> String::new()
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Err(vec![])
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Ok(vec![])
