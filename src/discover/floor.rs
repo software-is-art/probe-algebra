@@ -29,6 +29,8 @@ pub enum Observed {
     Names(Option<Vec<String>>),
     /// A boolean setting that must be affirmatively on; `None` = unread.
     Toggle(Option<bool>),
+    /// A free-text reading (a build command, say); `None` = unread.
+    Text(Option<String>),
 }
 
 /// The check a requirement imposes on its fact.
@@ -45,6 +47,8 @@ pub enum Check {
     Covers(Vec<String>),
     /// A toggle must read `Some(true)`.
     Enabled,
+    /// A text reading must equal this exactly — unread, or any other value, refuses.
+    Is(String),
 }
 
 /// One declared requirement: the fact it names and the check it imposes.
@@ -107,6 +111,7 @@ fn holds(check: &Check, obs: Option<&Observed>) -> bool {
             required.iter().all(|r| names.contains(r))
         }
         (Check::Enabled, Some(Observed::Toggle(Some(b)))) => *b,
+        (Check::Is(want), Some(Observed::Text(Some(got)))) => got == want,
         _ => false,
     }
 }

@@ -180,7 +180,7 @@ pub struct Infra {
 /// APIs (CORS rules, secret-name listings, project build settings). An ABSENT entry
 /// means the endpoint could not be read; the judge refuses that by name, never
 /// assumes it held.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LiveInfra {
     /// Store name → the origins its CORS allow-list currently permits.
     pub cors: Vec<(String, Vec<String>)>,
@@ -787,6 +787,129 @@ mod probes {
                 ),
             ],
         }
+    }
+
+    /// The ONE interpreter reproduces the infra judge across a grid of live infra states.
+    /// Infra's floor is DERIVED (seams → origins) and richer than perimeter's — per-store
+    /// CORS coverage, per-surface secret coverage, and an EXACT build-command match — so
+    /// this is the interpreter generalizing to `Covers` and `Is` over keyed observations.
+    /// The floor is stated as data (the exemplar's contract); the incumbent judge is the
+    /// transitional oracle; no hand-written oracle. Breadth: the same interpreter, a
+    /// second shape.
+    #[test]
+    fn the_one_interpreter_reproduces_the_infra_judge() {
+        use crate::discover::floor::{Check, Floor, Observed, Requirement};
+        let origins = vec![
+            "https://app.example".to_string(),
+            "https://preview.app.example".to_string(),
+        ];
+        let secrets = vec![
+            "OAUTH_CLIENT_SECRET".to_string(),
+            "STORE_ACCESS_KEY_ID".to_string(),
+            "STORE_SECRET_ACCESS_KEY".to_string(),
+        ];
+        let build = "npm ci && npm run build".to_string();
+
+        let floor = Floor::of(vec![
+            Requirement::new("cors:intake", Check::Covers(origins.clone())),
+            Requirement::new("secrets:app (prod)", Check::Covers(secrets.clone())),
+            Requirement::new("secrets:app (preview)", Check::Covers(secrets.clone())),
+            Requirement::new("build:app (prod)", Check::Is(build.clone())),
+            Requirement::new("build:app (preview)", Check::Is(build.clone())),
+        ]);
+        let exemplar = Infra::exemplar();
+
+        // three readings per fact: satisfy (0), violate (1, drop the last / drift the
+        // text), unread (2, the fact never appears).
+        let names = |ok: &[String], c: u8| -> Option<Vec<String>> {
+            match c {
+                0 => Some(ok.to_vec()),
+                1 => Some(ok[..ok.len() - 1].to_vec()),
+                _ => None,
+            }
+        };
+        let text = |ok: &str, c: u8| -> Option<String> {
+            match c {
+                0 => Some(ok.to_string()),
+                1 => Some(format!("{ok} && echo drift")),
+                _ => None,
+            }
+        };
+
+        let choices = [0u8, 1, 2];
+        let mut count = 0usize;
+        let mut caught = 0usize;
+        for &c_cors in &choices {
+            for &c_sp in &choices {
+                for &c_spv in &choices {
+                    for &c_bp in &choices {
+                        for &c_bpv in &choices {
+                            let mut cors = Vec::new();
+                            if let Some(v) = names(&origins, c_cors) {
+                                cors.push(("intake".to_string(), v));
+                            }
+                            let mut secret_names = Vec::new();
+                            if let Some(v) = names(&secrets, c_sp) {
+                                secret_names.push(("app (prod)".to_string(), v));
+                            }
+                            if let Some(v) = names(&secrets, c_spv) {
+                                secret_names.push(("app (preview)".to_string(), v));
+                            }
+                            let mut build_commands = Vec::new();
+                            if let Some(v) = text(&build, c_bp) {
+                                build_commands.push(("app (prod)".to_string(), v));
+                            }
+                            if let Some(v) = text(&build, c_bpv) {
+                                build_commands.push(("app (preview)".to_string(), v));
+                            }
+                            let live = LiveInfra {
+                                cors,
+                                secret_names,
+                                build_commands,
+                            };
+
+                            let mut world = std::collections::BTreeMap::new();
+                            world.insert(
+                                "cors:intake".to_string(),
+                                Observed::Names(names(&origins, c_cors)),
+                            );
+                            world.insert(
+                                "secrets:app (prod)".to_string(),
+                                Observed::Names(names(&secrets, c_sp)),
+                            );
+                            world.insert(
+                                "secrets:app (preview)".to_string(),
+                                Observed::Names(names(&secrets, c_spv)),
+                            );
+                            world.insert(
+                                "build:app (prod)".to_string(),
+                                Observed::Text(text(&build, c_bp)),
+                            );
+                            world.insert(
+                                "build:app (preview)".to_string(),
+                                Observed::Text(text(&build, c_bpv)),
+                            );
+
+                            let incumbent = exemplar.judge(&live).is_ok();
+                            let interpreted = floor.judge(&world).is_ok();
+                            assert_eq!(
+                                interpreted, incumbent,
+                                "the interpreter disagrees with the judge on {live:?}"
+                            );
+                            count += 1;
+                            if !incumbent {
+                                caught += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(count >= 200, "the grid should be substantial: {count}");
+        assert!(
+            caught > 0 && caught < count,
+            "the grid must straddle the floor"
+        );
     }
 
     /// The exemplar is coherent, and the derivations replace hand-encoded lists: the
