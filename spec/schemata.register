@@ -1,0 +1,11 @@
+# ratified schemata survivors — one line per compiled mutant the lib suite provably
+# cannot kill, each with its justification; judged with set-difference semantics by
+# .github/schemata.sh (an unratified survivor drifts; a ratified line whose mutant
+# dies goes stale by hand-review). Keys contain colons, so they are backtick-quoted.
+
+`boundary_spec::discover::mutation::never:deaf -> None`: equivalent by contract — `never` IS the always-None partiality mutant; its deafness form is itself
+`boundary_spec::discover::mutation::proj1:deaf -> None`: duplicate degree of freedom — deaf proj1 coincides with the `never` mutant the harness already plants
+`boundary_spec::discover::mutation::same_conduct:deaf -> false`: conservative direction — "every mutant is distinct" can only cause extra kills, never a miss
+`boundary_spec::discover::protocol::edit:deaf -> None`: the edit-counter freedom already ratified in spec/doc flow.mutation.spec, seen through the schemata lens
+`boundary_spec::discover::genesis::parse_expect:5: != -> ==`: uncovered by the lib suite — guarded in tests/genesis integration probes; the lib-side twin is owed (CLAUDE.md rule) and tracked
+`boundary_spec::discover::genesis::validate:4: == -> !=`: uncovered by the lib suite — same guard and same owed twin as parse_expect

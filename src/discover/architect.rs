@@ -94,6 +94,7 @@ struct Entry {
 /// signal (its first targeted sweep proved exactly that, with a survivor). Placement
 /// findings belong where the shape is still forming: a WORKBENCH, watched directly
 /// through [`Architect::place`].
+#[crate::mutate]
 fn registry() -> Vec<Entry> {
     fn s<T: Theory>() -> Option<Scaffold> {
         Scaffold::of::<T>()
@@ -124,6 +125,7 @@ fn registry() -> Vec<Entry> {
 /// declaration), or 1 if it can't be found.
 ///
 /// Capability: Effectful — reads the source file from disk (a world-read).
+#[crate::mutate]
 fn theory_line(file: &str) -> usize {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
     std::fs::read_to_string(path)
@@ -240,6 +242,7 @@ impl Architect {
 /// takes the generic `\u00XX` form. Deliberately a PER-CHARACTER map — each char's wire form is
 /// independent of its neighbours — so `esc` is a monoid homomorphism over concatenation, exactly
 /// the law the `EscapeCodec` theory discovers below.
+#[crate::mutate]
 fn esc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -262,6 +265,7 @@ fn esc(s: &str) -> String {
 
 /// The inverse of `esc` — decode the wire-escaping back to the original. With `esc` it forms a
 /// CODEC: `unesc(esc(s)) = s`, the round-trip the `EscapeCodec` theory discovers below.
+#[crate::mutate]
 fn unesc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars();
@@ -355,6 +359,7 @@ pub const APPLY_CAPABILITY: crate::boundary::Capability = crate::boundary::Capab
 
 /// True iff `rel` stays UNDER a root when joined — the confinement bound `apply` declares. An
 /// absolute path or a `..` component would escape it, so neither is confined.
+#[crate::mutate]
 fn confined(rel: &Path) -> bool {
     !rel.is_absolute()
         && !rel
@@ -429,14 +434,17 @@ pub enum RSort {
     Report,
 }
 
+#[crate::mutate]
 fn empty_report(_: &[Report]) -> Option<Report> {
     Some(Report(BTreeSet::new()))
 }
+#[crate::mutate]
 fn merge_reports(v: &[Report]) -> Option<Report> {
     let mut merged = v[0].0.clone();
     merged.extend(v[1].0.iter().cloned());
     Some(Report(merged))
 }
+#[crate::mutate]
 fn sample_reports() -> Vec<Report> {
     let r = |names: &[&str]| Report(names.iter().map(|s| s.to_string()).collect());
     vec![r(&[]), r(&["x"]), r(&["y"]), r(&["x", "y"]), r(&["z"])]
@@ -480,12 +488,15 @@ pub enum ESort {
     Str,
 }
 
+#[crate::mutate]
 fn cat(v: &[String]) -> Option<String> {
     Some(format!("{}{}", v[0], v[1]))
 }
+#[crate::mutate]
 fn esc_op(v: &[String]) -> Option<String> {
     Some(esc(&v[0]))
 }
+#[crate::mutate]
 fn unesc_op(v: &[String]) -> Option<String> {
     Some(unesc(&v[0]))
 }
@@ -496,6 +507,7 @@ fn unesc_op(v: &[String]) -> Option<String> {
 /// and discovery over-fits — `unesc` looks like an involution and a homomorphism (it is neither);
 /// the sequences refute both, leaving only the TRUE laws (esc homomorphism, the codec round-trip,
 /// concat associativity). A non-invertible mutation still fails the round-trip on its escape arm.
+#[crate::mutate]
 fn escape_inhabitants() -> Vec<String> {
     ["", "\"", "\\", "\n", "\t", "\r", "ab", "\\n", "x\\y"]
         .iter()
@@ -560,7 +572,7 @@ mod tests {
         assert_eq!(date.diagnostic.file, "src/discover/date.rs");
         // the exact line of `crate::theory! {` in date.rs — pins the `i + 1` line math.
         assert_eq!(
-            date.diagnostic.line, 57,
+            date.diagnostic.line, 64,
             "should locate the theory! declaration"
         );
     }

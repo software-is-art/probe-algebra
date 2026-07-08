@@ -105,6 +105,7 @@ impl Proposal {
 }
 
 /// Collect the operator indices a term mentions.
+#[crate::mutate]
 fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
     if let Term::App(op, args) = t {
         out.insert(*op);
@@ -117,6 +118,7 @@ fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
 /// Propose a modular decomposition of a theory's (flat) algebra. Partition by law-connectivity, score
 /// each cluster by the laws it holds, mark its tightness, and rank the shapes ahead of the misfits.
 /// (Private — reached as `Proposal::of`.)
+#[crate::mutate]
 fn modularize<T: Theory>() -> Proposal {
     let engine = Engine::<T>::new();
     let sigs = engine.signatures();

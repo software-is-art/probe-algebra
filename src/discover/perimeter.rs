@@ -398,19 +398,16 @@ mod probes {
     #[test]
     fn the_required_checks_come_from_the_registry() {
         let p = Perimeter::declared();
-        assert_eq!(
-            p.required_checks,
-            vec!["fmt + clippy + test", "dogfood (changed lines)"]
-        );
+        assert_eq!(p.required_checks, vec!["fmt + clippy + test"]);
         assert_eq!(p.merge_methods, &["squash"]);
         assert_eq!(p.required_approvals, 0);
         // both renders carry the derived checks verbatim:
         assert!(p
             .render()
-            .contains("fmt + clippy + test, dogfood (changed lines)"));
+            .contains("required status checks: fmt + clippy + test"));
         assert!(p
             .ruleset_json()
-            .contains("\"context\": \"dogfood (changed lines)\""));
+            .contains("\"context\": \"fmt + clippy + test\""));
     }
 
     /// An applied floor holds — and the held facts name everything defended. Extra
@@ -465,23 +462,23 @@ mod probes {
             .iter()
             .any(|v| v.contains("merge method `merge`")));
 
-        // ONE declared check missing while another is present refuses by the missing
-        // check's name — the membership test must match the check itself, not merely
-        // notice that some other context differs (`==` vs `!=` in the `any`).
+        // the declared check missing while ANOTHER context is present refuses by the
+        // missing check's name — the membership test must match the check itself,
+        // not merely notice that some context exists (`==` vs `!=` in the `any`).
         let mut partial = applied_floor();
-        partial.required_checks = vec!["fmt + clippy + test".to_string()];
+        partial.required_checks = vec!["some other job".to_string()];
         let violations = p.judge(&partial).unwrap_err();
         assert!(
             violations
                 .iter()
-                .any(|v| v.contains("`dogfood (changed lines)` is not required")),
+                .any(|v| v.contains("`fmt + clippy + test` is not required")),
             "{violations:#?}"
         );
         assert!(
             !violations
                 .iter()
-                .any(|v| v.contains("`fmt + clippy + test` is not required")),
-            "the present check must not be reported missing: {violations:#?}"
+                .any(|v| v.contains("`some other job` is not required")),
+            "an extra live context is not a missing one: {violations:#?}"
         );
 
         // vulnerability reporting explicitly off is its own violation:
@@ -504,10 +501,10 @@ mod probes {
             applied.dents(),
         )
         .expect("the perimeter judge distinguishes every fact");
-        assert_eq!(held.len(), 9, "{held:#?}");
+        assert_eq!(held.len(), 8, "{held:#?}");
         assert!(held
             .iter()
-            .any(|h| h == "sensitive to required check `dogfood (changed lines)` removed"));
+            .any(|h| h == "sensitive to required check `fmt + clippy + test` removed"));
     }
 
     /// The committed perimeter locks are FRESH — declaration, render, and ruleset move

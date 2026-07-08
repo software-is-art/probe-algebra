@@ -1014,6 +1014,29 @@ ratified survivor count read from the committed mutation locks, byte-stable betw
 ratifications — the agent wakes knowing how many named degrees of freedom are open
 and where the addresses are.
 
+## The first retirement, taken: the per-diff source gate is gone
+
+The census went 70 → 371 → 697: cfg-gated dual emission (`--features schemata`
+builds carry the branches; every other build compiles the ORIGINAL items byte for
+byte) let the engine and the whole discover tree join, impl-level plus free-fn
+blanket annotation, all site ids module-path-qualified at expansion (two theories
+both had an `add`; the collision refused, as designed). Completeness is now a
+CENSUS, not an intention: every top-level fn and impl either carries `#[mutate]`,
+is `cfg(test)`/`const`, or its file holds a reasoned line in
+`spec/instrumentation.register` — judged two-way, so exemptions can only shrink
+honestly. The 697-site sweep (parallel workers over one build, coverage-mapped,
+~8 minutes at 4 cores) found six survivors, each ratified with its reason in
+`spec/schemata.register`: two equivalences in the mutation harness's own mutant
+vocabulary, one conservative-direction freedom, the doc-flow edit freedom seen
+through a second lens, and two genesis sites uncovered by the lib suite — the
+owed lib-side twins, disclosed. On that basis the `mutation (changed lines)`
+per-diff gate is RETIRED from the registry (13 gates; the perimeter's required
+checks derive down to the one job — re-apply the ruleset after merge). Still
+earning rent: the since-green incremental and the weekly shards (type-level
+mutations, statement deletion, the exempted files) and the member-crate
+companions. They retire the same way this one did: when the census closes the
+territory they cover.
+
 ## Retiring the source-level mutator: the enablers (BUILT), the retirement (staged)
 
 The two enablers landed. `#[mutate]` applies to WHOLE impl blocks (labels

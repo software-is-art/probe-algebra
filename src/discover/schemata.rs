@@ -245,7 +245,7 @@ mod probes {
         };
         assert!(law.matches("mutants-green"), "unmutated: exact match holds");
         // the exact-match arm's `==` site, flipped to `!=`:
-        let site = "TagLaw::matches:0: == -> !=";
+        let site = "boundary_spec::discover::substrate::TagLaw::matches:0: == -> !=";
         assert!(
             Schemata::census().unwrap().contains(&site),
             "the drill's site must exist in the census (renumbered? re-pin it)"
@@ -259,15 +259,140 @@ mod probes {
         });
         assert!(law.matches("mutants-green"), "the force is dropped");
         // the DEAFNESS form, same plumbing: the function returns the constant.
-        Schemata::force("TagLaw::matches:deaf -> true", || {
-            assert!(law.matches("anything-at-all"), "deaf-true hears nothing");
-        });
-        Schemata::force("TagLaw::matches:deaf -> false", || {
-            assert!(
-                !law.matches("mutants-green"),
-                "deaf-false denies everything"
-            );
-        });
+        Schemata::force(
+            "boundary_spec::discover::substrate::TagLaw::matches:deaf -> true",
+            || {
+                assert!(law.matches("anything-at-all"), "deaf-true hears nothing");
+            },
+        );
+        Schemata::force(
+            "boundary_spec::discover::substrate::TagLaw::matches:deaf -> false",
+            || {
+                assert!(
+                    !law.matches("mutants-green"),
+                    "deaf-false denies everything"
+                );
+            },
+        );
+    }
+
+    /// COMPLETENESS is a census, not an intention: every top-level function and
+    /// impl block under `src/` either carries `#[mutate]`, sits under `cfg(test)`,
+    /// is a `const fn` (no runtime branch to host), or its FILE is exempted by name
+    /// and reason in `spec/instrumentation.register`. Two-way set difference, the
+    /// house judgment: an uninstrumented item in an unexempted file refuses, and a
+    /// register line whose file has no uninstrumented items left is STALE and
+    /// refuses too — the register can only shrink honestly.
+    #[test]
+    fn every_eligible_item_is_instrumented_or_exempted() {
+        fn is_test_or_mutate(attrs: &[syn::Attribute]) -> (bool, bool) {
+            let mut test = false;
+            let mut mutate = false;
+            for a in attrs {
+                let path = a
+                    .path()
+                    .segments
+                    .iter()
+                    .map(|s| s.ident.to_string())
+                    .collect::<Vec<_>>()
+                    .join("::");
+                if path == "cfg" {
+                    let tokens = a.meta.require_list().map(|l| l.tokens.to_string());
+                    if tokens.map(|t| t.contains("test")).unwrap_or(false) {
+                        test = true;
+                    }
+                }
+                if path.ends_with("mutate") {
+                    mutate = true;
+                }
+            }
+            (test, mutate)
+        }
+        fn uninstrumented(items: &[syn::Item], out: &mut Vec<String>) {
+            for item in items {
+                match item {
+                    syn::Item::Fn(f) => {
+                        let (test, mutate) = is_test_or_mutate(&f.attrs);
+                        if !test && !mutate && f.sig.constness.is_none() {
+                            out.push(format!("fn {}", f.sig.ident));
+                        }
+                    }
+                    syn::Item::Impl(i) => {
+                        let (test, mutate) = is_test_or_mutate(&i.attrs);
+                        let has_fn = i.items.iter().any(
+                            |it| matches!(it, syn::ImplItem::Fn(m) if m.sig.constness.is_none()),
+                        );
+                        if !test && !mutate && has_fn {
+                            let ty = &i.self_ty;
+                            out.push(format!("impl {}", quote::ToTokens::to_token_stream(ty)));
+                        }
+                    }
+                    syn::Item::Mod(m) => {
+                        let (test, _) = is_test_or_mutate(&m.attrs);
+                        if let (false, Some((_, items))) = (test, &m.content) {
+                            uninstrumented(items, out);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let register = root.join("spec").join("instrumentation.register");
+        let exempt: std::collections::BTreeMap<String, String> = std::fs::read_to_string(&register)
+            .unwrap_or_default()
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
+            .filter_map(|l| {
+                let (file, reason) = l.split_once(':')?;
+                Some((file.trim().to_string(), reason.trim().to_string()))
+            })
+            .collect();
+        let mut files = Vec::new();
+        let mut stack = vec![root.join("src")];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("src readable") {
+                let path = entry.expect("entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    files.push(path);
+                }
+            }
+        }
+        let mut missing = Vec::new();
+        let mut used = std::collections::BTreeSet::new();
+        for path in files {
+            let rel = path
+                .strip_prefix(&root)
+                .expect("under root")
+                .to_string_lossy()
+                .replace('\\', "/");
+            let text = std::fs::read_to_string(&path).expect("file readable");
+            let parsed = syn::parse_file(&text).expect("file parses");
+            let mut items = Vec::new();
+            uninstrumented(&parsed.items, &mut items);
+            if items.is_empty() {
+                continue;
+            }
+            if exempt.contains_key(&rel) {
+                used.insert(rel);
+            } else {
+                missing.push(format!("{rel}: {}", items.join(", ")));
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "uninstrumented items in unexempted files — add #[mutate] or a line to \
+             spec/instrumentation.register:\n{}",
+            missing.join("\n")
+        );
+        let stale: Vec<_> = exempt.keys().filter(|k| !used.contains(*k)).collect();
+        assert!(
+            stale.is_empty(),
+            "stale instrumentation exemptions (file fully instrumented or gone) — \
+             delete the line(s): {stale:?}"
+        );
     }
 
     /// The committed schemata lock is FRESH — instrumentation and census move

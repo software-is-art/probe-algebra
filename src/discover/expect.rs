@@ -254,6 +254,7 @@ impl Distance {
     }
 }
 
+#[crate::mutate]
 fn render_list(expectations: &[Expectation]) -> String {
     expectations
         .iter()
@@ -265,6 +266,7 @@ fn render_list(expectations: &[Expectation]) -> String {
 /// Distinct symbols in first-appearance order — the same normalisation `DiscoveredLaw::ops`
 /// applies, so a declaration like `homomorphism(esc, ++, ++)` (the shape's three parameter
 /// slots, two coinciding) compares equal to the discovered law's fingerprint `[esc, ++]`.
+#[crate::mutate]
 fn dedup(ops: Vec<String>) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for op in ops {

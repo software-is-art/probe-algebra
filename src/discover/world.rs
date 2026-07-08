@@ -132,9 +132,11 @@ impl StoreModel {
     }
 }
 
+#[crate::mutate]
 fn empty_trace(_: &[Trace]) -> Option<Trace> {
     Some(Trace(Vec::new()))
 }
+#[crate::mutate]
 fn concat_traces(v: &[Trace]) -> Option<Trace> {
     let mut commands = v[0].0.clone();
     commands.extend(v[1].0.iter().copied());

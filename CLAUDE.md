@@ -18,7 +18,7 @@ diff — the committed diff is the ratification. A missing lock counts as stale.
 |---|---|
 | `spec/<theory>.spec`, `.system.spec`, `.shape.spec`, `.world.spec`, `.mutation.spec` | `cargo run --example freeze_spec` |
 | `spec/shapes.spec` (the law-language catalog) | `cargo run --example freeze_shapes` |
-| `spec/gates.spec`, `.github/workflows/ci.yml`, `spec/perimeter.spec`, `spec/perimeter.ruleset.json`, `spec/substrate.spec`, `spec/schemata.spec` (pipeline, settings perimeter, git substrate, and the compiled-mutant census are locks) | `cargo run --example freeze_gates` |
+| `spec/gates.spec`, `.github/workflows/ci.yml`, `spec/perimeter.spec`, `spec/perimeter.ruleset.json`, `spec/substrate.spec`, `spec/schemata.spec` (pipeline, settings perimeter, git substrate, and the compiled-mutant census are locks) | `cargo run --features schemata --example freeze_gates` |
 | `spec/<system>.infra.spec` (the declared infra graph; its `.infra.register` floor is hand-authored, never generated) | `cargo run --example freeze_infra` |
 | `spec/qualify.spec` (public-surface census; build fails when stale) | `BLESS_QUALIFY=1 cargo build` |
 | `spec/tiers.spec` (the derived tier partition; KERNEL only via `spec/kernel.register`) | `BLESS_TIERS=1 cargo build` |
@@ -39,8 +39,9 @@ package alone silently skips the fixtures.
 
 ## Mutation testing
 
-- PRs mutate changed lines only; the default branch mutates the diff since the
-  `mutants-green` tag; a weekly sweep covers everything, sharded. All through
+- PRs are mutation-gated by SCHEMATA (below), not cargo-mutants — the per-diff
+  source gate is retired. The default branch still mutates the diff since the
+  `mutants-green` tag and a weekly sweep covers everything, sharded, through
   `.github/mutants-gate.sh`. Timeouts count as detections, not survivors.
 - The root sweep runs only `--lib`, `refusal_drill`, and `fire_drill` — a lock defended
   only in `tests/` is invisible to it. Give every lock a lib-side twin.
@@ -49,9 +50,13 @@ package alone silently skips the fixtures.
   reason) only when you can't.
 - Theories are also mutated in-process on every `cargo test` (`discover::mutation`);
   survivors there are spec degrees of freedom, ratified in `spec/<theory>.mutation.spec`.
-- `#[mutate]`-instrumented functions carry compiled expression flips
-  (`spec/schemata.spec`), swept on every change by `.github/schemata.sh` — one build,
-  one test run per site; survivors are ratified in `spec/schemata.register`.
+- `#[mutate]`-instrumented code (the whole discover tree, engine included) carries
+  compiled flips and deafness forms (`spec/schemata.spec`, ~700 sites), swept on
+  every change by `.github/schemata.sh`: one `--features schemata` build, coverage-
+  mapped test runs per site, parallel workers. Survivors are ratified in
+  `spec/schemata.register` (backtick-quoted keys). Instrumentation completeness is
+  itself a census: uninstrumented files need a reasoned line in
+  `spec/instrumentation.register`.
 
 ## Conventions that bite
 

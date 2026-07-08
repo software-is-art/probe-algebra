@@ -27,11 +27,13 @@ pub enum Sort {
     Router,
 }
 
+#[crate::mutate]
 fn empty(_: &[Routes]) -> Option<Routes> {
     Some(Routes([None; PATHS]))
 }
 
 /// First-match union: where both route a path, the LEFT router wins (so `or` is not commutative).
+#[crate::mutate]
 fn or(vs: &[Routes]) -> Option<Routes> {
     let (a, b) = (&vs[0].0, &vs[1].0);
     let mut out = [None; PATHS];
@@ -43,6 +45,7 @@ fn or(vs: &[Routes]) -> Option<Routes> {
 
 /// A spread that includes OVERLAPPING routers (several route path 0), so the grid can tell
 /// `a or b` from `b or a` — and the engine correctly omits commutativity.
+#[crate::mutate]
 fn routers() -> Vec<Routes> {
     vec![
         Routes([None, None, None, None]),

@@ -283,12 +283,24 @@ impl Register {
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            let (key, justification) = line.split_once(':').ok_or(format!(
-                "register `{}` line {}: an entry is `<key>: <justification>` — a bare key \
-                 is not a ratification",
-                self.name,
-                n + 1
-            ))?;
+            // a key may itself contain `:` (schemata site ids do) — such keys are
+            // BACKTICK-QUOTED: `` `<key>`: <justification> ``. Bare keys keep the
+            // plain first-colon grammar.
+            let (key, justification) = if let Some(rest) = line.strip_prefix('`') {
+                rest.split_once("`:").ok_or(format!(
+                    "register `{}` line {}: a backtick-quoted key must be \
+                     `` `<key>`: <justification> ``",
+                    self.name,
+                    n + 1
+                ))?
+            } else {
+                line.split_once(':').ok_or(format!(
+                    "register `{}` line {}: an entry is `<key>: <justification>` — a bare key \
+                     is not a ratification",
+                    self.name,
+                    n + 1
+                ))?
+            };
             let (key, justification) = (key.trim().to_string(), justification.trim());
             if justification.is_empty() {
                 return Err(format!(

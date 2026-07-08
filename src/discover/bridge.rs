@@ -250,11 +250,13 @@ impl Export {
     }
 }
 
+#[crate::mutate]
 fn slots() -> &'static [OnceLock<Export>; SLOTS] {
     static SLOTS_STORE: [OnceLock<Export>; SLOTS] = [const { OnceLock::new() }; SLOTS];
     &SLOTS_STORE
 }
 
+#[crate::mutate]
 fn export<const SLOT: usize>() -> &'static Export {
     slots()[SLOT]
         .get()
@@ -270,6 +272,7 @@ pub struct El(pub u8);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct One;
 
+#[crate::mutate]
 fn eval<const SLOT: usize, const OP: usize>(v: &[El]) -> Option<El> {
     let e = export::<SLOT>();
     let op = &e.ops[OP];

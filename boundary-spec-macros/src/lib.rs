@@ -837,7 +837,8 @@ pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
             let ident = format_ident!("__MUTANT_SITE_{i}");
             let registration: syn::Stmt = syn::parse_quote! {
                 #[::linkme::distributed_slice(crate::discover::schemata::MUTANT_SITES)]
-                static #ident: &'static str = #site;
+                static #ident: &'static str =
+                    ::core::concat!(::core::module_path!(), "::", #site);
             };
             f.block.stmts.insert(i, registration);
         }
@@ -904,7 +905,11 @@ fn mutate_body(label: &str, output: &ReturnType, block: &mut syn::Block) -> Vec<
             let site = format!("{label}:deaf -> {desc}");
             sites.push(site.clone());
             prologue.push(syn::parse_quote! {
-                if crate::discover::schemata::Schemata::active(#site) {
+                if crate::discover::schemata::Schemata::active(::core::concat!(
+                    ::core::module_path!(),
+                    "::",
+                    #site
+                )) {
                     return #value;
                 }
             });
@@ -928,7 +933,8 @@ fn registrations(sites: &[String]) -> TokenStream2 {
         quote! {
             #[cfg(feature = "schemata")]
             #[::linkme::distributed_slice(crate::discover::schemata::MUTANT_SITES)]
-            static #ident: &'static str = #site;
+            static #ident: &'static str =
+                ::core::concat!(::core::module_path!(), "::", #site);
         }
     });
     quote! { #(#statics)* }
@@ -1022,7 +1028,11 @@ impl syn::visit_mut::VisitMut for FlipMutator {
                 // `Not`); deletion is then a second negation — both arms one type.
                 *expr = syn::parse_quote!({
                     let __mutant_v = !(#inner);
-                    if crate::discover::schemata::Schemata::active(#site) {
+                    if crate::discover::schemata::Schemata::active(::core::concat!(
+                        ::core::module_path!(),
+                        "::",
+                        #site
+                    )) {
                         !__mutant_v
                     } else {
                         __mutant_v
@@ -1070,7 +1080,11 @@ impl syn::visit_mut::VisitMut for FlipMutator {
             // the right stays a lazy expression in both branches.
             syn::BinOp::And(_) | syn::BinOp::Or(_) => syn::parse_quote!({
                 let __mutant_l = #left;
-                if crate::discover::schemata::Schemata::active(#site) {
+                if crate::discover::schemata::Schemata::active(::core::concat!(
+                    ::core::module_path!(),
+                    "::",
+                    #site
+                )) {
                     __mutant_l #flipped (#right)
                 } else {
                     __mutant_l #op (#right)
@@ -1082,7 +1096,11 @@ impl syn::visit_mut::VisitMut for FlipMutator {
             _ => syn::parse_quote!({
                 let __mutant_l = &(#left);
                 let __mutant_r = &(#right);
-                if crate::discover::schemata::Schemata::active(#site) {
+                if crate::discover::schemata::Schemata::active(::core::concat!(
+                    ::core::module_path!(),
+                    "::",
+                    #site
+                )) {
                     __mutant_l #flipped __mutant_r
                 } else {
                     __mutant_l #op __mutant_r

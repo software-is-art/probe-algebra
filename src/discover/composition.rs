@@ -58,21 +58,25 @@ impl PipelineLaw {
 }
 
 /// Apply a unary operator, threading partiality.
+#[crate::mutate]
 fn apply1<T: Theory>(op: &Operator<T>, x: &T::Value) -> Option<T::Value> {
     (op.eval)(std::slice::from_ref(x))
 }
 
 /// Apply a binary operator.
+#[crate::mutate]
 fn apply2<T: Theory>(op: &Operator<T>, a: &T::Value, b: &T::Value) -> Option<T::Value> {
     (op.eval)(&[a.clone(), b.clone()])
 }
 
 /// Is `op` a homogeneous binary operator on sort `s` (`s × s → s`)?
+#[crate::mutate]
 fn binary_on<T: Theory>(op: &Operator<T>, s: T::Sort) -> bool {
     op.inputs.len() == 2 && op.inputs[0] == s && op.inputs[1] == s && op.output == s
 }
 
 /// Is `op` a unary conversion `from → to`?
+#[crate::mutate]
 fn unary<T: Theory>(op: &Operator<T>) -> Option<(T::Sort, T::Sort)> {
     (op.inputs.len() == 1).then(|| (op.inputs[0], op.output))
 }
@@ -83,6 +87,7 @@ fn unary<T: Theory>(op: &Operator<T>) -> Option<(T::Sort, T::Sort)> {
 /// composite `h2∘h1` carries a binary operator on `s` to one on `u` as a homomorphism, over the
 /// source grid. Each that holds is a whole-program law of that pipeline. (Private — reached as
 /// `PipelineLaw::discover`.)
+#[crate::mutate]
 fn pipeline_laws<T: Theory>() -> Vec<PipelineLaw> {
     let ops = T::operators();
     let mut laws = Vec::new();

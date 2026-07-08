@@ -6,376 +6,702 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 371 sites.
+# 697 sites.
 
-- Architect::analyze:deaf -> vec![]
-- Architect::apply:0: ! -> (deleted)
-- Architect::apply:deaf -> Ok(vec![])
-- Architect::place:deaf -> None
-- Architect::render_lsp:deaf -> String::new()
-- BiteVerdicts::gate:deaf -> Err(String::new())
-- BiteVerdicts::gate:deaf -> Ok(String::new())
-- Bridged<SLOT>::expectations:deaf -> vec![]
-- Bridged<SLOT>::inhabitants:deaf -> vec![]
-- Bridged<SLOT>::operators:deaf -> vec![]
-- CoherenceReport::between:deaf -> Err(String::new())
-- CohesionReport::is_cohesive:0: <= -> >
-- CohesionReport::is_cohesive:deaf -> false
-- CohesionReport::is_cohesive:deaf -> true
-- CohesionReport::render:deaf -> String::new()
-- Component::render:deaf -> String::new()
-- ComponentLayering::is_atomic:deaf -> false
-- ComponentLayering::is_atomic:deaf -> true
-- Corpus::bites:0: ! -> (deleted)
-- Corpus::bites:1: || -> &&
-- Corpus::bites:deaf -> vec![]
-- Corpus::judge_with:0: ! -> (deleted)
-- Corpus::judge_with:deaf -> Err(String::new())
-- Corpus::parse:deaf -> Err(String::new())
-- Corpus::read:deaf -> Err(String::new())
-- Corpus::tables:0: ! -> (deleted)
-- Corpus::tables:1: || -> &&
-- Corpus::tables:2: == -> !=
-- Dependence::judge_register:0: || -> &&
-- Dependence::judge_register:1: || -> &&
-- Dependence::judge_register:2: == -> !=
-- Dependence::judge_register:deaf -> Err(String::new())
-- Dependence::judge_register:deaf -> Ok(vec![])
-- DiscoveredLaw::ops:deaf -> vec![]
-- Distance::is_met:deaf -> false
-- Distance::is_met:deaf -> true
-- Distance::of:0: ! -> (deleted)
-- Distance::of:1: ! -> (deleted)
-- Distance::of:2: ! -> (deleted)
-- Distance::of:3: && -> ||
-- Distance::render:0: && -> ||
-- Distance::render:1: ! -> (deleted)
-- Distance::render:2: ! -> (deleted)
-- Distance::render:deaf -> String::new()
-- Engine<T>::check:0: != -> ==
-- Engine<T>::check:1: || -> &&
-- Engine<T>::check:2: || -> &&
-- Engine<T>::check:3: == -> !=
-- Engine<T>::check:4: ! -> (deleted)
-- Engine<T>::check:5: && -> ||
-- Engine<T>::check:6: ! -> (deleted)
-- Engine<T>::check:deaf -> Err(String::new())
-- Engine<T>::concretize:deaf -> None
-- Engine<T>::declarations:deaf -> vec![]
-- Engine<T>::discover:0: ! -> (deleted)
-- Engine<T>::discover:1: ! -> (deleted)
-- Engine<T>::enumerate:0: ! -> (deleted)
-- Engine<T>::enumerate:1: != -> ==
-- Engine<T>::enumerate:2: == -> !=
-- Engine<T>::enumerate:3: < -> >=
-- Engine<T>::enumerate:deaf -> vec![]
-- Engine<T>::eval:deaf -> None
-- Engine<T>::evals:deaf -> vec![]
-- Engine<T>::instantiate_shape:0: ! -> (deleted)
-- Engine<T>::instantiate_shape:10: != -> ==
-- Engine<T>::instantiate_shape:11: && -> ||
-- Engine<T>::instantiate_shape:12: != -> ==
-- Engine<T>::instantiate_shape:13: == -> !=
-- Engine<T>::instantiate_shape:14: == -> !=
-- Engine<T>::instantiate_shape:15: ! -> (deleted)
-- Engine<T>::instantiate_shape:1: == -> !=
-- Engine<T>::instantiate_shape:2: != -> ==
-- Engine<T>::instantiate_shape:3: ! -> (deleted)
-- Engine<T>::instantiate_shape:4: == -> !=
-- Engine<T>::instantiate_shape:5: && -> ||
-- Engine<T>::instantiate_shape:6: ! -> (deleted)
-- Engine<T>::instantiate_shape:7: ! -> (deleted)
-- Engine<T>::instantiate_shape:8: || -> &&
-- Engine<T>::instantiate_shape:9: ! -> (deleted)
-- Engine<T>::meaningful:deaf -> false
-- Engine<T>::meaningful:deaf -> true
-- Engine<T>::new:0: ! -> (deleted)
-- Engine<T>::new:1: <= -> >
-- Engine<T>::render:deaf -> String::new()
-- Engine<T>::same:0: == -> !=
-- Engine<T>::same:deaf -> false
-- Engine<T>::same:deaf -> true
-- Engine<T>::signatures:deaf -> vec![]
-- Engine<T>::templates:0: == -> !=
-- Engine<T>::templates:1: == -> !=
-- Engine<T>::templates:2: ! -> (deleted)
-- Engine<T>::var:0: == -> !=
-- Engine<T>::var:1: == -> !=
-- Engine<T>::var:2: && -> ||
-- Engine<T>::var:deaf -> None
-- Expectation::canonical:0: == -> !=
-- Expectation::canonical:1: == -> !=
-- Expectation::canonical:2: || -> &&
-- Expectation::canonical:deaf -> None
-- Expectation::key:0: == -> !=
-- Expectation::of:0: == -> !=
-- Expectation::of:1: == -> !=
-- Expectation::of:2: || -> &&
-- Expectation::render:deaf -> String::new()
-- Expectation::vocabulary_keys:deaf -> vec![]
-- Export::install:0: != -> ==
-- Export::install:deaf -> Err(String::new())
-- Export::parse:0: || -> &&
-- Export::parse:10: ! -> (deleted)
-- Export::parse:1: > -> <=
-- Export::parse:2: > -> <=
-- Export::parse:3: == -> !=
-- Export::parse:4: == -> !=
-- Export::parse:5: == -> !=
-- Export::parse:6: == -> !=
-- Export::parse:7: != -> ==
-- Export::parse:8: != -> ==
-- Export::parse:9: == -> !=
-- Export::parse:deaf -> Err(String::new())
-- Gate::command_line:deaf -> String::new()
-- GateRegistry::declared:deaf -> vec![]
-- GateRegistry::pr_checks:0: == -> !=
-- GateRegistry::pr_checks:deaf -> vec![]
-- GateRegistry::render_registry:deaf -> String::new()
-- GateRegistry::render_workflow:0: == -> !=
-- GateRegistry::render_workflow:10: && -> ||
-- GateRegistry::render_workflow:11: != -> ==
-- GateRegistry::render_workflow:1: == -> !=
-- GateRegistry::render_workflow:2: == -> !=
-- GateRegistry::render_workflow:3: == -> !=
-- GateRegistry::render_workflow:4: == -> !=
-- GateRegistry::render_workflow:5: ! -> (deleted)
-- GateRegistry::render_workflow:6: != -> ==
-- GateRegistry::render_workflow:7: && -> ||
-- GateRegistry::render_workflow:8: ! -> (deleted)
-- GateRegistry::render_workflow:9: == -> !=
-- GateRegistry::render_workflow:deaf -> String::new()
-- Genesis::apply:deaf -> Ok(vec![])
-- Genesis::plan:0: ! -> (deleted)
-- Genesis::plan:1: || -> &&
-- Genesis::plan:2: ! -> (deleted)
-- Genesis::plan:deaf -> Err(String::new())
-- GuardVoices::for_edit:0: == -> !=
-- GuardVoices::for_edit:1: || -> &&
-- Inert::census:deaf -> vec![]
-- Inert::render_census:0: == -> !=
-- Inert::render_census:1: == -> !=
-- Inert::render_census:deaf -> String::new()
-- Inert::simplifiable:0: == -> !=
-- Inert::simplifiable:deaf -> vec![]
-- Infra::coherent:0: == -> !=
-- Infra::coherent:1: == -> !=
-- Infra::coherent:deaf -> Err(vec![])
-- Infra::coherent:deaf -> Ok(vec![])
-- Infra::ephemeral_prefixes:deaf -> vec![]
-- Infra::floor:deaf -> Err(String::new())
-- Infra::judge:0: == -> !=
-- Infra::judge:1: == -> !=
-- Infra::judge:2: == -> !=
-- Infra::judge:3: == -> !=
-- Infra::judge:deaf -> Err(vec![])
-- Infra::judge:deaf -> Ok(vec![])
-- Infra::render:deaf -> String::new()
-- Infra::slug:0: == -> !=
-- Infra::slug:deaf -> String::new()
-- Infra::store:0: == -> !=
-- Infra::store:deaf -> None
-- Infra::surface:0: == -> !=
-- Infra::surface:deaf -> None
-- Infra::unjudgeable:deaf -> vec![]
-- LayeringReport::render:0: ! -> (deleted)
-- LayeringReport::render:deaf -> String::new()
-- LayeringReport::wants_layering:0: ! -> (deleted)
-- LayeringReport::wants_layering:deaf -> false
-- LayeringReport::wants_layering:deaf -> true
-- LiveDent<L>::drill:deaf -> Err(vec![])
-- LiveDent<L>::drill:deaf -> Ok(vec![])
-- LiveInfra::dents:0: != -> ==
-- LiveInfra::dents:1: == -> !=
-- LiveInfra::dents:2: != -> ==
-- LiveInfra::dents:3: != -> ==
-- LiveInfra::dents:4: == -> !=
-- LiveInfra::dents:5: != -> ==
-- LiveInfra::dents:6: != -> ==
-- LiveInfra::dents:7: == -> !=
-- LiveInfra::dents:deaf -> vec![]
-- LiveInfra::lookup:0: == -> !=
-- LiveInfra::lookup:deaf -> None
-- LivePerimeter::dents:0: != -> ==
-- LivePerimeter::dents:deaf -> vec![]
-- LiveSubstrate::dents:0: == -> !=
-- LiveSubstrate::dents:1: && -> ||
-- LiveSubstrate::dents:2: || -> &&
-- LiveSubstrate::dents:3: != -> ==
-- LiveSubstrate::dents:4: != -> ==
-- LiveSubstrate::dents:5: || -> &&
-- LiveSubstrate::dents:6: == -> !=
-- LiveSubstrate::dents:7: != -> ==
-- LiveSubstrate::dents:8: != -> ==
-- LiveSubstrate::dents:deaf -> vec![]
-- Meaning::describe:deaf -> String::new()
-- MutationReport::deaf_survivors:0: ! -> (deleted)
-- MutationReport::deaf_survivors:deaf -> vec![]
-- MutationReport::dent_survivors:0: ! -> (deleted)
-- MutationReport::dent_survivors:deaf -> vec![]
-- MutationReport::lock_in:0: == -> !=
-- MutationReport::of:0: != -> ==
-- MutationReport::render:deaf -> String::new()
-- MutationReport::survivors:0: ! -> (deleted)
-- MutationReport::survivors:deaf -> vec![]
-- Perimeter::judge:0: == -> !=
-- Perimeter::judge:1: == -> !=
-- Perimeter::judge:deaf -> Err(vec![])
-- Perimeter::judge:deaf -> Ok(vec![])
-- Perimeter::render:deaf -> String::new()
-- Perimeter::ruleset_json:deaf -> String::new()
-- Pipeline::locks_in:deaf -> Err(String::new())
-- Pipeline::locks_in:deaf -> Ok(vec![])
-- Pipeline::render_registry:deaf -> String::new()
-- Pipeline::render_workflow:0: == -> !=
-- Pipeline::render_workflow:1: == -> !=
-- Pipeline::render_workflow:2: == -> !=
-- Pipeline::render_workflow:3: ! -> (deleted)
-- Pipeline::render_workflow:4: && -> ||
-- Pipeline::render_workflow:5: == -> !=
-- Pipeline::render_workflow:6: == -> !=
-- Pipeline::render_workflow:deaf -> Err(String::new())
-- Pipeline::render_workflow:deaf -> Ok(String::new())
-- PipelineLaw::discover:deaf -> vec![]
-- PipelineLaw::render:deaf -> String::new()
-- Placement::is_settled:0: <= -> >
-- Placement::is_settled:deaf -> false
-- Placement::is_settled:deaf -> true
-- Placement::over:0: ! -> (deleted)
-- Placement::over:1: == -> !=
-- Placement::render:deaf -> String::new()
-- Placement::signatures_of:deaf -> vec![]
-- Plan::listing:deaf -> vec![]
-- Proposal::misfits:0: ! -> (deleted)
-- Proposal::misfits:deaf -> vec![]
-- Proposal::render:deaf -> String::new()
-- Proposal::shapes:deaf -> vec![]
-- ProposedModule::is_shape:0: > -> <=
-- ProposedModule::is_shape:deaf -> false
-- ProposedModule::is_shape:deaf -> true
-- Report::flagged:deaf -> vec![]
-- Rule::doc:deaf -> String::new()
-- Scaffold::of:deaf -> None
-- Scaffold::placement:deaf -> None
-- Scaffold::render:deaf -> String::new()
-- SchemaTerm::render:deaf -> String::new()
-- SeamReport::transform:0: ! -> (deleted)
-- SeamReport::transform:1: == -> !=
-- SeamReport::transform:2: && -> ||
-- SeamStatus::is_met:deaf -> false
-- SeamStatus::is_met:deaf -> true
-- ShapeCatalog::inventory:deaf -> vec![]
-- ShapeCatalog::render:deaf -> String::new()
-- ShapeGate::admit:deaf -> Err(String::new())
-- ShapeGate::bind:0: != -> ==
-- ShapeGate::bind:10: && -> ||
-- ShapeGate::bind:11: && -> ||
-- ShapeGate::bind:12: == -> !=
-- ShapeGate::bind:13: && -> ||
-- ShapeGate::bind:14: && -> ||
-- ShapeGate::bind:15: == -> !=
-- ShapeGate::bind:16: == -> !=
-- ShapeGate::bind:17: && -> ||
-- ShapeGate::bind:18: && -> ||
-- ShapeGate::bind:19: && -> ||
-- ShapeGate::bind:1: != -> ==
-- ShapeGate::bind:20: == -> !=
-- ShapeGate::bind:21: == -> !=
-- ShapeGate::bind:22: && -> ||
-- ShapeGate::bind:23: && -> ||
-- ShapeGate::bind:24: && -> ||
-- ShapeGate::bind:25: ! -> (deleted)
-- ShapeGate::bind:26: == -> !=
-- ShapeGate::bind:27: == -> !=
-- ShapeGate::bind:2: || -> &&
-- ShapeGate::bind:3: <= -> >
-- ShapeGate::bind:4: == -> !=
-- ShapeGate::bind:5: == -> !=
-- ShapeGate::bind:6: == -> !=
-- ShapeGate::bind:7: && -> ||
-- ShapeGate::bind:8: == -> !=
-- ShapeGate::bind:9: && -> ||
-- ShapeGate::bind:deaf -> Err(String::new())
-- ShapeGate::bind:deaf -> Ok(vec![])
-- ShapeInfo::equation:deaf -> String::new()
-- ShapeInfo::instantiate:deaf -> String::new()
-- ShapeInfo::matches:0: == -> !=
-- ShapeInfo::matches:deaf -> false
-- ShapeInfo::matches:deaf -> true
-- ShapeReport::is_settled:deaf -> false
-- ShapeReport::is_settled:deaf -> true
-- ShapeReport::lock_in:0: == -> !=
-- ShapeReport::of:0: || -> &&
-- ShapeReport::render:deaf -> String::new()
-- Spec::check_all_fresh:deaf -> Err(vec![])
-- Spec::check_all_fresh:deaf -> Ok(vec![])
-- Spec::parse_lock:deaf -> vec![]
-- Substrate::judge:0: == -> !=
-- Substrate::judge:1: ! -> (deleted)
-- Substrate::judge:2: == -> !=
-- Substrate::judge:deaf -> Err(vec![])
-- Substrate::judge:deaf -> Ok(vec![])
-- Substrate::render:deaf -> String::new()
-- SystemDistance::latent:0: ! -> (deleted)
-- SystemDistance::latent:deaf -> vec![]
-- SystemDistance::render:deaf -> String::new()
-- SystemReport::is_met:deaf -> false
-- SystemReport::is_met:deaf -> true
-- SystemReport::lock_in:0: == -> !=
-- SystemReport::render:0: ! -> (deleted)
-- SystemReport::render:deaf -> String::new()
-- TagLaw::matches:0: == -> !=
-- TagLaw::matches:deaf -> false
-- TagLaw::matches:deaf -> true
-- Trace::perturbation_classes:deaf -> vec![]
-- Triage::certify:deaf -> Err(String::new())
-- Triage::of:0: ! -> (deleted)
-- Triage::render:deaf -> String::new()
-- WorldReport::disagreements:0: != -> ==
-- WorldReport::disagreements:1: != -> ==
-- WorldReport::disagreements:deaf -> vec![]
-- WorldReport::lock_in:0: == -> !=
-- WorldReport::render:deaf -> String::new()
-- agenda::of:deaf -> Err(String::new())
-- agenda::of_with:0: ! -> (deleted)
-- agenda::of_with:deaf -> Err(String::new())
-- agenda::render:0: ! -> (deleted)
-- agenda::render:1: ! -> (deleted)
-- agenda::render:deaf -> String::new()
-- agenda_render::edit_guard:0: ! -> (deleted)
-- agenda_render::edit_guard:1: ! -> (deleted)
-- agenda_render::edit_guard:2: && -> ||
-- agenda_render::edit_guard:3: && -> ||
-- agenda_render::edit_guard:4: ! -> (deleted)
-- agenda_render::edit_guard:5: && -> ||
-- agenda_render::edit_guard:deaf -> None
-- classify:0: || -> &&
-- classify:1: == -> !=
-- classify:2: == -> !=
-- classify:3: == -> !=
-- classify:4: == -> !=
-- classify:5: == -> !=
-- classify:6: || -> &&
-- classify:7: == -> !=
-- classify:8: == -> !=
-- classify:9: == -> !=
-- classify:deaf -> Err(String::new())
-- dependence::judge:0: == -> !=
-- dependence::judge:1: == -> !=
-- dependence::judge:2: == -> !=
-- dependence::judge:3: == -> !=
-- dependence::judge:deaf -> Err(String::new())
-- dependence_report::is_intact:deaf -> false
-- dependence_report::is_intact:deaf -> true
-- dependence_report::render:deaf -> String::new()
-- ratification::question:deaf -> String::new()
-- shape_event::render:deaf -> String::new()
-- ticker::parse_ops:deaf -> Err(String::new())
-- ticker::parse_ops:deaf -> Ok(vec![])
-- ticker_speak::hook_line:0: > -> <=
-- ticker_speak::hook_line:deaf -> None
-- ticker_speak::resume:0: ! -> (deleted)
-- ticker_speak::step:deaf -> Err(String::new())
-- ticker_speak::store:deaf -> Err(String::new())
-- ticker_speak::store:deaf -> Ok(String::new())
-- ticker_speak::store_signatures:deaf -> String::new()
+- boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
+- boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
+- boundary_spec::discover::agenda::agenda::of:deaf -> Err(String::new())
+- boundary_spec::discover::agenda::agenda::of_with:0: ! -> (deleted)
+- boundary_spec::discover::agenda::agenda::of_with:deaf -> Err(String::new())
+- boundary_spec::discover::agenda::agenda::render:0: ! -> (deleted)
+- boundary_spec::discover::agenda::agenda::render:1: ! -> (deleted)
+- boundary_spec::discover::agenda::agenda::render:deaf -> String::new()
+- boundary_spec::discover::agenda::agenda_render::edit_guard:0: ! -> (deleted)
+- boundary_spec::discover::agenda::agenda_render::edit_guard:1: ! -> (deleted)
+- boundary_spec::discover::agenda::agenda_render::edit_guard:2: && -> ||
+- boundary_spec::discover::agenda::agenda_render::edit_guard:3: && -> ||
+- boundary_spec::discover::agenda::agenda_render::edit_guard:4: ! -> (deleted)
+- boundary_spec::discover::agenda::agenda_render::edit_guard:5: && -> ||
+- boundary_spec::discover::agenda::agenda_render::edit_guard:deaf -> None
+- boundary_spec::discover::agenda::classify:0: || -> &&
+- boundary_spec::discover::agenda::classify:1: == -> !=
+- boundary_spec::discover::agenda::classify:2: == -> !=
+- boundary_spec::discover::agenda::classify:3: == -> !=
+- boundary_spec::discover::agenda::classify:4: == -> !=
+- boundary_spec::discover::agenda::classify:5: == -> !=
+- boundary_spec::discover::agenda::classify:6: || -> &&
+- boundary_spec::discover::agenda::classify:7: == -> !=
+- boundary_spec::discover::agenda::classify:8: == -> !=
+- boundary_spec::discover::agenda::classify:9: == -> !=
+- boundary_spec::discover::agenda::classify:deaf -> Err(String::new())
+- boundary_spec::discover::agenda::ratification::question:deaf -> String::new()
+- boundary_spec::discover::architect::Architect::analyze:deaf -> vec![]
+- boundary_spec::discover::architect::Architect::apply:0: ! -> (deleted)
+- boundary_spec::discover::architect::Architect::apply:deaf -> Ok(vec![])
+- boundary_spec::discover::architect::Architect::place:deaf -> None
+- boundary_spec::discover::architect::Architect::render_lsp:deaf -> String::new()
+- boundary_spec::discover::architect::Report::flagged:deaf -> vec![]
+- boundary_spec::discover::architect::cat:deaf -> None
+- boundary_spec::discover::architect::confined:0: ! -> (deleted)
+- boundary_spec::discover::architect::confined:1: == -> !=
+- boundary_spec::discover::architect::confined:2: ! -> (deleted)
+- boundary_spec::discover::architect::confined:3: && -> ||
+- boundary_spec::discover::architect::confined:deaf -> false
+- boundary_spec::discover::architect::confined:deaf -> true
+- boundary_spec::discover::architect::empty_report:deaf -> None
+- boundary_spec::discover::architect::esc:0: < -> >=
+- boundary_spec::discover::architect::esc:deaf -> String::new()
+- boundary_spec::discover::architect::esc_op:deaf -> None
+- boundary_spec::discover::architect::escape_inhabitants:deaf -> vec![]
+- boundary_spec::discover::architect::merge_reports:deaf -> None
+- boundary_spec::discover::architect::registry:deaf -> vec![]
+- boundary_spec::discover::architect::sample_reports:deaf -> vec![]
+- boundary_spec::discover::architect::unesc:0: == -> !=
+- boundary_spec::discover::architect::unesc:1: == -> !=
+- boundary_spec::discover::architect::unesc:deaf -> String::new()
+- boundary_spec::discover::architect::unesc_op:deaf -> None
+- boundary_spec::discover::arithmetic::add:deaf -> None
+- boundary_spec::discover::arithmetic::as_expr:deaf -> None
+- boundary_spec::discover::arithmetic::bin:deaf -> None
+- boundary_spec::discover::arithmetic::fls:deaf -> None
+- boundary_spec::discover::arithmetic::int_const:deaf -> None
+- boundary_spec::discover::arithmetic::lt:deaf -> None
+- boundary_spec::discover::arithmetic::mul:deaf -> None
+- boundary_spec::discover::arithmetic::one:deaf -> None
+- boundary_spec::discover::arithmetic::run:deaf -> None
+- boundary_spec::discover::arithmetic::zero:deaf -> None
+- boundary_spec::discover::bite::BiteVerdicts::gate:deaf -> Err(String::new())
+- boundary_spec::discover::bite::BiteVerdicts::gate:deaf -> Ok(String::new())
+- boundary_spec::discover::bite::Corpus::bites:0: ! -> (deleted)
+- boundary_spec::discover::bite::Corpus::bites:1: || -> &&
+- boundary_spec::discover::bite::Corpus::bites:deaf -> vec![]
+- boundary_spec::discover::bite::Corpus::judge_with:0: ! -> (deleted)
+- boundary_spec::discover::bite::Corpus::judge_with:deaf -> Err(String::new())
+- boundary_spec::discover::bite::Corpus::parse:deaf -> Err(String::new())
+- boundary_spec::discover::bite::Corpus::read:deaf -> Err(String::new())
+- boundary_spec::discover::bite::Corpus::tables:0: ! -> (deleted)
+- boundary_spec::discover::bite::Corpus::tables:1: || -> &&
+- boundary_spec::discover::bite::Corpus::tables:2: == -> !=
+- boundary_spec::discover::bridge::Bridged<SLOT>::expectations:deaf -> vec![]
+- boundary_spec::discover::bridge::Bridged<SLOT>::inhabitants:deaf -> vec![]
+- boundary_spec::discover::bridge::Bridged<SLOT>::operators:deaf -> vec![]
+- boundary_spec::discover::bridge::Export::install:0: != -> ==
+- boundary_spec::discover::bridge::Export::install:deaf -> Err(String::new())
+- boundary_spec::discover::bridge::Export::parse:0: || -> &&
+- boundary_spec::discover::bridge::Export::parse:10: ! -> (deleted)
+- boundary_spec::discover::bridge::Export::parse:1: > -> <=
+- boundary_spec::discover::bridge::Export::parse:2: > -> <=
+- boundary_spec::discover::bridge::Export::parse:3: == -> !=
+- boundary_spec::discover::bridge::Export::parse:4: == -> !=
+- boundary_spec::discover::bridge::Export::parse:5: == -> !=
+- boundary_spec::discover::bridge::Export::parse:6: == -> !=
+- boundary_spec::discover::bridge::Export::parse:7: != -> ==
+- boundary_spec::discover::bridge::Export::parse:8: != -> ==
+- boundary_spec::discover::bridge::Export::parse:9: == -> !=
+- boundary_spec::discover::bridge::Export::parse:deaf -> Err(String::new())
+- boundary_spec::discover::bridge::Triage::certify:deaf -> Err(String::new())
+- boundary_spec::discover::bridge::Triage::of:0: ! -> (deleted)
+- boundary_spec::discover::bridge::Triage::render:deaf -> String::new()
+- boundary_spec::discover::bridge::eval:deaf -> None
+- boundary_spec::discover::coherence::CoherenceReport::between:deaf -> Err(String::new())
+- boundary_spec::discover::coherence::coherence_violations:deaf -> Err(String::new())
+- boundary_spec::discover::coherence::coherence_violations:deaf -> Ok(vec![])
+- boundary_spec::discover::coherence::empty:deaf -> None
+- boundary_spec::discover::coherence::first_merge:0: != -> ==
+- boundary_spec::discover::coherence::first_merge:deaf -> None
+- boundary_spec::discover::coherence::gcd_merge:0: != -> ==
+- boundary_spec::discover::coherence::gcd_merge:deaf -> None
+- boundary_spec::discover::coherence::max_merge:deaf -> None
+- boundary_spec::discover::coherence::signature_mismatch:0: != -> ==
+- boundary_spec::discover::coherence::signature_mismatch:1: != -> ==
+- boundary_spec::discover::coherence::signature_mismatch:2: != -> ==
+- boundary_spec::discover::coherence::signature_mismatch:3: || -> &&
+- boundary_spec::discover::coherence::signature_mismatch:4: != -> ==
+- boundary_spec::discover::coherence::signature_mismatch:5: || -> &&
+- boundary_spec::discover::coherence::signature_mismatch:deaf -> None
+- boundary_spec::discover::cohesion::CohesionReport::is_cohesive:0: <= -> >
+- boundary_spec::discover::cohesion::CohesionReport::is_cohesive:deaf -> false
+- boundary_spec::discover::cohesion::CohesionReport::is_cohesive:deaf -> true
+- boundary_spec::discover::cohesion::CohesionReport::render:deaf -> String::new()
+- boundary_spec::discover::cohesion::cohesion:0: == -> !=
+- boundary_spec::discover::cohesion::cohesion:1: == -> !=
+- boundary_spec::discover::cohesion::cohesion:2: != -> ==
+- boundary_spec::discover::cohesion::cohesion:3: && -> ||
+- boundary_spec::discover::cohesion::find:0: != -> ==
+- boundary_spec::discover::composition::PipelineLaw::discover:deaf -> vec![]
+- boundary_spec::discover::composition::PipelineLaw::render:deaf -> String::new()
+- boundary_spec::discover::composition::apply1:deaf -> None
+- boundary_spec::discover::composition::apply2:deaf -> None
+- boundary_spec::discover::composition::binary_on:0: == -> !=
+- boundary_spec::discover::composition::binary_on:1: == -> !=
+- boundary_spec::discover::composition::binary_on:2: && -> ||
+- boundary_spec::discover::composition::binary_on:3: == -> !=
+- boundary_spec::discover::composition::binary_on:4: && -> ||
+- boundary_spec::discover::composition::binary_on:5: == -> !=
+- boundary_spec::discover::composition::binary_on:6: && -> ||
+- boundary_spec::discover::composition::binary_on:deaf -> false
+- boundary_spec::discover::composition::binary_on:deaf -> true
+- boundary_spec::discover::composition::pipeline_laws:0: != -> ==
+- boundary_spec::discover::composition::pipeline_laws:1: == -> !=
+- boundary_spec::discover::composition::pipeline_laws:2: || -> &&
+- boundary_spec::discover::composition::pipeline_laws:3: == -> !=
+- boundary_spec::discover::composition::pipeline_laws:deaf -> vec![]
+- boundary_spec::discover::composition::unary:0: == -> !=
+- boundary_spec::discover::composition::unary:deaf -> None
+- boundary_spec::discover::date::add:deaf -> None
+- boundary_spec::discover::date::at:deaf -> None
+- boundary_spec::discover::date::diff:0: >= -> <
+- boundary_spec::discover::date::diff:deaf -> None
+- boundary_spec::discover::date::plus:deaf -> None
+- boundary_spec::discover::date::since:deaf -> None
+- boundary_spec::discover::date::zero:deaf -> None
+- boundary_spec::discover::depend::Dependence::judge_register:0: || -> &&
+- boundary_spec::discover::depend::Dependence::judge_register:1: || -> &&
+- boundary_spec::discover::depend::Dependence::judge_register:2: == -> !=
+- boundary_spec::discover::depend::Dependence::judge_register:deaf -> Err(String::new())
+- boundary_spec::discover::depend::Dependence::judge_register:deaf -> Ok(vec![])
+- boundary_spec::discover::depend::dependence::judge:0: == -> !=
+- boundary_spec::discover::depend::dependence::judge:1: == -> !=
+- boundary_spec::discover::depend::dependence::judge:2: == -> !=
+- boundary_spec::discover::depend::dependence::judge:3: == -> !=
+- boundary_spec::discover::depend::dependence::judge:deaf -> Err(String::new())
+- boundary_spec::discover::depend::dependence_report::is_intact:deaf -> false
+- boundary_spec::discover::depend::dependence_report::is_intact:deaf -> true
+- boundary_spec::discover::depend::dependence_report::render:deaf -> String::new()
+- boundary_spec::discover::engine::DiscoveredLaw::ops:deaf -> vec![]
+- boundary_spec::discover::engine::Engine<T>::check:0: != -> ==
+- boundary_spec::discover::engine::Engine<T>::check:1: || -> &&
+- boundary_spec::discover::engine::Engine<T>::check:2: || -> &&
+- boundary_spec::discover::engine::Engine<T>::check:3: == -> !=
+- boundary_spec::discover::engine::Engine<T>::check:4: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::check:5: && -> ||
+- boundary_spec::discover::engine::Engine<T>::check:6: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::check:deaf -> Err(String::new())
+- boundary_spec::discover::engine::Engine<T>::concretize:deaf -> None
+- boundary_spec::discover::engine::Engine<T>::declarations:deaf -> vec![]
+- boundary_spec::discover::engine::Engine<T>::discover:0: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::discover:1: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::enumerate:0: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::enumerate:1: != -> ==
+- boundary_spec::discover::engine::Engine<T>::enumerate:2: == -> !=
+- boundary_spec::discover::engine::Engine<T>::enumerate:3: < -> >=
+- boundary_spec::discover::engine::Engine<T>::enumerate:deaf -> vec![]
+- boundary_spec::discover::engine::Engine<T>::eval:deaf -> None
+- boundary_spec::discover::engine::Engine<T>::evals:deaf -> vec![]
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:0: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:10: != -> ==
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:11: && -> ||
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:12: != -> ==
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:13: == -> !=
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:14: == -> !=
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:15: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:1: == -> !=
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:2: != -> ==
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:3: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:4: == -> !=
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:5: && -> ||
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:6: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:7: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:8: || -> &&
+- boundary_spec::discover::engine::Engine<T>::instantiate_shape:9: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::meaningful:deaf -> false
+- boundary_spec::discover::engine::Engine<T>::meaningful:deaf -> true
+- boundary_spec::discover::engine::Engine<T>::new:0: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::new:1: <= -> >
+- boundary_spec::discover::engine::Engine<T>::render:deaf -> String::new()
+- boundary_spec::discover::engine::Engine<T>::same:0: == -> !=
+- boundary_spec::discover::engine::Engine<T>::same:deaf -> false
+- boundary_spec::discover::engine::Engine<T>::same:deaf -> true
+- boundary_spec::discover::engine::Engine<T>::signatures:deaf -> vec![]
+- boundary_spec::discover::engine::Engine<T>::templates:0: == -> !=
+- boundary_spec::discover::engine::Engine<T>::templates:1: == -> !=
+- boundary_spec::discover::engine::Engine<T>::templates:2: ! -> (deleted)
+- boundary_spec::discover::engine::Engine<T>::var:0: == -> !=
+- boundary_spec::discover::engine::Engine<T>::var:1: == -> !=
+- boundary_spec::discover::engine::Engine<T>::var:2: && -> ||
+- boundary_spec::discover::engine::Engine<T>::var:deaf -> None
+- boundary_spec::discover::engine::SchemaTerm::render:deaf -> String::new()
+- boundary_spec::discover::engine::ShapeCatalog::inventory:deaf -> vec![]
+- boundary_spec::discover::engine::ShapeCatalog::render:deaf -> String::new()
+- boundary_spec::discover::engine::ShapeGate::admit:deaf -> Err(String::new())
+- boundary_spec::discover::engine::ShapeGate::bind:0: != -> ==
+- boundary_spec::discover::engine::ShapeGate::bind:10: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:11: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:12: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:13: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:14: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:15: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:16: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:17: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:18: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:19: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:1: != -> ==
+- boundary_spec::discover::engine::ShapeGate::bind:20: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:21: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:22: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:23: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:24: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:25: ! -> (deleted)
+- boundary_spec::discover::engine::ShapeGate::bind:26: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:27: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:2: || -> &&
+- boundary_spec::discover::engine::ShapeGate::bind:3: <= -> >
+- boundary_spec::discover::engine::ShapeGate::bind:4: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:5: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:6: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:7: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:8: == -> !=
+- boundary_spec::discover::engine::ShapeGate::bind:9: && -> ||
+- boundary_spec::discover::engine::ShapeGate::bind:deaf -> Err(String::new())
+- boundary_spec::discover::engine::ShapeGate::bind:deaf -> Ok(vec![])
+- boundary_spec::discover::engine::ShapeInfo::equation:deaf -> String::new()
+- boundary_spec::discover::engine::ShapeInfo::instantiate:deaf -> String::new()
+- boundary_spec::discover::engine::ShapeInfo::matches:0: == -> !=
+- boundary_spec::discover::engine::ShapeInfo::matches:deaf -> false
+- boundary_spec::discover::engine::ShapeInfo::matches:deaf -> true
+- boundary_spec::discover::engine::close:0: < -> >=
+- boundary_spec::discover::engine::close:1: >= -> <
+- boundary_spec::discover::engine::close:2: ! -> (deleted)
+- boundary_spec::discover::engine::coprime_step:0: != -> ==
+- boundary_spec::discover::engine::gcd:0: == -> !=
+- boundary_spec::discover::engine::grid_gaps:0: ! -> (deleted)
+- boundary_spec::discover::engine::grid_gaps:1: ! -> (deleted)
+- boundary_spec::discover::engine::grid_gaps:2: && -> ||
+- boundary_spec::discover::engine::grid_gaps:deaf -> vec![]
+- boundary_spec::discover::engine::is_binary_on:0: == -> !=
+- boundary_spec::discover::engine::is_binary_on:1: == -> !=
+- boundary_spec::discover::engine::is_binary_on:2: && -> ||
+- boundary_spec::discover::engine::is_binary_on:3: == -> !=
+- boundary_spec::discover::engine::is_binary_on:4: && -> ||
+- boundary_spec::discover::engine::is_binary_on:5: == -> !=
+- boundary_spec::discover::engine::is_binary_on:6: && -> ||
+- boundary_spec::discover::engine::is_binary_on:deaf -> false
+- boundary_spec::discover::engine::is_binary_on:deaf -> true
+- boundary_spec::discover::engine::shadow_grid:deaf -> vec![]
+- boundary_spec::discover::expect::Distance::is_met:deaf -> false
+- boundary_spec::discover::expect::Distance::is_met:deaf -> true
+- boundary_spec::discover::expect::Distance::of:0: ! -> (deleted)
+- boundary_spec::discover::expect::Distance::of:1: ! -> (deleted)
+- boundary_spec::discover::expect::Distance::of:2: ! -> (deleted)
+- boundary_spec::discover::expect::Distance::of:3: && -> ||
+- boundary_spec::discover::expect::Distance::render:0: && -> ||
+- boundary_spec::discover::expect::Distance::render:1: ! -> (deleted)
+- boundary_spec::discover::expect::Distance::render:2: ! -> (deleted)
+- boundary_spec::discover::expect::Distance::render:deaf -> String::new()
+- boundary_spec::discover::expect::Expectation::canonical:0: == -> !=
+- boundary_spec::discover::expect::Expectation::canonical:1: == -> !=
+- boundary_spec::discover::expect::Expectation::canonical:2: || -> &&
+- boundary_spec::discover::expect::Expectation::canonical:deaf -> None
+- boundary_spec::discover::expect::Expectation::key:0: == -> !=
+- boundary_spec::discover::expect::Expectation::of:0: == -> !=
+- boundary_spec::discover::expect::Expectation::of:1: == -> !=
+- boundary_spec::discover::expect::Expectation::of:2: || -> &&
+- boundary_spec::discover::expect::Expectation::render:deaf -> String::new()
+- boundary_spec::discover::expect::Expectation::vocabulary_keys:deaf -> vec![]
+- boundary_spec::discover::expect::dedup:0: ! -> (deleted)
+- boundary_spec::discover::expect::dedup:deaf -> vec![]
+- boundary_spec::discover::expect::render_list:deaf -> String::new()
+- boundary_spec::discover::fabric::closure:0: == -> !=
+- boundary_spec::discover::fabric::closure:1: && -> ||
+- boundary_spec::discover::fabric::closure:2: ! -> (deleted)
+- boundary_spec::discover::fabric::fabrics:deaf -> vec![]
+- boundary_spec::discover::fabric::grant:deaf -> None
+- boundary_spec::discover::fabric::join:deaf -> None
+- boundary_spec::discover::fabric::mesh:deaf -> None
+- boundary_spec::discover::fabric::reach:deaf -> None
+- boundary_spec::discover::fabric::revoke:deaf -> None
+- boundary_spec::discover::fabric::tru:deaf -> None
+- boundary_spec::discover::fabric::within:deaf -> None
+- boundary_spec::discover::freeze::Spec::check_all_fresh:deaf -> Err(vec![])
+- boundary_spec::discover::freeze::Spec::check_all_fresh:deaf -> Ok(vec![])
+- boundary_spec::discover::freeze::Spec::parse_lock:deaf -> vec![]
+- boundary_spec::discover::freeze::lock_path:0: == -> !=
+- boundary_spec::discover::freeze::render:0: ! -> (deleted)
+- boundary_spec::discover::freeze::render:deaf -> String::new()
+- boundary_spec::discover::gates::Gate::command_line:deaf -> String::new()
+- boundary_spec::discover::gates::GateRegistry::declared:deaf -> vec![]
+- boundary_spec::discover::gates::GateRegistry::pr_checks:0: == -> !=
+- boundary_spec::discover::gates::GateRegistry::pr_checks:deaf -> vec![]
+- boundary_spec::discover::gates::GateRegistry::render_registry:deaf -> String::new()
+- boundary_spec::discover::gates::GateRegistry::render_workflow:0: == -> !=
+- boundary_spec::discover::gates::GateRegistry::render_workflow:10: && -> ||
+- boundary_spec::discover::gates::GateRegistry::render_workflow:11: != -> ==
+- boundary_spec::discover::gates::GateRegistry::render_workflow:1: == -> !=
+- boundary_spec::discover::gates::GateRegistry::render_workflow:2: == -> !=
+- boundary_spec::discover::gates::GateRegistry::render_workflow:3: == -> !=
+- boundary_spec::discover::gates::GateRegistry::render_workflow:4: == -> !=
+- boundary_spec::discover::gates::GateRegistry::render_workflow:5: ! -> (deleted)
+- boundary_spec::discover::gates::GateRegistry::render_workflow:6: != -> ==
+- boundary_spec::discover::gates::GateRegistry::render_workflow:7: && -> ||
+- boundary_spec::discover::gates::GateRegistry::render_workflow:8: ! -> (deleted)
+- boundary_spec::discover::gates::GateRegistry::render_workflow:9: == -> !=
+- boundary_spec::discover::gates::GateRegistry::render_workflow:deaf -> String::new()
+- boundary_spec::discover::gates::Pipeline::locks_in:deaf -> Err(String::new())
+- boundary_spec::discover::gates::Pipeline::locks_in:deaf -> Ok(vec![])
+- boundary_spec::discover::gates::Pipeline::render_registry:deaf -> String::new()
+- boundary_spec::discover::gates::Pipeline::render_workflow:0: == -> !=
+- boundary_spec::discover::gates::Pipeline::render_workflow:1: == -> !=
+- boundary_spec::discover::gates::Pipeline::render_workflow:2: == -> !=
+- boundary_spec::discover::gates::Pipeline::render_workflow:3: ! -> (deleted)
+- boundary_spec::discover::gates::Pipeline::render_workflow:4: && -> ||
+- boundary_spec::discover::gates::Pipeline::render_workflow:5: == -> !=
+- boundary_spec::discover::gates::Pipeline::render_workflow:6: == -> !=
+- boundary_spec::discover::gates::Pipeline::render_workflow:deaf -> Err(String::new())
+- boundary_spec::discover::gates::Pipeline::render_workflow:deaf -> Ok(String::new())
+- boundary_spec::discover::gates::check_context:deaf -> String::new()
+- boundary_spec::discover::gates::job_slug:0: || -> &&
+- boundary_spec::discover::gates::job_slug:deaf -> String::new()
+- boundary_spec::discover::gates::registry_stanzas:deaf -> String::new()
+- boundary_spec::discover::genesis::Genesis::apply:deaf -> Ok(vec![])
+- boundary_spec::discover::genesis::Genesis::plan:0: ! -> (deleted)
+- boundary_spec::discover::genesis::Genesis::plan:1: || -> &&
+- boundary_spec::discover::genesis::Genesis::plan:2: ! -> (deleted)
+- boundary_spec::discover::genesis::Genesis::plan:deaf -> Err(String::new())
+- boundary_spec::discover::genesis::Plan::listing:deaf -> vec![]
+- boundary_spec::discover::genesis::Rule::doc:deaf -> String::new()
+- boundary_spec::discover::genesis::banner:deaf -> String::new()
+- boundary_spec::discover::genesis::bless_env:deaf -> String::new()
+- boundary_spec::discover::genesis::bless_tiers_env:deaf -> String::new()
+- boundary_spec::discover::genesis::camel:0: ! -> (deleted)
+- boundary_spec::discover::genesis::camel:deaf -> String::new()
+- boundary_spec::discover::genesis::crate_ident:deaf -> String::new()
+- boundary_spec::discover::genesis::doc_safe:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_boundary:0: == -> !=
+- boundary_spec::discover::genesis::emit_boundary:1: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_boundary:2: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_boundary:3: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_boundary:4: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_boundary:5: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_boundary:6: == -> !=
+- boundary_spec::discover::genesis::emit_boundary:7: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_boundary:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_build_rs:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_cargo_toml:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_expectations:0: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_expectations:1: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_expectations:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_freeze_example:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_freeze_gate:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_freeze_gates_example:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_gates_gate:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_gates_module:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_internal:0: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_internal:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_lib_rs:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_ops:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_probes_stub:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_seams:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_system:0: == -> !=
+- boundary_spec::discover::genesis::emit_system:1: && -> ||
+- boundary_spec::discover::genesis::emit_system:2: > -> <=
+- boundary_spec::discover::genesis::emit_system:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_system_lock:0: == -> !=
+- boundary_spec::discover::genesis::emit_system_lock:1: || -> &&
+- boundary_spec::discover::genesis::emit_system_lock:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_target_lock:0: == -> !=
+- boundary_spec::discover::genesis::emit_target_lock:1: ! -> (deleted)
+- boundary_spec::discover::genesis::emit_target_lock:deaf -> String::new()
+- boundary_spec::discover::genesis::emit_value_object:deaf -> String::new()
+- boundary_spec::discover::genesis::esc_lit:deaf -> String::new()
+- boundary_spec::discover::genesis::expects_for:0: == -> !=
+- boundary_spec::discover::genesis::expects_for:deaf -> vec![]
+- boundary_spec::discover::genesis::is_binary_on_value:0: == -> !=
+- boundary_spec::discover::genesis::is_binary_on_value:1: == -> !=
+- boundary_spec::discover::genesis::is_binary_on_value:2: && -> ||
+- boundary_spec::discover::genesis::is_binary_on_value:3: == -> !=
+- boundary_spec::discover::genesis::is_binary_on_value:4: && -> ||
+- boundary_spec::discover::genesis::is_binary_on_value:5: == -> !=
+- boundary_spec::discover::genesis::is_binary_on_value:6: && -> ||
+- boundary_spec::discover::genesis::is_binary_on_value:deaf -> false
+- boundary_spec::discover::genesis::is_binary_on_value:deaf -> true
+- boundary_spec::discover::genesis::owner_of:0: == -> !=
+- boundary_spec::discover::genesis::owner_of:1: == -> !=
+- boundary_spec::discover::genesis::owner_of:2: || -> &&
+- boundary_spec::discover::genesis::owner_of:deaf -> None
+- boundary_spec::discover::genesis::parse_declaration:0: == -> !=
+- boundary_spec::discover::genesis::parse_declaration:1: == -> !=
+- boundary_spec::discover::genesis::parse_declaration:2: == -> !=
+- boundary_spec::discover::genesis::parse_declaration:3: || -> &&
+- boundary_spec::discover::genesis::parse_declaration:deaf -> Err(String::new())
+- boundary_spec::discover::genesis::parse_expect:0: == -> !=
+- boundary_spec::discover::genesis::parse_expect:1: == -> !=
+- boundary_spec::discover::genesis::parse_expect:2: == -> !=
+- boundary_spec::discover::genesis::parse_expect:3: == -> !=
+- boundary_spec::discover::genesis::parse_expect:4: && -> ||
+- boundary_spec::discover::genesis::parse_expect:5: != -> ==
+- boundary_spec::discover::genesis::parse_expect:6: != -> ==
+- boundary_spec::discover::genesis::parse_module:0: ! -> (deleted)
+- boundary_spec::discover::genesis::parse_module:1: ! -> (deleted)
+- boundary_spec::discover::genesis::parse_module:2: ! -> (deleted)
+- boundary_spec::discover::genesis::parse_seam:0: == -> !=
+- boundary_spec::discover::genesis::parse_system:0: ! -> (deleted)
+- boundary_spec::discover::genesis::parse_system:1: ! -> (deleted)
+- boundary_spec::discover::genesis::parse_system:2: ! -> (deleted)
+- boundary_spec::discover::genesis::parse_system:3: ! -> (deleted)
+- boundary_spec::discover::genesis::parse_value:0: != -> ==
+- boundary_spec::discover::genesis::parse_value:1: && -> ||
+- boundary_spec::discover::genesis::shape_info:0: == -> !=
+- boundary_spec::discover::genesis::shape_rank:0: == -> !=
+- boundary_spec::discover::genesis::slice_by_line_column:0: == -> !=
+- boundary_spec::discover::genesis::slice_by_line_column:1: == -> !=
+- boundary_spec::discover::genesis::type_text:deaf -> String::new()
+- boundary_spec::discover::genesis::validate:0: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:10: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:11: && -> ||
+- boundary_spec::discover::genesis::validate:12: < -> >=
+- boundary_spec::discover::genesis::validate:13: && -> ||
+- boundary_spec::discover::genesis::validate:14: > -> <=
+- boundary_spec::discover::genesis::validate:15: == -> !=
+- boundary_spec::discover::genesis::validate:16: == -> !=
+- boundary_spec::discover::genesis::validate:17: || -> &&
+- boundary_spec::discover::genesis::validate:18: || -> &&
+- boundary_spec::discover::genesis::validate:19: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:1: || -> &&
+- boundary_spec::discover::genesis::validate:20: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:21: > -> <=
+- boundary_spec::discover::genesis::validate:22: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:23: == -> !=
+- boundary_spec::discover::genesis::validate:24: == -> !=
+- boundary_spec::discover::genesis::validate:25: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:26: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:27: == -> !=
+- boundary_spec::discover::genesis::validate:28: == -> !=
+- boundary_spec::discover::genesis::validate:29: != -> ==
+- boundary_spec::discover::genesis::validate:2: == -> !=
+- boundary_spec::discover::genesis::validate:30: != -> ==
+- boundary_spec::discover::genesis::validate:31: == -> !=
+- boundary_spec::discover::genesis::validate:32: != -> ==
+- boundary_spec::discover::genesis::validate:33: == -> !=
+- boundary_spec::discover::genesis::validate:34: == -> !=
+- boundary_spec::discover::genesis::validate:35: == -> !=
+- boundary_spec::discover::genesis::validate:36: || -> &&
+- boundary_spec::discover::genesis::validate:37: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:3: || -> &&
+- boundary_spec::discover::genesis::validate:4: == -> !=
+- boundary_spec::discover::genesis::validate:5: || -> &&
+- boundary_spec::discover::genesis::validate:6: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:7: || -> &&
+- boundary_spec::discover::genesis::validate:8: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:9: ! -> (deleted)
+- boundary_spec::discover::genesis::validate:deaf -> Err(String::new())
+- boundary_spec::discover::genesis::value_imports:0: == -> !=
+- boundary_spec::discover::genesis::value_imports:1: && -> ||
+- boundary_spec::discover::genesis::value_imports:deaf -> String::new()
+- boundary_spec::discover::genesis::via_seam_parts:0: == -> !=
+- boundary_spec::discover::genesis::via_seam_parts:1: == -> !=
+- boundary_spec::discover::infra::Infra::coherent:0: == -> !=
+- boundary_spec::discover::infra::Infra::coherent:1: == -> !=
+- boundary_spec::discover::infra::Infra::coherent:deaf -> Err(vec![])
+- boundary_spec::discover::infra::Infra::coherent:deaf -> Ok(vec![])
+- boundary_spec::discover::infra::Infra::ephemeral_prefixes:deaf -> vec![]
+- boundary_spec::discover::infra::Infra::floor:deaf -> Err(String::new())
+- boundary_spec::discover::infra::Infra::judge:0: == -> !=
+- boundary_spec::discover::infra::Infra::judge:1: == -> !=
+- boundary_spec::discover::infra::Infra::judge:2: == -> !=
+- boundary_spec::discover::infra::Infra::judge:3: == -> !=
+- boundary_spec::discover::infra::Infra::judge:deaf -> Err(vec![])
+- boundary_spec::discover::infra::Infra::judge:deaf -> Ok(vec![])
+- boundary_spec::discover::infra::Infra::render:deaf -> String::new()
+- boundary_spec::discover::infra::Infra::slug:0: == -> !=
+- boundary_spec::discover::infra::Infra::slug:deaf -> String::new()
+- boundary_spec::discover::infra::Infra::store:0: == -> !=
+- boundary_spec::discover::infra::Infra::store:deaf -> None
+- boundary_spec::discover::infra::Infra::surface:0: == -> !=
+- boundary_spec::discover::infra::Infra::surface:deaf -> None
+- boundary_spec::discover::infra::Infra::unjudgeable:deaf -> vec![]
+- boundary_spec::discover::infra::LiveInfra::dents:0: != -> ==
+- boundary_spec::discover::infra::LiveInfra::dents:1: == -> !=
+- boundary_spec::discover::infra::LiveInfra::dents:2: != -> ==
+- boundary_spec::discover::infra::LiveInfra::dents:3: != -> ==
+- boundary_spec::discover::infra::LiveInfra::dents:4: == -> !=
+- boundary_spec::discover::infra::LiveInfra::dents:5: != -> ==
+- boundary_spec::discover::infra::LiveInfra::dents:6: != -> ==
+- boundary_spec::discover::infra::LiveInfra::dents:7: == -> !=
+- boundary_spec::discover::infra::LiveInfra::dents:deaf -> vec![]
+- boundary_spec::discover::infra::LiveInfra::lookup:0: == -> !=
+- boundary_spec::discover::infra::LiveInfra::lookup:deaf -> None
+- boundary_spec::discover::infra::Meaning::describe:deaf -> String::new()
+- boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Err(vec![])
+- boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Ok(vec![])
+- boundary_spec::discover::layering::ComponentLayering::is_atomic:deaf -> false
+- boundary_spec::discover::layering::ComponentLayering::is_atomic:deaf -> true
+- boundary_spec::discover::layering::LayeringReport::render:0: ! -> (deleted)
+- boundary_spec::discover::layering::LayeringReport::render:deaf -> String::new()
+- boundary_spec::discover::layering::LayeringReport::wants_layering:0: ! -> (deleted)
+- boundary_spec::discover::layering::LayeringReport::wants_layering:deaf -> false
+- boundary_spec::discover::layering::LayeringReport::wants_layering:deaf -> true
+- boundary_spec::discover::layering::articulation_points:0: == -> !=
+- boundary_spec::discover::layering::connected_components:0: ! -> (deleted)
+- boundary_spec::discover::layering::connected_components:deaf -> vec![]
+- boundary_spec::discover::layering::dfs:0: == -> !=
+- boundary_spec::discover::layering::dfs:1: != -> ==
+- boundary_spec::discover::layering::dfs:2: >= -> <
+- boundary_spec::discover::layering::dfs:3: && -> ||
+- boundary_spec::discover::layering::dfs:4: != -> ==
+- boundary_spec::discover::layering::dfs:5: == -> !=
+- boundary_spec::discover::layering::dfs:6: > -> <=
+- boundary_spec::discover::layering::dfs:7: && -> ||
+- boundary_spec::discover::layering::interaction_graph:0: != -> ==
+- boundary_spec::discover::layering::interaction_graph:deaf -> vec![]
+- boundary_spec::discover::modularize::Proposal::misfits:0: ! -> (deleted)
+- boundary_spec::discover::modularize::Proposal::misfits:deaf -> vec![]
+- boundary_spec::discover::modularize::Proposal::render:deaf -> String::new()
+- boundary_spec::discover::modularize::Proposal::shapes:deaf -> vec![]
+- boundary_spec::discover::modularize::ProposedModule::is_shape:0: > -> <=
+- boundary_spec::discover::modularize::ProposedModule::is_shape:deaf -> false
+- boundary_spec::discover::modularize::ProposedModule::is_shape:deaf -> true
+- boundary_spec::discover::mutation::MutationReport::deaf_survivors:0: ! -> (deleted)
+- boundary_spec::discover::mutation::MutationReport::deaf_survivors:deaf -> vec![]
+- boundary_spec::discover::mutation::MutationReport::dent_survivors:0: ! -> (deleted)
+- boundary_spec::discover::mutation::MutationReport::dent_survivors:deaf -> vec![]
+- boundary_spec::discover::mutation::MutationReport::lock_in:0: == -> !=
+- boundary_spec::discover::mutation::MutationReport::of:0: != -> ==
+- boundary_spec::discover::mutation::MutationReport::render:deaf -> String::new()
+- boundary_spec::discover::mutation::MutationReport::survivors:0: ! -> (deleted)
+- boundary_spec::discover::mutation::MutationReport::survivors:deaf -> vec![]
+- boundary_spec::discover::mutation::deaf_battery:0: == -> !=
+- boundary_spec::discover::mutation::deaf_battery:deaf -> vec![]
+- boundary_spec::discover::mutation::dent_battery:0: == -> !=
+- boundary_spec::discover::mutation::dent_battery:1: || -> &&
+- boundary_spec::discover::mutation::dent_battery:2: >= -> <
+- boundary_spec::discover::mutation::dent_battery:deaf -> vec![]
+- boundary_spec::discover::mutation::input_tuples:0: >= -> <
+- boundary_spec::discover::mutation::input_tuples:1: >= -> <
+- boundary_spec::discover::mutation::input_tuples:deaf -> vec![]
+- boundary_spec::discover::mutation::judge_surgery:deaf -> false
+- boundary_spec::discover::mutation::judge_surgery:deaf -> true
+- boundary_spec::discover::mutation::law_set:deaf -> vec![]
+- boundary_spec::discover::mutation::laws_naming:deaf -> vec![]
+- boundary_spec::discover::mutation::mutants:0: != -> ==
+- boundary_spec::discover::mutation::mutants:10: == -> !=
+- boundary_spec::discover::mutation::mutants:11: && -> ||
+- boundary_spec::discover::mutation::mutants:12: ! -> (deleted)
+- boundary_spec::discover::mutation::mutants:13: || -> &&
+- boundary_spec::discover::mutation::mutants:14: == -> !=
+- boundary_spec::discover::mutation::mutants:1: == -> !=
+- boundary_spec::discover::mutation::mutants:2: && -> ||
+- boundary_spec::discover::mutation::mutants:3: <= -> >
+- boundary_spec::discover::mutation::mutants:4: && -> ||
+- boundary_spec::discover::mutation::mutants:5: == -> !=
+- boundary_spec::discover::mutation::mutants:6: && -> ||
+- boundary_spec::discover::mutation::mutants:7: ! -> (deleted)
+- boundary_spec::discover::mutation::mutants:8: || -> &&
+- boundary_spec::discover::mutation::mutants:9: > -> <=
+- boundary_spec::discover::mutation::mutants:deaf -> vec![]
+- boundary_spec::discover::mutation::never:deaf -> None
+- boundary_spec::discover::mutation::proj0:deaf -> None
+- boundary_spec::discover::mutation::proj1:deaf -> None
+- boundary_spec::discover::mutation::same_conduct:0: == -> !=
+- boundary_spec::discover::mutation::same_conduct:deaf -> false
+- boundary_spec::discover::mutation::same_conduct:deaf -> true
+- boundary_spec::discover::mutation::surgical_eval:0: == -> !=
+- boundary_spec::discover::mutation::surgical_eval:deaf -> None
+- boundary_spec::discover::perimeter::LivePerimeter::dents:0: != -> ==
+- boundary_spec::discover::perimeter::LivePerimeter::dents:deaf -> vec![]
+- boundary_spec::discover::perimeter::Perimeter::judge:0: == -> !=
+- boundary_spec::discover::perimeter::Perimeter::judge:1: == -> !=
+- boundary_spec::discover::perimeter::Perimeter::judge:deaf -> Err(vec![])
+- boundary_spec::discover::perimeter::Perimeter::judge:deaf -> Ok(vec![])
+- boundary_spec::discover::perimeter::Perimeter::render:deaf -> String::new()
+- boundary_spec::discover::perimeter::Perimeter::ruleset_json:deaf -> String::new()
+- boundary_spec::discover::protocol::approve:0: >= -> <
+- boundary_spec::discover::protocol::approve:deaf -> None
+- boundary_spec::discover::protocol::draft_seeds:deaf -> vec![]
+- boundary_spec::discover::protocol::edit:deaf -> None
+- boundary_spec::discover::protocol::revise:deaf -> None
+- boundary_spec::discover::protocol::submit:0: ! -> (deleted)
+- boundary_spec::discover::protocol::submit:deaf -> None
+- boundary_spec::discover::residue::Inert::census:deaf -> vec![]
+- boundary_spec::discover::residue::Inert::render_census:0: == -> !=
+- boundary_spec::discover::residue::Inert::render_census:1: == -> !=
+- boundary_spec::discover::residue::Inert::render_census:deaf -> String::new()
+- boundary_spec::discover::residue::Inert::simplifiable:0: == -> !=
+- boundary_spec::discover::residue::Inert::simplifiable:deaf -> vec![]
+- boundary_spec::discover::router::empty:deaf -> None
+- boundary_spec::discover::router::or:deaf -> None
+- boundary_spec::discover::router::routers:deaf -> vec![]
+- boundary_spec::discover::scaffold::Scaffold::of:deaf -> None
+- boundary_spec::discover::scaffold::Scaffold::placement:deaf -> None
+- boundary_spec::discover::scaffold::Scaffold::render:deaf -> String::new()
+- boundary_spec::discover::scaffold::render_module:0: ! -> (deleted)
+- boundary_spec::discover::scaffold::render_module:deaf -> String::new()
+- boundary_spec::discover::scaffold::scaffold:deaf -> None
+- boundary_spec::discover::shape::Component::render:deaf -> String::new()
+- boundary_spec::discover::shape::Placement::is_settled:0: <= -> >
+- boundary_spec::discover::shape::Placement::is_settled:deaf -> false
+- boundary_spec::discover::shape::Placement::is_settled:deaf -> true
+- boundary_spec::discover::shape::Placement::over:0: ! -> (deleted)
+- boundary_spec::discover::shape::Placement::over:1: == -> !=
+- boundary_spec::discover::shape::Placement::render:deaf -> String::new()
+- boundary_spec::discover::shape::Placement::signatures_of:deaf -> vec![]
+- boundary_spec::discover::shape::ShapeReport::is_settled:deaf -> false
+- boundary_spec::discover::shape::ShapeReport::is_settled:deaf -> true
+- boundary_spec::discover::shape::ShapeReport::lock_in:0: == -> !=
+- boundary_spec::discover::shape::ShapeReport::of:0: || -> &&
+- boundary_spec::discover::shape::ShapeReport::render:deaf -> String::new()
+- boundary_spec::discover::shape::find:0: != -> ==
+- boundary_spec::discover::substrate::LiveSubstrate::dents:0: == -> !=
+- boundary_spec::discover::substrate::LiveSubstrate::dents:1: && -> ||
+- boundary_spec::discover::substrate::LiveSubstrate::dents:2: || -> &&
+- boundary_spec::discover::substrate::LiveSubstrate::dents:3: != -> ==
+- boundary_spec::discover::substrate::LiveSubstrate::dents:4: != -> ==
+- boundary_spec::discover::substrate::LiveSubstrate::dents:5: || -> &&
+- boundary_spec::discover::substrate::LiveSubstrate::dents:6: == -> !=
+- boundary_spec::discover::substrate::LiveSubstrate::dents:7: != -> ==
+- boundary_spec::discover::substrate::LiveSubstrate::dents:8: != -> ==
+- boundary_spec::discover::substrate::LiveSubstrate::dents:deaf -> vec![]
+- boundary_spec::discover::substrate::Substrate::judge:0: == -> !=
+- boundary_spec::discover::substrate::Substrate::judge:1: ! -> (deleted)
+- boundary_spec::discover::substrate::Substrate::judge:2: == -> !=
+- boundary_spec::discover::substrate::Substrate::judge:deaf -> Err(vec![])
+- boundary_spec::discover::substrate::Substrate::judge:deaf -> Ok(vec![])
+- boundary_spec::discover::substrate::Substrate::render:deaf -> String::new()
+- boundary_spec::discover::substrate::TagLaw::matches:0: == -> !=
+- boundary_spec::discover::substrate::TagLaw::matches:deaf -> false
+- boundary_spec::discover::substrate::TagLaw::matches:deaf -> true
+- boundary_spec::discover::system::SeamReport::transform:0: ! -> (deleted)
+- boundary_spec::discover::system::SeamReport::transform:1: == -> !=
+- boundary_spec::discover::system::SeamReport::transform:2: && -> ||
+- boundary_spec::discover::system::SeamStatus::is_met:deaf -> false
+- boundary_spec::discover::system::SeamStatus::is_met:deaf -> true
+- boundary_spec::discover::system::SystemDistance::latent:0: ! -> (deleted)
+- boundary_spec::discover::system::SystemDistance::latent:deaf -> vec![]
+- boundary_spec::discover::system::SystemDistance::render:deaf -> String::new()
+- boundary_spec::discover::system::SystemReport::is_met:deaf -> false
+- boundary_spec::discover::system::SystemReport::is_met:deaf -> true
+- boundary_spec::discover::system::SystemReport::lock_in:0: == -> !=
+- boundary_spec::discover::system::SystemReport::render:0: ! -> (deleted)
+- boundary_spec::discover::system::SystemReport::render:deaf -> String::new()
+- boundary_spec::discover::watch::diff:0: ! -> (deleted)
+- boundary_spec::discover::watch::diff:1: ! -> (deleted)
+- boundary_spec::discover::watch::diff:2: < -> >=
+- boundary_spec::discover::watch::diff:3: > -> <=
+- boundary_spec::discover::watch::diff:deaf -> None
+- boundary_spec::discover::watch::net_name:deaf -> String::new()
+- boundary_spec::discover::watch::parse_entry:0: ! -> (deleted)
+- boundary_spec::discover::watch::parse_entry:deaf -> Err(String::new())
+- boundary_spec::discover::watch::parse_ops:0: == -> !=
+- boundary_spec::discover::watch::parse_ops:1: == -> !=
+- boundary_spec::discover::watch::parse_ops:2: || -> &&
+- boundary_spec::discover::watch::parse_ops:3: == -> !=
+- boundary_spec::discover::watch::parse_ops:4: ! -> (deleted)
+- boundary_spec::discover::watch::parse_ops:deaf -> Err(String::new())
+- boundary_spec::discover::watch::parse_ops:deaf -> Ok(vec![])
+- boundary_spec::discover::watch::shape_event::render:deaf -> String::new()
+- boundary_spec::discover::watch::ticker::parse_ops:deaf -> Err(String::new())
+- boundary_spec::discover::watch::ticker::parse_ops:deaf -> Ok(vec![])
+- boundary_spec::discover::watch::ticker_speak::hook_line:0: > -> <=
+- boundary_spec::discover::watch::ticker_speak::hook_line:deaf -> None
+- boundary_spec::discover::watch::ticker_speak::resume:0: ! -> (deleted)
+- boundary_spec::discover::watch::ticker_speak::step:deaf -> Err(String::new())
+- boundary_spec::discover::watch::ticker_speak::store:deaf -> Err(String::new())
+- boundary_spec::discover::watch::ticker_speak::store:deaf -> Ok(String::new())
+- boundary_spec::discover::watch::ticker_speak::store_signatures:deaf -> String::new()
+- boundary_spec::discover::world::Trace::perturbation_classes:deaf -> vec![]
+- boundary_spec::discover::world::WorldReport::disagreements:0: != -> ==
+- boundary_spec::discover::world::WorldReport::disagreements:1: != -> ==
+- boundary_spec::discover::world::WorldReport::disagreements:deaf -> vec![]
+- boundary_spec::discover::world::WorldReport::lock_in:0: == -> !=
+- boundary_spec::discover::world::WorldReport::render:deaf -> String::new()
+- boundary_spec::discover::world::concat_traces:deaf -> None
+- boundary_spec::discover::world::empty_trace:deaf -> None

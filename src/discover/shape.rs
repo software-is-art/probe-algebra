@@ -84,6 +84,7 @@ pub struct Placement {
 pub type NetSignature = (&'static str, Vec<String>, String);
 
 /// Union-find: the root of `x`, with path compression.
+#[crate::mutate]
 fn find(parent: &mut [usize], mut x: usize) -> usize {
     while parent[x] != x {
         parent[x] = parent[parent[x]];

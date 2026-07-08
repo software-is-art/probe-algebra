@@ -1,0 +1,26 @@
+# instrumentation exemptions — the completeness census's register. Every file named
+# here contains functions or impl blocks WITHOUT #[mutate], each with its reason; a
+# file whose debt is paid (fully instrumented) makes its line STALE and the census
+# refuses it. Judged two-way by `every_eligible_item_is_instrumented_or_exempted`
+# (schemata builds). The register can only shrink honestly.
+#
+# Format: <path relative to crate root>: <reason>
+
+src/tests.rs: test scaffolding — the mod declaration is cfg(test) in lib.rs; nothing here ships
+src/harness.rs: probe harness — test-facing scaffolding exercised only from suites
+src/main.rs: demo binary entry — banner and I/O, no lock rests on it
+src/gdp.rs: kernel — brand/proof machinery is type-level; guarded by trybuild and the fixture suites
+src/boundary.rs: kernel — the probe algebra itself; guarded by the interpreter/kvstore harnesses and trybuild
+src/capability.rs: kernel — capability observers; guarded by the same suites as boundary.rs
+src/interp/boundary.rs: worked example — guarded by its derived probe surface (harness.rs); next widening target
+src/interp/internal.rs: worked example — same surface as interp/boundary.rs; next widening target
+src/kvstore/probes.rs: probe suite for the worked example — probes are not product code
+src/kvstore/theory.rs: theory operators — mutated in-process on every test (spec/*.mutation.spec)
+src/kvstore/internal.rs: worked example — guarded by the ttl-store theory's in-process mutation and the layer probes; next widening target
+src/kvstore/store.rs: worked example — same guard as kvstore/internal.rs; next widening target
+src/select/boundary.rs: audit tooling — consumes cargo-mutants outcomes.json; retires with the source sweeps
+src/select/internal.rs: audit tooling — same as select/boundary.rs
+src/discover/mod.rs: theory declarations and spec tables — data mutated in-process, plus the theory!/system! macros
+src/discover/derived.rs: theory operators in inline algebra modules — mutated in-process on every test
+src/discover/modularize.rs: sample corpus for the placer probes — the placer itself is instrumented
+src/discover/schemata.rs: the selector — instrumenting the mutant switch with mutants is self-reference

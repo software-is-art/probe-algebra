@@ -94,6 +94,7 @@ impl LayeringReport {
 }
 
 /// Collect the operator indices a term mentions.
+#[crate::mutate]
 fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
     if let Term::App(op, args) = t {
         out.insert(*op);
@@ -105,6 +106,7 @@ fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
 
 /// The operator-interaction graph: an adjacency set per operator, an undirected edge between two
 /// operators whenever a discovered law mentions both.
+#[crate::mutate]
 fn interaction_graph<T: Theory>(n: usize) -> Vec<BTreeSet<usize>> {
     let mut adj = vec![BTreeSet::new(); n];
     for law in Engine::<T>::new().discover().laws {
@@ -127,6 +129,7 @@ fn interaction_graph<T: Theory>(n: usize) -> Vec<BTreeSet<usize>> {
 
 /// The connected components of the graph (vertices reachable from each other), each as a sorted
 /// vertex list, in ascending order of least vertex.
+#[crate::mutate]
 fn connected_components(adj: &[BTreeSet<usize>]) -> Vec<Vec<usize>> {
     let n = adj.len();
     let mut seen = vec![false; n];
@@ -156,6 +159,7 @@ fn connected_components(adj: &[BTreeSet<usize>]) -> Vec<Vec<usize>> {
 /// The ARTICULATION POINTS (hinges) of the graph — vertices whose removal increases the number of
 /// connected components. Tarjan's DFS: a root is a hinge iff it has >1 DFS child; a non-root `u` is
 /// a hinge iff some child `v` cannot reach an ancestor of `u` (`low[v] >= disc[u]`).
+#[crate::mutate]
 fn articulation_points(adj: &[BTreeSet<usize>]) -> BTreeSet<usize> {
     let n = adj.len();
     let mut disc = vec![usize::MAX; n];
@@ -179,6 +183,7 @@ fn articulation_points(adj: &[BTreeSet<usize>]) -> BTreeSet<usize> {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[crate::mutate]
 fn dfs(
     u: usize,
     parent: usize,
@@ -213,6 +218,7 @@ fn dfs(
 
 /// Analyse a theory's discovered algebra for sprawl — per connected component, which operators are
 /// hinges (load-bearing for connectivity). (Private — reached as `LayeringReport::of`.)
+#[crate::mutate]
 fn layering<T: Theory>() -> LayeringReport {
     let sigs = Engine::<T>::new().signatures();
     let adj = interaction_graph::<T>(sigs.len());

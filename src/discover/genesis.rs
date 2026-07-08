@@ -210,6 +210,7 @@ pub enum SeamKindDecl {
 }
 
 /// The catalog row a (validated) expectation instantiates.
+#[crate::mutate]
 fn shape_info(e: &Expectation) -> ShapeInfo {
     ShapeCatalog::inventory()
         .into_iter()
@@ -219,6 +220,7 @@ fn shape_info(e: &Expectation) -> ShapeInfo {
 
 /// The shape-catalog rank — the order the engine tries (and therefore renders) the shapes, so
 /// the target lock's law order matches a discovery that confirms the declaration.
+#[crate::mutate]
 fn shape_rank(e: &Expectation) -> usize {
     ShapeCatalog::inventory()
         .iter()
@@ -235,6 +237,7 @@ fn shape_rank(e: &Expectation) -> usize {
 /// equation is byte-for-byte what the engine renders for the shape's discovered instance.
 /// The dynamic sync test (`the_target_lock_reproduces_discovery_byte_for_byte`) holds this
 /// to the freeze's actual render.
+#[crate::mutate]
 fn law(e: &Expectation) -> (String, String) {
     let op = e.ops[0].as_str();
     let subs: Vec<(&str, &str)> = match e.shape {
@@ -298,6 +301,7 @@ mod kw {
 /// A raw type's canonical text: `quote`'s token render with its inter-token spacing
 /// collapsed back to source form (`Vec < u8 >` → `Vec<u8>`), so the generated newtypes read
 /// as written.
+#[crate::mutate]
 fn type_text(ty: &syn::Type) -> String {
     quote::quote!(#ty)
         .to_string()
@@ -311,6 +315,7 @@ fn type_text(ty: &syn::Type) -> String {
 }
 
 /// One end of a range rule: an integer literal, optionally negated.
+#[crate::mutate]
 fn parse_bound(input: ParseStream) -> syn::Result<i128> {
     let negative = input.peek(Token![-]);
     if negative {
@@ -321,6 +326,7 @@ fn parse_bound(input: ParseStream) -> syn::Result<i128> {
     Ok(if negative { -magnitude } else { magnitude })
 }
 
+#[crate::mutate]
 fn parse_value(input: ParseStream) -> syn::Result<ValueDecl> {
     let name: Ident = input.parse()?;
     input.parse::<Token![=]>()?;
@@ -355,6 +361,7 @@ fn parse_value(input: ParseStream) -> syn::Result<ValueDecl> {
     })
 }
 
+#[crate::mutate]
 fn parse_op(input: ParseStream) -> syn::Result<OpDecl> {
     let name: Ident = input.parse()?;
     let args;
@@ -370,6 +377,7 @@ fn parse_op(input: ParseStream) -> syn::Result<OpDecl> {
     })
 }
 
+#[crate::mutate]
 fn parse_expect(input: ParseStream) -> syn::Result<Expectation> {
     let shape: Ident = input.parse()?;
     let args;
@@ -434,6 +442,7 @@ fn parse_expect(input: ParseStream) -> syn::Result<Expectation> {
     Ok(Expectation::of(key, names))
 }
 
+#[crate::mutate]
 fn parse_module(input: ParseStream) -> syn::Result<ModuleDecl> {
     let name: Ident = input.parse()?;
     let body;
@@ -466,6 +475,7 @@ fn parse_module(input: ParseStream) -> syn::Result<ModuleDecl> {
     })
 }
 
+#[crate::mutate]
 fn parse_seam(input: ParseStream) -> syn::Result<SeamDecl> {
     let left: Ident = input.parse()?;
     input.parse::<Token![-]>()?;
@@ -506,6 +516,7 @@ fn parse_seam(input: ParseStream) -> syn::Result<SeamDecl> {
     })
 }
 
+#[crate::mutate]
 fn parse_system(input: ParseStream) -> syn::Result<SystemDecl> {
     input.parse::<kw::name>()?;
     input.parse::<Token![:]>()?;
@@ -549,6 +560,7 @@ fn parse_system(input: ParseStream) -> syn::Result<SystemDecl> {
 }
 
 /// Find the `system! { ... }` invocation in the declaration file and parse its token stream.
+#[crate::mutate]
 fn parse_declaration(source: &str) -> Result<(SystemDecl, String), String> {
     let file = syn::parse_file(source)
         .map_err(|e| format!("genesis: the declaration is not parseable Rust: {e}"))?;
@@ -591,6 +603,7 @@ fn parse_declaration(source: &str) -> Result<(SystemDecl, String), String> {
 
 /// The byte slice of `source` between two proc-macro2 line/column positions (lines are
 /// 1-based, columns are UTF-8-character offsets within the line).
+#[crate::mutate]
 fn slice_by_line_column(
     source: &str,
     start: proc_macro2::LineColumn,
@@ -622,6 +635,7 @@ fn slice_by_line_column(
 
 /// Reject an incoherent declaration with a message naming the exact production at fault —
 /// generation only ever runs over a validated system.
+#[crate::mutate]
 fn validate(sys: &SystemDecl) -> Result<(), String> {
     let err = |msg: String| Err(format!("genesis: {msg}"));
 
@@ -853,6 +867,7 @@ fn validate(sys: &SystemDecl) -> Result<(), String> {
 }
 
 /// Is `op` a homogeneous binary over declared value `v` (`v × v → v`)?
+#[crate::mutate]
 fn is_binary_on_value(op: &OpDecl, v: &str) -> bool {
     op.inputs.len() == 2 && op.inputs[0] == v && op.inputs[1] == v && op.output == v
 }
@@ -860,6 +875,7 @@ fn is_binary_on_value(op: &OpDecl, v: &str) -> bool {
 /// The resolved pieces of a `via` transform seam — the conversion and the two endpoint
 /// binaries the spanning theory carries: `(h, from_op, to_op)`. Only callable on a
 /// VALIDATED system (every lookup was checked by `validate`).
+#[crate::mutate]
 fn via_seam_parts<'a>(sys: &'a SystemDecl, s: &SeamDecl) -> (&'a OpDecl, &'a OpDecl, &'a OpDecl) {
     let module = |name: &String| {
         sys.modules
@@ -890,6 +906,7 @@ fn via_seam_parts<'a>(sys: &'a SystemDecl, s: &SeamDecl) -> (&'a OpDecl, &'a OpD
 
 /// A `via` seam's spanning-theory naming: `(ops module, theory marker, display name)` —
 /// `meter`/`billing` → (`meter_billing_seam_ops`, `MeterBillingSeam`, "meter-billing seam").
+#[crate::mutate]
 fn seam_theory_names(s: &SeamDecl) -> (String, String, String) {
     (
         format!("{}_{}_seam_ops", s.left, s.right),
@@ -903,6 +920,7 @@ fn seam_theory_names(s: &SeamDecl) -> (String, String, String) {
 /// The module that OWNS a value: the first module (declaration order) whose operators mention
 /// it. The value object is defined in that module's boundary file; everyone else imports it —
 /// which is exactly what makes a declared `transport` seam true by construction.
+#[crate::mutate]
 fn owner_of<'a>(sys: &'a SystemDecl, value: &str) -> Option<&'a str> {
     sys.modules
         .iter()
@@ -915,6 +933,7 @@ fn owner_of<'a>(sys: &'a SystemDecl, value: &str) -> Option<&'a str> {
 }
 
 /// `credit_meter` → `CreditMeter`: the theory type name for a module.
+#[crate::mutate]
 fn camel(s: &str) -> String {
     s.split(['_', '-'])
         .filter(|part| !part.is_empty())
@@ -929,6 +948,7 @@ fn camel(s: &str) -> String {
 }
 
 /// The crate name as a Rust identifier (`credit-app` → `credit_app`).
+#[crate::mutate]
 fn crate_ident(name: &str) -> String {
     name.replace('-', "_")
 }
@@ -936,16 +956,19 @@ fn crate_ident(name: &str) -> String {
 /// The generated crate's qualify-census bless variable (`credit-app` →
 /// `BLESS_CREDIT_APP_QUALIFY`) — renamed per crate so a workspace-wide bless cannot silently
 /// re-bless two censuses at once (the fixture's own convention).
+#[crate::mutate]
 fn bless_env(name: &str) -> String {
     format!("BLESS_{}_QUALIFY", name.to_uppercase().replace('-', "_"))
 }
 
 /// The per-crate bless variable for the derived tier partition (`spec/tiers.spec`).
+#[crate::mutate]
 fn bless_tiers_env(name: &str) -> String {
     format!("BLESS_{}_TIERS", name.to_uppercase().replace('-', "_"))
 }
 
 /// Escape text for embedding inside a generated double-quoted string literal.
+#[crate::mutate]
 fn esc_lit(s: &str) -> String {
     s.replace('\\', "\\\\")
         .replace('"', "\\\"")
@@ -953,6 +976,7 @@ fn esc_lit(s: &str) -> String {
 }
 
 /// One line of validity prose safe for a generated doc comment.
+#[crate::mutate]
 fn doc_safe(s: &str) -> String {
     s.replace('\n', " ")
 }
@@ -960,6 +984,7 @@ fn doc_safe(s: &str) -> String {
 const ARG_NAMES: [&str; 6] = ["a", "b", "c", "d", "e", "f"];
 
 /// The `//! GENERATED …` banner every emitted `.rs` carries under its tier line.
+#[crate::mutate]
 fn banner(app: &str) -> String {
     format!(
         "//!\n\
@@ -971,6 +996,7 @@ fn banner(app: &str) -> String {
 
 /// The expectations that name `op` as their operator, in shape-catalog order — for doc lines
 /// and the target lock.
+#[crate::mutate]
 fn expects_for<'a>(m: &'a ModuleDecl, op: &str) -> Vec<&'a Expectation> {
     let mut found: Vec<&Expectation> = m.expects.iter().filter(|e| e.ops[0] == op).collect();
     found.sort_by_key(|e| shape_rank(e));
@@ -979,6 +1005,7 @@ fn expects_for<'a>(m: &'a ModuleDecl, op: &str) -> Vec<&'a Expectation> {
 
 // ===== emission (one function per generated file) ===========================================
 
+#[crate::mutate]
 fn emit_cargo_toml(sys: &SystemDecl, deps: &Deps) -> String {
     let (bspec, slock, benforce) = match deps {
         Deps::Path(root) => {
@@ -1019,6 +1046,7 @@ fn emit_cargo_toml(sys: &SystemDecl, deps: &Deps) -> String {
     )
 }
 
+#[crate::mutate]
 fn emit_build_rs(sys: &SystemDecl) -> String {
     let template = r#"//! build.rs — the enforcement shim genesis emitted: attach the whole structural discipline
 //! from `boundary-enforce`, with a config that is THIS crate's own.
@@ -1044,6 +1072,7 @@ use boundary_enforce::{Config, Enforcement};
 /// The RATIFIED kernel of THIS crate — the only files the partition places in KERNEL.
 const KERNEL_ALLOWLIST: &[&str] = &["src/lib.rs"];
 
+#[crate::mutate]
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
     let mut config = Config::new(&manifest);
@@ -1060,6 +1089,7 @@ fn main() {
         .replace("@BLESS@", &bless_env(&sys.name))
 }
 
+#[crate::mutate]
 fn emit_lib_rs(sys: &SystemDecl) -> String {
     let mut out = String::from(
         "//! The crate's trusted floor: the module roster, and nothing else. KERNEL is a\n\
@@ -1128,6 +1158,7 @@ fn emit_lib_rs(sys: &SystemDecl) -> String {
 
 /// `use crate::<owner>::<Value>;` lines for every value `m`'s operators touch, deduplicated
 /// and sorted (imports are mechanical; the set is exactly what the signatures name).
+#[crate::mutate]
 fn value_imports(sys: &SystemDecl, m: &ModuleDecl, exclude_own: bool) -> String {
     let mut lines = BTreeSet::new();
     for op in &m.ops {
@@ -1147,6 +1178,7 @@ fn value_imports(sys: &SystemDecl, m: &ModuleDecl, exclude_own: bool) -> String 
 /// so everything stays a `MEANING:` hole; a structured range implies its predicate and its
 /// edge-seeking grid (generated), and the `saturating` policy — when declared — its
 /// clamping `mint`. The policy itself is meaning, so a range WITHOUT one keeps the hole.
+#[crate::mutate]
 fn emit_value_object(v: &ValueDecl) -> String {
     let (name, raw) = (&v.name, &v.raw);
     let rule_doc = v.rule.doc();
@@ -1264,6 +1296,7 @@ fn emit_value_object(v: &ValueDecl) -> String {
     )
 }
 
+#[crate::mutate]
 fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
     let owned: Vec<&ValueDecl> = sys
         .values
@@ -1364,6 +1397,7 @@ fn emit_boundary(sys: &SystemDecl, m: &ModuleDecl) -> String {
     out
 }
 
+#[crate::mutate]
 fn emit_internal(sys: &SystemDecl, m: &ModuleDecl) -> String {
     let mut out = format!(
         "//! The workshop `{m}`'s boundary delegates to — not pub-reachable, deriving INTERIOR\n\
@@ -1409,6 +1443,7 @@ fn emit_internal(sys: &SystemDecl, m: &ModuleDecl) -> String {
     out
 }
 
+#[crate::mutate]
 fn emit_ops(sys: &SystemDecl) -> String {
     let mut out = String::from(
         "//! The discovered-law layer: each declared module's operators, as the theory\n\
@@ -1525,6 +1560,7 @@ fn emit_ops(sys: &SystemDecl) -> String {
 /// The TARGET lock: the DECLARED laws in the exact committed lock format
 /// (`discover::freeze::render` — header, law lines, coverage line), so the generated crate's
 /// drift gate is red until discovery re-derives precisely what was declared.
+#[crate::mutate]
 fn emit_target_lock(m: &ModuleDecl) -> String {
     let mut out = format!(
         "# discovered spec: {} — a behaviour lock; regenerate via this repo's freeze path and ratify the diff.\n\n",
@@ -1583,6 +1619,7 @@ fn emit_target_lock(m: &ModuleDecl) -> String {
 /// seams by construction, and checks named transform seams in their spanning theories — so
 /// declaration↔code drift is a COMPILE error whose message points back at the declaration.
 /// A via-less transform seam is skipped by the macro; its hole lives in `tests/seams.rs`.
+#[crate::mutate]
 fn emit_system(sys: &SystemDecl, declaration: &str) -> String {
     let marker = camel(&sys.name);
     let holes = sys
@@ -1623,6 +1660,7 @@ fn emit_system(sys: &SystemDecl, declaration: &str) -> String {
 /// (`discover::system::SystemReport::render` — keep the two in step; the render pin in the
 /// tests holds this side). Transport seams are born discharged (by construction), so this
 /// lock goes green the moment the crate compiles and discovery runs.
+#[crate::mutate]
 fn emit_system_lock(sys: &SystemDecl) -> String {
     let mut out = format!(
         "# system spec: {} — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.\n\n",
@@ -1689,6 +1727,7 @@ fn emit_system_lock(sys: &SystemDecl) -> String {
 /// The DECLARED-LAWS gate: one distance test per module that declares expectations —
 /// `Distance::of` names exactly what is missing, so the gate is red WITH A WORKLIST until
 /// the meaning earns the declaration. Emitted only when some module declares `expects`.
+#[crate::mutate]
 fn emit_expectations(sys: &SystemDecl) -> String {
     let krate = crate_ident(&sys.name);
     let mut out = String::from(
@@ -1743,6 +1782,7 @@ fn emit_expectations(sys: &SystemDecl) -> String {
     out
 }
 
+#[crate::mutate]
 fn emit_freeze_example(sys: &SystemDecl) -> String {
     let template = r#"//! freeze — the BLESS path: regenerate `spec/*.spec` from the live, discovered algebra.
 //!
@@ -1762,6 +1802,7 @@ use std::path::PathBuf;
 use boundary_spec::discover::system::{System, SystemReport};
 use @KRATE@::system::@MARKER@;
 
+#[crate::mutate]
 fn main() {
     let spec_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
     let mut locks: Vec<spec_lock::Lock> = @MARKER@::modules()
@@ -1781,6 +1822,7 @@ fn main() {
         .replace("@MARKER@", &camel(&sys.name))
 }
 
+#[crate::mutate]
 fn emit_freeze_gate(sys: &SystemDecl) -> String {
     let template = r#"//! freeze_gate — the DRIFT GATE, as a plain integration test.
 //!
@@ -1795,6 +1837,7 @@ use std::path::PathBuf;
 use boundary_spec::discover::system::{System, SystemReport};
 use @KRATE@::system::@MARKER@;
 
+#[crate::mutate]
 fn spec_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec")
 }
@@ -1825,6 +1868,7 @@ fn the_committed_specs_are_fresh() {
         .replace("@MARKER@", &camel(&sys.name))
 }
 
+#[crate::mutate]
 fn emit_gates_module(sys: &SystemDecl) -> String {
     let template = r#"//! A discovered-law / report layer (exempt from the inward rule).
 //!
@@ -1859,6 +1903,7 @@ impl Ci {
     template.replace("@APP@", &sys.name)
 }
 
+#[crate::mutate]
 fn emit_freeze_gates_example(sys: &SystemDecl) -> String {
     let template = r#"//! freeze_gates — regenerate the pipeline locks from this crate's gate declaration.
 //!
@@ -1872,6 +1917,7 @@ use std::path::PathBuf;
 
 use @KRATE@::gates::Ci;
 
+#[crate::mutate]
 fn main() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let locks = Ci::pipeline()
@@ -1886,6 +1932,7 @@ fn main() {
     template.replace("@KRATE@", &crate_ident(&sys.name))
 }
 
+#[crate::mutate]
 fn emit_gates_gate(sys: &SystemDecl) -> String {
     let template = r#"//! gates — the pipeline drift gate: CI validates its own declaration on every run.
 
@@ -1930,6 +1977,7 @@ fn every_declared_gate_is_rendered_into_the_workflow() {
     template.replace("@KRATE@", &crate_ident(&sys.name))
 }
 
+#[crate::mutate]
 fn emit_probes_stub(sys: &SystemDecl) -> String {
     let template = r#"//! probes — the edge-probe half of the contract: the build shim proves every edge HAS an
 //! `impl Probed`; this file is where the probes RUN in CI.
@@ -1950,6 +1998,7 @@ fn the_edges_are_probed() {
     template.replace("@APP@", &sys.name)
 }
 
+#[crate::mutate]
 fn emit_seams(sys: &SystemDecl) -> String {
     let krate = crate_ident(&sys.name);
     let mut out = format!(

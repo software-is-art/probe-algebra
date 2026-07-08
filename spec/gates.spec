@@ -19,10 +19,6 @@
       cargo test --workspace --all-targets
       promises: every workspace member's suites: the enforcement passes and qualify censuses (ride the builds), the drift gates (module, system, shapes, and world locks), the distance gates, the probes, and the consumer fixtures
 
-- mutation (changed lines) (per PR diff; pure)
-      .github/mutants-gate.sh --in-diff pr.diff
-      promises: no mutant of the PR's changed lines survives the probe suite (timeouts are detections; ratified equivalents live in .cargo/mutants.toml)
-
 - mutation (since green) (default branch, diff since mutants-green; pure)
       .github/mutants-gate.sh --in-diff since-green.diff
       promises: no mutant of anything changed since the last fully-certified tree (the mutants-green tag) survives — a merge re-verifies its drift, not the whole tree, and advances the tag on green

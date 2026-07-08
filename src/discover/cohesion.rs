@@ -96,6 +96,7 @@ impl CohesionReport {
 }
 
 /// Collect the operator indices a term mentions.
+#[crate::mutate]
 fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
     if let Term::App(op, args) = t {
         out.insert(*op);
@@ -106,6 +107,7 @@ fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
 }
 
 /// Union-find: the root of `x`, with path compression.
+#[crate::mutate]
 fn find(parent: &mut [usize], mut x: usize) -> usize {
     while parent[x] != x {
         parent[x] = parent[parent[x]];
@@ -115,6 +117,7 @@ fn find(parent: &mut [usize], mut x: usize) -> usize {
 }
 
 /// The analysis body (private — reached as `CohesionReport::of`).
+#[crate::mutate]
 fn cohesion<T: Theory>() -> CohesionReport {
     let engine = Engine::<T>::new();
     let sigs = engine.signatures();

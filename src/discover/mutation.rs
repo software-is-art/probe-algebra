@@ -68,16 +68,19 @@ const DENT_POINTS_PER_OP: usize = 16;
 const DENT_WRONGS_PER_POINT: usize = 2;
 
 /// A binary's left-projection mutant: `a ⊕ b` = `a`. (Also a unary's identity mutant.)
+#[crate::mutate]
 fn proj0<T: Theory>(v: &[T::Value]) -> Option<T::Value> {
     Some(v[0].clone())
 }
 
 /// A binary's right-projection mutant: `a ⊕ b` = `b`.
+#[crate::mutate]
 fn proj1<T: Theory>(v: &[T::Value]) -> Option<T::Value> {
     Some(v[1].clone())
 }
 
 /// The partiality mutant: defined nowhere.
+#[crate::mutate]
 fn never<T: Theory>(_: &[T::Value]) -> Option<T::Value> {
     None
 }
@@ -120,6 +123,7 @@ enum SurgeryKind<T: Theory> {
 /// The trampoline: a plain [`EvalFn`] (what the operator table stores) that applies the
 /// thread-local surgery over the real evaluator. Installed at exactly one operator
 /// index per mutant; the surgery is always set for the duration of a judgment.
+#[crate::mutate]
 fn surgical_eval<T>(args: &[T::Value]) -> Option<T::Value>
 where
     T: Theory + 'static,
@@ -153,6 +157,7 @@ where
 /// `laws` must already be filtered to those NAMING operator `i` — an exact economy,
 /// not an approximation: a term evaluates only the operators it names, so a law that
 /// never names `i` cannot reach the surgery and its verdict cannot change.
+#[crate::mutate]
 fn judge_surgery<T>(
     engine: &Engine<T>,
     laws: &[DiscoveredLaw],
@@ -176,6 +181,7 @@ where
 
 /// The laws that NAME each operator, by operator index — the exact set a surgery at
 /// that index can disturb.
+#[crate::mutate]
 fn laws_naming<T: Theory>(engine: &Engine<T>, laws: &[DiscoveredLaw]) -> Vec<Vec<DiscoveredLaw>> {
     let symbols: Vec<&'static str> = engine.signatures().iter().map(|s| s.0).collect();
     symbols
@@ -206,6 +212,7 @@ pub struct MutationReport {
 
 /// The named-law identity of a spec — what judgment compares. Prose and equation together,
 /// so a law is its ratified rendering, exactly as the module lock states it.
+#[crate::mutate]
 fn law_set<T: Theory>(engine: &Engine<T>) -> Vec<String> {
     engine
         .discover()
@@ -218,6 +225,7 @@ fn law_set<T: Theory>(engine: &Engine<T>) -> Vec<String> {
 /// Every argument tuple for an operator's input sorts, capped — the sample two evaluators
 /// are compared on before a confusion mutant is planted (behaviourally identical evaluators
 /// make an equivalent-by-construction mutant: noise, not a spec gap).
+#[crate::mutate]
 fn input_tuples<T: Theory>(inputs: &[T::Sort], cap: usize) -> Vec<Vec<T::Value>> {
     let pools: Vec<Vec<T::Value>> = inputs.iter().map(|s| T::inhabitants(*s)).collect();
     let mut tuples: Vec<Vec<T::Value>> = vec![Vec::new()];
@@ -243,6 +251,7 @@ fn input_tuples<T: Theory>(inputs: &[T::Sort], cap: usize) -> Vec<Vec<T::Value>>
 
 /// Do two evaluators behave identically on every sampled tuple? (Observationally, like all
 /// judgment here.)
+#[crate::mutate]
 fn same_conduct<T: Theory>(a: EvalFn<T>, b: EvalFn<T>, tuples: &[Vec<T::Value>]) -> bool {
     tuples.iter().all(|t| {
         let oa = a(t).map(|v| T::observe(&v));
@@ -253,6 +262,7 @@ fn same_conduct<T: Theory>(a: EvalFn<T>, b: EvalFn<T>, tuples: &[Vec<T::Value>])
 
 /// Generate the mutant battery for a theory's operator table. Deterministic order:
 /// confusions (by target then source index), projections, partialities.
+#[crate::mutate]
 fn mutants<T: Theory>(engine: &Engine<T>) -> Vec<AlgebraMutant<T>> {
     let sigs = engine.signatures();
     let evals = engine.evals();
@@ -324,6 +334,7 @@ fn mutants<T: Theory>(engine: &Engine<T>) -> Vec<AlgebraMutant<T>> {
 /// The deafness battery for one operator: one mutant per distinct-observation
 /// inhabitant of the output sort, skipping constants the operator already behaves as
 /// on the sampled tuples (equivalent by construction — noise, not a spec gap).
+#[crate::mutate]
 fn deaf_battery<T>(
     engine: &Engine<T>,
     laws: &[DiscoveredLaw],
@@ -377,6 +388,7 @@ where
 /// trying the first wrong outputs whose observation differs from the true one. Points
 /// where the operator is undefined are skipped (a definedness change is the partiality
 /// mutant's job, at whole-operator granularity).
+#[crate::mutate]
 fn dent_battery<T>(
     engine: &Engine<T>,
     laws: &[DiscoveredLaw],

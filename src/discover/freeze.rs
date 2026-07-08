@@ -30,6 +30,7 @@ use spec_lock::Lock;
 use super::{all_specs, Spec};
 
 /// The lock file for a theory inside a given spec directory (the theory name slugified).
+#[crate::mutate]
 fn lock_path(spec_dir: &Path, theory: &str) -> PathBuf {
     let slug: String = theory
         .chars()
@@ -40,6 +41,7 @@ fn lock_path(spec_dir: &Path, theory: &str) -> PathBuf {
 
 /// The canonical text of a discovered spec — deterministic, human-readable, diffable. Renders
 /// only domain facts (header, named laws, coverage) per the lock principle in the module docs.
+#[crate::mutate]
 fn render(spec: &Spec) -> String {
     // the header names no crate-specific regen command — this render serves DOWNSTREAM locks
     // too, and a consumer's freeze path is its own (see docs/ci-discipline.md).

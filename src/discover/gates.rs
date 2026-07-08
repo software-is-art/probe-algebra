@@ -124,6 +124,7 @@ impl Gate {
 /// `mutation (...)` registry sugar unwrapped into the `dogfood (...)` display form).
 /// Shared by the workflow render and [`GateRegistry::pr_checks`], so the perimeter's
 /// required contexts and the executed job names are one computation, never two.
+#[crate::mutate]
 fn check_context(gate: &Gate) -> String {
     format!(
         "dogfood ({})",
@@ -137,6 +138,7 @@ fn check_context(gate: &Gate) -> String {
 /// The registry inventory's stanza list — one stanza per gate (name, cadence, capability,
 /// command, promise). ONE render for this repo's registry and every consumer pipeline, so
 /// the two lock dialects cannot drift apart.
+#[crate::mutate]
 fn registry_stanzas(gates: &[Gate]) -> String {
     let mut out = String::new();
     for gate in gates {
@@ -165,6 +167,7 @@ fn registry_stanzas(gates: &[Gate]) -> String {
 
 /// A GitHub Actions job id from a gate's name — job ids allow only alphanumerics and
 /// dashes.
+#[crate::mutate]
 fn job_slug(label: &str) -> String {
     let mut id = String::new();
     for c in label.chars() {
@@ -533,16 +536,6 @@ impl GateRegistry {
                            probes, and the consumer fixtures",
                 command: &["cargo", "test", "--workspace", "--all-targets"],
                 cadence: Cadence::EveryChange,
-                effect: Capability::Pure,
-                sharded: false,
-            },
-            Gate {
-                name: "mutation (changed lines)",
-                verifies: "no mutant of the PR's changed lines survives the probe suite \
-                           (timeouts are detections; ratified equivalents live in \
-                           .cargo/mutants.toml)",
-                command: &[".github/mutants-gate.sh", "--in-diff", "pr.diff"],
-                cadence: Cadence::PerDiff,
                 effect: Capability::Pure,
                 sharded: false,
             },
@@ -1119,13 +1112,15 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: fourteen gates — four every-change (fmt,
-    /// clippy, test, and the compiled-mutant schemata sweep, whose one-build
-    /// population is cheap enough to ride every PR), one per-diff, one default-branch
-    /// incremental, seven weekly (the sharded whole-tree sweep, four member/corpus
-    /// companions, and the two world gates), and the release gate on the
-    /// certification cadence — and every declared command reappears verbatim in the
-    /// rendered workflow (nothing declared can fall out of execution).
+    /// The registry's SHAPE is pinned: thirteen gates — four every-change (fmt,
+    /// clippy, test, and the compiled-mutant schemata sweep: the full-tree compiled
+    /// population rides every PR, which is what RETIRED the per-diff source gate —
+    /// the first cargo-mutants retirement, ratified by the instrumentation
+    /// completeness census), one default-branch incremental, seven weekly (the
+    /// sharded whole-tree sweep, four member/corpus companions, and the two world
+    /// gates), and the release gate on the certification cadence — and every
+    /// declared command reappears verbatim in the rendered workflow (nothing
+    /// declared can fall out of execution).
     /// Every gate is Pure except exactly three, each wearing the EFFECTFUL tag for its
     /// own reason: the release WRITES the world (tags, a GitHub release, crates.io),
     /// the perimeter READS state the tree cannot contain (the live repository
@@ -1134,7 +1129,7 @@ mod tests {
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 14);
+        assert_eq!(gates.len(), 13);
         assert_eq!(
             gates
                 .iter()

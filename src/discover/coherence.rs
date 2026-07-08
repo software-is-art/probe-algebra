@@ -23,15 +23,19 @@ pub enum Sort {
     Key,
 }
 
+#[crate::mutate]
 fn val(v: &i64) -> i64 {
     *v
 }
+#[crate::mutate]
 fn empty(_: &[i64]) -> Option<i64> {
     Some(0)
 }
+#[crate::mutate]
 fn max_merge(v: &[i64]) -> Option<i64> {
     Some(val(&v[0]).max(val(&v[1])))
 }
+#[crate::mutate]
 fn gcd_merge(v: &[i64]) -> Option<i64> {
     let (mut a, mut b) = (val(&v[0]), val(&v[1]));
     while b != 0 {
@@ -39,6 +43,7 @@ fn gcd_merge(v: &[i64]) -> Option<i64> {
     }
     Some(a)
 }
+#[crate::mutate]
 fn first_merge(v: &[i64]) -> Option<i64> {
     // first-match: the left key wins unless it is "empty" (0). NOT commutative.
     Some(if val(&v[0]) != 0 {
@@ -78,6 +83,7 @@ merge_theory!(FirstMerge, "first-merge", first_merge);
 /// B's engine is only meaningful when index `i` names the same operator in both — same table
 /// length, and pairwise the same name, input sorts, and output sort (comparable because the
 /// signatures share `Sort`, which also fixes the engines' variable indexing). `None` ⇒ aligned.
+#[crate::mutate]
 fn signature_mismatch<A, B>() -> Option<String>
 where
     A: Theory,
@@ -141,6 +147,7 @@ impl CoherenceReport {
 }
 
 /// The violation scan (private — reached as `CoherenceReport::between`).
+#[crate::mutate]
 fn coherence_violations<A, B>() -> Result<Vec<String>, String>
 where
     A: Theory,

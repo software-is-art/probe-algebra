@@ -18,6 +18,7 @@ pub enum Sort {
 pub struct Arithmetic;
 
 /// Evaluate a closed expression through the interpreter's own boundary (`Check` ⊳ `Eval`).
+#[crate::mutate]
 fn run(e: &Expr) -> Option<Value> {
     with_seed(|seed| {
         let named = seed.new_named(e.clone());
@@ -26,6 +27,7 @@ fn run(e: &Expr) -> Option<Value> {
     })
 }
 
+#[crate::mutate]
 fn as_expr(v: &Value) -> Option<Expr> {
     match v {
         Value::Int(i) => Expr::int(i.get()),
@@ -33,28 +35,36 @@ fn as_expr(v: &Value) -> Option<Expr> {
     }
 }
 
+#[crate::mutate]
 fn bin(op: Op, vs: &[Value]) -> Option<Value> {
     run(&Expr::bin(op, as_expr(&vs[0])?, as_expr(&vs[1])?))
 }
 
+#[crate::mutate]
 fn add(vs: &[Value]) -> Option<Value> {
     bin(Op::Add, vs)
 }
+#[crate::mutate]
 fn mul(vs: &[Value]) -> Option<Value> {
     bin(Op::Mul, vs)
 }
+#[crate::mutate]
 fn lt(vs: &[Value]) -> Option<Value> {
     bin(Op::Lt, vs)
 }
+#[crate::mutate]
 fn int_const(n: i64) -> Option<Value> {
     Some(Value::Int(Int::new(n)?))
 }
+#[crate::mutate]
 fn zero(_: &[Value]) -> Option<Value> {
     int_const(0)
 }
+#[crate::mutate]
 fn one(_: &[Value]) -> Option<Value> {
     int_const(1)
 }
+#[crate::mutate]
 fn fls(_: &[Value]) -> Option<Value> {
     Some(Value::Bool(false))
 }

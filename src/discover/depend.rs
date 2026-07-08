@@ -223,6 +223,7 @@ impl DependenceReport {
 }
 
 /// Append a line (tiny helper keeping `render` allocation-light and total).
+#[crate::mutate]
 fn writeln(out: &mut String, line: String) {
     out.push_str(&line);
     out.push('\n');

@@ -53,27 +53,6 @@ jobs:
       - run: cargo test --workspace --all-targets
       - run: .github/schemata.sh
 
-  # Per-change dogfood: mutate only the lines this PR touches. New code that a
-  # probe cannot kill fails the gate; pre-existing documented equivalents are
-  # not in the diff, so they never re-trip it.
-  mutants-diff:
-    name: dogfood (changed lines)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@1.94.1
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-mutants,cargo-nextest
-      - name: mutate the diff
-        run: |
-          git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
-          .github/mutants-gate.sh --in-diff pr.diff
-
   # Incremental dogfood on the default branch: a green sweep is a lock over the
   # tree at that sha (the `mutants-green` tag), so a merge mutates only the diff
   # since it. On green the tag advances — CI's countersignature, the pipeline's

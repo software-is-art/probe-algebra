@@ -70,38 +70,44 @@ with open(os.path.join(dir, "plan.txt"), "w") as out:
             out.write(site + "\t" + " ".join(sorted(coverage.get(site, []))) + "\n")
 PYEOF
 
-: >"${dir}/survivors.txt"
-covered_runs=0
-while IFS=$'\t' read -r site tests; do
-  if [ "${have_nextest}" = "1" ]; then
-    if [ -z "${tests}" ]; then
+# verdicts fan out: one build serves every worker, so parallelism is free of build
+# contention (the thing that throttles source-level mutation). Each worker appends
+# one line (O_APPEND) to the shared verdict file.
+judge_site() {
+  line="$1"
+  site="${line%%$'\t'*}"
+  tests="${line#*$'\t'}"
+  if [ "${HAVE_NEXTEST}" = "1" ]; then
+    if [ -z "${tests}" ] || [ "${tests}" = "${line}" ]; then
       # no test executes this site's guard: unkillable, disclosed immediately.
-      echo "SURVIVED ${site} (uncovered — no test reaches it)"
-      echo "${site}" >>"${dir}/survivors.txt"
-      continue
+      echo "SURVIVED ${site} (uncovered — no test reaches it)" >>"${VERDICTS}"
+      return
     fi
     expr=""
     for t in ${tests}; do
       [ -n "${expr}" ] && expr="${expr} or "
       expr="${expr}test(=${t})"
     done
-    covered_runs=$((covered_runs + 1))
-    if timeout "${limit}" env PROBE_MUTANT="${site}" \
-      cargo nextest run -p boundary-spec --lib --features schemata --fail-fast -E "${expr}" >/dev/null 2>&1; then
-      echo "SURVIVED ${site}"
-      echo "${site}" >>"${dir}/survivors.txt"
+    if timeout "${LIMIT}" env PROBE_MUTANT="${site}" \
+      cargo nextest run -p boundary-spec --lib --features schemata --fail-fast --test-threads 2 -E "${expr}" >/dev/null 2>&1; then
+      echo "SURVIVED ${site}" >>"${VERDICTS}"
     else
-      echo "killed   ${site}"
+      echo "killed   ${site}" >>"${VERDICTS}"
     fi
   else
-    if timeout "${limit}" env PROBE_MUTANT="${site}" \
+    if timeout "${LIMIT}" env PROBE_MUTANT="${site}" \
       cargo test -q -p boundary-spec --lib --features schemata >/dev/null 2>&1; then
-      echo "SURVIVED ${site}"
-      echo "${site}" >>"${dir}/survivors.txt"
+      echo "SURVIVED ${site}" >>"${VERDICTS}"
     else
-      echo "killed   ${site}"
+      echo "killed   ${site}" >>"${VERDICTS}"
     fi
   fi
-done <"${dir}/plan.txt"
+}
+export -f judge_site
+export VERDICTS="${dir}/verdicts.txt" LIMIT="${limit}" HAVE_NEXTEST="${have_nextest}"
+: >"${VERDICTS}"
+xargs -P "$(nproc)" -d '\n' -I{} bash -c 'judge_site "$1"' _ {} <"${dir}/plan.txt"
+cat "${VERDICTS}"
+grep "^SURVIVED" "${VERDICTS}" | sed 's/^SURVIVED //; s/ (uncovered.*$//' >"${dir}/survivors.txt" || true
 
 cargo run -q --features schemata --example schemata -- judge "${dir}/survivors.txt"

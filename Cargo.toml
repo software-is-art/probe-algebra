@@ -72,6 +72,8 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 # discipline's gates can still fire.
 fire-drill = { path = "fire-drill" }
 proptest = "1"
+# the instrumentation-completeness census parses the tree (schemata builds only).
+syn = { version = "2", features = ["full"] }
 trybuild = "1.0.117"
 # Only the `suite_audit` example uses these — to parse cargo-mutants' `outcomes.json`
 # and feed the real kill matrix into `select`. Not a library dependency.

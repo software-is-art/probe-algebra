@@ -61,18 +61,35 @@ mod probes {
     fn the_census_and_register_paths_hold() {
         let sites = Schemata::census().expect("collision-free");
         if cfg!(feature = "schemata") {
-            assert!(sites.contains(&"TagLaw::matches:0: == -> !="));
+            assert!(
+                sites.contains(&"boundary_spec::discover::substrate::TagLaw::matches:0: == -> !=")
+            );
         } else {
             assert!(
                 sites.is_empty(),
                 "instrumentation must not leak into normal builds"
             );
         }
-        // no survivors and an absent register hold vacuously:
-        assert!(Schemata::register().check([]).is_ok());
-        // an unratified survivor drifts, named:
+        // the committed register and the ratified survivors are one set: exactly the
+        // ratified keys hold, an empty sweep flags them stale, and an unratified
+        // survivor drifts, named.
+        let ratified: Vec<String> = Schemata::register()
+            .entries()
+            .expect("register parses")
+            .into_iter()
+            .map(|(k, _)| k)
+            .collect();
+        assert!(Schemata::register()
+            .check(ratified.iter().map(String::as_str))
+            .is_ok());
+        assert!(Schemata::register().check([]).is_err(), "stale lines flag");
         let err = Schemata::register()
-            .check(["classify:1: == -> !="])
+            .check(
+                ratified
+                    .iter()
+                    .map(String::as_str)
+                    .chain(["classify:1: == -> !="]),
+            )
             .unwrap_err();
         assert!(err.contains("classify:1"), "{err}");
     }
