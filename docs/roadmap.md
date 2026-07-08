@@ -1131,6 +1131,31 @@ live in `spec/<theory>.mutation.spec`, enumerated and ratified. So the guarantee
 its own fine print: green is evidence over the enumerable grid, the survivors ARE the list
 of swaps we would miss, and there is nowhere else for one to hide.
 
+Two distinctions keep that guarantee honest. First, DETECTION is not sampled: what catches
+a swapped implementation is `check(discovered laws)` run against it over the bounded
+term-CLOSURE of the grid (seeds plus every operator composition up to the depth bound —
+`surgical_eval` answers on whatever intermediate values `check` feeds it), so any law it
+violates anywhere in that closure is caught deterministically, not at coordinates we
+happened to try. The dent/deaf SWEEP is a separate, offline thing: evidence that the laws
+are worth running — tight enough to catch meaningful deviations, with the gaps enumerated
+where they are not. Second, the grid is the JUDGE's observational universe, not a limit of
+the oracle: a swap that differs from the real module only OUTSIDE the closure is, by this
+repo's observation-function quotient, the SAME behaviour as far as the spec is concerned —
+not a coverage gap but the definition of what the spec means, and the reason arbitrary-CODE
+oracles add no detection power over perturbed tables (`check` cannot tell apart two
+implementations that agree on the closure). The bound widens MONOTONICALLY with the grid —
+more inhabitants, more rounds — so the guarantee only ever grows, never silently shrinks.
+
+A different, blunter guarantee is possible and worth NOT conflating: a DIFFERENTIAL mode
+that generates oracles as actual code (or fuzzes the real module) over an open input space
+and compares against the real implementation directly rather than against the laws. It
+catches off-closure differences the spec is blind to, but it has no spec to consult, so it
+OVER-reports — flagging every behavioural difference including the ratified degrees of
+freedom the spec deliberately left free. It answers "does this differ anywhere?", not "does
+this violate the contract?" The spec-check guarantee is the right default (contract
+violation, enumerated fine print, monotone in the grid); the differential mode is an opt-in
+second net answering a weaker question.
+
 Deriving a consumer's spec is BUILT: discovery runs their code, `spec-lock` freezes the
 laws/census, genesis scaffolds the suite, drift is gated. That half needs no new brick.
 The half nobody outside this repo can reach is the one the whole method turns on — *are
@@ -1209,10 +1234,12 @@ from their types, discovery finds the laws, and the sweep judges generated table
 them. So the remaining work is one brick and a few genuinely-open questions, no longer the
 whole engine:
 
-- **The brick: auto-lift** — synthesize the `Theory` impl from a plain module's inferred
-  public surface (functions over `Shaped` types → operators; the `Shaped` types → sorts and
-  the grid). This is the whole distance between "built for our theories" and "a Rust
-  consumer runs it on their own PRs having written only types and Rust."
+- **The brick: auto-lift** — synthesize the `Theory` impl by SCANNING the tree the qualify
+  census already walks: functions over `Shaped` types → operators, the `Shaped` types →
+  sorts and the grid. No macro, no `lift!`, no declaration — the consumer writes types and
+  Rust and the surface is read, the same zero-annotation inference the census already does.
+  This is the whole distance between "built for our theories" and "a Rust consumer runs it
+  on their own PRs having written nothing extra."
 - **Open: the enumerability edge** — the honest limit, inherited from discovery: a public
   function over a non-`Shaped` carrier has no table to lift, so auto-lift must name what it
   skips (the census move) rather than silently cover a subset. How far the common Rust
