@@ -1116,54 +1116,64 @@ field reports — bricks first (a hook, a register, a judge), worldview later. T
 crates.io publish is the first prerequisite (done); the one-page mental-model document
 is the open one.
 
-## Candidate: the apparatus pointed at the consumer — probes derived, sensitivity validated
+## Candidate: sensitivity without mutation — the arbitrary-oracle partition
 
-Today the meta-layer is entirely INTERNAL. `discover::schemata` (the compiled mutant
-population) and the judge engines (`discover::floor`, `discover::relation`) harden THIS
-repo's own probes and locks; a downstream crate cannot run either against itself. What
-a consumer gets is genesis scaffolding a probe suite from a `system!` declaration, or
-`boundary-enforce` attaching the structural discipline through `build.rs`. Neither
-answers the question the whole method turns on — *are the probes you have SENSITIVE?* —
-which is the mutation-adequacy question, and it is exactly the one we kept for ourselves.
+Deriving a consumer's spec is BUILT: discovery runs their code, `spec-lock` freezes the
+laws/census, genesis scaffolds the suite, drift is gated. That half needs no new brick.
+The half nobody outside this repo can reach is the one the whole method turns on — *are
+the probes you have SENSITIVE?* — the mutation-adequacy question. Internally we answer it
+by mutating our own code: `discover::schemata` (the compiled population) gates every PR,
+`discover::mutation` rides every `cargo test`. Both edit an implementation and ask "did a
+probe catch it?", and both inherit mutation testing's tax — a survivor's spec-status is
+unknown, so every one needs the equivalent-mutant ratification dance.
 
-The candidate ships it outward, in the shape the mutation-is-for-us conversation settled
-on. Two moves, in order:
+The candidate answers the sensitivity question WITHOUT mutating anything, which is what
+lets it replace mutation testing on PRs rather than merely speed it up. Do not perturb the
+consumer's source (invasive — needs their build, our attributes in their tree, one process
+per mutant). GENERATE an alternative behaviour as DATA — a sampled state machine, an
+operator table, a synthetic conduct — CONSTRUCTED to violate a named law L (or to conform
+to all of them), and check the probes PARTITION it: refuse the constructed-to-violate
+oracle, hold on the conforming one. A probe suite that fails to refuse a
+constructed-to-violate-L oracle is DEAF to L — named, no litigation, because the oracle
+carries its ground-truth label BY CONSTRUCTION. That is the move that dissolves the
+equivalent-mutant problem: you generate against the spec boundary, not the code's
+neighbourhood, so a behaviour is admitted or forbidden by definition, never an unknown to
+ratify. And because the oracle is data judged by the ONE interpreter (`discover::floor` /
+`discover::relation`), never code inside the consumer's module, it "could be compiled and
+run anywhere" — no per-mutant build, no coverage map, no process fan-out, no attribute.
+That is precisely why it can be a PR gate without the schemata machinery. The in-process
+theory layer (`discover::mutation`, perturbed operator tables judged by re-running
+discovery) is the theory-scale ancestor of this move; the candidate is its
+arbitrary-behaviour generalisation, packaged as a consumer entry point.
 
-1. **Probes DERIVED for the consumer, not hand-written.** The sweep of the real code is
-   already what tells US which behaviours a probe must pin — "after the sweep of the real
-   code determines what the probes are, we just need to explore N instantiations." Point
-   the same derivation at the consumer's declared boundary/theory and the probe suite is a
-   derived, freezable artifact like every other census, not a diligence exercise. Genesis
-   scaffolds a suite; this DERIVES one and gates its drift.
+Honest frame, the method's own and unsoftened: this samples the BEHAVIOUR space where
+mutation samples the IMPLEMENTATION's neighbourhood — different coverage, not strictly a
+superset. The oracle grid is bounded, so a suite that partitions every sampled oracle is
+EVIDENCE of sensitivity over that sample, never proof it catches everything (the same
+green-is-evidence discipline discovery and the sweeps live under). An insensitive probe is
+a fact; a sensitive one is a bounded observation. So the internal schemata engine does not
+retire — it stays as the weekly implementation-side backstop, the way the source sweeps
+back up the in-process layers today; what retires is the NEED for it on the PR path.
 
-2. **Sensitivity validated by the ARBITRARY-ORACLE system, not by mutating their code.**
-   The insight that makes this deployable anywhere: do not mutate the consumer's source
-   (invasive — needs their build, our attributes in their tree, one process per mutant).
-   GENERATE arbitrary alternative behaviours as DATA — a sampled state machine, an operator
-   table, a synthetic conduct that straddles the declared spec boundary — and check the
-   probes PARTITION them: hold on the ones the spec admits, refuse the ones it forbids. A
-   probe that cannot tell a compliant oracle from a violating one is INSENSITIVE, named as a
-   gap. Because the oracle is data checked by the ONE interpreter (`discover::floor` /
-   `discover::relation`), never code inside the consumer's module, it "could be compiled and
-   run anywhere" — no attribute, no rebuild, no reach into their tree. The generation-based
-   layer we already run in-process on theories (`discover::mutation`) is this move at the
-   theory scale; the candidate is its arbitrary-behaviour generalisation, packaged as a
-   consumer entry point.
+The consumer writes NOTHING new for this — the same zero-annotation posture the rest of
+the method already holds. A Rust consumer's public surface is auto-inferred (the qualify
+census, no annotations) and the behaviour grid comes from their types; they define types
+and write Rust, and the oracle is minted over that inferred surface. `theory!`/`system!`
+enters only for the OTHER case — when they are using probe-algebra to encode something that
+is not native Rust (a workflow's states, an infra graph, a foreign prover's tables) — where
+the declaration is the surface because there is no Rust surface to infer. The oracle move is
+the same in both: generate an alternative behaviour over the carrier, labelled by
+construction, and check the surface's probes partition it.
 
-The honest frame is the method's own and does not soften: generation REFUTES, never proves.
-The oracle grid is bounded and the arbitrary behaviours are samples, so a probe that
-partitions the sampled oracles is EVIDENCE of sensitivity over that sample, not a proof it
-catches everything — the same green-is-evidence discipline that governs discovery and the
-sweeps. An insensitive probe is a fact; a sensitive one is a bounded observation.
-
-Open design pieces, none built: the consumer's declaration surface (likely the existing
-`theory!`/`system!`/boundary vocabulary, so the derivation reads what genesis already
-parses); the arbitrary-oracle representation and its grid economics (how many oracles, how
-they are sampled to straddle the boundary deterministically — the splitmix64 discipline the
-warrant sampler already uses); and whether this is a library entry point a consumer calls or
-a genesis-emitted gate that rides `cargo test` like the internal sweeps. This is the single
-change that most moves the consumer experience: the gap between what the method can do and
-what a consumer can invoke is currently the whole meta-layer, and this closes it.
+Open design pieces, none built: the arbitrary-oracle representation and its
+straddle-sampling economics (how many oracles, sampled deterministically to bracket each
+law's boundary — the splitmix64 discipline the warrant sampler already uses); how a
+constructed-to-violate-L oracle is minted from a frozen law (the inverse of the check the
+interpreter already runs); and whether the consumer entry is a library call or a
+genesis-emitted gate riding `cargo test` like the internal sweeps. This is the single
+change that most moves the consumer experience: it takes the sensitivity guarantee we keep
+for ourselves and makes it a thing a downstream crate runs on its own PRs, with no mutation
+tooling in its tree at all.
 
 ## Standing follow-ups
 
