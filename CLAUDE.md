@@ -19,6 +19,7 @@ diff — the committed diff is the ratification. A missing lock counts as stale.
 | `spec/<theory>.spec`, `.system.spec`, `.shape.spec`, `.world.spec`, `.mutation.spec` | `cargo run --example freeze_spec` |
 | `spec/shapes.spec` (the law-language catalog) | `cargo run --example freeze_shapes` |
 | `spec/gates.spec`, `.github/workflows/ci.yml`, `spec/perimeter.spec`, `spec/perimeter.ruleset.json` (pipeline + settings perimeter are locks) | `cargo run --example freeze_gates` |
+| `spec/<system>.infra.spec` (the declared infra graph; its `.infra.register` floor is hand-authored, never generated) | `cargo run --example freeze_infra` |
 | `spec/qualify.spec` (public-surface census; build fails when stale) | `BLESS_QUALIFY=1 cargo build` |
 | `spec/tiers.spec` (the derived tier partition; KERNEL only via `spec/kernel.register`) | `BLESS_TIERS=1 cargo build` |
 | member crates' censuses (qualify + tiers) | `BLESS_<CRATE>_QUALIFY=1` / `BLESS_<CRATE>_TIERS=1` (`CREDIT_APP`, `RELAY_APP`, `FIXTURE`) |

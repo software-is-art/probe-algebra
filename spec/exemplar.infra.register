@@ -1,0 +1,11 @@
+# the exemplar infra's REGISTER FLOOR — hand-ratified lines for the declared facts no
+# API can judge (root meanings, authorities, cadences). Writing a line here IS the
+# ratification; the justification is the one thing no derivation can produce. Judged by
+# `Infra::floor` on every test run: a new unjudgeable fact drifts as a new finding, a
+# line for a fact no longer declared drifts as resolved. NEVER generated.
+meaning intake/test/ = ephemeral(24h): the reaper's daily sweep deletes anything under test/ after a day — probes may write here freely
+meaning intake/drafts/ = drafts: work in progress, writable and promotable, not yet under any retention promise
+meaning intake/v1/ = locked: customer data under an indefinite lock — nothing automated deletes here, ever
+authority test-token mint: org membership gates minting, a declared holdover — replacing it is now a declaration edit, not archaeology
+cadence reaper: runs daily against the ephemeral roots; its TTL honours the declared meaning above
+cadence post-deploy probe: exercises the presign seams end to end after every deploy, writing only under ephemeral roots (derived, not hand-listed)

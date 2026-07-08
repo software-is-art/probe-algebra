@@ -857,6 +857,57 @@ expires — and a world fact never feeds the countersign: the certified tag must
 wait on a settings page. Casualty of the brick, per its own instruction: CLAUDE.md's
 "PRs land by squash merge" line, now a declared, read-back merge-method rule.
 
+## The twelfth ask: encode the infra meaning (BUILT)
+
+The consumer's incident chain had a layer below any repository: a bucket's CORS
+allow-list that still named a migrated-away origin, a build command living in a
+dashboard text box, a surface running a day on placeholder secrets, store-prefix
+meanings encoded as a regex in one file and prose in another. Every one was a law
+without a declaration — the seam existed, the law existed, and the refusal came from a
+customer's browser weeks later. `discover::infra` extends the declaration discipline
+one level down, on the perimeter pattern: `Infra` declares the graph (surfaces with
+origins and the build that produces them; stores whose roots carry a meaning class —
+`ephemeral(ttl)`, `locked`, `drafts`; presign/read seams; credential NAMES per
+surface; authorities; cadences), `coherent()` judges the declaration against itself
+(an edge to an undeclared node, a presign outside any declared root: refused by name
+before any API is consulted), and `judge()` holds a consumer-extracted `LiveInfra` to
+the three API-readable laws — *cors-covers-origins*, *secrets-census*,
+*build-command-is-derived* — with the perimeter's floor semantics (extra coverage is
+not drift; the build command is the one exact match).
+
+Where no API reaches, the register floor: `unjudgeable()` derives the exact key set
+(root meanings, authorities, cadences) and `floor()` holds a hand-authored
+`<system>.infra.register` to it with the existing set-difference semantics —
+declared-but-unjudgeable is disclosed as exactly that, never silently assumed held.
+What derives instead of being re-encoded: `ephemeral_prefixes()` hands a probe the
+writable-without-consequence roots and their TTLs straight from the declaration; the
+TTL half of prefix-discipline is unrepresentable as drift because `Meaning` carries it
+by construction. The committed exemplar (`spec/exemplar.infra.spec` +
+`.infra.register`, frozen by `freeze_infra`) is the first consumer's shape with the
+names washed out — two surfaces, one store with three root meanings, four seams, six
+secret names, one authority, two cadences — so the whole path runs on every test run.
+The router learned the class (`Ratification::Infra`, named by system). Honest frame:
+the judge holds declared facts against readable state — an undeclared seam is
+invisible; and the judging gate's own credential is a line in the census it checks,
+which is why the floor exists from day one. The extraction (which cloud API, which
+fields) is the consumer's, like `examples/perimeter.rs` is ours; only the judgment
+lives here, where the probes reach. This is behaviour-as-code rung 2 made concrete:
+read-only world probes, judged on the consumer's cadence and credentials.
+
+## Candidate: git itself has no vocabulary
+
+The perimeter covers GitHub-the-service; nothing covers git-the-data, and the repo
+already leans on undeclared git meaning: the `mutants-green` tag is the incremental
+gate's entire baseline, its semantics living as prose and as behaviour inside
+`mutants-gate.sh` (the exact gate-defined-where-no-drift-gate-can-see-it shape); the
+CalVer release tags carry certification semantics `release.sh` assumes; and "main is
+linear, every commit a squash of a gated PR" is a declared perimeter rule about future
+merges but an unjudged observation about the history that exists. A git lock would
+declare tag meanings and history laws and judge them from `git log` and `git tag` —
+the first world lock with zero world-read cost: no credentials, no network, the
+repository is already on disk. Close kin to the infra register floor ("tag X means Y"
+is a ratified meaning line); could ride the same vocabulary.
+
 ## Candidate: the audience is the agent
 
 Adoption of this method is chosen inside agentic sessions, by whichever instance is
