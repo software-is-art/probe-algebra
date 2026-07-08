@@ -97,7 +97,7 @@ pub struct Substrate {
 /// What the world reports — parsed from `git tag --list`, per-tag
 /// `git merge-base --is-ancestor`, and `git rev-list --min-parents=2 --count` by
 /// `examples/substrate.rs`. `None` = the read failed; refused by name, never assumed.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LiveSubstrate {
     /// Every tag name the repository carries.
     pub tags: Option<Vec<String>>,
@@ -454,6 +454,120 @@ mod probes {
             merges_after_epoch: Some(0),
             published_versions: Some(vec!["0.1.0".to_string()]),
         }
+    }
+
+    /// substrate's judgment reformulated over the RELATIONAL primitive — the tag/marker
+    /// verdict is a JOIN (tags ⋈ ancestry) plus a live-DERIVED marker floor, not a flat
+    /// floor. This reformulation reproduces the incumbent judge's accept/reject across a
+    /// grid of live substrates (tags/ancestry/markers/linearity, straddling the floor),
+    /// proving the relational engine faithfully holds substrate before the message work.
+    /// The incumbent is the transitional oracle; no hand-written oracle.
+    #[test]
+    fn the_relational_reformulation_reproduces_the_substrate_judge() {
+        use crate::discover::relation::{Joined, Requirements};
+
+        fn relational_ok(sub: &Substrate, live: &LiveSubstrate) -> bool {
+            let (tags, ancestry) = match (&live.tags, &live.ancestry) {
+                (Some(t), Some(a)) => (t, a),
+                _ => return false,
+            };
+            let joined = Joined::left(tags, ancestry);
+            // tag laws: for each, the matching tags must all be on the certified line;
+            // a required law with no match refuses (an optional one is vacuously held).
+            for law in &sub.tags {
+                let matching = joined.matching(|t| law.matches(t));
+                if matching.is_empty() {
+                    if law.required {
+                        return false;
+                    }
+                } else if matching.iter().any(|(_, on_line)| *on_line != Some(true)) {
+                    return false;
+                }
+            }
+            // publish markers, DERIVED from the live index: each must exist and sit on
+            // the certified line.
+            let versions = match &live.published_versions {
+                Some(v) => v,
+                None => return false,
+            };
+            let markers = Requirements::awaiting().derive(versions);
+            for marker in markers.members() {
+                if !joined.has(marker) || joined.annotation(marker) != Some(Some(true)) {
+                    return false;
+                }
+            }
+            // linearity: a flat scalar, exactly zero.
+            matches!(live.merges_after_epoch, Some(0))
+        }
+
+        let declared = Substrate::declared();
+        // ancestry with exactly one named tag knocked off the certified line (the rest
+        // on) — so each tag's line-status hinges on ITS OWN join lookup; a lookup that
+        // fetched a neighbour's status would flip the verdict on exactly these states.
+        let off_one = |off: &str| {
+            Some(
+                ["mutants-green", "v0.1.0", "v2026.07.07"]
+                    .iter()
+                    .map(|t| (t.to_string(), *t != off))
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let all_on = off_one("");
+        let tags_opts: Vec<Option<Vec<String>>> = vec![
+            Some(vec![
+                "mutants-green".to_string(),
+                "v0.1.0".to_string(),
+                "v2026.07.07".to_string(),
+            ]),
+            None,
+            Some(vec!["v0.1.0".to_string(), "v2026.07.07".to_string()]), // required green gone
+            Some(vec!["mutants-green".to_string(), "v2026.07.07".to_string()]), // marker v0.1.0 gone
+        ];
+        let ancestry_opts = vec![
+            all_on,
+            None,
+            off_one("mutants-green"),
+            off_one("v0.1.0"),
+            off_one("v2026.07.07"),
+        ];
+        let merges_opts = [Some(0u64), Some(1), None];
+        let versions_opts: Vec<Option<Vec<String>>> = vec![
+            Some(vec!["0.1.0".to_string()]),
+            None,
+            Some(vec!["0.1.0".to_string(), "0.2.0".to_string()]), // 0.2.0 unmarked
+        ];
+
+        let mut count = 0usize;
+        let mut caught = 0usize;
+        for tags in &tags_opts {
+            for ancestry in &ancestry_opts {
+                for merges in merges_opts {
+                    for versions in &versions_opts {
+                        let live = LiveSubstrate {
+                            tags: tags.clone(),
+                            ancestry: ancestry.clone(),
+                            merges_after_epoch: merges,
+                            published_versions: versions.clone(),
+                        };
+                        let incumbent = declared.judge(&live).is_ok();
+                        let relational = relational_ok(&declared, &live);
+                        assert_eq!(
+                            relational, incumbent,
+                            "relational disagrees with the judge on {live:?}"
+                        );
+                        count += 1;
+                        if !incumbent {
+                            caught += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(count >= 100, "the grid should be substantial: {count}");
+        assert!(
+            caught > 0 && caught < count,
+            "the grid must straddle the floor"
+        );
     }
 
     /// The pattern grammar, one arm at a time: an exact name matches only itself
