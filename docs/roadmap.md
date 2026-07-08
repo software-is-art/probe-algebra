@@ -857,6 +857,74 @@ expires — and a world fact never feeds the countersign: the certified tag must
 wait on a settings page. Casualty of the brick, per its own instruction: CLAUDE.md's
 "PRs land by squash merge" line, now a declared, read-back merge-method rule.
 
+## The twelfth ask: encode the infra meaning (BUILT)
+
+The consumer's incident chain had a layer below any repository: a bucket's CORS
+allow-list that still named a migrated-away origin, a build command living in a
+dashboard text box, a surface running a day on placeholder secrets, store-prefix
+meanings encoded as a regex in one file and prose in another. Every one was a law
+without a declaration — the seam existed, the law existed, and the refusal came from a
+customer's browser weeks later. `discover::infra` extends the declaration discipline
+one level down, on the perimeter pattern: `Infra` declares the graph (surfaces with
+origins and the build that produces them; stores whose roots carry a meaning class —
+`ephemeral(ttl)`, `locked`, `drafts`; presign/read seams; credential NAMES per
+surface; authorities; cadences), `coherent()` judges the declaration against itself
+(an edge to an undeclared node, a presign outside any declared root: refused by name
+before any API is consulted), and `judge()` holds a consumer-extracted `LiveInfra` to
+the three API-readable laws — *cors-covers-origins*, *secrets-census*,
+*build-command-is-derived* — with the perimeter's floor semantics (extra coverage is
+not drift; the build command is the one exact match).
+
+Where no API reaches, the register floor: `unjudgeable()` derives the exact key set
+(root meanings, authorities, cadences) and `floor()` holds a hand-authored
+`<system>.infra.register` to it with the existing set-difference semantics —
+declared-but-unjudgeable is disclosed as exactly that, never silently assumed held.
+What derives instead of being re-encoded: `ephemeral_prefixes()` hands a probe the
+writable-without-consequence roots and their TTLs straight from the declaration; the
+TTL half of prefix-discipline is unrepresentable as drift because `Meaning` carries it
+by construction. The committed exemplar (`spec/exemplar.infra.spec` +
+`.infra.register`, frozen by `freeze_infra`) is the first consumer's shape with the
+names washed out — two surfaces, one store with three root meanings, four seams, six
+secret names, one authority, two cadences — so the whole path runs on every test run.
+The router learned the class (`Ratification::Infra`, named by system). Honest frame:
+the judge holds declared facts against readable state — an undeclared seam is
+invisible; and the judging gate's own credential is a line in the census it checks,
+which is why the floor exists from day one. The extraction (which cloud API, which
+fields) is the consumer's, like `examples/perimeter.rs` is ours; only the judgment
+lives here, where the probes reach. This is behaviour-as-code rung 2 made concrete:
+read-only world probes, judged on the consumer's cadence and credentials.
+
+## Git itself is a lock: the substrate (BUILT)
+
+The perimeter covers GitHub-the-service; nothing covered git-the-data, and the repo
+leaned on undeclared git meaning everywhere: the `mutants-green` tag is the
+incremental gate's entire baseline, its semantics living as prose and as behaviour
+inside `mutants-gate.sh` (the exact gate-defined-where-no-drift-gate-can-see-it shape
+the pipeline brick killed); the CalVer release tags carry certification semantics
+`release.sh` assumes; and "main is linear, every commit a squash of a gated PR" was a
+declared perimeter rule about future merges but an unjudged observation about the
+history that exists. `discover::substrate` declares those meanings — each tag or
+trailing-`*` family with the prose the scripts otherwise keep (each name owned once:
+`mutants-green` IS `gates::GREEN_TAG`, never restated), plus the linearity epoch (the
+last pre-discipline merge commit) — and `Substrate::judge` holds a `LiveSubstrate` to
+them: a required tag absent, a meaning-carrying tag off the certified line, a merge
+commit after the epoch, an unreadable read — each refuses by name. The meanings are
+STATE-FREE (what a tag means never changes with whether it exists; presence is the
+judge's to report), and the publish-marker law names no tag at all: every version the
+crates.io index reports published for the root crate demands its `v<version>` marker
+on the certified line — instances derived at judgment time, so a new publish extends
+the law with no declaration edit, and `release.sh` mints the marker when it publishes
+so the law self-satisfies going forward. Frozen as `spec/substrate.spec` (rides
+`freeze_gates` with the other repo-meta locks); read back by the weekly
+`substrate (git drift)` world gate (`.github/substrate.sh` → `examples/substrate.rs`,
+which asks the declaration for the epoch and the marker crate instead of restating
+them). The reads are credential-free — git plumbing against the checkout's own origin
+plus one anonymous sparse-index read — and like every world fact never feed the
+countersign. One derived instance is red on arrival: `boundary-spec` 0.1.0 is on
+crates.io with no `v0.1.0` marker in the repository (the one publish that predates
+the minting machinery) — the reminder that never expires, computed instead of
+declared; push the tag at the published tree and the gate goes green.
+
 ## Candidate: the audience is the agent
 
 Adoption of this method is chosen inside agentic sessions, by whichever instance is

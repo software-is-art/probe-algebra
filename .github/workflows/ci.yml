@@ -178,6 +178,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: .github/perimeter.sh
 
+  # World gate: read state the tree cannot contain, hold it to the declared
+  # floor — see the gate registry for what it verifies. Not a countersign
+  # input: a world fact is not evidence about the tree.
+  world-substrate-git-drift:
+    name: substrate (git drift)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: Swatinem/rust-cache@v2
+      - run: .github/substrate.sh
+
   # Whole-crate dogfood: the green gate is "0 MISSED". Timeouts (non-termination
   # mutants) are DETECTIONS, not survivors — `.github/mutants-gate.sh` distinguishes
   # a timeout-only exit (pass) from a real survivor in `missed.txt` (fail). The

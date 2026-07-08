@@ -51,6 +51,13 @@ pub enum Ratification {
     /// The perimeter moved: the declared repository-settings floor (branch rules,
     /// merge methods, vulnerability reporting) or its apply-able ruleset changed.
     Perimeter,
+    /// An infra graph moved (`<system>.infra.spec`): a surface, store meaning, seam,
+    /// credential name, authority, or cadence changed — the deployment's declared
+    /// meaning, one level below the repo.
+    Infra { system: String },
+    /// The git substrate moved (`substrate.spec`): a tag meaning or history law
+    /// changed — what the repository's own tags and history are declared to mean.
+    Substrate,
     /// A CONSUMER-registered lock class moved: the class and its ratification question
     /// are the consumer's own data (see [`Agenda::of_with`]) — the routing machinery is
     /// generic; the class table is not upstream's to own.
@@ -98,6 +105,16 @@ impl Ratification {
             Ratification::Perimeter => {
                 "the perimeter moved — the declared settings floor changed; re-apply \
                  spec/perimeter.ruleset.json and re-check the live settings against it."
+                    .to_string()
+            }
+            Ratification::Infra { system } => format!(
+                "`{system}`: the infra graph moved — a declared surface, meaning, seam, \
+                 credential, authority, or cadence changed; re-judge the live state \
+                 against it."
+            ),
+            Ratification::Substrate => {
+                "the git substrate moved — a tag meaning or history law changed; \
+                 re-read what the repository's tags now claim."
                     .to_string()
             }
             Ratification::Custom { class, question } => format!("`{class}`: {question}"),
@@ -331,8 +348,14 @@ fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
             Ratification::Partition
         } else if file == "perimeter.spec" || file == "perimeter.ruleset.json" {
             Ratification::Perimeter
+        } else if file == "substrate.spec" {
+            Ratification::Substrate
         } else if file == "shapes.spec" {
             Ratification::Vocabulary
+        } else if file.ends_with(".infra.spec") {
+            Ratification::Infra {
+                system: theory(".infra.spec"),
+            }
         } else if file.ends_with(".mutation.spec") {
             Ratification::Freedoms {
                 theory: theory(".mutation.spec"),
@@ -469,6 +492,42 @@ mod probes {
         assert!(Ratification::Perimeter
             .question()
             .contains("perimeter moved"));
+    }
+
+    /// An infra lock routes to ITS OWN class, named by system — not the `.spec` law
+    /// catch-all (which would pose a theory question about a deployment) — and its
+    /// register floor routes as the exception class every register shares.
+    #[test]
+    fn an_infra_lock_routes_to_its_own_class() {
+        let agenda = Agenda::of(["spec/exemplar.infra.spec"]).expect("a known lock class");
+        assert_eq!(
+            agenda.ratifications,
+            vec![Ratification::Infra {
+                system: "exemplar".to_string()
+            }]
+        );
+        assert!(agenda.ratifications[0]
+            .question()
+            .contains("infra graph moved"));
+        let floor = Agenda::of(["spec/exemplar.infra.register"]).unwrap();
+        assert_eq!(
+            floor.ratifications,
+            vec![Ratification::Exceptions {
+                register: "spec/exemplar.infra.register".to_string()
+            }]
+        );
+    }
+
+    /// The substrate lock routes to ITS OWN class — an exact-name arm, like the
+    /// perimeter's, because the `.spec` catch-all would pose a theory-law question
+    /// about the repository's tags.
+    #[test]
+    fn the_substrate_lock_routes_to_its_own_class() {
+        let agenda = Agenda::of(["spec/substrate.spec"]).expect("a known lock class");
+        assert_eq!(agenda.ratifications, vec![Ratification::Substrate]);
+        assert!(agenda.ratifications[0]
+            .question()
+            .contains("git substrate moved"));
     }
 
     /// An unknown spec-directory artifact REFUSES — a new lock class must be taught to

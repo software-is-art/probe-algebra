@@ -5,7 +5,7 @@
 # reachability's tier. KERNEL is a decision, never derived: it is ratified in the
 # consumer's own tree (the build.rs allowlist, or a register it parses).
 # Regenerate with `BLESS_TIERS=1 cargo build`.
-# 48 files: 3 boundary, 4 interior, 31 algebra, 10 kernel.
+# 50 files: 3 boundary, 4 interior, 33 algebra, 10 kernel.
 
 - src/boundary.rs: KERNEL (registered — a decision, never derived)
 - src/capability.rs: KERNEL (registered — a decision, never derived)
@@ -26,6 +26,7 @@
 - src/discover/freeze.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/gates.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/genesis.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
+- src/discover/infra.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/layering.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/mod.rs: KERNEL (registered — a decision, never derived)
 - src/discover/modularize.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
@@ -36,6 +37,7 @@
 - src/discover/router.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/scaffold.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/shape.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
+- src/discover/substrate.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/system.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/watch.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/world.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)

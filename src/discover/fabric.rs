@@ -357,4 +357,16 @@ mod tests {
         );
         assert_eq!(e.check(&d.laws), Ok(()));
     }
+
+    /// The closure composes HEAD TO TAIL and nothing else: {1→2, 2→3} closes to
+    /// exactly {1→2, 2→3, 1→3}. Pinned as an exact set because the discovered laws
+    /// alone did not distinguish the matched-endpoint join (`b == c`) from its
+    /// mismatched twin, which drops 1→3 and mints a spurious 2→2 — the main-sweep
+    /// survivor this probe exists to kill.
+    #[test]
+    fn the_closure_composes_head_to_tail() {
+        let links: BTreeSet<Link> = [(1, 2), (2, 3)].into_iter().collect();
+        let expected: BTreeSet<Link> = [(1, 2), (2, 3), (1, 3)].into_iter().collect();
+        assert_eq!(closure(&links), expected);
+    }
 }
