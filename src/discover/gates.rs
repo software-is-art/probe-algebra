@@ -145,7 +145,7 @@ fn registry_stanzas(gates: &[Gate]) -> String {
         let cadence = match gate.cadence {
             Cadence::EveryChange => "every change",
             Cadence::PerDiff => "per PR diff",
-            Cadence::DefaultBranch => "default branch, diff since mutants-green",
+            Cadence::DefaultBranch => "default branch, after the every-change gates",
             Cadence::Weekly => "weekly + manual, sharded",
             Cadence::OnCertify => "on certification, when the mutants-green tag advances",
         };
@@ -540,11 +540,14 @@ impl GateRegistry {
                 sharded: false,
             },
             Gate {
-                name: "mutation (since green)",
-                verifies: "no mutant of anything changed since the last fully-certified \
-                           tree (the mutants-green tag) survives — a merge re-verifies \
-                           its drift, not the whole tree, and advances the tag on green",
-                command: &[".github/mutants-gate.sh", "--in-diff", "since-green.diff"],
+                name: "certify (mutants-green)",
+                verifies: "the default branch marks itself certified: once the \
+                           every-change gates — which carry the WHOLE compiled-mutant \
+                           population — pass on a push, the mutants-green tag advances \
+                           to HEAD and the release mints. The per-merge cargo-mutants \
+                           run is retired; the weekly sweeps keep the exempted \
+                           remainder",
+                command: &["git", "tag", "-f", "mutants-green"],
                 cadence: Cadence::DefaultBranch,
                 effect: Capability::Pure,
                 sharded: false,
@@ -669,7 +672,16 @@ impl GateRegistry {
                            killed with a probe. The rebuild-per-mutant price is gone, \
                            so the whole population rides EVERY change (~a minute on a \
                            warm cache), not a weekly clock",
-                command: &[".github/schemata.sh"],
+                command: &[
+                    "cargo",
+                    "run",
+                    "--features",
+                    "schemata",
+                    "--example",
+                    "schemata",
+                    "--",
+                    "sweep",
+                ],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
                 sharded: false,
@@ -874,8 +886,9 @@ impl GateRegistry {
                  \x20 # one effect. A red gate leaves the tag put, so the next merge re-verifies the\n\
                  \x20 # accumulated drift. The weekly sharded sweep re-certifies from scratch.\n\
                  \x20 mutants-incremental:\n\
-                 \x20   name: dogfood (since green)\n\
+                 \x20   name: certify (mutants-green)\n\
                  \x20   if: github.event_name == 'push'\n\
+                 \x20   needs: check\n\
                  \x20   runs-on: ubuntu-latest\n\
                  \x20   permissions:\n\
                  \x20     contents: write\n\
@@ -885,17 +898,9 @@ impl GateRegistry {
                  \x20         fetch-depth: 0\n\
                  \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
                  \x20     - uses: Swatinem/rust-cache@v2\n\
-                 \x20     - uses: taiki-e/install-action@v2\n\
-                 \x20       with:\n\
-                 \x20         tool: cargo-mutants,cargo-nextest\n\
-                 \x20     - name: mutate the drift since the certified tree\n\
+                 \x20     - name: countersign — the fully-gated tree marks itself certified\n\
                  \x20       run: |\n\
-                 \x20         git rev-parse -q --verify refs/tags/{GREEN_TAG} >/dev/null || {{ echo \"::error::no {GREEN_TAG} tag - bootstrap by dispatching this workflow (Actions -> ci -> Run workflow): the full sweep's countersign plants the tag it earns\"; exit 1; }}\n\
-                 \x20         git diff \"{GREEN_TAG}...HEAD\" > since-green.diff\n\
                  \x20         {}\n\
-                 \x20     - name: countersign — advance the certified-tree tag\n\
-                 \x20       run: |\n\
-                 \x20         git tag -f {GREEN_TAG}\n\
                  \x20         git push -f origin {GREEN_TAG}\n",
                 gate.command_line()
             ));
@@ -1071,6 +1076,31 @@ impl GateRegistry {
 mod tests {
     use super::*;
 
+    /// `check_context` renders a gate's status-check name: the `mutation (...)` sugar
+    /// unwrapped to `dogfood (...)`, the bare name otherwise. Probed directly because the
+    /// library's own pipeline declares no per-diff gate to reach it through the render.
+    #[test]
+    fn check_context_renders_the_status_name() {
+        let mutation = Gate {
+            name: "mutation (changed lines)",
+            verifies: "",
+            command: &[],
+            cadence: Cadence::PerDiff,
+            effect: Capability::Pure,
+            sharded: false,
+        };
+        assert_eq!(check_context(&mutation), "dogfood (changed lines)");
+        let plain = Gate {
+            name: "audit",
+            verifies: "",
+            command: &[],
+            cadence: Cadence::PerDiff,
+            effect: Capability::Pure,
+            sharded: false,
+        };
+        assert_eq!(check_context(&plain), "dogfood (audit)");
+    }
+
     /// BOTH pipeline locks are fresh: the committed inventory and the committed workflow
     /// match the registry's renders. A hand edit to `ci.yml` fails HERE — inside the very
     /// `cargo test` the workflow runs — so the pipeline can no longer drift silently the
@@ -1205,9 +1235,12 @@ mod tests {
         assert!(workflow.contains(&format!(
             "--shard ${{{{ matrix.shard }}}}/{FULL_SWEEP_SHARDS}"
         )));
-        assert!(workflow.contains(&format!(
-            "git diff \"{GREEN_TAG}...HEAD\" > since-green.diff"
-        )));
+        // certification is no longer a cargo-mutants run: the certify job NEEDS the
+        // check job (which carries the whole compiled-mutant population) and only
+        // marks and releases.
+        assert!(workflow.contains("needs: check"));
+        assert!(!workflow.contains("since-green.diff"));
+        assert!(workflow.contains(&format!("git tag -f {GREEN_TAG}")));
         assert!(workflow.contains(&format!("git push -f origin {GREEN_TAG}")));
         // the full sweep runs on the clock and the button, never per-merge (that is the
         // incremental job's cadence — the whole point of the split).
@@ -1513,7 +1546,7 @@ mod tests {
             "\n- test (every change; pure)\n      cargo test --workspace --all-targets\n"
         ));
         assert!(text.contains(
-            "\n- mutation (since green) (default branch, diff since mutants-green; pure)\n"
+            "\n- certify (mutants-green) (default branch, after the every-change gates; pure)\n"
         ));
         assert!(text.contains("\n- mutation (full sweep) (weekly + manual, sharded; pure)\n"));
         // the release stanza wears both distinctions: the certification cadence and the

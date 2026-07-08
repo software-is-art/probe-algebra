@@ -19,9 +19,9 @@
       cargo test --workspace --all-targets
       promises: every workspace member's suites: the enforcement passes and qualify censuses (ride the builds), the drift gates (module, system, shapes, and world locks), the distance gates, the probes, and the consumer fixtures
 
-- mutation (since green) (default branch, diff since mutants-green; pure)
-      .github/mutants-gate.sh --in-diff since-green.diff
-      promises: no mutant of anything changed since the last fully-certified tree (the mutants-green tag) survives — a merge re-verifies its drift, not the whole tree, and advances the tag on green
+- certify (mutants-green) (default branch, after the every-change gates; pure)
+      git tag -f mutants-green
+      promises: the default branch marks itself certified: once the every-change gates — which carry the WHOLE compiled-mutant population — pass on a push, the mutants-green tag advances to HEAD and the release mints. The per-merge cargo-mutants run is retired; the weekly sweeps keep the exempted remainder
 
 - mutation (full sweep) (weekly + manual, sharded; pure)
       .github/mutants-gate.sh
@@ -52,7 +52,7 @@
       promises: the LIVE repository perimeter — branch rules on the default branch, merge methods, private vulnerability reporting — still satisfies the declared floor (spec/perimeter.spec). Settings are configuration that drifts silently and that no one re-audits; this gate reads them back on the weekly clock and refuses by name. READ-ONLY: the write stays human — a privilege is ratified, never self-served
 
 - mutation (schemata) (every change; pure)
-      .github/schemata.sh
+      cargo run --features schemata --example schemata -- sweep
       promises: no compiled expression-flip mutant survives the lib suite: every `#[mutate]` site (spec/schemata.spec — the judges, the router's classifier, the reliance judge) ships in ONE build behind the PROBE_MUTANT selector, and the sweep runs the suite once per site — a green run with a flip active is a survivor, ratified by key in spec/schemata.register or killed with a probe. The rebuild-per-mutant price is gone, so the whole population rides EVERY change (~a minute on a warm cache), not a weekly clock
 
 - substrate (git drift) (weekly + manual, sharded; EFFECTFUL)

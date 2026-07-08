@@ -39,10 +39,11 @@ package alone silently skips the fixtures.
 
 ## Mutation testing
 
-- PRs are mutation-gated by SCHEMATA (below), not cargo-mutants — the per-diff
-  source gate is retired. The default branch still mutates the diff since the
-  `mutants-green` tag and a weekly sweep covers everything, sharded, through
-  `.github/mutants-gate.sh`. Timeouts count as detections, not survivors.
+- PRs and merges are mutation-gated by SCHEMATA (below), not cargo-mutants — the
+  per-diff and since-green source gates are retired; a green check job on main
+  advances `mutants-green` and mints the release. Only the weekly sharded sweep and
+  the member companions still run cargo-mutants (`.github/mutants-gate.sh`), covering
+  the exempted remainder. Timeouts count as detections, not survivors.
 - The root sweep runs only `--lib`, `refusal_drill`, and `fire_drill` — a lock defended
   only in `tests/` is invisible to it. Give every lock a lib-side twin.
 - A surviving mutant means a missing probe. For an equivalent mutant, prefer deleting
@@ -52,8 +53,9 @@ package alone silently skips the fixtures.
   survivors there are spec degrees of freedom, ratified in `spec/<theory>.mutation.spec`.
 - `#[mutate]`-instrumented code (the whole discover tree, engine included) carries
   compiled flips and deafness forms (`spec/schemata.spec`, ~700 sites), swept on
-  every change by `.github/schemata.sh`: one `--features schemata` build, coverage-
-  mapped test runs per site, parallel workers. Survivors are ratified in
+  every change by `cargo run --features schemata --example schemata -- sweep`: one
+  build, coverage-mapped test runs per site, parallel workers — the whole pipeline is
+  typed Rust with pinned semantics, no shell. Survivors are ratified in
   `spec/schemata.register` (backtick-quoted keys). Instrumentation completeness is
   itself a census: uninstrumented files need a reasoned line in
   `spec/instrumentation.register`.
