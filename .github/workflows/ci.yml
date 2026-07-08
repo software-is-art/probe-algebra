@@ -46,6 +46,7 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-targets
+      - run: .github/schemata.sh
 
   # Per-change dogfood: mutate only the lines this PR touches. New code that a
   # probe cannot kill fails the gate; pre-existing documented equivalents are
@@ -163,21 +164,6 @@ jobs:
           tool: cargo-mutants,cargo-nextest
       - run: .github/mutants-gate.sh --package layout-probe --config .github/layout-probe-mutants.toml
 
-  # Weekly companion gate: one plain job on the weekly clock, feeding the
-  # same countersign — see the gate registry for what it verifies.
-  mutants-schemata:
-    name: dogfood (schemata)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.94.1
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-mutants,cargo-nextest
-      - run: .github/schemata.sh
-
   # World gate: read state the tree cannot contain, hold it to the declared
   # floor — see the gate registry for what it verifies. Not a countersign
   # input: a world fact is not evidence about the tree.
@@ -239,7 +225,7 @@ jobs:
   # the certified DEFAULT-BRANCH tree — a branch tip must never claim it.
   mutants-full-countersign:
     name: countersign (full sweep)
-    needs: [mutants-full, mutants-delta-render-plumbing, mutants-statement-bites-lean-corpus, mutants-fire-drill-plumbing, mutants-layout-probe-plumbing, mutants-schemata]
+    needs: [mutants-full, mutants-delta-render-plumbing, mutants-statement-bites-lean-corpus, mutants-fire-drill-plumbing, mutants-layout-probe-plumbing]
     if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

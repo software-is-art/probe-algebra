@@ -1,7 +1,7 @@
 # the schemata census, DERIVED — every expression-flip mutant this build
 # carries (`#[mutate]` sites, registered at link time), one per line. The
-# weekly `mutation (schemata)` gate builds once and runs the lib suite once
-# per site with the flip active; survivors are ratified by key in
+# every-change `mutation (schemata)` gate builds once and runs the lib suite
+# once per site with the flip active; survivors are ratified by key in
 # spec/schemata.register or killed with a probe. Instrumenting a function
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.

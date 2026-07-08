@@ -14,9 +14,10 @@
 //! if Schemata::active("<site>") { <flipped> } else { <original> }
 //! ```
 //!
-//! so every flip ships in the same build, inert until selected. The weekly
+//! so every flip ships in the same build, inert until selected. The
 //! `mutation (schemata)` gate then builds ONCE and runs the lib suite once per site
-//! with `PROBE_MUTANT=<site>`: a run that goes green with a flip active is a SURVIVOR
+//! with `PROBE_MUTANT=<site>` — cheap enough (~a minute warm) to ride EVERY change,
+//! not a weekly clock: a run that goes green with a flip active is a SURVIVOR
 //! — a probe hole (or a ratified equivalence, one line in `spec/schemata.register`
 //! with its justification). These are exactly the operator classes every recent
 //! source-sweep survivor lived in, now judged at test-run price.
@@ -112,8 +113,8 @@ impl Schemata {
         let mut out = format!(
             "# the schemata census, DERIVED — every expression-flip mutant this build\n\
              # carries (`#[mutate]` sites, registered at link time), one per line. The\n\
-             # weekly `mutation (schemata)` gate builds once and runs the lib suite once\n\
-             # per site with the flip active; survivors are ratified by key in\n\
+             # every-change `mutation (schemata)` gate builds once and runs the lib suite\n\
+             # once per site with the flip active; survivors are ratified by key in\n\
              # spec/schemata.register or killed with a probe. Instrumenting a function\n\
              # (or moving its sites) is a ratified diff to this file. Regenerate with\n\
              # `cargo run --example freeze_gates`.\n\
@@ -141,7 +142,7 @@ impl Schemata {
     /// The ratified-survivor register: `spec/schemata.register`, one
     /// `<site>: <justification>` line per mutant the suite provably cannot kill and a
     /// human has accepted as equivalent (or as a freedom). Judged with the standard
-    /// set-difference semantics by the weekly sweep.
+    /// set-difference semantics on every sweep.
     pub fn register() -> Register {
         Register {
             name: "schemata survivors".to_string(),

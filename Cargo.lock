@@ -38,7 +38,7 @@ dependencies = [
 
 [[package]]
 name = "boundary-spec"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "boundary-enforce",
  "boundary-spec-macros",
@@ -57,7 +57,7 @@ dependencies = [
 
 [[package]]
 name = "boundary-spec-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -260,7 +260,7 @@ dependencies = [
 
 [[package]]
 name = "probe-hook"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "boundary-spec",
  "serde_json",

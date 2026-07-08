@@ -49,6 +49,9 @@ package alone silently skips the fixtures.
   reason) only when you can't.
 - Theories are also mutated in-process on every `cargo test` (`discover::mutation`);
   survivors there are spec degrees of freedom, ratified in `spec/<theory>.mutation.spec`.
+- `#[mutate]`-instrumented functions carry compiled expression flips
+  (`spec/schemata.spec`), swept on every change by `.github/schemata.sh` — one build,
+  one test run per site; survivors are ratified in `spec/schemata.register`.
 
 ## Conventions that bite
 

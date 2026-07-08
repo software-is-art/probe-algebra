@@ -964,14 +964,16 @@ operand binds once, so laziness is preserved and left-leaning chains grow linear
 and every site registers into a link-time slice (`discover::schemata::MUTANT_SITES`)
 whose sorted census freezes as `spec/schemata.spec`: instrumenting a function is a
 ratified diff, a label collision refuses by name, and the router routes the census to
-its own class. The weekly `mutation (schemata)` gate (Pure — a countersign input,
-unlike the world gates) builds ONCE and runs the lib suite once per site with
+its own class. The `mutation (schemata)` gate (Pure) builds ONCE and runs the lib
+suite once per site with
 `PROBE_MUTANT` selecting the flip; survivors are ratified by key in
 `spec/schemata.register` or killed with a probe. First full sweep, measured: 23 sites
 across the three world judges, the router's classifier, the reliance judge, and the
 tag grammar — 23 killed, 0 survivors, 82 seconds end to end (the same population as
-rebuilds: ~12+ minutes). The zero is not luck: the sensitivity drills are the killers
-for every judge site — the layers compose. Honest frame: schemata covers what a
+rebuilds: ~12+ minutes). Cheap enough that it was promoted from the weekly clock to
+EVERY change on arrival — expression mutants now gate PRs, inside the same required
+check as fmt/clippy/test. The zero is not luck: the sensitivity drills are the
+killers for every judge site — the layers compose. Honest frame: schemata covers what a
 runtime branch can express; whole-function replacements and type-level mutations stay
 with the source sweeps, `matches!`/`assert!` interiors are opaque tokens (disclosed in
 the macro docs), and one mutant runs per process — flip interactions are out of scope,

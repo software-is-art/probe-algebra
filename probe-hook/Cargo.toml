@@ -1,6 +1,6 @@
 [package]
 name = "probe-hook"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "The probe-algebra edit guard as a shipped Claude Code hook: speaks the hook protocol natively, derives its voices from the tree, teaches classes from the repo's own register, installs its own wiring — fail-open as a tested property, not a per-consumer convention."
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ repository = "https://github.com/software-is-art/probe-algebra"
 [dependencies]
 # The judged core this binary is the envelope for: the guard, its derived voices,
 # and the consumer-taught class table.
-boundary-spec = { path = "..", version = "0.1.0" }
+boundary-spec = { path = "..", version = "0.2.0" }
 # The register grammar (spec/agenda.register carries the taught classes).
 spec-lock = { path = "../spec-lock", version = "0.1.0" }
 # The hook protocol is JSON on stdin; a real parser, because file paths can carry

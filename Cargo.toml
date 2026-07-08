@@ -1,6 +1,6 @@
 [package]
 name = "boundary-spec"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A module boundary specified precisely enough that its validating tests — and the proof their interior is correct — derive themselves."
 license = "MIT OR Apache-2.0"
@@ -34,7 +34,7 @@ name = "demo"
 path = "src/main.rs"
 
 [dependencies]
-boundary-spec-macros = { path = "boundary-spec-macros", version = "0.1.0" }
+boundary-spec-macros = { path = "boundary-spec-macros", version = "0.2.0" }
 # The freeze/drift-gate mechanics (`discover::freeze` is a thin adapter over it) — extracted so
 # any project can lift the "frozen spec + drift gate" discipline without the discovery engine.
 spec-lock = { path = "spec-lock", version = "0.1.0" }

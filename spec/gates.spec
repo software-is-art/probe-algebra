@@ -55,9 +55,9 @@
       .github/perimeter.sh
       promises: the LIVE repository perimeter — branch rules on the default branch, merge methods, private vulnerability reporting — still satisfies the declared floor (spec/perimeter.spec). Settings are configuration that drifts silently and that no one re-audits; this gate reads them back on the weekly clock and refuses by name. READ-ONLY: the write stays human — a privilege is ratified, never self-served
 
-- mutation (schemata) (weekly + manual, sharded; pure)
+- mutation (schemata) (every change; pure)
       .github/schemata.sh
-      promises: no compiled expression-flip mutant survives the lib suite: every `#[mutate]` site (spec/schemata.spec — the judges, the router's classifier, the reliance judge) ships in ONE build behind the PROBE_MUTANT selector, and the sweep runs the suite once per site — a green run with a flip active is a survivor, ratified by key in spec/schemata.register or killed with a probe. The rebuild-per-mutant price is gone: a verdict costs a test run
+      promises: no compiled expression-flip mutant survives the lib suite: every `#[mutate]` site (spec/schemata.spec — the judges, the router's classifier, the reliance judge) ships in ONE build behind the PROBE_MUTANT selector, and the sweep runs the suite once per site — a green run with a flip active is a survivor, ratified by key in spec/schemata.register or killed with a probe. The rebuild-per-mutant price is gone, so the whole population rides EVERY change (~a minute on a warm cache), not a weekly clock
 
 - substrate (git drift) (weekly + manual, sharded; EFFECTFUL)
       .github/substrate.sh

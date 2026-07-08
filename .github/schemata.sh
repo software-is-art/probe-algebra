@@ -4,7 +4,8 @@
 # flip selected via PROBE_MUTANT — never a rebuild (the selector is read at runtime,
 # so the cached test binary serves every site). A run that stays green with a flip
 # active is a SURVIVOR, judged against the ratified register (spec/schemata.register)
-# with set-difference semantics. Pure: a deterministic function of the tree.
+# with set-difference semantics. Pure and cheap (one build, ~a minute of test runs
+# warm), so it rides EVERY change alongside fmt/clippy/test.
 set -euo pipefail
 
 # build the lib test binary and the runner once; every per-site run below reuses them.
