@@ -9,10 +9,7 @@
 #
 # Format: <probe key>: <why it leans on the shared drift gate rather than an individual drill>
 
-surface: the public-surface census (qualify.spec) is a derived byte-lock; any surface change drifts it, and the spec-lock drift gate proves the drift check fires. An individual drill would plant a surface that changed without a re-bless — not yet built.
-tiers: the derived tier partition (tiers.spec) is a byte-lock; a re-derived tier that moved drifts it. An individual drill would plant a mis-derived partition and demand refusal — not yet built.
-shape: the placement lock (boundary-spec.shape.spec) is a byte-lock over the derived module boundaries; a re-placement drifts it. An individual drill would plant a mis-placed operator — not yet built.
-seams: the seam graph (boundary-spec.system.spec) is a byte-lock; a drawn/dropped seam or flipped verdict drifts it. The seam verdicts have their own tests, but no planted-bad-seam fire-drill exists yet.
-pipeline: the gate census (gates.spec) is a byte-lock over the declared pipeline; a changed gate drifts it. Individual gates carry fire-drills, but the census lock itself leans on the shared drift gate.
-schemata: the compiled-mutant census (schemata.spec) is a byte-lock; an instrumented function or moved site drifts it. Schemata IS a sensitivity engine, but the census lock over its sites leans on the shared drift gate.
-world: the world lock (store-model.world.spec) is a byte-lock over the model's ratified beliefs; a re-derived belief drifts it. A planted-drift world drill exists in layout-probe's domain, not here.
+surface: the public-surface census (qualify.spec) is derived by boundary-enforce over the source tree; its DERIVATION is mutation-tested in that crate, but no in-crate fire-drill plants a surface that changed without a re-bless. An individual drill would run the census over a synthetic tree with an added public item and demand the line appears.
+tiers: the derived tier partition (tiers.spec) is derived by boundary-enforce; its derivation is mutation-tested there, but no in-crate fire-drill plants a mis-derived partition. An individual drill would run derive_partition over a synthetic file that should change tier and demand the move.
+pipeline: the gate census (gates.spec) is a byte-lock over the declared pipeline; the individual pipeline GATES carry fire-drills (fire_drill::Battery), but the census over the registry data leans on the shared drift gate. An individual drill would plant a registry with a dropped/renamed gate and demand the census refuses.
+schemata: the compiled-mutant census (schemata.spec) is a byte-lock over the instrumented sites; the instrumentation-completeness census actively refuses an un-exempted uninstrumented item, but no planted-fixture drill proves that refusal fires. An individual drill would plant an uninstrumented eligible fn and demand the completeness census names it.

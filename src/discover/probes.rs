@@ -22,7 +22,8 @@
 //! can hide (`the_probe_census_covers_every_frozen_lock`).
 //!
 //! RUNG 1.5 (BUILT): `Mechanism::FireDrill` distinguishes the probes with an INDIVIDUAL
-//! fire-drill (the catalog: `shape data gate` + `expectation vocabulary`) from the byte-locks
+//! fire-drill (the catalog, the seam graph, the placer, and the world lock — each with a
+//! plant-a-bad-fixture drill in its own suite, cited at [`STRUCTURAL`]) from the byte-locks
 //! that lean on the shared `spec-lock drift gate`. The router files `spec/probes.spec` under
 //! its own `Ratification::Probes` class.
 //!
@@ -109,18 +110,26 @@ const STRUCTURAL: &[(&str, Mechanism)] = &[
     ("perimeter", Mechanism::LiveDent),
     ("infra", Mechanism::LiveDent),
     ("substrate", Mechanism::LiveDent),
-    // the law-language catalog — INDIVIDUAL fire-drills: a mis-sorted identity is refused
-    // (`shape data gate`) and an unratified shape name is rejected (`expectation vocabulary`).
+    // INDIVIDUAL fire-drills — each plants a probe-specific known-bad fixture and demands
+    // refusal, in the module's own suite:
+    //   catalog  — a mis-sorted identity is refused (`shape data gate`) and an unratified
+    //              shape name rejected (`expectation vocabulary`), in fire_drill::Battery.
+    //   seams    — a non-homomorphic conversion leaves the transform seam UNEARNED, named in
+    //              the render (system::probes::a_broken_conversion_leaves_the_transform_seam_unearned).
+    //   shape    — a placement disagreeing with the declaration renders "DISAGREES" and is
+    //              not settled (shape::probes::a_disagreeing_shape_renders_loud).
+    //   world    — a broken vendor's divergence and a mismatched battery are refused and
+    //              named (world::probes::reports_over_different_batteries_are_refused).
     ("catalog", Mechanism::FireDrill),
+    ("seams", Mechanism::FireDrill),
+    ("shape", Mechanism::FireDrill),
+    ("world", Mechanism::FireDrill),
     // byte-locks — only the shared `spec-lock drift gate` fire-drill; each ratified in
     // spec/probes.register (rung 2) until it earns an individual drill.
     ("surface", Mechanism::DriftGate),
     ("tiers", Mechanism::DriftGate),
-    ("shape", Mechanism::DriftGate),
-    ("seams", Mechanism::DriftGate),
     ("pipeline", Mechanism::DriftGate),
     ("schemata", Mechanism::DriftGate),
-    ("world", Mechanism::DriftGate),
 ];
 
 /// The unified probe census — every probe lock with the mechanism that proves it sensitive.
@@ -380,6 +389,8 @@ mod probes_tests {
         assert!(text.contains("- perimeter: live-dent"));
         assert!(text.contains("- surface: drift-gate"));
         assert!(text.contains("- catalog: fire-drill"));
+        assert!(text.contains("- seams: fire-drill"));
+        assert!(text.contains("- world: fire-drill"));
         // behavioural section lists a theory as oracle-swap.
         assert!(text.contains(": oracle-swap"));
     }

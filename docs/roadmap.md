@@ -1303,10 +1303,28 @@ Rung 2: the census is NORMATIVE — `every_probe_has_an_individual_drill_or_is_r
 the drift-gate set to `spec/probes.register` by SET DIFFERENCE, so a byte-lock leaning only
 on the shared gate must be a ratified line with a reason (an un-ratified one refuses, a line
 for a probe that earned an individual drill is stale), and the drift-gate set can only
-shrink as byte-locks earn their own drills. Seven byte-locks are ratified there today
-(surface, tiers, shape, seams, pipeline, schemata, world); the catalog and the three world
-judges carry individual proofs and need no line. Still open, disclosed: the byte-locks'
-individual refutation drills — each register line names the drill it is waiting for.
+shrink as byte-locks earn their own drills.
+
+The register already SHRANK 7 → 4 on first honest review — the tiers-ladder lesson ("was
+the derivation missing evidence?") applied to sensitivity. Reading the suites showed the
+seam graph, the placer, and the world lock each ALREADY carry a plant-a-bad-fixture drill:
+a non-homomorphic conversion leaves the transform seam UNEARNED and names it
+(`a_broken_conversion_leaves_the_transform_seam_unearned`), a placement disagreeing with the
+declaration renders "DISAGREES" and is unsettled (`a_disagreeing_shape_renders_loud`), a
+broken vendor / mismatched battery is refused and named
+(`reports_over_different_batteries_are_refused`). All three moved to `Mechanism::FireDrill`
+(joining the catalog), so only FOUR byte-locks now lean on the shared gate — surface, tiers,
+pipeline, schemata — each ratified with the individual drill it awaits (surface/tiers'
+derivations are mutation-tested in `boundary-enforce`; pipeline's individual gates are
+fire-drilled but the census over them is not; schemata's completeness census refuses an
+uninstrumented item but no planted fixture proves that refusal fires).
+
+RUNG 3, disclosed: the census CLASSIFIES a probe's mechanism but does not yet RUN each cited
+fire-drill to prove it fires — a `FireDrill` claim is pinned only by the drill test existing
+in the suite, so a deleted drill would leave a vacuous claim. Reconciling the fire-drill
+roster against `fire_drill::Battery` (and the module drills) so the census verifies each
+cited drill exists is the "battery attests its own completeness" shape one level up — the
+next rung, alongside the four remaining byte-lock drills.
 
 ## Framing: the real domain is stability under containment
 

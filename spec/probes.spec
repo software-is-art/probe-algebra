@@ -20,10 +20,10 @@
 - perimeter: live-dent
 - pipeline: drift-gate
 - schemata: drift-gate
-- seams: drift-gate
-- shape: drift-gate
+- seams: fire-drill
+- shape: fire-drill
 - substrate: live-dent
 - surface: drift-gate
 - tiers: drift-gate
-- world: drift-gate
+- world: fire-drill
 
