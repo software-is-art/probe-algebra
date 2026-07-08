@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 683 sites.
+# 684 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -24,6 +24,7 @@
 - boundary_spec::discover::agenda::agenda_render::edit_guard:5: && -> ||
 - boundary_spec::discover::agenda::agenda_render::edit_guard:deaf -> None
 - boundary_spec::discover::agenda::classify:0: || -> &&
+- boundary_spec::discover::agenda::classify:10: == -> !=
 - boundary_spec::discover::agenda::classify:1: == -> !=
 - boundary_spec::discover::agenda::classify:2: == -> !=
 - boundary_spec::discover::agenda::classify:3: == -> !=

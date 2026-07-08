@@ -1,0 +1,18 @@
+# probes register — the ratified drift-gate probes (rung 2 of the unified probe census,
+# discover::probes). Every probe here leans only on the SHARED `spec-lock drift gate`
+# fire-drill (a tampered or missing committed lock is caught) and has NO individual
+# refutation drill of its own. Writing a line IS the ratification; the reason is the one
+# thing no derivation produces. Held by set difference against the live drift-gate set
+# (`every_probe_has_an_individual_drill_or_is_ratified`): an un-ratified byte-lock refuses,
+# and a line for a probe that earned an individual drill is stale — so this set can only
+# shrink. To remove a line, give that probe its own drill.
+#
+# Format: <probe key>: <why it leans on the shared drift gate rather than an individual drill>
+
+surface: the public-surface census (qualify.spec) is a derived byte-lock; any surface change drifts it, and the spec-lock drift gate proves the drift check fires. An individual drill would plant a surface that changed without a re-bless — not yet built.
+tiers: the derived tier partition (tiers.spec) is a byte-lock; a re-derived tier that moved drifts it. An individual drill would plant a mis-derived partition and demand refusal — not yet built.
+shape: the placement lock (boundary-spec.shape.spec) is a byte-lock over the derived module boundaries; a re-placement drifts it. An individual drill would plant a mis-placed operator — not yet built.
+seams: the seam graph (boundary-spec.system.spec) is a byte-lock; a drawn/dropped seam or flipped verdict drifts it. The seam verdicts have their own tests, but no planted-bad-seam fire-drill exists yet.
+pipeline: the gate census (gates.spec) is a byte-lock over the declared pipeline; a changed gate drifts it. Individual gates carry fire-drills, but the census lock itself leans on the shared drift gate.
+schemata: the compiled-mutant census (schemata.spec) is a byte-lock; an instrumented function or moved site drifts it. Schemata IS a sensitivity engine, but the census lock over its sites leans on the shared drift gate.
+world: the world lock (store-model.world.spec) is a byte-lock over the model's ratified beliefs; a re-derived belief drifts it. A planted-drift world drill exists in layout-probe's domain, not here.

@@ -15,7 +15,7 @@
 - ttl store: oracle-swap
 
 ## structural probes (shape)
-- catalog: drift-gate
+- catalog: fire-drill
 - infra: live-dent
 - perimeter: live-dent
 - pipeline: drift-gate

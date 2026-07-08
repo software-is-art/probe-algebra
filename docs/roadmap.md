@@ -1290,14 +1290,23 @@ It is gated for COMPLETENESS against the committed `spec/` directory — every a
 backs a probe must be covered and every named probe must have a committed lock, so a new
 lock that no probe covers fails the census, and the roster can only grow honestly (the
 tiers-ladder rung-1 move: derive-and-disclose, no coherence to argue with). The disclosure
-IS the finding: eight structural probes rest on freshness alone, with no active proof they
-can REFUSE a planted fixture — exactly the pressure rung 2 turns into a gate. Honest scope,
-carried in the module docs: the census covers frozen probe LOCKS, not the discipline /
-pipeline fire-drill gates (which live in `fire_drill::Battery`, not `spec/`) — folding those
-in, with `Mechanism::FireDrill`, is rung 1.5; and the router classifies `spec/probes.spec`
-through the `.spec` catch-all (`Laws`) for now, a dedicated `Ratification` arm being the
-same rung's small follow-up. RUNG 2, still ahead: normative — a `spec/probes.register` that
-ratifies each drift-gate-only probe with a reason, so the drift-gate set can only shrink.
+IS the finding, and reading the fire-drill battery sharpened it: the byte-locks are not
+sensitivity-UNPROVEN — they lean on the SHARED `spec-lock drift gate` fire-drill (a
+tampered or missing committed lock is caught), which proves the drift mechanism fires but
+not that each lock's own derivation is individually sensitive.
+
+**Rungs 1.5 and 2 are BUILT too.** Rung 1.5: `Mechanism::FireDrill` now distinguishes the
+probe with an INDIVIDUAL drill (the catalog — the `shape data gate` and `expectation
+vocabulary` drills) from the byte-locks on the shared gate, and the review router files
+`spec/probes.spec` under its own `Ratification::Probes` class (not the `.spec` catch-all).
+Rung 2: the census is NORMATIVE — `every_probe_has_an_individual_drill_or_is_ratified` holds
+the drift-gate set to `spec/probes.register` by SET DIFFERENCE, so a byte-lock leaning only
+on the shared gate must be a ratified line with a reason (an un-ratified one refuses, a line
+for a probe that earned an individual drill is stale), and the drift-gate set can only
+shrink as byte-locks earn their own drills. Seven byte-locks are ratified there today
+(surface, tiers, shape, seams, pipeline, schemata, world); the catalog and the three world
+judges carry individual proofs and need no line. Still open, disclosed: the byte-locks'
+individual refutation drills — each register line names the drill it is waiting for.
 
 ## Framing: the real domain is stability under containment
 

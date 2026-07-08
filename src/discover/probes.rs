@@ -17,15 +17,20 @@
 //!     Sensitivity is only freshness: a change is caught, but there is no active proof the
 //!     gate can REFUSE a planted bad fixture. This is disclosed, not hidden.
 //!
-//! RUNG 1 (this artifact, per the tiers-ladder discipline: derive-and-disclose first,
-//! tighten later): the census ENUMERATES every frozen probe lock and discloses its
+//! RUNG 1 (BUILT): the census ENUMERATES every frozen probe lock and discloses its
 //! mechanism, gated for COMPLETENESS against the committed `spec/` directory so no probe lock
-//! can hide (`the_probe_census_covers_every_frozen_lock`). RUNG 2, recorded in
-//! `docs/roadmap.md`: make it NORMATIVE — every probe must carry an ACTIVE mechanism
-//! (oracle-swap / live-dent / fire-drill), and a `DriftGate`-only probe becomes a ratified
-//! line in a `spec/probes.register` with a reason, so the drift-gate-only set can only shrink
-//! honestly. RUNG 1.5: fold in the pipeline / discipline fire-drill gates (which are not
-//! frozen locks — they live in `fire_drill::Battery`), adding `Mechanism::FireDrill`.
+//! can hide (`the_probe_census_covers_every_frozen_lock`).
+//!
+//! RUNG 1.5 (BUILT): `Mechanism::FireDrill` distinguishes the probes with an INDIVIDUAL
+//! fire-drill (the catalog: `shape data gate` + `expectation vocabulary`) from the byte-locks
+//! that lean on the shared `spec-lock drift gate`. The router files `spec/probes.spec` under
+//! its own `Ratification::Probes` class.
+//!
+//! RUNG 2 (BUILT): NORMATIVE — every probe must carry an INDIVIDUAL active mechanism
+//! (oracle-swap / live-dent / fire-drill), or be a ratified line in `spec/probes.register`
+//! explaining it leans only on the shared drift gate. `every_probe_has_an_individual_drill_or_is_ratified`
+//! holds the drift-gate set to the register by SET DIFFERENCE, so it can only shrink as
+//! byte-locks earn individual drills — an un-ratified byte-lock refuses, a stale line refuses.
 //!
 //! Not mutated: the census is aggregation whose decisions are pinned by its byte-render
 //! probes and the completeness gate — GENERATED against, like `discover::floor` (see
@@ -47,13 +52,26 @@ pub enum ProbeKind {
 }
 
 /// How a probe proves it is SENSITIVE — that it can fail. One question, mechanisms by kind.
+/// The first three are INDIVIDUAL, active per-probe proofs; [`Mechanism::DriftGate`] is the
+/// shared, generic one — normatively ratified in `spec/probes.register` (rung 2).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Mechanism {
     /// Behavioural: a perturbed operator table judged by the frozen laws (`discover::mutation`).
+    /// Each theory has its own dent/deaf sweep; the `algebra mutation` fire-drill proves the
+    /// mechanism itself fires (a lawless theory yields survivors).
     OracleSwap,
-    /// Structural world judge: one applied-fixture field perturbed (`discover::judgment`).
+    /// Structural world judge: one applied-fixture field perturbed, verdict must move and
+    /// name the fact (`discover::judgment`'s `LiveDent`). Individual to each judge.
     LiveDent,
-    /// Structural byte-lock: freshness only — disclosed as having no active refutation drill.
+    /// Structural: an INDIVIDUAL fire-drill plants a probe-specific known-bad fixture and
+    /// demands refusal (`fire_drill::Battery` — the catalog's `shape data gate` and
+    /// `expectation vocabulary` drills).
+    FireDrill,
+    /// Structural byte-lock with NO individual drill: sensitivity is the SHARED `spec-lock
+    /// drift gate` fire-drill (a tampered/missing committed lock is caught), which proves the
+    /// drift mechanism fires but not that this lock's own derivation is individually
+    /// sensitive. Rung 2 makes each a ratified line in `spec/probes.register`, so the set can
+    /// only shrink as byte-locks earn individual drills.
     DriftGate,
 }
 
@@ -63,6 +81,7 @@ impl Mechanism {
         match self {
             Mechanism::OracleSwap => "oracle-swap",
             Mechanism::LiveDent => "live-dent",
+            Mechanism::FireDrill => "fire-drill",
             Mechanism::DriftGate => "drift-gate",
         }
     }
@@ -90,12 +109,15 @@ const STRUCTURAL: &[(&str, Mechanism)] = &[
     ("perimeter", Mechanism::LiveDent),
     ("infra", Mechanism::LiveDent),
     ("substrate", Mechanism::LiveDent),
-    // byte-locks — freshness only (rung 1: disclosed, no active refutation drill yet).
+    // the law-language catalog — INDIVIDUAL fire-drills: a mis-sorted identity is refused
+    // (`shape data gate`) and an unratified shape name is rejected (`expectation vocabulary`).
+    ("catalog", Mechanism::FireDrill),
+    // byte-locks — only the shared `spec-lock drift gate` fire-drill; each ratified in
+    // spec/probes.register (rung 2) until it earns an individual drill.
     ("surface", Mechanism::DriftGate),
     ("tiers", Mechanism::DriftGate),
     ("shape", Mechanism::DriftGate),
     ("seams", Mechanism::DriftGate),
-    ("catalog", Mechanism::DriftGate),
     ("pipeline", Mechanism::DriftGate),
     ("schemata", Mechanism::DriftGate),
     ("world", Mechanism::DriftGate),
@@ -190,6 +212,30 @@ impl ProbeCensus {
     /// repository's own freeze and staleness gate.
     pub fn lock(&self) -> Lock {
         self.lock_in(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec"))
+    }
+
+    /// The NORMATIVE register (rung 2): the hand-authored ratification of every probe that
+    /// leans only on the shared `spec-lock drift gate` (a [`Mechanism::DriftGate`] probe). A
+    /// probe with an individual active mechanism needs no line; a drift-gate probe without a
+    /// line is an un-ratified finding, and a line for a probe that earned an individual drill
+    /// is stale — so the drift-gate set can only shrink honestly (`spec_lock::Register`).
+    pub fn register(&self) -> spec_lock::Register {
+        spec_lock::Register {
+            name: "probes".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("spec")
+                .join("probes.register"),
+        }
+    }
+
+    /// The keys of the probes leaning only on the shared drift gate — the live finding set
+    /// the register ratifies.
+    pub fn drift_gate_keys(&self) -> Vec<&str> {
+        self.probes
+            .iter()
+            .filter(|p| p.mechanism == Mechanism::DriftGate)
+            .map(|p| p.key.as_str())
+            .collect()
     }
 }
 
@@ -333,7 +379,25 @@ mod probes_tests {
         assert!(text.contains("## structural probes (shape)"));
         assert!(text.contains("- perimeter: live-dent"));
         assert!(text.contains("- surface: drift-gate"));
+        assert!(text.contains("- catalog: fire-drill"));
         // behavioural section lists a theory as oracle-swap.
         assert!(text.contains(": oracle-swap"));
+    }
+
+    /// NORMATIVE (rung 2): every probe carries an INDIVIDUAL active mechanism, or its reliance
+    /// on the shared `spec-lock drift gate` is ratified in `spec/probes.register`. Held by set
+    /// difference — an un-ratified drift-gate probe is a new finding, a ratified line for a
+    /// probe that earned an individual drill is stale. The drift-gate set can only shrink.
+    #[test]
+    fn every_probe_has_an_individual_drill_or_is_ratified() {
+        let census = ProbeCensus::of();
+        if let Err(drift) = census.register().check(census.drift_gate_keys()) {
+            panic!(
+                "the probe register drifted from the drift-gate probe set: {drift}\n\
+                 (a byte-lock leaning only on the shared spec-lock drift gate must be ratified \
+                 in spec/probes.register with the reason; give it an individual drill to drop \
+                 the line)"
+            );
+        }
     }
 }

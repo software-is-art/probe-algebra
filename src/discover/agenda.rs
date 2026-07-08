@@ -61,6 +61,9 @@ pub enum Ratification {
     /// The schemata census moved (`schemata.spec`): the compiled-mutant population
     /// changed — a function was instrumented or its flip sites moved.
     Schemata,
+    /// The probe census moved (`probes.spec`): a probe was added, removed, or its
+    /// sensitivity mechanism changed — is every probe still sensitivity-proven?
+    Probes,
     /// A CONSUMER-registered lock class moved: the class and its ratification question
     /// are the consumer's own data (see [`Agenda::of_with`]) — the routing machinery is
     /// generic; the class table is not upstream's to own.
@@ -124,6 +127,12 @@ impl Ratification {
             Ratification::Schemata => {
                 "the schemata census moved — the compiled-mutant population changed; \
                  is each instrumented function and site set intended?"
+                    .to_string()
+            }
+            Ratification::Probes => {
+                "the probe census moved — a probe was added, removed, or re-mechanised; \
+                 is every probe still sensitivity-proven (and each drift-gate reliance \
+                 ratified in spec/probes.register)?"
                     .to_string()
             }
             Ratification::Custom { class, question } => format!("`{class}`: {question}"),
@@ -365,6 +374,8 @@ fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
             Ratification::Substrate
         } else if file == "schemata.spec" {
             Ratification::Schemata
+        } else if file == "probes.spec" {
+            Ratification::Probes
         } else if file == "shapes.spec" {
             Ratification::Vocabulary
         } else if file.ends_with(".infra.spec") {
@@ -472,6 +483,24 @@ mod probes {
         assert!(text.contains("`router`: the discovered laws moved"));
         assert!(text.contains("read for sense (prose, no lock question):\n- docs/roadmap.md\n"));
         assert!(text.contains("machinery-verified (the gates hold these — listed, not read):"));
+    }
+
+    /// The probe census routes to its OWN class, and its register routes as an exception —
+    /// the unified probe roster is a lock class the router names, not an unknown `.spec`
+    /// swallowed by the law-lock catch-all.
+    #[test]
+    fn the_probe_census_routes_to_its_own_class() {
+        let agenda = Agenda::of(["spec/probes.spec", "spec/probes.register"]).expect("known");
+        assert_eq!(
+            agenda.ratifications,
+            vec![
+                Ratification::Probes,
+                Ratification::Exceptions {
+                    register: "spec/probes.register".to_string()
+                },
+            ]
+        );
+        assert!(agenda.render().contains("the probe census moved"));
     }
 
     /// An interior-only diff requires NO ratification — the agenda says so instead of
