@@ -1319,12 +1319,18 @@ derivations are mutation-tested in `boundary-enforce`; pipeline's individual gat
 fire-drilled but the census over them is not; schemata's completeness census refuses an
 uninstrumented item but no planted fixture proves that refusal fires).
 
-RUNG 3, disclosed: the census CLASSIFIES a probe's mechanism but does not yet RUN each cited
-fire-drill to prove it fires — a `FireDrill` claim is pinned only by the drill test existing
-in the suite, so a deleted drill would leave a vacuous claim. Reconciling the fire-drill
-roster against `fire_drill::Battery` (and the module drills) so the census verifies each
-cited drill exists is the "battery attests its own completeness" shape one level up — the
-next rung, alongside the four remaining byte-lock drills.
+RUNG 3 (BUILT): the `FireDrill` claims are now NON-VACUOUS.
+`every_fire_drill_probe_has_a_live_drill_that_fires` reconciles the census's FireDrill set
+through a `fire_drill::Battery` that `requires` exactly those keys and drills each by
+PLANTING the probe's known-bad fixture — so `verdict()` refuses a FireDrill probe with no
+live drill (UNPROVEN) and a drill that stopped firing (VACUOUS). A deleted drill breaks the
+gate; the "a FireDrill claim pinned only by a test that could vanish" gap is closed. Each
+module owns its drill (the seam graph's non-homomorphic conversion, the placer's disagreeing
+placement); the catalog and world drills build from the public API. Remaining, disclosed:
+the four byte-lock drills (surface/tiers are covered cross-crate by `boundary-enforce`'s
+mutation tests — a ratified reliance, not a debt; pipeline/schemata are the tractable ones
+worth building), and the headline auto-lift — point the census at a consumer's plain Rust
+module.
 
 ## Framing: the real domain is stability under containment
 
