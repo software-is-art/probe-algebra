@@ -955,12 +955,31 @@ check-judged layers trade the appearing-law kill direction for every-change econ
 delta-render in the dev-profile opt-level override — measured 8.5× on the mutation
 suite (22.8s → 2.7s) — so the widened batteries ride `cargo test` at compute speed.
 
-Remaining rungs, in order: **judgment-as-data** (the world-lock judges become fact
-tables, so deafness and dents reach them the way they reach operator tables — the
-class every recent source-level survivor lived in), then **mutant schemata** for the
-opaque remainder (compile all expression flips into one binary behind a runtime
-selector via the macro layer — one build, N test runs — demoting the
-rebuild-per-mutant grind to a certifier).
+Remaining rung: **mutant schemata** for the opaque remainder (compile all expression
+flips into one binary behind a runtime selector via the macro layer — one build, N
+test runs — demoting the rebuild-per-mutant grind to a certifier).
+
+## The sensitivity drill: judges deaf to nothing (BUILT)
+
+The dent idea reached the world-lock judges without table-izing them: a judge's
+domain is its LIVE state, so the minimal meaning change is a LIVE DENT — one field of
+an applied fixture perturbed, and the verdict must both move and NAME the fact
+(`discover::judgment`, `LiveDent::drill`). Each `Live*` struct enumerates its own
+dents, and completeness is a compile-time pin: the enumerator opens with a full
+destructure naming every field, so a new live field refuses to compile until its dent
+is decided. The enumerators encode one reviewable judgment — which perturbations are
+refusal-worthy (floor semantics accept widenings; an optional tag family's deletion
+claims nothing) — and the drill catches both failure modes by name: a judge DEAF to a
+fact (verdict stays green) and a judge that moves without naming it (a refusal nobody
+can act on). All three judges pass: perimeter 9 dents, infra 15, substrate 11. Under
+the source-level sweeps the drill is itself a probe, so the survivor species that
+kept recurring — a membership check that stops distinguishing one element among
+present ones — is closed as a CLASS: a mutant that deafens any judge to any fact now
+dies here, and a fact added tomorrow arrives with its dent or does not compile.
+Alongside, the session-start hook gained a FREEDOM sense next to the topography: the
+ratified survivor count read from the committed mutation locks, byte-stable between
+ratifications — the agent wakes knowing how many named degrees of freedom are open
+and where the addresses are.
 
 ## Candidate: shape pressure in the hook voice
 

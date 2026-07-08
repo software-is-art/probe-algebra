@@ -52,7 +52,7 @@ pub struct Perimeter {
 
 /// What the world reports, extracted from the GitHub API by `examples/perimeter.rs`
 /// (the extraction is field reads; the JUDGMENT lives here, where the probes reach).
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct LivePerimeter {
     /// A `deletion` rule is active on the default branch.
     pub deletion_blocked: bool,
@@ -67,6 +67,83 @@ pub struct LivePerimeter {
     pub required_checks: Vec<String>,
     /// `None` = the endpoint could not be read; refused by name, never assumed.
     pub private_vulnerability_reporting: Option<bool>,
+}
+
+impl LivePerimeter {
+    /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
+    /// the floor exactly — no extra protections, or a widening dent stops being
+    /// refusal-worthy). One dent per refusal-worthy single-fact perturbation; the
+    /// destructure below is the completeness pin — a new live field refuses to
+    /// compile until its dent is decided (see `discover::judgment`).
+    pub fn dents(&self) -> Vec<super::judgment::LiveDent<LivePerimeter>> {
+        let LivePerimeter {
+            deletion_blocked: _,
+            force_push_blocked: _,
+            required_approvals: _,
+            merge_methods: _,
+            required_checks,
+            private_vulnerability_reporting: _,
+        } = self;
+        let mut dents = Vec::new();
+        let mut dent = |what: &str, must_name: &str, live: LivePerimeter| {
+            dents.push(super::judgment::LiveDent {
+                what: what.to_string(),
+                live,
+                must_name: must_name.to_string(),
+            });
+        };
+        dent("deletion unblocked", "can be DELETED", {
+            let mut l = self.clone();
+            l.deletion_blocked = false;
+            l
+        });
+        dent("force pushes unblocked", "FORCE PUSHES", {
+            let mut l = self.clone();
+            l.force_push_blocked = false;
+            l
+        });
+        dent("the pull-request rule dropped", "no pull-request rule", {
+            let mut l = self.clone();
+            l.required_approvals = None;
+            l
+        });
+        dent(
+            "required approvals raised above the floor",
+            "deadlocks a solo maintainer",
+            {
+                let mut l = self.clone();
+                l.required_approvals = l.required_approvals.map(|n| n + 1);
+                l
+            },
+        );
+        dent("a widened merge method", "merge method `rebase`", {
+            let mut l = self.clone();
+            l.merge_methods.push("rebase".to_string());
+            l
+        });
+        for check in required_checks {
+            dent(
+                &format!("required check `{check}` removed"),
+                &format!("`{check}` is not required"),
+                {
+                    let mut l = self.clone();
+                    l.required_checks.retain(|c| c != check);
+                    l
+                },
+            );
+        }
+        dent("vulnerability reporting disabled", "DISABLED", {
+            let mut l = self.clone();
+            l.private_vulnerability_reporting = Some(false);
+            l
+        });
+        dent("vulnerability reporting unreadable", "could not be READ", {
+            let mut l = self.clone();
+            l.private_vulnerability_reporting = None;
+            l
+        });
+        dents
+    }
 }
 
 impl Perimeter {
@@ -410,6 +487,25 @@ mod probes {
         off.private_vulnerability_reporting = Some(false);
         let violations = p.judge(&off).unwrap_err();
         assert!(violations.iter().any(|v| v.contains("DISABLED")));
+    }
+
+    /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied
+    /// floor moves the verdict and names its fact — the derived battery that closes,
+    /// as a class, the survivor species the source sweeps kept finding here (a
+    /// membership check that stops distinguishing one element among present ones).
+    #[test]
+    fn the_judge_is_deaf_to_nothing() {
+        let applied = applied_floor();
+        let held = crate::discover::judgment::LiveDent::drill(
+            |l| Perimeter::declared().judge(l),
+            &applied,
+            applied.dents(),
+        )
+        .expect("the perimeter judge distinguishes every fact");
+        assert_eq!(held.len(), 9, "{held:#?}");
+        assert!(held
+            .iter()
+            .any(|h| h == "sensitive to required check `dogfood (changed lines)` removed"));
     }
 
     /// The committed perimeter locks are FRESH — declaration, render, and ruleset move

@@ -96,7 +96,7 @@ pub struct Substrate {
 /// What the world reports — parsed from `git tag --list`, per-tag
 /// `git merge-base --is-ancestor`, and `git rev-list --min-parents=2 --count` by
 /// `examples/substrate.rs`. `None` = the read failed; refused by name, never assumed.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct LiveSubstrate {
     /// Every tag name the repository carries.
     pub tags: Option<Vec<String>>,
@@ -106,6 +106,135 @@ pub struct LiveSubstrate {
     pub merges_after_epoch: Option<u64>,
     /// Versions of the marker crate the crates.io index reports as published.
     pub published_versions: Option<Vec<String>>,
+}
+
+impl LiveSubstrate {
+    /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
+    /// the declaration exactly). One dent per refusal-worthy single-fact
+    /// perturbation; the destructure below is the completeness pin — a new live field
+    /// refuses to compile until its dent is decided (see `discover::judgment`).
+    pub fn dents(&self) -> Vec<super::judgment::LiveDent<LiveSubstrate>> {
+        let LiveSubstrate {
+            tags,
+            ancestry,
+            merges_after_epoch: _,
+            published_versions,
+        } = self;
+        let mut dents = Vec::new();
+        let mut dent = |what: String, must_name: String, live: LiveSubstrate| {
+            dents.push(super::judgment::LiveDent {
+                what,
+                live,
+                must_name,
+            });
+        };
+        dent(
+            "the tag list read lost".to_string(),
+            "tag list could not be READ".to_string(),
+            {
+                let mut l = self.clone();
+                l.tags = None;
+                l
+            },
+        );
+        dent(
+            "the ancestry read lost".to_string(),
+            "could not be READ".to_string(),
+            {
+                let mut l = self.clone();
+                l.ancestry = None;
+                l
+            },
+        );
+        // refusal-worthiness is DECLARATION knowledge: deleting a tag only refuses if
+        // some required law or publish marker demands it (an empty optional family is
+        // "nothing minted, nothing claimed"), while knocking a tag off the certified
+        // line refuses for anything that carries a declared meaning at all.
+        let declared = Substrate::declared();
+        let is_marker = |tag: &str| {
+            published_versions
+                .iter()
+                .flatten()
+                .any(|v| format!("v{v}") == tag)
+        };
+        for tag in tags.iter().flatten() {
+            if declared.tags.iter().any(|l| l.required && l.matches(tag)) || is_marker(tag) {
+                dent(format!("tag `{tag}` deleted"), format!("`{tag}`"), {
+                    let mut l = self.clone();
+                    if let Some(t) = &mut l.tags {
+                        t.retain(|x| x != tag);
+                    }
+                    if let Some(a) = &mut l.ancestry {
+                        a.retain(|(x, _)| x != tag);
+                    }
+                    l
+                });
+            }
+            if declared.tags.iter().any(|l| l.matches(tag)) || is_marker(tag) {
+                dent(
+                    format!("tag `{tag}` knocked off the certified line"),
+                    format!("`{tag}` is not on the default branch"),
+                    {
+                        let mut l = self.clone();
+                        if let Some(a) = &mut l.ancestry {
+                            for (x, on) in a.iter_mut() {
+                                if x == tag {
+                                    *on = false;
+                                }
+                            }
+                        }
+                        l
+                    },
+                );
+            }
+        }
+        let _ = ancestry;
+        dent(
+            "the merge count read lost".to_string(),
+            "merge-commit count".to_string(),
+            {
+                let mut l = self.clone();
+                l.merges_after_epoch = None;
+                l
+            },
+        );
+        dent(
+            "a merge commit landed after the epoch".to_string(),
+            "merge commit(s)".to_string(),
+            {
+                let mut l = self.clone();
+                l.merges_after_epoch = Some(1);
+                l
+            },
+        );
+        dent(
+            "the index read lost".to_string(),
+            "published versions".to_string(),
+            {
+                let mut l = self.clone();
+                l.published_versions = None;
+                l
+            },
+        );
+        for version in published_versions.iter().flatten() {
+            dent(
+                format!("published {version} lost its marker"),
+                format!("tag `v{version}` does not exist"),
+                {
+                    let mut l = self.clone();
+                    let marker = format!("v{version}");
+                    if let Some(t) = &mut l.tags {
+                        t.retain(|x| *x != marker);
+                    }
+                    if let Some(a) = &mut l.ancestry {
+                        a.retain(|(x, _)| *x != marker);
+                    }
+                    l
+                },
+            );
+        }
+        dents
+    }
 }
 
 impl Substrate {
@@ -501,6 +630,27 @@ mod probes {
         assert!(violations
             .iter()
             .any(|v| v.contains("merge-commit count") && v.contains("could not be READ")));
+    }
+
+    /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied
+    /// fixture moves the verdict and names its fact — lost reads, deleted required
+    /// tags and markers, tags knocked off the certified line, a merge after the epoch
+    /// (see `discover::judgment`). Deleting an OPTIONAL family tag is deliberately
+    /// not a dent: floor semantics say an empty family claims nothing.
+    #[test]
+    fn the_judge_is_deaf_to_nothing() {
+        let s = Substrate::declared();
+        let live = applied();
+        let held = crate::discover::judgment::LiveDent::drill(|l| s.judge(l), &live, live.dents())
+            .expect("the substrate judge distinguishes every fact");
+        assert_eq!(held.len(), 11, "{held:#?}");
+        assert!(held
+            .iter()
+            .any(|h| h == "sensitive to tag `v2026.07.07` knocked off the certified line"));
+        assert!(
+            !held.iter().any(|h| h.contains("tag `v2026.07.07` deleted")),
+            "an optional family tag's deletion is not refusal-worthy: {held:#?}"
+        );
     }
 
     /// The committed substrate lock is FRESH — declaration and spec move together or

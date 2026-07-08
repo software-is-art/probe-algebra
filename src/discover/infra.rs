@@ -179,7 +179,7 @@ pub struct Infra {
 /// APIs (CORS rules, secret-name listings, project build settings). An ABSENT entry
 /// means the endpoint could not be read; the judge refuses that by name, never
 /// assumes it held.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct LiveInfra {
     /// Store name → the origins its CORS allow-list currently permits.
     pub cors: Vec<(String, Vec<String>)>,
@@ -192,6 +192,104 @@ pub struct LiveInfra {
 impl LiveInfra {
     fn lookup<'a, T>(map: &'a [(String, T)], key: &str) -> Option<&'a T> {
         map.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
+    /// the declaration exactly — no extra origins or secrets, or a widening dent stops
+    /// being refusal-worthy). One dent per refusal-worthy single-fact perturbation;
+    /// the destructure below is the completeness pin — a new live field refuses to
+    /// compile until its dent is decided (see `discover::judgment`).
+    pub fn dents(&self) -> Vec<super::judgment::LiveDent<LiveInfra>> {
+        let LiveInfra {
+            cors,
+            secret_names,
+            build_commands,
+        } = self;
+        let mut dents = Vec::new();
+        let mut dent = |what: String, must_name: String, live: LiveInfra| {
+            dents.push(super::judgment::LiveDent {
+                what,
+                live,
+                must_name,
+            });
+        };
+        for (store, origins) in cors {
+            dent(
+                format!("the CORS read of `{store}` lost"),
+                format!("CORS allow-list of `{store}` could not be READ"),
+                {
+                    let mut l = self.clone();
+                    l.cors.retain(|(s, _)| s != store);
+                    l
+                },
+            );
+            for origin in origins {
+                dent(
+                    format!("origin `{origin}` dropped from `{store}`"),
+                    format!("does not allow origin `{origin}`"),
+                    {
+                        let mut l = self.clone();
+                        for (s, list) in &mut l.cors {
+                            if s == store {
+                                list.retain(|o| o != origin);
+                            }
+                        }
+                        l
+                    },
+                );
+            }
+        }
+        for (surface, names) in secret_names {
+            dent(
+                format!("the secret-name read of `{surface}` lost"),
+                format!("secret names of `{surface}` could not be READ"),
+                {
+                    let mut l = self.clone();
+                    l.secret_names.retain(|(s, _)| s != surface);
+                    l
+                },
+            );
+            for name in names {
+                dent(
+                    format!("secret `{name}` dropped from `{surface}`"),
+                    format!("does not hold secret `{name}`"),
+                    {
+                        let mut l = self.clone();
+                        for (s, list) in &mut l.secret_names {
+                            if s == surface {
+                                list.retain(|n| n != name);
+                            }
+                        }
+                        l
+                    },
+                );
+            }
+        }
+        for (surface, _) in build_commands {
+            dent(
+                format!("the build-command read of `{surface}` lost"),
+                format!("build command of `{surface}` could not be READ"),
+                {
+                    let mut l = self.clone();
+                    l.build_commands.retain(|(s, _)| s != surface);
+                    l
+                },
+            );
+            dent(
+                format!("the build command of `{surface}` drifted"),
+                format!("build command of `{surface}` is"),
+                {
+                    let mut l = self.clone();
+                    for (s, command) in &mut l.build_commands {
+                        if s == surface {
+                            command.push_str(" && echo drifted");
+                        }
+                    }
+                    l
+                },
+            );
+        }
+        dents
     }
 }
 
@@ -834,6 +932,23 @@ mod probes {
         assert!(violations
             .iter()
             .any(|v| v.contains("build command of `app (preview)` could not be READ")));
+    }
+
+    /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied
+    /// fixture moves the verdict and names its fact — lost reads, dropped origins,
+    /// dropped secrets, drifted build commands (see `discover::judgment`).
+    #[test]
+    fn the_judge_is_deaf_to_nothing() {
+        let infra = Infra::exemplar();
+        let live = applied();
+        let held =
+            crate::discover::judgment::LiveDent::drill(|l| infra.judge(l), &live, live.dents())
+                .expect("the infra judge distinguishes every fact");
+        assert_eq!(held.len(), 15, "{held:#?}");
+        assert!(held
+            .iter()
+            .any(|h| h
+                == "sensitive to secret `STORE_SECRET_ACCESS_KEY` dropped from `app (preview)`"));
     }
 
     /// An incoherent declaration refuses BEFORE any live fact is consulted.

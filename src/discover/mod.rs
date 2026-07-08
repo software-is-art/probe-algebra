@@ -35,6 +35,7 @@ pub mod freeze;
 pub mod gates;
 pub mod genesis;
 pub mod infra;
+pub mod judgment;
 pub mod layering;
 pub mod modularize;
 pub mod mutation;

@@ -22,6 +22,19 @@ if [ -f "spec/boundary-spec.shape.spec" ]; then
   grep -E "^- |^verdict:" spec/boundary-spec.shape.spec || true
 fi
 
+# FREEDOM, same discipline as topography: read from the COMMITTED mutation locks, so
+# the line is byte-stable between ratified survivor changes. This is the agent's sense
+# for open degrees of freedom — every SURVIVED line is a mutant the committed spec
+# cannot refute (deafness constants, unpinned dent coordinates, table confusions),
+# each one an address where a sharper shape or expectation would go.
+if ls spec/*.mutation.spec >/dev/null 2>&1; then
+  survivors=$(grep -h -c "^- SURVIVED" spec/*.mutation.spec 2>/dev/null | paste -sd+ - | bc)
+  locks=$(ls spec/*.mutation.spec | wc -l | tr -d ' ')
+  echo
+  echo "## freedom (derived — the committed mutation locks)"
+  echo "${survivors:-0} ratified survivor(s) across ${locks} mutation lock(s) — each a named degree of freedom (grep SURVIVED spec/*.mutation.spec)"
+fi
+
 # SITUATION, the volatile layer: small, git-derived, entropy-free (no timestamps —
 # deterministic given repo state). Startup injection is once-per-session, so this
 # never churns the within-session cache prefix; it exists so a session's first minutes
