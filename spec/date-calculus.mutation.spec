@@ -20,3 +20,28 @@
 - killed    `diff` becomes undefined everywhere
 - killed    `since` becomes undefined everywhere
 - killed    `at` becomes undefined everywhere
+
+# deafness floor: 24 constant-return mutants (every operator × every distinct
+# output), judged by re-checking the discovered laws — all killed: every operator's output provably depends on its input.
+
+# dent sweep: 96 one-point mutants (first 16 grid points per operator,
+# 2 wrong outputs per point — a resource bound, not a curated list), judged by
+# re-checking the discovered laws — 18 SURVIVED — each an UNPINNED COORDINATE, the exact input a missing probe would constrain.
+- SURVIVED  `add` dented at [(0, 0), (1, 1)]: (0, 1) -> (0, 0)
+- SURVIVED  `add` dented at [(0, 0), (1, 1)]: (0, 1) -> (0, 2)
+- SURVIVED  `add` dented at [(0, 0), (1, 2)]: (0, 2) -> (0, 0)
+- SURVIVED  `add` dented at [(0, 0), (1, 2)]: (0, 2) -> (0, 1)
+- SURVIVED  `add` dented at [(0, 0), (1, 4)]: (0, 4) -> (0, 0)
+- SURVIVED  `add` dented at [(0, 0), (1, 4)]: (0, 4) -> (0, 1)
+- SURVIVED  `add` dented at [(0, 3), (1, 0)]: (0, 3) -> (0, 0)
+- SURVIVED  `add` dented at [(0, 3), (1, 0)]: (0, 3) -> (0, 1)
+- SURVIVED  `add` dented at [(0, 3), (1, 1)]: (0, 4) -> (0, 0)
+- SURVIVED  `add` dented at [(0, 3), (1, 1)]: (0, 4) -> (0, 1)
+- SURVIVED  `diff` dented at [(0, 1), (0, 0)]: (1, 1) -> (1, 0)
+- SURVIVED  `diff` dented at [(0, 1), (0, 0)]: (1, 1) -> (1, 2)
+- SURVIVED  `diff` dented at [(0, 2), (0, 0)]: (1, 2) -> (1, 0)
+- SURVIVED  `diff` dented at [(0, 2), (0, 0)]: (1, 2) -> (1, 1)
+- SURVIVED  `diff` dented at [(0, 2), (0, 1)]: (1, 1) -> (1, 0)
+- SURVIVED  `diff` dented at [(0, 2), (0, 1)]: (1, 1) -> (1, 2)
+- SURVIVED  `since` dented at [(0, 3)]: (1, 3) -> (1, 0)
+- SURVIVED  `since` dented at [(0, 3)]: (1, 3) -> (1, 1)

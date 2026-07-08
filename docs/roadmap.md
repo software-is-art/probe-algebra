@@ -925,6 +925,55 @@ crates.io with no `v0.1.0` marker in the repository (the one publish that predat
 the minting machinery) — the reminder that never expires, computed instead of
 declared; push the tag at the published tree and the gate goes green.
 
+## Mutation as a distance dial: the deafness floor and the dent sweep (BUILT)
+
+A function on a bounded grid IS its value table, so "how different from the real
+thing" is a distance, and mutation layers sit at points on that dial.
+`discover::mutation` grew two, both in-process, both inside every `cargo test`:
+**deafness** (farthest — an operator returns one constant everywhere, one mutant per
+distinct output: is its output constrained to depend on its input at all? random
+noise derandomised — on enumerable codomains, every constant beats a coin flip) and
+the **dent sweep** (nearest — the minimal meaning change: exactly one input tuple
+returns a wrong value). The existing table battery (confusion, projection,
+partiality) sits between them. The mutants carry captured state a bare `fn` cannot,
+so a thread-local surgery + trampoline evaluator plants them without touching the
+engine's fn-pointer design; judgment is `Engine::check` over the laws NAMING the
+mutated operator (exact, not approximate: a term evaluates only the operators it
+names), which is why hundreds of mutants per theory cost tenths of a second.
+
+The feedback changed kind, not just amount: a surviving dent is not a source line, it
+is a COORDINATE — the exact input whose output no ratified law constrains. The
+committed `.mutation.spec` locks now carry each theory's unpinned-region map: fabric's
+`within` verdict is free at specific pairs, doc-flow's `edit` revision counter is
+largely unpinned, arithmetic's `<` is unconstrained at `(0, k)` off the law grid —
+each a ratified degree of freedom with an address, closable by a sharper shape or
+expectation and gated the moment it moves. Honest frame: dent adequacy is per-point —
+coordinated multi-point changes that preserve every law are the spec's symmetries
+(relational probes pin meaning up to isomorphism, their theoretical ceiling), and the
+check-judged layers trade the appearing-law kill direction for every-change economics
+(disclosed in the lock headers). Alongside: `boundary-spec` joined layout-probe and
+delta-render in the dev-profile opt-level override — measured 8.5× on the mutation
+suite (22.8s → 2.7s) — so the widened batteries ride `cargo test` at compute speed.
+
+Remaining rungs, in order: **judgment-as-data** (the world-lock judges become fact
+tables, so deafness and dents reach them the way they reach operator tables — the
+class every recent source-level survivor lived in), then **mutant schemata** for the
+opaque remainder (compile all expression flips into one binary behind a runtime
+selector via the macro layer — one build, N test runs — demoting the
+rebuild-per-mutant grind to a certifier).
+
+## Candidate: shape pressure in the hook voice
+
+Field feedback from an agent running the hook day to day: the voices pay their way —
+cheap, attached to the real changed files, never a separate review ritual — and the
+one addition it would want is SHAPE PRESSURE: a whisper naming which seam to split
+next when one file accumulates several operator families; not a hard rule, ranked
+coupling evidence. The machinery half-exists: cohesion reports and the placer already compute
+clusters and placements; the ticker already narrates shape events on theory edits.
+Shape pressure is their composition at edit time — when the edited file's derived
+clusters exceed one, the hook whispers the ranked split (which operators cohere,
+which seam the placer would draw), advisory like every voice, priced in silence.
+
 ## Candidate: the audience is the agent
 
 Adoption of this method is chosen inside agentic sessions, by whichever instance is

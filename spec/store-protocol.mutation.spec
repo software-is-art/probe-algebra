@@ -12,3 +12,10 @@
 - killed    `++` returns its second argument unchanged
 - killed    `empty` becomes undefined everywhere
 - killed    `++` becomes undefined everywhere
+
+# deafness floor: 8 constant-return mutants (every operator × every distinct
+# output), judged by re-checking the discovered laws — all killed: every operator's output provably depends on its input.
+
+# dent sweep: 32 one-point mutants (first 16 grid points per operator,
+# 2 wrong outputs per point — a resource bound, not a curated list), judged by
+# re-checking the discovered laws — all killed: every sampled point is pinned.

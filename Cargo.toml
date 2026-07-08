@@ -85,3 +85,11 @@ opt-level = 2
 
 [profile.dev.package.delta-render]
 opt-level = 2
+
+# The discovery engine is grid-bounded compute: in debug it dominates `cargo test`
+# (each in-process mutant re-checks laws over the grid). Optimising JUST this crate in
+# dev/test keeps the edit-compile loop honest for everything else while the probe
+# batteries run at compute speed. Ratified trade-off: slightly slower lib compiles,
+# several-fold faster suites — including each cargo-mutants iteration (build+test).
+[profile.dev.package.boundary-spec]
+opt-level = 1

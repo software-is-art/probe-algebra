@@ -135,6 +135,7 @@ pub enum Polarity {
 
 /// A discovered law: its plain-language and symbolic renderings, plus the two terms it equates
 /// (so the spec can be re-probed over a fresh grid, where mutation judges its kill power).
+#[derive(Clone)]
 pub struct DiscoveredLaw {
     /// The ratified catalog shape this law instantiates — EXACTLY a `ShapeCatalog::inventory()`
     /// name, set at the `templates()` push site that minted the law. The tag is what the

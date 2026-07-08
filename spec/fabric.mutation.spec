@@ -29,3 +29,31 @@
 - killed    `reach` becomes undefined everywhere
 - killed    `within` becomes undefined everywhere
 - killed    `true` becomes undefined everywhere
+
+# deafness floor: 26 constant-return mutants (every operator × every distinct
+# output), judged by re-checking the discovered laws — 5 SURVIVED.
+- SURVIVED  `grant` goes deaf: always (0, [(0, 1), (1, 2)], [])
+- SURVIVED  `revoke` goes deaf: always (0, [], [])
+- SURVIVED  `revoke` goes deaf: always (0, [(0, 1)], [(0, 1)])
+- SURVIVED  `revoke` goes deaf: always (0, [], [(1, 2)])
+- SURVIVED  `reach` goes deaf: always (0, [], [])
+
+# dent sweep: 124 one-point mutants (first 16 grid points per operator,
+# 2 wrong outputs per point — a resource bound, not a curated list), judged by
+# re-checking the discovered laws — 16 SURVIVED — each an UNPINNED COORDINATE, the exact input a missing probe would constrain.
+- SURVIVED  `grant` dented at [(0, [], []), (1, [(0, 2)], [])]: (0, [(0, 2)], []) -> (0, [], [])
+- SURVIVED  `grant` dented at [(0, [], []), (1, [(1, 0)], [])]: (0, [(1, 0)], []) -> (0, [], [])
+- SURVIVED  `revoke` dented at [(0, [], []), (1, [(0, 2)], [])]: (0, [], [(0, 2)]) -> (0, [], [])
+- SURVIVED  `revoke` dented at [(0, [], []), (1, [(1, 0)], [])]: (0, [], [(1, 0)]) -> (0, [], [])
+- SURVIVED  `reach` dented at [(0, [(0, 1)], [(0, 1)])]: (0, [], [(0, 1)]) -> (0, [], [])
+- SURVIVED  `reach` dented at [(0, [], [(1, 2)])]: (0, [], [(1, 2)]) -> (0, [], [])
+- SURVIVED  `within` dented at [(0, [], []), (0, [(1, 2)], [])]: (2, [(1, 1)], []) -> (2, [], [])
+- SURVIVED  `within` dented at [(0, [], []), (0, [(0, 1), (1, 2)], [])]: (2, [(1, 1)], []) -> (2, [], [])
+- SURVIVED  `within` dented at [(0, [], []), (0, [(0, 1)], [(0, 1)])]: (2, [(1, 1)], []) -> (2, [], [])
+- SURVIVED  `within` dented at [(0, [], []), (0, [], [(1, 2)])]: (2, [(1, 1)], []) -> (2, [], [])
+- SURVIVED  `within` dented at [(0, [(0, 1)], []), (0, [], [])]: (2, [], []) -> (2, [(1, 1)], [])
+- SURVIVED  `within` dented at [(0, [(0, 1)], []), (0, [(1, 2)], [])]: (2, [], []) -> (2, [(1, 1)], [])
+- SURVIVED  `within` dented at [(0, [(0, 1)], []), (0, [(0, 1)], [(0, 1)])]: (2, [], []) -> (2, [(1, 1)], [])
+- SURVIVED  `within` dented at [(0, [(0, 1)], []), (0, [], [(1, 2)])]: (2, [], []) -> (2, [(1, 1)], [])
+- SURVIVED  `within` dented at [(0, [(1, 2)], []), (0, [], [])]: (2, [], []) -> (2, [(1, 1)], [])
+- SURVIVED  `within` dented at [(0, [(1, 2)], []), (0, [(0, 1)], [])]: (2, [], []) -> (2, [(1, 1)], [])

@@ -40,3 +40,11 @@
 - killed    `delay` becomes undefined everywhere
 - killed    `d` becomes undefined everywhere
 - killed    `i` becomes undefined everywhere
+
+# deafness floor: 30 constant-return mutants (every operator × every distinct
+# output), judged by re-checking the discovered laws — 1 SURVIVED.
+- SURVIVED  `delay` goes deaf: always [[], [], [], [], []]
+
+# dent sweep: 80 one-point mutants (first 16 grid points per operator,
+# 2 wrong outputs per point — a resource bound, not a curated list), judged by
+# re-checking the discovered laws — all killed: every sampled point is pinned.
