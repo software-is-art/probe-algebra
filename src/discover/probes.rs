@@ -33,6 +33,14 @@
 //! holds the drift-gate set to the register by SET DIFFERENCE, so it can only shrink as
 //! byte-locks earn individual drills — an un-ratified byte-lock refuses, a stale line refuses.
 //!
+//! RUNG 3 (BUILT): the `FireDrill` claims are NON-VACUOUS. `every_fire_drill_probe_has_a_live_drill_that_fires`
+//! reconciles the census's FireDrill set through a `fire_drill::Battery` that `requires` those
+//! keys and drills each by planting the probe's known-bad fixture — so a FireDrill probe with
+//! no live drill is UNPROVEN and a drill that stopped firing is VACUOUS. A deleted drill
+//! breaks the gate, closing the "a FireDrill claim pinned only by a test that could vanish"
+//! gap. Each module owns its drill (`system::tests::seam_sensitivity_drill_fires`,
+//! `shape::probes::shape_sensitivity_drill_fires`); catalog and world build from the public API.
+//!
 //! Not mutated: the census is aggregation whose decisions are pinned by its byte-render
 //! probes and the completeness gate — GENERATED against, like `discover::floor` (see
 //! `spec/instrumentation.register`).
@@ -408,6 +416,79 @@ mod probes_tests {
                  (a byte-lock leaning only on the shared spec-lock drift gate must be ratified \
                  in spec/probes.register with the reason; give it an individual drill to drop \
                  the line)"
+            );
+        }
+    }
+
+    /// RUNG 3: every `FireDrill` probe has a LIVE drill that actually FIRES — the census
+    /// classification is not vacuous. Reconciled through `fire_drill::Battery`: the battery
+    /// `requires` exactly the census's FireDrill keys and drills each by planting the probe's
+    /// known-bad fixture, so `verdict()` refuses a FireDrill probe with no drill (UNPROVEN)
+    /// and a drill that stopped firing (VACUOUS). A deleted drill therefore breaks this gate,
+    /// closing the "a FireDrill claim pinned only by a test that could vanish" gap.
+    #[test]
+    fn every_fire_drill_probe_has_a_live_drill_that_fires() {
+        use fire_drill::{Battery, Outcome};
+        fn fired(refused: bool) -> Outcome {
+            if refused {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            }
+        }
+        let census = ProbeCensus::of();
+        let keys: Vec<String> = census
+            .probes()
+            .iter()
+            .filter(|p| p.mechanism == Mechanism::FireDrill)
+            .map(|p| p.key.clone())
+            .collect();
+
+        // catalog — a mis-sorted identity declaration is refused by the shape-data gate.
+        let identity = crate::discover::engine::ShapeCatalog::inventory()
+            .into_iter()
+            .find(|s| s.name == "identity")
+            .expect("identity is ratified")
+            .gate_slots;
+        let missorted: Vec<(Vec<&str>, &str)> = vec![
+            (vec!["credits", "credits"], "credits"),
+            (vec![], "vouchers"),
+        ];
+        let catalog = identity.admit(&missorted, &["merge", "empty"]).is_err();
+
+        // world — a battery of a different size is refused, never row-matched by luck.
+        let world = !crate::discover::world::StoreModel::beliefs()
+            .disagreements(&crate::discover::world::WorldReport::record(
+                "small",
+                4,
+                crate::discover::world::StoreModel::replay,
+            ))
+            .is_empty();
+
+        let battery = Battery::named("probe sensitivity")
+            .requires(keys)
+            .drill(
+                "catalog",
+                "a mis-sorted identity declaration",
+                fired(catalog),
+            )
+            .drill(
+                "seams",
+                "a non-homomorphic transform conversion",
+                fired(crate::discover::system::tests::seam_sensitivity_drill_fires()),
+            )
+            .drill(
+                "shape",
+                "a placement disagreeing with the declaration",
+                fired(crate::discover::shape::probes::shape_sensitivity_drill_fires()),
+            )
+            .drill("world", "a mismatched-size world battery", fired(world));
+
+        if let Err(why) = battery.verdict() {
+            panic!(
+                "the probe-sensitivity battery is not sound: {why}\n(a FireDrill probe with \
+                 no drill is UNPROVEN; a drill that no longer fires is VACUOUS — reconcile \
+                 discover::probes STRUCTURAL against the live drills)"
             );
         }
     }

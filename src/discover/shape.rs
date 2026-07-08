@@ -345,7 +345,7 @@ impl ShapeReport {
 }
 
 #[cfg(test)]
-mod probes {
+pub(crate) mod probes {
     use super::*;
     use crate::discover::arithmetic::Arithmetic;
     use crate::discover::coherence::{GcdMerge, MaxMerge};
@@ -353,6 +353,22 @@ mod probes {
     use crate::discover::date::Calendar;
     use crate::discover::protocol::DocFlow;
     use crate::discover::BoundarySpec;
+
+    /// The `shape` probe's individual sensitivity drill, exposed for the unified probe
+    /// census's rung-3 reconciliation (`discover::probes`): a placement disagreeing with the
+    /// declaration must render UNSETTLED. Fires (returns `true`) when the report is not
+    /// settled — the fixture `a_disagreeing_shape_renders_loud` pins the render.
+    pub(crate) fn shape_sensitivity_drill_fires() -> bool {
+        !ShapeReport {
+            system: "disagreeing",
+            placements: vec![
+                Placement::over("bundle", bundle()),
+                Placement::of::<DocFlow>(),
+            ],
+            candidates: vec![],
+        }
+        .is_settled()
+    }
 
     fn sig(symbol: &'static str, inputs: &[&str], output: &str) -> NetSignature {
         (
