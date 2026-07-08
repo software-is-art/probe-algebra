@@ -1146,14 +1146,25 @@ theory layer (`discover::mutation`, perturbed operator tables judged by re-runni
 discovery) is the theory-scale ancestor of this move; the candidate is its
 arbitrary-behaviour generalisation, packaged as a consumer entry point.
 
-Honest frame, the method's own and unsoftened: this samples the BEHAVIOUR space where
-mutation samples the IMPLEMENTATION's neighbourhood — different coverage, not strictly a
-superset. The oracle grid is bounded, so a suite that partitions every sampled oracle is
-EVIDENCE of sensitivity over that sample, never proof it catches everything (the same
-green-is-evidence discipline discovery and the sweeps live under). An insensitive probe is
-a fact; a sensitive one is a bounded observation. So the internal schemata engine does not
-retire — it stays as the weekly implementation-side backstop, the way the source sweeps
-back up the in-process layers today; what retires is the NEED for it on the PR path.
+Honest frame, the method's own and unsoftened — but NOT the two-regimes hedge it is tempting
+to reach for. There is no separate "implementation neighbourhood" that mutation keeps
+covering and the oracle grid does not: the neighbourhood is ALREADY sampled by the probes
+that survive the sweep. Making the sweep go green is a one-time selection pressure that
+leaves the probe set sensitive; a passing suite CARRIES that coverage as a property, not as
+something to redraw every PR. And the only part of the neighbourhood that matters is the
+part that crosses the spec boundary — a mutant that does not cross it is an equivalent
+mutant, i.e. noise. So the meaningful mutation coverage and the spec-boundary coverage are
+the SAME coverage, and the oracle grid samples it directly. The one real caveat is the
+shared one: the oracle grid is bounded, so a suite that partitions every sampled oracle is
+EVIDENCE of sensitivity over that sample near each law's boundary, never proof it catches
+everything (the green-is-evidence discipline discovery and the sweeps already live under).
+This removes the coverage-based reason to keep the internal schemata engine standing: its
+job was to make the probes sensitive once, and the oracle-partition maintains that against
+the spec going forward. What residual role schemata keeps, if any, is a bootstrap or a
+periodic audit of the interpreter that judges the oracles — and even that interpreter is
+generation-tested, not mutated (`discover::floor` / `discover::relation` are GENERATED
+against), so it is not a standing mutation dependency. Retiring schemata is on the table,
+not deferred by a coverage argument.
 
 The consumer writes NOTHING new for this — the same zero-annotation posture the rest of
 the method already holds. A Rust consumer's public surface is auto-inferred (the qualify
