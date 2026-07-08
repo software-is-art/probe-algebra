@@ -646,6 +646,21 @@ impl GateRegistry {
                 effect: Capability::Effectful,
                 sharded: false,
             },
+            Gate {
+                name: "substrate (git drift)",
+                verifies: "the LIVE repository's tags and history still satisfy the \
+                           declared git substrate (spec/substrate.spec): the tags the \
+                           machinery leans on exist and sit on the certified line, and \
+                           the default branch stays linear after the declared epoch — \
+                           the perimeter's squash-only rule, judged backward over the \
+                           history that exists. READ-ONLY git plumbing against the \
+                           checkout's own origin: the first world gate with no \
+                           third-party API and no extra credential",
+                command: &[".github/substrate.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Effectful,
+                sharded: false,
+            },
         ]
     }
 
@@ -1053,25 +1068,26 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: twelve gates — three every-change, one per-diff,
-    /// one default-branch incremental, six weekly (the sharded whole-tree sweep, four
-    /// member/corpus companions, and the perimeter world gate), and the release gate on
-    /// the certification cadence — and every declared command reappears verbatim in the
-    /// rendered workflow (nothing declared can fall out of execution). Every gate is
-    /// Pure except exactly two, each wearing the EFFECTFUL tag for a different reason:
-    /// the release WRITES the world (tags, a GitHub release, crates.io), and the
-    /// perimeter READS state the tree cannot contain (the live repository settings) —
-    /// which is also why the perimeter never feeds the countersign.
+    /// The registry's SHAPE is pinned: thirteen gates — three every-change, one
+    /// per-diff, one default-branch incremental, seven weekly (the sharded whole-tree
+    /// sweep, four member/corpus companions, and the two world gates), and the release
+    /// gate on the certification cadence — and every declared command reappears
+    /// verbatim in the rendered workflow (nothing declared can fall out of execution).
+    /// Every gate is Pure except exactly three, each wearing the EFFECTFUL tag for its
+    /// own reason: the release WRITES the world (tags, a GitHub release, crates.io),
+    /// the perimeter READS state the tree cannot contain (the live repository
+    /// settings), and the substrate READS the repository's own tags and history —
+    /// which is also why no world gate feeds the countersign.
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 12);
+        assert_eq!(gates.len(), 13);
         assert_eq!(
             gates
                 .iter()
                 .filter(|g| g.cadence == Cadence::Weekly)
                 .count(),
-            6
+            7
         );
         assert_eq!(
             gates.iter().filter(|g| g.sharded).count(),
@@ -1091,26 +1107,30 @@ mod tests {
             .collect();
         assert_eq!(
             effectful.len(),
-            2,
-            "the release (a world write) and the perimeter (a world read)"
+            3,
+            "the release (a world write), the perimeter and the substrate (world reads)"
         );
         assert_eq!(effectful[0].name, "release (certified tree)");
         assert_eq!(effectful[0].cadence, Cadence::OnCertify);
         assert_eq!(effectful[1].name, "perimeter (settings drift)");
         assert_eq!(effectful[1].cadence, Cadence::Weekly);
+        assert_eq!(effectful[2].name, "substrate (git drift)");
+        assert_eq!(effectful[2].cadence, Cadence::Weekly);
 
-        // the world gate rides the weekly clock but is NOT a countersign input, and its
-        // job carries the read token: a world fact is not evidence about the tree.
+        // the world gates ride the weekly clock but are NOT countersign inputs, and
+        // their jobs carry the read token: a world fact is not evidence about the tree.
         let workflow = GateRegistry::render_workflow();
-        assert!(
-            workflow.contains("world-perimeter-settings-drift:"),
-            "{workflow}"
-        );
-        assert!(
-            !workflow.contains("world-perimeter-settings-drift,")
-                && !workflow.contains(", world-perimeter-settings-drift"),
-            "the perimeter must never appear in the countersign's needs list"
-        );
+        for world_job in [
+            "world-perimeter-settings-drift",
+            "world-substrate-git-drift",
+        ] {
+            assert!(workflow.contains(&format!("{world_job}:")), "{workflow}");
+            assert!(
+                !workflow.contains(&format!("{world_job},"))
+                    && !workflow.contains(&format!(", {world_job}")),
+                "`{world_job}` must never appear in the countersign's needs list"
+            );
+        }
 
         let workflow = GateRegistry::render_workflow();
         for gate in &gates {

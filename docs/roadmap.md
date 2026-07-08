@@ -894,19 +894,28 @@ fields) is the consumer's, like `examples/perimeter.rs` is ours; only the judgme
 lives here, where the probes reach. This is behaviour-as-code rung 2 made concrete:
 read-only world probes, judged on the consumer's cadence and credentials.
 
-## Candidate: git itself has no vocabulary
+## Git itself is a lock: the substrate (BUILT)
 
-The perimeter covers GitHub-the-service; nothing covers git-the-data, and the repo
-already leans on undeclared git meaning: the `mutants-green` tag is the incremental
-gate's entire baseline, its semantics living as prose and as behaviour inside
-`mutants-gate.sh` (the exact gate-defined-where-no-drift-gate-can-see-it shape); the
-CalVer release tags carry certification semantics `release.sh` assumes; and "main is
-linear, every commit a squash of a gated PR" is a declared perimeter rule about future
-merges but an unjudged observation about the history that exists. A git lock would
-declare tag meanings and history laws and judge them from `git log` and `git tag` —
-the first world lock with zero world-read cost: no credentials, no network, the
-repository is already on disk. Close kin to the infra register floor ("tag X means Y"
-is a ratified meaning line); could ride the same vocabulary.
+The perimeter covers GitHub-the-service; nothing covered git-the-data, and the repo
+leaned on undeclared git meaning everywhere: the `mutants-green` tag is the
+incremental gate's entire baseline, its semantics living as prose and as behaviour
+inside `mutants-gate.sh` (the exact gate-defined-where-no-drift-gate-can-see-it shape
+the pipeline brick killed); the CalVer release tags carry certification semantics
+`release.sh` assumes; and "main is linear, every commit a squash of a gated PR" was a
+declared perimeter rule about future merges but an unjudged observation about the
+history that exists. `discover::substrate` declares those meanings — each tag or
+trailing-`*` family with the prose the scripts otherwise keep, plus the linearity
+epoch (the last pre-discipline merge commit) — and `Substrate::judge` holds a
+`LiveSubstrate` to them: a required tag absent, a meaning-carrying tag off the
+certified line, a merge commit after the epoch, an unreadable read — each refuses by
+name. Frozen as `spec/substrate.spec` (rides `freeze_gates` with the other repo-meta
+locks); read back by the weekly `substrate (git drift)` world gate
+(`.github/substrate.sh` → `examples/substrate.rs`, which asks the declaration for the
+epoch instead of restating it). The reads are git plumbing against the checkout's own
+origin — the first world gate with no third-party API and no extra credential — and
+like every world fact it never feeds the countersign. One declaration is deliberately
+red on arrival: the owed `v0.1.0` tag is `required`, so the roadmap memo below became
+the reminder that never expires; push the tag and the gate goes green.
 
 ## Candidate: the audience is the agent
 
