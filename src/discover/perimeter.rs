@@ -386,6 +386,25 @@ mod probes {
             .iter()
             .any(|v| v.contains("merge method `merge`")));
 
+        // ONE declared check missing while another is present refuses by the missing
+        // check's name — the membership test must match the check itself, not merely
+        // notice that some other context differs (`==` vs `!=` in the `any`).
+        let mut partial = applied_floor();
+        partial.required_checks = vec!["fmt + clippy + test".to_string()];
+        let violations = p.judge(&partial).unwrap_err();
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("`dogfood (changed lines)` is not required")),
+            "{violations:#?}"
+        );
+        assert!(
+            !violations
+                .iter()
+                .any(|v| v.contains("`fmt + clippy + test` is not required")),
+            "the present check must not be reported missing: {violations:#?}"
+        );
+
         // vulnerability reporting explicitly off is its own violation:
         let mut off = applied_floor();
         off.private_vulnerability_reporting = Some(false);

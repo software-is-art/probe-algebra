@@ -450,6 +450,27 @@ mod probes {
         );
     }
 
+    /// BOTH perimeter artifacts route to the Perimeter class — each ALONE (the spec
+    /// would otherwise misfile into the `.spec` law catch-all, the ruleset would
+    /// refuse as unknown; an `&&` in the arm would silence both), and together they
+    /// deduplicate to one ratification question.
+    #[test]
+    fn the_perimeter_artifacts_route_to_their_own_class() {
+        for path in ["spec/perimeter.spec", "spec/perimeter.ruleset.json"] {
+            let agenda = Agenda::of([path]).expect("a known lock class");
+            assert_eq!(
+                agenda.ratifications,
+                vec![Ratification::Perimeter],
+                "{path}"
+            );
+        }
+        let both = Agenda::of(["spec/perimeter.spec", "spec/perimeter.ruleset.json"]).unwrap();
+        assert_eq!(both.ratifications, vec![Ratification::Perimeter]);
+        assert!(Ratification::Perimeter
+            .question()
+            .contains("perimeter moved"));
+    }
+
     /// An unknown spec-directory artifact REFUSES — a new lock class must be taught to
     /// the router, because misfiled-as-machinery is a silently dropped review.
     #[test]

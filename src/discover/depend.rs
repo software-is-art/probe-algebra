@@ -405,13 +405,19 @@ mod probes {
         assert!(err.contains("` | `"), "{err}");
 
         // a theory name carrying path syntax is refused, never resolved — the lock
-        // lookup must not be steerable outside the spec directory:
-        let traversal = register(
-            "traversal.register",
+        // lookup must not be steerable outside the spec directory. Each syntax REFUSES
+        // ALONE (slash, backslash, dot-dot): the guard is a disjunction, and a probe
+        // that only ever combines them would let `||` quietly become `&&`.
+        for bad in [
             "../outside | (a or a) = a: someone — a path is not a theory\n",
-        );
-        let err = Dependence::judge_register(&traversal, &root.join("spec")).unwrap_err();
-        assert!(err.contains("path syntax cannot name a lock"), "{err}");
+            "up..sneak | (a or a) = a: someone — dot-dot alone must refuse\n",
+            "sub/theory | (a or a) = a: someone — a slash alone must refuse\n",
+            "sub\\theory | (a or a) = a: someone — a backslash alone must refuse\n",
+        ] {
+            let traversal = register("traversal.register", bad);
+            let err = Dependence::judge_register(&traversal, &root.join("spec")).unwrap_err();
+            assert!(err.contains("path syntax cannot name a lock"), "{err}");
+        }
 
         // a reliance on a theory with no committed lock refuses by path:
         let unknown = register(
