@@ -1281,6 +1281,38 @@ the logical end state: the judges collapsed to data plus one interpreter, the se
 proofs collapsed to one question with two mechanisms, and the whole thing a census a
 downstream crate can compute about itself.
 
+## Framing: the real domain is stability under containment
+
+Worth stating plainly, because it reframes what the method is FOR. Probe-algebra's real
+domain isn't "migration" or "diagrams" or "HTML". It is stability verification over any
+DECLARATIVE-MODEL → CONSTRAINT-LAYOUT pipeline where containment makes local edits have
+non-local — and sometimes LEGITIMATELY non-local — effects. The hard part of every such
+pipeline is the same: a local change ripples through the layout, and you cannot tell a bug
+from a correct-but-far-reaching consequence by looking at the diff. That is exactly the
+distinction the apparatus already draws — a refuted law is the bug, a surviving dent is the
+legitimate degree of freedom — so the method is not analogising to these domains, it is
+their native shape.
+
+Three instances make the generality concrete, and their ORACLES are what differ:
+
+- **CALM + ELK** (architecture model → graph layout): a node moves and the whole diagram
+  reflows; which reflows are correct is a stability question, not a structural one.
+- **DOM + CSS** (document model → box layout): an element's style changes and containment
+  propagates; the same non-local, sometimes-legitimate effect.
+- **Migration** (schema/model → byte-identical SQL): the THIRD instance, and the reason it
+  worked first and cleanly is that its oracle is TRIVIAL — byte-identity is a total,
+  decidable equality, so there is no "sometimes-legitimate" band to adjudicate. The layout
+  instances have no such luck; their oracle is metamorphic (rename-then-render =
+  render-then-relabel) and toleranced (insertion locality within ε), which is precisely the
+  vocabulary `layout-probe` built.
+
+So the layout-probe brick is not a second domain bolted on — it is the method meeting its
+general case, where the oracle stops being byte-identity and becomes a metamorphic /
+toleranced judgment over containment. The consumer guarantee reads the same in all three:
+swap the pipeline's implementation, and we catch the swap unless the difference is a
+ratified degree of freedom (a legitimate non-local effect) or a spec symmetry. Migration
+just happens to be the instance where that fine print is empty.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
