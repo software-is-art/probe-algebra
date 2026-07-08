@@ -501,6 +501,121 @@ mod probes {
         );
     }
 
+    /// The prose for one judged line — PRESENTATION, not judgment. The interpreter
+    /// decides held-vs-why (`Floor::outcomes`); this renders the decision to the exact
+    /// message the perimeter has always spoken. It is data-shaped (a match to strings),
+    /// pinned byte-for-byte by the differential below, so nothing free-form decides
+    /// pass/fail here.
+    fn render_line(l: &crate::discover::floor::Line, declared: &Perimeter) -> String {
+        use crate::discover::floor::Fail;
+        match (l.key.as_str(), &l.verdict) {
+            ("deletion", Ok(())) => "deletion of the default branch: blocked".to_string(),
+            ("deletion", Err(Fail::Off)) => "the default branch can be DELETED — the \
+                 declared perimeter blocks deletion (apply spec/perimeter.ruleset.json)"
+                .to_string(),
+            ("force_push", Ok(())) => "force pushes: blocked".to_string(),
+            ("force_push", Err(Fail::Off)) => "the default branch accepts FORCE PUSHES — \
+                 the declared perimeter blocks them (apply spec/perimeter.ruleset.json)"
+                .to_string(),
+            ("approvals", Ok(())) => format!("pull requests required; approvals: {}", l.subject),
+            ("approvals", Err(Fail::Unread)) => "no pull-request rule is active — direct \
+                 pushes to the default branch are unguarded (apply spec/perimeter.ruleset.json)"
+                .to_string(),
+            ("approvals", Err(Fail::Wrong(n))) => format!(
+                "required approvals is {n}, declared {} — above the floor this is not \
+                 stricter, it deadlocks a solo maintainer (no one can approve their own PR)",
+                declared.required_approvals
+            ),
+            ("merge_methods", Ok(())) => format!("merge method allowed: {}", l.subject),
+            ("merge_methods", Err(Fail::Outside)) => format!(
+                "merge method `{}` is allowed — the declared perimeter permits only: {}",
+                l.subject,
+                declared.merge_methods.join(", ")
+            ),
+            ("required_checks", Ok(())) => format!("required check: {}", l.subject),
+            ("required_checks", Err(Fail::Missing)) => format!(
+                "status check `{}` is not required on the default branch — a PR can merge \
+                 without it (apply spec/perimeter.ruleset.json)",
+                l.subject
+            ),
+            ("vuln", Ok(())) => "private vulnerability reporting: enabled".to_string(),
+            ("vuln", Err(Fail::Off)) => "private vulnerability reporting is DISABLED — \
+                 SECURITY.md instructs reporters to use it (enable in the repository's \
+                 security settings)"
+                .to_string(),
+            ("vuln", Err(Fail::Unread)) => "private vulnerability reporting could not be \
+                 READ — refused by name, never assumed enabled; verify the endpoint and \
+                 the token's read access"
+                .to_string(),
+            other => panic!("unmapped perimeter line: {other:?}"),
+        }
+    }
+
+    /// The DEPTH crux: the interpreter's structured judgment, rendered, reproduces the
+    /// incumbent judge's exact held/violation MESSAGES across the grid — not just its
+    /// accept/reject. So `Perimeter::judge` can become `outcomes` + `render_line` with
+    /// the free-form decision logic deleted: the decision moves to the interpreter, the
+    /// prose stays as presentation (pinned here, byte for byte).
+    #[test]
+    fn the_interpreter_outcomes_render_the_incumbent_messages() {
+        let declared = Perimeter::declared();
+        let floor = perimeter_floor(&declared);
+        let checks = &declared.required_checks;
+        let missing_one: Vec<String> = checks.iter().skip(1).cloned().collect();
+        let bools = [true, false];
+        let approvals = [None, Some(0u64), Some(1u64)];
+        let methods: [Vec<String>; 4] = [
+            vec![],
+            vec!["squash".to_string()],
+            vec!["squash".to_string(), "merge".to_string()],
+            vec!["rebase".to_string()],
+        ];
+        let checksets = [checks.clone(), Vec::new(), missing_one];
+        let vulns = [Some(true), Some(false), None];
+
+        for &deletion_blocked in &bools {
+            for &force_push_blocked in &bools {
+                for required_approvals in approvals {
+                    for merge_methods in &methods {
+                        for required_checks in &checksets {
+                            for private_vulnerability_reporting in vulns {
+                                let live = LivePerimeter {
+                                    deletion_blocked,
+                                    force_push_blocked,
+                                    required_approvals,
+                                    merge_methods: merge_methods.clone(),
+                                    required_checks: required_checks.clone(),
+                                    private_vulnerability_reporting,
+                                };
+                                let mut held = Vec::new();
+                                let mut viol = Vec::new();
+                                for l in floor.outcomes(&perimeter_world(&live)) {
+                                    let msg = render_line(&l, &declared);
+                                    match l.verdict {
+                                        Ok(()) => held.push(msg),
+                                        Err(_) => viol.push(msg),
+                                    }
+                                }
+                                match declared.judge(&live) {
+                                    Ok(inc_held) => {
+                                        assert!(viol.is_empty(), "{live:?}");
+                                        assert_eq!(held, inc_held, "held mismatch on {live:?}");
+                                    }
+                                    Err(inc_viol) => {
+                                        assert_eq!(
+                                            viol, inc_viol,
+                                            "violation mismatch on {live:?}"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// The declaration DERIVES from the gate registry: the required checks are the
     /// every-change job plus each per-diff gate, by rendered job name — so a renamed
     /// gate moves this lock in the same diff.

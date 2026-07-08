@@ -98,6 +98,96 @@ impl Floor {
     }
 }
 
+/// Why a requirement (or one element of a set requirement) failed — the interpreter's
+/// JUDGMENT, from which a judge renders its prose. The interpreter decides held-vs-why;
+/// the message is the judge's presentation, pinned byte-for-byte by its own tests.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Fail {
+    /// The fact could not be read (`None`) — refused, never assumed.
+    Unread,
+    /// A required element (Covers) is absent from the observed set.
+    Missing,
+    /// An observed element (Within) is not in the allow-set.
+    Outside,
+    /// A scalar read the wrong value (Exactly / Is) — the read carried here.
+    Wrong(String),
+    /// A flag read false, or a toggle read `Some(false)`.
+    Off,
+}
+
+/// One judged line: the requirement key, the SUBJECT it concerns (the element for a set
+/// check, the value for a scalar, empty for a bare flag), and the verdict.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Line {
+    pub key: String,
+    pub subject: String,
+    pub verdict: Result<(), Fail>,
+}
+
+impl Floor {
+    /// The structured judgment — every requirement expanded to its per-element lines,
+    /// held or failed with a reason. A judge renders these to prose; the DECISION is
+    /// here, so no free-form judge code decides pass/fail. Set checks (Covers/Within)
+    /// expand to one line per element, in element order.
+    pub fn outcomes(&self, world: &BTreeMap<String, Observed>) -> Vec<Line> {
+        let mut lines = Vec::new();
+        for req in &self.requirements {
+            let obs = world.get(&req.key);
+            let line = |subject: &str, verdict: Result<(), Fail>| Line {
+                key: req.key.clone(),
+                subject: subject.to_string(),
+                verdict,
+            };
+            match (&req.check, obs) {
+                (Check::True, Some(Observed::Flag(b))) => {
+                    lines.push(line("", if *b { Ok(()) } else { Err(Fail::Off) }));
+                }
+                (Check::Enabled, Some(Observed::Toggle(Some(b)))) => {
+                    lines.push(line("", if *b { Ok(()) } else { Err(Fail::Off) }));
+                }
+                (Check::Exactly(n), Some(Observed::Count(Some(m)))) => {
+                    if m == n {
+                        lines.push(line(&m.to_string(), Ok(())));
+                    } else {
+                        lines.push(line("", Err(Fail::Wrong(m.to_string()))));
+                    }
+                }
+                (Check::Is(want), Some(Observed::Text(Some(got)))) => {
+                    if got == want {
+                        lines.push(line(got, Ok(())));
+                    } else {
+                        lines.push(line("", Err(Fail::Wrong(got.clone()))));
+                    }
+                }
+                (Check::Within(allow), Some(Observed::Names(Some(names)))) => {
+                    for name in names {
+                        let v = if allow.contains(name) {
+                            Ok(())
+                        } else {
+                            Err(Fail::Outside)
+                        };
+                        lines.push(line(name, v));
+                    }
+                }
+                (Check::Covers(required), Some(Observed::Names(Some(names)))) => {
+                    for elem in required {
+                        let v = if names.contains(elem) {
+                            Ok(())
+                        } else {
+                            Err(Fail::Missing)
+                        };
+                        lines.push(line(elem, v));
+                    }
+                }
+                // any unread fact, absent fact, or type mismatch is a single Unread line
+                // for the key — refused by name, never assumed.
+                _ => lines.push(line("", Err(Fail::Unread))),
+            }
+        }
+        lines
+    }
+}
+
 /// Does one check hold against its (possibly unread, possibly absent) fact? An unread
 /// reading, a missing fact, or a type mismatch never holds — refused, never assumed.
 fn holds(check: &Check, obs: Option<&Observed>) -> bool {
