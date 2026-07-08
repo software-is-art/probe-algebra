@@ -176,3 +176,22 @@ would be dead weight for the mutation gates to chew on. The workbench is declare
 work starts and retired when it ends; the fixtures in `architect.rs` pin the machinery
 meanwhile. Dogfood commitment: the next algebra brick in this repository gets written
 through this protocol, and what it teaches goes back into this section.
+
+## Antipattern — open text feeding the rules
+
+When a plain-text document is the driving input to a formal change — a pasted ask, a
+prose convention a release is expected to honour, a doc that describes what a gate
+should hold — the system's correctness rests on a human re-reading it. The spec should
+drive formally: demote the mechanical half to a judged artifact (a register entry, a
+fixture line, a spec diff) and keep prose for the one thing no derivation produces,
+the justification. Text that states a fact the machine could carry is a mirror;
+mirrors are deleted, not verified.
+
+The receiving surfaces for downstream asks, so the pattern never grows back: a LAW
+reliance is a line in `downstream/reliances.register` (`<theory> | <equation>:
+<consumer> — <why>`, self-judged against the committed locks on every test run — a
+re-bless that drops it refuses by name); a SURFACE reliance is a line in
+`downstream-fixture/tests/reliances.rs` (compile-judged — a dropped or renamed API
+refuses at build). Consumers author their own lines by PR; the justification is the
+ratification. (Named 07/07/2026, the day nine open-text asks landed by hand and the
+tenth asked to be the last.)

@@ -50,3 +50,7 @@
 - release (certified tree) (on certification, when the mutants-green tag advances; EFFECTFUL)
       .github/release.sh
       promises: every certified default-branch tree publishes itself: the countersign's tag advance IS the release event, the version is CalVer (a date claims nothing about compatibility, which is honest), and the notes are DERIVED — commit subjects plus the ratified spec-lock diff, the uncompressed truth a semver integer would compress into an unchecked claim
+
+- perimeter (settings drift) (weekly + manual, sharded; EFFECTFUL)
+      .github/perimeter.sh
+      promises: the LIVE repository perimeter — branch rules on the default branch, merge methods, private vulnerability reporting — still satisfies the declared floor (spec/perimeter.spec). Settings are configuration that drifts silently and that no one re-audits; this gate reads them back on the weekly clock and refuses by name. READ-ONLY: the write stays human — a privilege is ratified, never self-served

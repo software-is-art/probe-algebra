@@ -797,6 +797,80 @@ cost, countersigning the simulation through the transport seam; (3) the world lo
 generalised from library dependencies to any probed surface. Build nothing that
 mutates: the arm stays someone else's.
 
+## The tenth ask: open text stops feeding the rules (BUILT)
+
+The adopter's tenth ask asked to be the last of its kind: nine asks had landed as
+hand-carried markdown — plain text as the driving input to a formal system, held by
+diligence. The receiving surfaces now exist. A LAW reliance is a line in
+`downstream/reliances.register` (`<theory> | <equation>: <consumer> — <why>`),
+self-judged against the committed locks on every test run — a re-bless that drops a
+relied-on law refuses by name, equation and consumer and why, before the release
+ships. A SURFACE reliance is a line in `downstream-fixture/tests/reliances.rs`,
+compile-judged — the strongest gate available for an API. Prose keeps only the
+justification, the one thing no derivation produces; the antipattern is named in
+`docs/experience.md` so the pattern cannot grow back unrecognised. Consumers author
+their own lines by PR. Field reports remain welcome for what registers cannot carry:
+lessons, corrections of frame, and the eleventh kind of ask nobody has had yet.
+
+## The eleventh ask: the hook is a shipped binary (BUILT)
+
+Filed the moment the tenth ask's antipattern was spotted wearing the consumer's own
+`settings.json`: the guard is mutation-tested and register-driven, and every consumer
+was fencing it with the same four pieces of unjudged glue — a bash wrapper, inline
+JSON-parsing Python, a stale-binary build fallback, hand-authored settings plumbing.
+`probe-hook` (a workspace member, `cargo install probe-hook`) is that envelope inside
+the boundary: it speaks the hook protocol natively (real JSON parser — paths can carry
+escaped quotes), honours `CLAUDE_PROJECT_DIR`, derives voices from the tree and
+classes from `spec/agenda.register`, and `probe-hook install` writes or idempotently
+merges its own `settings.json` entry, refusing (never clobbering) a file it cannot
+parse. Fail-open is a DRILLED property of the library (`respond` returns `Option`;
+malformed JSON, missing paths, refused registers are silence), not a `|| exit 0`
+convention. The skew floor from the ask's honest frame ships: every voice block
+carries the binary's version, and advisory/fail-open means skew degrades to weaker
+advice, never a false refusal. Re-execing a repo-local build stays deliberately
+unbuilt until skew is observed hurting. It publishes with the other four on every
+certification release.
+
+## The perimeter is a lock (BUILT)
+
+The settings page was the last hand-clicked configuration in the loop — the open-text
+antipattern one level up: prose recipes translated into a UI, verified by nobody,
+drifting silently, re-audited never. Now it is what everything else is. The floor is
+DECLARED (`discover::perimeter`), and its required status checks derive from the gate
+registry itself, so a renamed or re-cadenced gate moves `spec/perimeter.spec` in the
+same diff — a rename can never silently unprotect the default branch. The declaration
+renders TWO artifacts: the human-readable floor and `spec/perimeter.ruleset.json`, the
+apply-able branch ruleset — the one manual act left is posting it
+(`gh api repos/<owner>/<repo>/rulesets -X POST --input spec/perimeter.ruleset.json`).
+The write stays human on principle: the perimeter constrains the agents, so it must
+not be agent-writable — GitHub's settings page is the platform's kernel register, and
+a privilege is ratified, never self-served.
+
+What the machine owns is refusing to let reality rot: the `perimeter (settings
+drift)` gate — the pipeline's first WORLD gate, weekly, Effectful-as-a-read — pulls
+the live rules back (`.github/perimeter.sh` → `examples/perimeter.rs` →
+`Perimeter::judge`, where the probes reach) and holds them to the floor. FLOOR
+semantics: extra live protections are not drift (stricter is never a lie); required
+approvals are the one exact match (above zero deadlocks a solo maintainer). The
+never-applied state is a red gate naming each missing rule — the reminder that never
+expires — and a world fact never feeds the countersign: the certified tag must not
+wait on a settings page. Casualty of the brick, per its own instruction: CLAUDE.md's
+"PRs land by squash merge" line, now a declared, read-back merge-method rule.
+
+## Candidate: the audience is the agent
+
+Adoption of this method is chosen inside agentic sessions, by whichever instance is
+advising on stack — not by a programmer who hand-reviews everything (whose bottleneck
+the method exists to dissolve, and who is fine without us). That inverts the usual
+promotion problem: the reader is a model with a context budget, a taste for verifiable
+claims, and no patience for marketing. What would land: a front door sized for one
+context window that states the authority inversion once (derive → freeze → ratify the
+diff); claims that are CHECKABLE from the tree in seconds (`cargo run --example gate`,
+the committed locks, the fire-drill); and the adoption gradient already proven by the
+field reports — bricks first (a hook, a register, a judge), worldview later. The
+crates.io publish is the first prerequisite (done); the one-page mental-model document
+is the open one.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
@@ -806,9 +880,16 @@ mutates: the arm stays someone else's.
   integer is a hand-asserted compatibility claim nobody checks — the lock diff is the
   same information, uncompressed and verifiable. Consumers pin a release tag and read
   exactly which laws moved between any two of them.
-- **Publish** when ready: `docs/publishing.md` has the dependency-ordered sequence;
-  all four names (`boundary-spec`, `boundary-spec-macros`, `spec-lock`,
-  `boundary-enforce`) were verified unclaimed on crates.io on 2026-07-02.
+- ~~**Publish** when ready~~ — PUBLISHED 2026-07-07: all four crates
+  (`spec-lock`, `boundary-spec-macros`, `boundary-enforce`, `boundary-spec`) live
+  on crates.io at 0.1.0, in the runbook's dependency order. The root crate's
+  registry verify build resolved the three from the LIVE index and ran every
+  enforcement pass over the packaged tree — the real consumer path, green at
+  publish time. Still owed: a `v0.1.0` tag at the published tree (the publish
+  session's push scope was branch-only, so tags could not leave it) —
+  `git tag v0.1.0 <sha of "Publish-readiness: version the spec-lock
+  build-dependency"> && git push origin v0.1.0`; the tag sits outside
+  `release.sh`'s `v2*` CalVer glob, so the two tag families cannot collide.
 - **Morphism downstream**: the fixture exercises Construction/Branch/Guarded;
   the fourth edge shape is honestly unexercised downstream.
 - **MSRV**: unpinned; verify and add `rust-version` after first publish.

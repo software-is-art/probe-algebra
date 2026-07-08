@@ -48,6 +48,9 @@ pub enum Ratification {
     World,
     /// A shapes.spec move: the law LANGUAGE itself grew or changed.
     Vocabulary,
+    /// The perimeter moved: the declared repository-settings floor (branch rules,
+    /// merge methods, vulnerability reporting) or its apply-able ruleset changed.
+    Perimeter,
     /// A CONSUMER-registered lock class moved: the class and its ratification question
     /// are the consumer's own data (see [`Agenda::of_with`]) — the routing machinery is
     /// generic; the class table is not upstream's to own.
@@ -91,6 +94,11 @@ impl Ratification {
             }
             Ratification::Vocabulary => {
                 "the shape catalog moved — the law language itself changed.".to_string()
+            }
+            Ratification::Perimeter => {
+                "the perimeter moved — the declared settings floor changed; re-apply \
+                 spec/perimeter.ruleset.json and re-check the live settings against it."
+                    .to_string()
             }
             Ratification::Custom { class, question } => format!("`{class}`: {question}"),
         }
@@ -321,6 +329,8 @@ fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
             Ratification::Pipeline
         } else if file == "tiers.spec" {
             Ratification::Partition
+        } else if file == "perimeter.spec" || file == "perimeter.ruleset.json" {
+            Ratification::Perimeter
         } else if file == "shapes.spec" {
             Ratification::Vocabulary
         } else if file.ends_with(".mutation.spec") {
@@ -438,6 +448,27 @@ mod probes {
             !text.contains("read for sense"),
             "an empty prose list renders no prose section"
         );
+    }
+
+    /// BOTH perimeter artifacts route to the Perimeter class — each ALONE (the spec
+    /// would otherwise misfile into the `.spec` law catch-all, the ruleset would
+    /// refuse as unknown; an `&&` in the arm would silence both), and together they
+    /// deduplicate to one ratification question.
+    #[test]
+    fn the_perimeter_artifacts_route_to_their_own_class() {
+        for path in ["spec/perimeter.spec", "spec/perimeter.ruleset.json"] {
+            let agenda = Agenda::of([path]).expect("a known lock class");
+            assert_eq!(
+                agenda.ratifications,
+                vec![Ratification::Perimeter],
+                "{path}"
+            );
+        }
+        let both = Agenda::of(["spec/perimeter.spec", "spec/perimeter.ruleset.json"]).unwrap();
+        assert_eq!(both.ratifications, vec![Ratification::Perimeter]);
+        assert!(Ratification::Perimeter
+            .question()
+            .contains("perimeter moved"));
     }
 
     /// An unknown spec-directory artifact REFUSES — a new lock class must be taught to

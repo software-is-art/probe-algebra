@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 # The library under consumption. A real consumer writes
-# `boundary-spec = { git = "https://github.com/software-is-art/probe-algebra" }`.
+# `boundary-spec = "0.1"` (published on crates.io).
 boundary-spec = { path = ".." }
 
 [dev-dependencies]

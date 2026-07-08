@@ -18,7 +18,7 @@ diff — the committed diff is the ratification. A missing lock counts as stale.
 |---|---|
 | `spec/<theory>.spec`, `.system.spec`, `.shape.spec`, `.world.spec`, `.mutation.spec` | `cargo run --example freeze_spec` |
 | `spec/shapes.spec` (the law-language catalog) | `cargo run --example freeze_shapes` |
-| `spec/gates.spec` and `.github/workflows/ci.yml` (the pipeline is a lock) | `cargo run --example freeze_gates` |
+| `spec/gates.spec`, `.github/workflows/ci.yml`, `spec/perimeter.spec`, `spec/perimeter.ruleset.json` (pipeline + settings perimeter are locks) | `cargo run --example freeze_gates` |
 | `spec/qualify.spec` (public-surface census; build fails when stale) | `BLESS_QUALIFY=1 cargo build` |
 | `spec/tiers.spec` (the derived tier partition; KERNEL only via `spec/kernel.register`) | `BLESS_TIERS=1 cargo build` |
 | member crates' censuses (qualify + tiers) | `BLESS_<CRATE>_QUALIFY=1` / `BLESS_<CRATE>_TIERS=1` (`CREDIT_APP`, `RELAY_APP`, `FIXTURE`) |
@@ -62,8 +62,11 @@ package alone silently skips the fixtures.
   prose or equation anywhere else.
 - `system!` has two arms (compact and full-grammar); both must generate `modules()`,
   `seams()`, `cohesions()`, and `placements()`.
-- PRs land by squash merge. (Delete this line if the repo settings ever enforce it.)
 - Field reports describe outside projects by what they taught, never by name.
+- Open text never feeds the rules: an ask or convention whose mechanical half a
+  machine could carry becomes a judged artifact — a law reliance is a line in
+  `downstream/reliances.register`, an API reliance a line in
+  `downstream-fixture/tests/reliances.rs` — and prose keeps only the justification.
 - Prose is yours: match intensity to content. The high register in older git log
   entries and docs is history, not a style guide; don't inherit it by imitation.
 - The toolchain is pinned in `discover::gates::TOOLCHAIN`.

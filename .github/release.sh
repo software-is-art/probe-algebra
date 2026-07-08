@@ -60,3 +60,29 @@ git tag "${tag}"
 git push origin "${tag}"
 gh release create "${tag}" --title "${tag} — certified tree ${sha}" --notes-file "${notes}"
 echo "released ${tag} (${sha})"
+
+# crates.io rides the same event: any publishable crate whose manifest version is not
+# yet on the registry publishes now, in dependency order. IDEMPOTENT by construction —
+# an already-published version is skipped, so every certification is safe to re-run and
+# a release with no version bump publishes nothing. A version bump is therefore a
+# ratified DECISION (a manifest diff, reviewed like anything else; the semver signal is
+# spec/shapes.spec per docs/publishing.md); shipping it is machinery. A publish failure
+# fails the job loudly — a certified bump that cannot ship is a real error — but a
+# missing token skips quietly (forks and checkouts without the secret still release).
+if [ -n "${CARGO_REGISTRY_TOKEN:-}" ]; then
+  for crate in spec-lock boundary-spec-macros boundary-enforce boundary-spec probe-hook; do
+    version=$(cargo metadata --no-deps --format-version 1 |
+      python3 -c "import json,sys; print(next(p['version'] for p in json.load(sys.stdin)['packages'] if p['name']=='${crate}'))")
+    prefix2=$(printf '%s' "${crate}" | cut -c1-2)
+    prefix4=$(printf '%s' "${crate}" | cut -c3-4)
+    if curl -sSf "https://index.crates.io/${prefix2}/${prefix4}/${crate}" 2>/dev/null |
+      grep -q "\"vers\":\"${version}\""; then
+      echo "crates.io: ${crate} ${version} already published — skipping"
+    else
+      echo "crates.io: publishing ${crate} ${version}"
+      cargo publish -p "${crate}"
+    fi
+  done
+else
+  echo "crates.io: CARGO_REGISTRY_TOKEN absent — GitHub release only"
+fi

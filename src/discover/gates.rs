@@ -49,6 +49,12 @@ pub const TOOLCHAIN: &str = "1.94.1";
 /// The weekly full-sweep schedule (Mondays 04:00 UTC) — the periodic whole-crate guarantee.
 pub const FULL_SWEEP_CRON: &str = "0 4 * * 1";
 
+/// The every-change job's display name — the status-check CONTEXT a branch ruleset
+/// requires. One constant shared by the workflow renders and the perimeter declaration,
+/// so renaming the job drifts the perimeter lock in the same diff: a rename can never
+/// silently unprotect the default branch.
+pub const CHECK_JOB: &str = "fmt + clippy + test";
+
 /// How many parallel shards the weekly full sweep splits into. The whole workspace is
 /// ~1,300 mutants; serially that is ~5½ hours — past what a single hosted runner reliably
 /// survives (the sweep on PR #26's merge died at 5h16m with the gate step still running).
@@ -111,6 +117,20 @@ impl Gate {
     pub fn command_line(&self) -> String {
         self.command.join(" ")
     }
+}
+
+/// A dogfood gate's RENDERED job name — the status-check CONTEXT GitHub reports (the
+/// `mutation (...)` registry sugar unwrapped into the `dogfood (...)` display form).
+/// Shared by the workflow render and [`GateRegistry::pr_checks`], so the perimeter's
+/// required contexts and the executed job names are one computation, never two.
+fn check_context(gate: &Gate) -> String {
+    format!(
+        "dogfood ({})",
+        gate.name
+            .strip_prefix("mutation (")
+            .and_then(|s| s.strip_suffix(')'))
+            .unwrap_or(gate.name)
+    )
 }
 
 /// The registry inventory's stanza list — one stanza per gate (name, cadence, capability,
@@ -612,7 +632,37 @@ impl GateRegistry {
                 effect: Capability::Effectful,
                 sharded: false,
             },
+            Gate {
+                name: "perimeter (settings drift)",
+                verifies: "the LIVE repository perimeter — branch rules on the default \
+                           branch, merge methods, private vulnerability reporting — still \
+                           satisfies the declared floor (spec/perimeter.spec). Settings \
+                           are configuration that drifts silently and that no one \
+                           re-audits; this gate reads them back on the weekly clock and \
+                           refuses by name. READ-ONLY: the write stays human — a \
+                           privilege is ratified, never self-served",
+                command: &[".github/perimeter.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Effectful,
+                sharded: false,
+            },
         ]
+    }
+
+    /// The status-check contexts a PR must pass before merging — the every-change job
+    /// plus each per-diff gate, by their RENDERED job names. The perimeter declaration
+    /// consumes this, which is the point of deriving it: a gate added, renamed, or
+    /// re-cadenced here moves `spec/perimeter.spec` in the same diff, and the weekly
+    /// read-back then holds the live branch rules to it.
+    pub fn pr_checks() -> Vec<String> {
+        let mut checks = vec![CHECK_JOB.to_string()];
+        checks.extend(
+            Self::declared()
+                .iter()
+                .filter(|g| g.cadence == Cadence::PerDiff)
+                .map(check_context),
+        );
+        checks
     }
 
     /// The human-readable inventory — what `spec/gates.spec` locks: one stanza per gate
@@ -667,6 +717,7 @@ impl GateRegistry {
                     "      - name: release — the certified tree publishes itself\n\
                      \x20       env:\n\
                      \x20         GH_TOKEN: ${{{{ github.token }}}}\n\
+                     \x20         CARGO_REGISTRY_TOKEN: ${{{{ secrets.CARGO_REGISTRY_TOKEN }}}}\n\
                      \x20       run: {}\n",
                     gate.command_line()
                 ));
@@ -679,6 +730,12 @@ impl GateRegistry {
              # the diff. The registry is the single source for the commands, cadences, the\n\
              # toolchain pin, and the sweep schedule; `spec/gates.spec` carries the promises.\n\
              name: ci\n\
+             \n\
+             # Default-deny at the top; the two tag-advance/release jobs elevate to\n\
+             # `contents: write` explicitly. (Scorecard's token-permissions criterion,\n\
+             # and simply the capability-honesty rule applied to CI itself.)\n\
+             permissions:\n\
+             {sp2}contents: read\n\
              \n\
              # Dogfood everywhere, all the time. The fast gates run on every push and PR; the\n\
              # mutation gate — the method's own \"the real test\" — runs per-change on PRs (only\n\
@@ -730,7 +787,7 @@ impl GateRegistry {
                  \x20 # probe cannot kill fails the gate; pre-existing documented equivalents are\n\
                  \x20 # not in the diff, so they never re-trip it.\n\
                  \x20 mutants-diff:\n\
-                 \x20   name: dogfood (changed lines)\n\
+                 \x20   name: {context}\n\
                  \x20   if: github.event_name == 'pull_request'\n\
                  \x20   runs-on: ubuntu-latest\n\
                  \x20   steps:\n\
@@ -746,7 +803,8 @@ impl GateRegistry {
                  \x20       run: |\n\
                  \x20         git diff \"origin/${{{{ github.base_ref }}}}...HEAD\" > pr.diff\n\
                  \x20         {}\n",
-                gate.command_line()
+                gate.command_line(),
+                context = check_context(gate)
             ));
         }
         for gate in &default_branch {
@@ -812,7 +870,10 @@ impl GateRegistry {
                 }
             }
         };
-        for gate in weekly.iter().filter(|g| !g.sharded) {
+        for gate in weekly
+            .iter()
+            .filter(|g| !g.sharded && g.effect != Capability::Effectful)
+        {
             out.push_str(&format!(
                 "\n  # Weekly companion gate: one plain job on the weekly clock, feeding the\n\
                  \x20 # same countersign — see the gate registry for what it verifies.\n\
@@ -833,7 +894,40 @@ impl GateRegistry {
                 label = companion_label(gate),
             ));
         }
-        let weekly_needs: Vec<String> = weekly.iter().map(|g| weekly_job_id(g)).collect();
+        // WORLD gates: weekly Effectful reads of state the tree cannot contain (the
+        // repository perimeter). They ride the weekly clock but never feed the
+        // countersign — a world fact is not evidence about the TREE, and the certified
+        // tag must never wait on someone's settings page. GH_TOKEN is the workflow's
+        // ordinary read token; the world gates only ever read.
+        for gate in weekly
+            .iter()
+            .filter(|g| !g.sharded && g.effect == Capability::Effectful)
+        {
+            out.push_str(&format!(
+                "\n  # World gate: read state the tree cannot contain, hold it to the declared\n\
+                 \x20 # floor — see the gate registry for what it verifies. Not a countersign\n\
+                 \x20 # input: a world fact is not evidence about the tree.\n\
+                 \x20 world-{slug}:\n\
+                 \x20   name: {label}\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   env:\n\
+                 \x20     GH_TOKEN: ${{{{ github.token }}}}\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - run: {}\n",
+                gate.command_line(),
+                slug = job_slug(gate.name),
+                label = gate.name,
+            ));
+        }
+        let weekly_needs: Vec<String> = weekly
+            .iter()
+            .filter(|g| g.effect != Capability::Effectful)
+            .map(|g| weekly_job_id(g))
+            .collect();
         for gate in weekly.iter().filter(|g| g.sharded) {
             let shards: Vec<String> = (0..FULL_SWEEP_SHARDS).map(|s| s.to_string()).collect();
             out.push_str(&format!(
@@ -959,23 +1053,25 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: eleven gates — three every-change, one per-diff,
-    /// one default-branch incremental, five weekly (the sharded whole-tree sweep plus
-    /// four member/corpus companions), and the release gate on the certification
-    /// cadence — and every declared command reappears verbatim in the rendered
-    /// workflow (nothing declared can fall out of execution). Every gate is Pure
-    /// except exactly one: the release is the pipeline's first EFFECTFUL gate, wearing
-    /// the tag the registry reserved for it.
+    /// The registry's SHAPE is pinned: twelve gates — three every-change, one per-diff,
+    /// one default-branch incremental, six weekly (the sharded whole-tree sweep, four
+    /// member/corpus companions, and the perimeter world gate), and the release gate on
+    /// the certification cadence — and every declared command reappears verbatim in the
+    /// rendered workflow (nothing declared can fall out of execution). Every gate is
+    /// Pure except exactly two, each wearing the EFFECTFUL tag for a different reason:
+    /// the release WRITES the world (tags, a GitHub release, crates.io), and the
+    /// perimeter READS state the tree cannot contain (the live repository settings) —
+    /// which is also why the perimeter never feeds the countersign.
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 11);
+        assert_eq!(gates.len(), 12);
         assert_eq!(
             gates
                 .iter()
                 .filter(|g| g.cadence == Cadence::Weekly)
                 .count(),
-            5
+            6
         );
         assert_eq!(
             gates.iter().filter(|g| g.sharded).count(),
@@ -993,9 +1089,28 @@ mod tests {
             .iter()
             .filter(|g| g.effect == Capability::Effectful)
             .collect();
-        assert_eq!(effectful.len(), 1, "the release is the one effectful gate");
+        assert_eq!(
+            effectful.len(),
+            2,
+            "the release (a world write) and the perimeter (a world read)"
+        );
         assert_eq!(effectful[0].name, "release (certified tree)");
         assert_eq!(effectful[0].cadence, Cadence::OnCertify);
+        assert_eq!(effectful[1].name, "perimeter (settings drift)");
+        assert_eq!(effectful[1].cadence, Cadence::Weekly);
+
+        // the world gate rides the weekly clock but is NOT a countersign input, and its
+        // job carries the read token: a world fact is not evidence about the tree.
+        let workflow = GateRegistry::render_workflow();
+        assert!(
+            workflow.contains("world-perimeter-settings-drift:"),
+            "{workflow}"
+        );
+        assert!(
+            !workflow.contains("world-perimeter-settings-drift,")
+                && !workflow.contains(", world-perimeter-settings-drift"),
+            "the perimeter must never appear in the countersign's needs list"
+        );
 
         let workflow = GateRegistry::render_workflow();
         for gate in &gates {

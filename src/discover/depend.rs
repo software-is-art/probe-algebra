@@ -35,6 +35,8 @@
 //!     refuses by equation, naming the reliance, before the ratification diff lands:
 //!     self-judgment makes declared reliances un-droppable.
 
+use std::path::Path;
+
 use super::Spec;
 
 /// One declared reliance: a theory's law, by its rendered equation (the stable key —
@@ -111,6 +113,65 @@ impl Dependence {
             theory: theory.to_string(),
             verdicts,
         })
+    }
+}
+
+impl Dependence {
+    /// Judge a DOWNSTREAM-RELIANCE register against this repo's own committed locks —
+    /// the owner-side receiving surface that retires open text as the ask channel.
+    /// Each entry is `<theory> | <equation>: <consumer> — <why>` (the `Register`
+    /// grammar; the key must carry ` | `, and a missing register is honestly empty).
+    /// The judgment is the SELF-JUDGMENT form — the committed lock on both sides — so
+    /// INTACT is the only passing standing and the protection is the refusal path: a
+    /// re-bless that drops a relied-on law refuses BY NAME — equation, consumer, and
+    /// why — before the release ships, instead of breaking a pin downstream a day
+    /// later. Returns the held reliances as `(key, justification)` for rendering.
+    ///
+    /// Honest frame: this judges DECLARED reliances only (it cannot know what a
+    /// consumer forgot to declare), and surface (API) reliances are the compiler's to
+    /// judge — one line each in `downstream-fixture/tests/reliances.rs`.
+    ///
+    /// Capability: Effectful — reads the register and the committed spec locks.
+    pub fn judge_register(
+        register: &spec_lock::Register,
+        spec_dir: &Path,
+    ) -> Result<Vec<(String, String)>, String> {
+        let mut held = Vec::new();
+        for (key, justification) in register.entries()? {
+            let Some((theory, equation)) = key.split_once(" | ") else {
+                return Err(format!(
+                    "downstream reliance `{key}` refused: the key grammar is \
+                     `<theory> | <equation>` — without the ` | ` there is nothing \
+                     to judge"
+                ));
+            };
+            let (theory, equation) = (theory.trim(), equation.trim());
+            // the theory names a lock FILE, so it must stay inside the spec directory:
+            // a name carrying path syntax is refused, never resolved — the register is
+            // reviewed data, but the judge does not lean on that.
+            if theory.contains('/') || theory.contains('\\') || theory.contains("..") {
+                return Err(format!(
+                    "downstream reliance `{key}` refused: `{theory}` is not a theory \
+                     name — path syntax cannot name a lock"
+                ));
+            }
+            let slug: String = theory
+                .chars()
+                .map(|c| if c == ' ' { '-' } else { c })
+                .collect();
+            let lock_path = spec_dir.join(format!("{slug}.spec"));
+            let text = std::fs::read_to_string(&lock_path).map_err(|e| {
+                format!(
+                    "downstream reliance on `{equation}` refused: no committed lock \
+                     for `{theory}` ({e}) — declared by {justification}"
+                )
+            })?;
+            let deps = vec![Dependence::on(theory, equation)];
+            Dependence::judge(theory, &deps, &text, &text)
+                .map_err(|inner| format!("{inner} — declared by {justification}"))?;
+            held.push((key, justification));
+        }
+        Ok(held)
     }
 }
 
@@ -280,6 +341,101 @@ mod probes {
         let err = Dependence::judge("router", &deps, NEW, NEW).unwrap_err();
         assert!(err.contains("(a or a) = a"), "{err}");
         assert!(err.contains("never existed"), "{err}");
+    }
+
+    /// THE RECEIVING SURFACE for downstream asks, live: every reliance declared in
+    /// `downstream/reliances.register` HOLDS in this repo's committed locks. A re-bless
+    /// that drops a relied-on law fails HERE, naming the equation, the consumer, and
+    /// the why — before the release ships. An empty register passes honestly: the
+    /// surface exists; consumers author their own lines by PR.
+    #[test]
+    fn the_downstream_reliance_register_holds() {
+        let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let register = spec_lock::Register {
+            name: "downstream reliances".to_string(),
+            path: manifest.join("downstream/reliances.register"),
+        };
+        let held = Dependence::judge_register(&register, &manifest.join("spec"))
+            .expect("every declared downstream reliance holds in the committed locks");
+        // render the held set so a passing run still shows what is being defended.
+        for (key, justification) in &held {
+            println!("held: {key} ({justification})");
+        }
+    }
+
+    /// The register judge's refusal paths, on fixtures: a held reliance passes and is
+    /// returned; a dropped law refuses naming equation AND consumer; a key without the
+    /// ` | ` grammar refuses; a missing register is honestly empty.
+    #[test]
+    fn the_register_judge_refuses_by_name() {
+        let root = std::env::temp_dir().join(format!("depend-register-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("spec")).unwrap();
+        std::fs::write(root.join("spec/router.spec"), OLD).unwrap();
+        let register = |name: &str, text: &str| {
+            let path = root.join(name);
+            std::fs::write(&path, text).unwrap();
+            spec_lock::Register {
+                name: "downstream reliances".to_string(),
+                path,
+            }
+        };
+
+        // a held reliance passes, and the held set carries the justification through:
+        let good = register(
+            "good.register",
+            "router | (a or a) = a: a production consumer — the retry loop stands on idempotence\n",
+        );
+        let held = Dependence::judge_register(&good, &root.join("spec")).expect("holds");
+        assert_eq!(held.len(), 1);
+        assert!(held[0].1.contains("retry loop"));
+
+        // a reliance the lock no longer holds refuses, naming equation and consumer:
+        let dropped = register(
+            "dropped.register",
+            "router | (a or b) = (b or a): a production consumer — assumed commutativity\n",
+        );
+        let err = Dependence::judge_register(&dropped, &root.join("spec")).unwrap_err();
+        assert!(err.contains("(a or b) = (b or a)"), "{err}");
+        assert!(err.contains("a production consumer"), "{err}");
+
+        // a key without the ` | ` grammar has nothing to judge — refused, not skipped:
+        let malformed = register("malformed.register", "router idempotence: someone — why\n");
+        let err = Dependence::judge_register(&malformed, &root.join("spec")).unwrap_err();
+        assert!(err.contains("` | `"), "{err}");
+
+        // a theory name carrying path syntax is refused, never resolved — the lock
+        // lookup must not be steerable outside the spec directory. Each syntax REFUSES
+        // ALONE (slash, backslash, dot-dot): the guard is a disjunction, and a probe
+        // that only ever combines them would let `||` quietly become `&&`.
+        for bad in [
+            "../outside | (a or a) = a: someone — a path is not a theory\n",
+            "up..sneak | (a or a) = a: someone — dot-dot alone must refuse\n",
+            "sub/theory | (a or a) = a: someone — a slash alone must refuse\n",
+            "sub\\theory | (a or a) = a: someone — a backslash alone must refuse\n",
+        ] {
+            let traversal = register("traversal.register", bad);
+            let err = Dependence::judge_register(&traversal, &root.join("spec")).unwrap_err();
+            assert!(err.contains("path syntax cannot name a lock"), "{err}");
+        }
+
+        // a reliance on a theory with no committed lock refuses by path:
+        let unknown = register(
+            "unknown.register",
+            "ghost theory | (x ⊕ y) = (y ⊕ x): someone — relies on a lock that never froze\n",
+        );
+        let err = Dependence::judge_register(&unknown, &root.join("spec")).unwrap_err();
+        assert!(err.contains("no committed lock"), "{err}");
+
+        // a missing register is the empty register — no declared reliances, honestly none:
+        let absent = spec_lock::Register {
+            name: "downstream reliances".to_string(),
+            path: root.join("absent.register"),
+        };
+        assert_eq!(
+            Dependence::judge_register(&absent, &root.join("spec")).expect("empty"),
+            vec![]
+        );
     }
 
     /// The judgment reads REAL frozen locks: every law in this repo's committed router
