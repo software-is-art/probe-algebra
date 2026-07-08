@@ -1116,7 +1116,20 @@ field reports — bricks first (a hook, a register, a judge), worldview later. T
 crates.io publish is the first prerequisite (done); the one-page mental-model document
 is the open one.
 
-## Candidate: sensitivity without mutation — the arbitrary-oracle partition
+## Candidate: the sweep discovers, the oracle proves sensitivity
+
+The whole candidate in one line: **the sweep discovers the laws, the oracle proves they are
+sensitive.** What a consumer is handed is a GUARANTEE, stated the way they would hear it:
+swap this module's implementation for any other with the same interface, and a law refuses
+the swap — we catch it. The method's honesty bounds that promise exactly, and the bound is
+not a footnote but a COMMITTED artifact: the swap is caught wherever it differs from the
+real behaviour at a grid coordinate some law pins; it is missed only where the difference
+lands entirely in a ratified DEGREE OF FREEDOM (a named dent survivor — the coordinate no
+law constrains) or is a SYMMETRY of the spec (a coordinated change every law tolerates —
+meaning pinned up to isomorphism, the theoretical ceiling). Both exception classes already
+live in `spec/<theory>.mutation.spec`, enumerated and ratified. So the guarantee ships with
+its own fine print: green is evidence over the enumerable grid, the survivors ARE the list
+of swaps we would miss, and there is nowhere else for one to hide.
 
 Deriving a consumer's spec is BUILT: discovery runs their code, `spec-lock` freezes the
 laws/census, genesis scaffolds the suite, drift is gated. That half needs no new brick.
@@ -1138,13 +1151,37 @@ constructed-to-violate-L oracle is DEAF to L — named, no litigation, because t
 carries its ground-truth label BY CONSTRUCTION. That is the move that dissolves the
 equivalent-mutant problem: you generate against the spec boundary, not the code's
 neighbourhood, so a behaviour is admitted or forbidden by definition, never an unknown to
-ratify. And because the oracle is data judged by the ONE interpreter (`discover::floor` /
-`discover::relation`), never code inside the consumer's module, it "could be compiled and
-run anywhere" — no per-mutant build, no coverage map, no process fan-out, no attribute.
-That is precisely why it can be a PR gate without the schemata machinery. The in-process
-theory layer (`discover::mutation`, perturbed operator tables judged by re-running
-discovery) is the theory-scale ancestor of this move; the candidate is its
-arbitrary-behaviour generalisation, packaged as a consumer entry point.
+ratify. And because the oracle is data judged by the frozen spec (`Engine::check` over a theory
+carrier), never code inside the consumer's module, it "could be compiled and run
+anywhere" — no per-mutant build, no coverage map, no process fan-out, no attribute. That
+is precisely why it can be a PR gate without the schemata machinery.
+
+The core is not a future generalisation — it is BUILT and rides every `cargo test`:
+`discover::mutation` already IS this. A mutant there is a perturbed operator TABLE (a
+`Deaf` constant, or a one-point `Dent` returning a wrong value at one grid coordinate) —
+a behaviour as DATA, labelled by construction — installed over the real evaluator and
+judged by `Engine::check` over the laws that name the operator, the real `fn` never
+touched. A surviving dent is the insensitive coordinate: the input no ratified law pins.
+So "generate a behaviour constructed to violate a law, check the spec partitions it" is
+the dent sweep, running today for every declared theory (fabric's twenty-two, the bridge,
+the protocol). Its reach is EXACTLY discovery's reach, because it is discovery's own
+judgment pointed at generated tables: wherever a carrier is enumerable (`#[derive(Shaped)]`
+gives a grid and a function becomes a finite table) it works, and where the carrier is not
+enumerable there is no table, no discovery, and no oracle — the same boundary discovery
+has always had, not a new one.
+
+That reach reframes the two consumer cases. The NON-Rust encoding — `theory!`,
+`protocol!`, `bridge`, `fabric` — is already done, because the declaration bounds the
+carrier and the sweep runs on it now. The NATIVE-Rust case is where the one gap sits, and
+it is narrow: a plain module's public functions over `Shaped` types already carry
+everything the `Theory` trait needs (sorts are the distinct `Shaped` types in the
+signatures, `inhabitants` is the grid, `observe` is the value's own observation, operators
+are the functions with their `eval`), so the missing brick is an AUTO-LIFT — synthesize the
+`Theory` impl from the inferred module surface — after which discovery and the dent / deaf
+sweep run with zero declaration and the consumer has written only types and Rust. Minting a
+table that fails one NAMED law (the inverse of `check`) is a reporting refinement on top,
+not a missing capability: the blanket dent sweep already finds every insensitive
+coordinate.
 
 Honest frame, the method's own and unsoftened — but NOT the two-regimes hedge it is tempting
 to reach for. There is no separate "implementation neighbourhood" that mutation keeps
@@ -1166,24 +1203,27 @@ generation-tested, not mutated (`discover::floor` / `discover::relation` are GEN
 against), so it is not a standing mutation dependency. Retiring schemata is on the table,
 not deferred by a coverage argument.
 
-The consumer writes NOTHING new for this — the same zero-annotation posture the rest of
-the method already holds. A Rust consumer's public surface is auto-inferred (the qualify
-census, no annotations) and the behaviour grid comes from their types; they define types
-and write Rust, and the oracle is minted over that inferred surface. `theory!`/`system!`
-enters only for the OTHER case — when they are using probe-algebra to encode something that
-is not native Rust (a workflow's states, an infra graph, a foreign prover's tables) — where
-the declaration is the surface because there is no Rust surface to infer. The oracle move is
-the same in both: generate an alternative behaviour over the carrier, labelled by
-construction, and check the surface's probes partition it.
+The consumer writes NOTHING new — the zero-annotation posture the rest of the method
+already holds: the public surface is auto-inferred (the qualify census), the grid comes
+from their types, discovery finds the laws, and the sweep judges generated tables against
+them. So the remaining work is one brick and a few genuinely-open questions, no longer the
+whole engine:
 
-Open design pieces, none built: the arbitrary-oracle representation and its
-straddle-sampling economics (how many oracles, sampled deterministically to bracket each
-law's boundary — the splitmix64 discipline the warrant sampler already uses); how a
-constructed-to-violate-L oracle is minted from a frozen law (the inverse of the check the
-interpreter already runs); and whether the consumer entry is a library call or a
-genesis-emitted gate riding `cargo test` like the internal sweeps. This is the single
-change that most moves the consumer experience: it takes the sensitivity guarantee we keep
-for ourselves and makes it a thing a downstream crate runs on its own PRs, with no mutation
+- **The brick: auto-lift** — synthesize the `Theory` impl from a plain module's inferred
+  public surface (functions over `Shaped` types → operators; the `Shaped` types → sorts and
+  the grid). This is the whole distance between "built for our theories" and "a Rust
+  consumer runs it on their own PRs having written only types and Rust."
+- **Open: the enumerability edge** — the honest limit, inherited from discovery: a public
+  function over a non-`Shaped` carrier has no table to lift, so auto-lift must name what it
+  skips (the census move) rather than silently cover a subset. How far the common Rust
+  shapes reach before that edge is the thing to measure first.
+- **Open: the entry point** — a library call the consumer wires into their suite, or a
+  genesis-emitted gate riding `cargo test` like the internal sweeps.
+
+Not open, contrary to an earlier draft: the oracle representation (a perturbed table) and
+minting a violate-the-law oracle (the dent sweep) are BUILT. This is the single change that
+most moves the consumer experience — it takes the sensitivity guarantee we keep for
+ourselves and makes it a thing a downstream crate runs on its own PRs, with no mutation
 tooling in its tree at all.
 
 ## Standing follow-ups
