@@ -280,8 +280,12 @@ impl Substrate {
 
         match (&live.tags, &live.ancestry) {
             (Some(tags), Some(ancestry)) => {
+                // the tags ⋈ ancestry left join, assembled once — the relational
+                // primitive the flat floor could not express (discover::relation).
+                let joined = crate::discover::relation::Joined::left(tags, ancestry);
+
                 for law in &self.tags {
-                    let matching: Vec<&String> = tags.iter().filter(|t| law.matches(t)).collect();
+                    let matching = joined.matching(|t| law.matches(t));
                     if matching.is_empty() {
                         if law.required {
                             violations.push(format!(
@@ -296,29 +300,28 @@ impl Substrate {
                         }
                         continue;
                     }
-                    for tag in matching {
-                        match ancestry.iter().find(|(t, _)| t == tag) {
-                            None => violations.push(format!(
-                                "the ancestry of tag `{tag}` could not be READ — \
-                                 refused by name, never assumed on the certified line"
-                            )),
-                            Some((_, true)) => {
+                    for (tag, _) in matching {
+                        match joined.annotation(tag) {
+                            Some(Some(true)) => {
                                 held.push(format!("tag `{tag}` is on the certified line"))
                             }
-                            Some((_, false)) => violations.push(format!(
+                            Some(Some(false)) => violations.push(format!(
                                 "tag `{tag}` is not on the default branch — its declared \
                                  meaning names a certified default-branch tree, and a \
                                  stray tag claims one it never earned"
+                            )),
+                            _ => violations.push(format!(
+                                "the ancestry of tag `{tag}` could not be READ — \
+                                 refused by name, never assumed on the certified line"
                             )),
                         }
                     }
                 }
 
-                // the publish-marker law, instances DERIVED: every version the index
-                // reports published demands its `v<version>` tag on the certified
-                // line. The declaration names no version, so a new publish extends
-                // the judgment with no edit — and no declared prose can go stale
-                // against the registry.
+                // the publish-marker law, instances DERIVED from the live index via the
+                // derive-then-judge typestate: every published version demands its
+                // `v<version>` tag on the certified line. A new publish extends the
+                // judgment with no declaration edit; no declared prose can go stale.
                 match &live.published_versions {
                     None => violations.push(format!(
                         "the published versions of `{}` could not be READ from the \
@@ -326,9 +329,10 @@ impl Substrate {
                         self.publish_marker_crate
                     )),
                     Some(versions) => {
-                        for version in versions {
-                            let marker = format!("v{version}");
-                            if !tags.contains(&marker) {
+                        let markers =
+                            crate::discover::relation::Requirements::awaiting().derive(versions);
+                        for (marker, version) in markers.members().iter().zip(versions) {
+                            if !joined.has(marker) {
                                 violations.push(format!(
                                     "tag `{marker}` does not exist, but `{}` {version} \
                                      is on crates.io — every published version marks \
@@ -339,20 +343,20 @@ impl Substrate {
                                 ));
                                 continue;
                             }
-                            match ancestry.iter().find(|(t, _)| t == &marker) {
-                                None => violations.push(format!(
-                                    "the ancestry of tag `{marker}` could not be READ — \
-                                     refused by name, never assumed on the certified line"
-                                )),
-                                Some((_, true)) => held.push(format!(
+                            match joined.annotation(marker) {
+                                Some(Some(true)) => held.push(format!(
                                     "tag `{marker}` marks published version {version} \
                                      on the certified line"
                                 )),
-                                Some((_, false)) => violations.push(format!(
+                                Some(Some(false)) => violations.push(format!(
                                     "tag `{marker}` is not on the default branch — a \
                                      publish marker names the certified tree that \
                                      shipped, and a stray one claims a tree it never \
                                      earned"
+                                )),
+                                _ => violations.push(format!(
+                                    "the ancestry of tag `{marker}` could not be READ — \
+                                     refused by name, never assumed on the certified line"
                                 )),
                             }
                         }
