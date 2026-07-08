@@ -31,6 +31,7 @@ pub mod derived;
 pub mod engine;
 pub mod expect;
 pub mod fabric;
+pub mod floor;
 pub mod freeze;
 pub mod gates;
 pub mod genesis;

@@ -6,7 +6,8 @@
 #
 # Format: <path relative to crate root>: <reason>
 
-src/discover/perimeter.rs: the judge is characterized by GENERATION not mutation — a bounded grid of live perimeters checked against an independent floor reference (probes::the_judge_agrees_with_the_floor_across_a_bounded_grid), plus the LiveDent drill; render/declared/ruleset are byte-pinned by the freshness and derivation probes. The pilot for judges leaving schemata (see docs/roadmap.md)
+src/discover/floor.rs: the ONE floor interpreter — not mutated, GENERATED against; every declared-floor judge routes through it, and its correctness is characterized by differential grids against each incumbent judge (probes::the_one_interpreter_reproduces_the_perimeter_judge and the judges that follow). The diversity of client grids is its coverage (see docs/roadmap.md)
+src/discover/perimeter.rs: the judge collapses to floor-data fed to discover::floor::judge — characterized by GENERATION not mutation, the one interpreter reproducing this judge across a bounded grid (probes::the_one_interpreter_reproduces_the_perimeter_judge), plus the LiveDent drill; render/declared/ruleset are byte-pinned by the freshness and derivation probes. The pilot for judges leaving schemata (see docs/roadmap.md)
 src/tests.rs: test scaffolding — the mod declaration is cfg(test) in lib.rs; nothing here ships
 src/harness.rs: probe harness — test-facing scaffolding exercised only from suites
 src/main.rs: demo binary entry — banner and I/O, no lock rests on it

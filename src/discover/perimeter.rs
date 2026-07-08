@@ -390,35 +390,63 @@ mod probes {
         }
     }
 
-    /// The floor as ONE independent reference — the judge's accept condition written
-    /// as a single conjunction instead of the imperative fact-by-fact machinery. Kept
-    /// eyeball-simple on purpose: it is the oracle the judge is differential-tested
-    /// against, so it must be obviously correct where the judge is thorough.
-    fn meets_floor(l: &LivePerimeter, d: &Perimeter) -> bool {
-        l.deletion_blocked
-            && l.force_push_blocked
-            && l.required_approvals == Some(d.required_approvals)
-            && l.merge_methods
-                .iter()
-                .all(|m| d.merge_methods.contains(&m.as_str()))
-            && d.required_checks
-                .iter()
-                .all(|c| l.required_checks.contains(c))
-            && l.private_vulnerability_reporting == Some(true)
+    /// The perimeter floor, as DATA for the one interpreter: each requirement is a fact
+    /// key and a check. This is the whole judge — no imperative fact-by-fact machinery,
+    /// just the catalog `discover::floor::judge` folds over.
+    fn perimeter_floor(d: &Perimeter) -> crate::discover::floor::Floor {
+        use crate::discover::floor::{Check, Floor, Requirement};
+        let allowed: Vec<String> = d.merge_methods.iter().map(|s| s.to_string()).collect();
+        Floor::of(vec![
+            Requirement::new("deletion", Check::True),
+            Requirement::new("force_push", Check::True),
+            Requirement::new("approvals", Check::Exactly(d.required_approvals)),
+            Requirement::new("merge_methods", Check::Within(allowed)),
+            Requirement::new("required_checks", Check::Covers(d.required_checks.clone())),
+            Requirement::new("vuln", Check::Enabled),
+        ])
     }
 
-    /// The judge, characterized by GENERATION rather than mutation. Instead of flipping
-    /// an operator in the judge's own source (schemata) and asking whether a probe
-    /// notices, enumerate a bounded GRID of live perimeters — every field ranged over a
-    /// small candidate set, the "N instantiations" made deterministic — and assert the
-    /// judge's accept/reject agrees with the independent floor reference on every one.
-    /// The thing on the other side of the module is DATA, not code: a judge whose
-    /// operators drift (a flipped `==`, a dropped fact) diverges from the reference on
-    /// some grid state, so this covers the judge's sensitivity with no `#[mutate]`, no
-    /// implementation to mutate — just the contract and a sampler.
+    /// A live perimeter, presented to the interpreter as keyed observations.
+    fn perimeter_world(
+        l: &LivePerimeter,
+    ) -> std::collections::BTreeMap<String, crate::discover::floor::Observed> {
+        use crate::discover::floor::Observed;
+        let mut w = std::collections::BTreeMap::new();
+        w.insert("deletion".to_string(), Observed::Flag(l.deletion_blocked));
+        w.insert(
+            "force_push".to_string(),
+            Observed::Flag(l.force_push_blocked),
+        );
+        w.insert(
+            "approvals".to_string(),
+            Observed::Count(l.required_approvals),
+        );
+        w.insert(
+            "merge_methods".to_string(),
+            Observed::Names(Some(l.merge_methods.clone())),
+        );
+        w.insert(
+            "required_checks".to_string(),
+            Observed::Names(Some(l.required_checks.clone())),
+        );
+        w.insert(
+            "vuln".to_string(),
+            Observed::Toggle(l.private_vulnerability_reporting),
+        );
+        w
+    }
+
+    /// The ONE interpreter, fed the perimeter floor as data, reproduces the incumbent
+    /// perimeter judge across a bounded GRID of live perimeters — so the judge collapses
+    /// to floor-data plus `discover::floor::judge`, with NOTHING hand-written on the
+    /// oracle side. The incumbent judge is the transitional oracle: agreement across the
+    /// grid certifies the interpreter, and once every judge routes through it the
+    /// incumbent is deleted. No `#[mutate]`, no restated floor — the diversity of grids
+    /// is what characterizes the one interpreter.
     #[test]
-    fn the_judge_agrees_with_the_floor_across_a_bounded_grid() {
+    fn the_one_interpreter_reproduces_the_perimeter_judge() {
         let declared = Perimeter::declared();
+        let floor = perimeter_floor(&declared);
         let checks = &declared.required_checks;
         let missing_one: Vec<String> = checks.iter().skip(1).cloned().collect();
         let bools = [true, false];
@@ -448,14 +476,14 @@ mod probes {
                                     required_checks: required_checks.clone(),
                                     private_vulnerability_reporting,
                                 };
-                                let verdict = declared.judge(&live).is_ok();
-                                let reference = meets_floor(&live, &declared);
+                                let incumbent = declared.judge(&live).is_ok();
+                                let interpreted = floor.judge(&perimeter_world(&live)).is_ok();
                                 assert_eq!(
-                                    verdict, reference,
-                                    "judge disagrees with the floor reference on {live:?}"
+                                    interpreted, incumbent,
+                                    "the interpreter disagrees with the judge on {live:?}"
                                 );
                                 count += 1;
-                                if !reference {
+                                if !incumbent {
                                     caught += 1;
                                 }
                             }
