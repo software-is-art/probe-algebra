@@ -42,6 +42,7 @@ pub mod modularize;
 pub mod mutation;
 pub mod perimeter;
 pub mod protocol;
+pub mod relation;
 pub mod residue;
 pub mod router;
 pub mod scaffold;

@@ -192,7 +192,6 @@ pub struct LiveInfra {
 
 #[crate::mutate]
 impl LiveInfra {
-
     /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
     /// the declaration exactly — no extra origins or secrets, or a widening dent stops
     /// being refusal-worthy). One dent per refusal-worthy single-fact perturbation;

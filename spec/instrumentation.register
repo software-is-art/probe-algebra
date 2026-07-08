@@ -6,7 +6,8 @@
 #
 # Format: <path relative to crate root>: <reason>
 
-src/discover/floor.rs: the ONE floor interpreter — not mutated, GENERATED against; every declared-floor judge routes through it, and its correctness is characterized by differential grids against each incumbent judge (probes::the_one_interpreter_reproduces_the_perimeter_judge and the judges that follow). The diversity of client grids is its coverage (see docs/roadmap.md)
+src/discover/floor.rs: the ONE floor interpreter — not mutated, GENERATED against; every declared-floor judge routes through it, and its correctness is characterized by the byte-pinned message probes of the judges that route through it (perimeter, infra), a fold bug under one dying under another. The diversity of client grids is its coverage (see docs/roadmap.md)
+src/discover/relation.rs: the relational primitive (the tags-ancestry left join, the derive-then-judge typestate) — like floor.rs, not mutated but GENERATED against: its own probes plus substrate's differential when it routes through (see docs/roadmap.md)
 src/discover/perimeter.rs: the judge collapses to floor-data fed to discover::floor::judge — characterized by GENERATION not mutation, the one interpreter reproducing this judge across a bounded grid (probes::the_one_interpreter_reproduces_the_perimeter_judge), plus the LiveDent drill; render/declared/ruleset are byte-pinned by the freshness and derivation probes. The pilot for judges leaving schemata (see docs/roadmap.md)
 src/tests.rs: test scaffolding — the mod declaration is cfg(test) in lib.rs; nothing here ships
 src/harness.rs: probe harness — test-facing scaffolding exercised only from suites
