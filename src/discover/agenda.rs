@@ -67,6 +67,7 @@ pub enum Ratification {
     Custom { class: String, question: String },
 }
 
+#[crate::mutate("ratification")]
 impl Ratification {
     /// The one question this ratification asks the reviewer.
     pub fn question(&self) -> String {
@@ -142,6 +143,7 @@ pub struct Agenda {
     pub machinery: Vec<String>,
 }
 
+#[crate::mutate("agenda")]
 impl Agenda {
     /// Route a changed-path list (repo-relative, e.g. `git diff --name-only`) into the
     /// review agenda. Path classification is by the repo's own artifact conventions;
@@ -263,6 +265,7 @@ impl GuardVoices {
     }
 }
 
+#[crate::mutate("agenda_render")]
 impl Agenda {
     /// The EDIT-TIME guard — the hook's second voice: move EXISTING refusals earlier,
     /// never add judgments. Two pre-fires: the one rule (an edit landing on a generated

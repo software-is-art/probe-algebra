@@ -27,6 +27,7 @@
 use super::engine::Theory;
 use super::shape::{NetSignature, Placement};
 
+#[crate::mutate("ticker")]
 impl Ticker {
     /// Extract the operator signatures from a source file's `ops { ... }` stanzas.
     ///
@@ -143,6 +144,7 @@ pub enum ShapeEvent {
     Rederived,
 }
 
+#[crate::mutate("shape_event")]
 impl ShapeEvent {
     /// The event as a ticker line.
     pub fn render(&self) -> String {
@@ -167,6 +169,7 @@ pub struct Ticker {
     previous: Option<Placement>,
 }
 
+#[crate::mutate("ticker_speak")]
 impl Ticker {
     /// A fresh ticker (the first step reports the whole shape as `Seeded`).
     pub fn new() -> Ticker {

@@ -69,6 +69,7 @@ pub struct DependenceReport {
     pub verdicts: Vec<(String, Standing)>,
 }
 
+#[crate::mutate("dependence")]
 impl Dependence {
     /// A reliance on `theory`'s law with this `equation`.
     pub fn on(theory: impl Into<String>, equation: impl Into<String>) -> Dependence {
@@ -176,6 +177,7 @@ impl Dependence {
     }
 }
 
+#[crate::mutate("dependence_report")]
 impl DependenceReport {
     /// Did every declared dependence survive intact?
     pub fn is_intact(&self) -> bool {

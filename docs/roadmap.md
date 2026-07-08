@@ -1014,7 +1014,34 @@ ratified survivor count read from the committed mutation locks, byte-stable betw
 ratifications — the agent wakes knowing how many named degrees of freedom are open
 and where the addresses are.
 
-## Candidate: retiring the source-level mutator
+## Retiring the source-level mutator: the enablers (BUILT), the retirement (staged)
+
+The two enablers landed. `#[mutate]` applies to WHOLE impl blocks (labels
+`<Type>::<method>` — coverage grows per block, not per function), and the sweep is
+COVERAGE-MAPPED: the baseline run doubles as the recording run (`SCHEMATA_RECORD`;
+nextest's one-process-per-test makes each touch-file a site→test edge list), so every
+mutant runs only the tests whose execution reaches its guard. That selection is
+EXACT, not sampled — a flip cannot change behaviour where its guard never executes —
+and a site no test reaches is a survivor before any run: unexecuted is unkillable,
+disclosed, never assumed. Measured at 70 sites (the judges, the full review router,
+the dependence judge and report, the ticker): 70 killed, 0 survivors, 0 uncovered,
+~68s end to end with sub-second marginal cost per mutant — the population can grow
+an order of magnitude and stay inside the every-change budget, two orders with
+process-level fan-out.
+
+The retirement itself is DATA-driven, in stages: (1) keep widening instrumentation
+through the cold interior (impl-level attributes make each module a one-line diff,
+each ratified in the census lock); (2) the completeness census — "every eligible
+interior function carries `#[mutate]` or a register-exempted line" — turns coverage
+from intention into a gate; (3) the engine (hot paths) needs CFG-GATED emission
+(`--features schemata` builds carry the branches, normal builds carry nothing) — the
+one remaining design piece, priced at one extra cached CI build; (4) each source-gate
+retires when the sweeps go quiet on the classes schemata covers where it covers them
+— the changed-lines PR gate first (its diff is almost always instrumented territory
+once the census gate exists), the weekly shards last. Every source-sweep survivor
+until then is a signpost naming the next function to instrument.
+
+## Candidate (superseded): retiring the source-level mutator
 
 The four layers exist to be composed, and their composition points at full
 elimination of the external mutation tool — aspirationally fast enough to be a LOCAL

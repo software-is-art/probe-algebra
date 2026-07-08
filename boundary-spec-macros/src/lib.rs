@@ -803,23 +803,37 @@ pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
     } else {
         Some(parse_macro_input!(attr as LitStr))
     };
-    // a free fn or an impl method — same signature/body shape, different item type.
+    // a free fn, an impl method, or a WHOLE impl block (every method instrumented,
+    // labelled `<Type>::<method>` — coverage grows per block, not per function).
     if let Ok(mut f) = syn::parse::<ItemFn>(item.clone()) {
         let label = label
             .map(|l| l.value())
             .unwrap_or_else(|| f.sig.ident.to_string());
         mutate_body(&label, &f.sig.output.clone(), &mut f.block);
         quote! { #f }.into()
-    } else if let Ok(mut f) = syn::parse::<syn::ImplItemFn>(item) {
+    } else if let Ok(mut f) = syn::parse::<syn::ImplItemFn>(item.clone()) {
         let label = label
             .map(|l| l.value())
             .unwrap_or_else(|| f.sig.ident.to_string());
         mutate_body(&label, &f.sig.output.clone(), &mut f.block);
         quote! { #f }.into()
+    } else if let Ok(mut block) = syn::parse::<syn::ItemImpl>(item) {
+        let type_label = label.map(|l| l.value()).unwrap_or_else(|| {
+            let ty = &block.self_ty;
+            let tokens = quote!(#ty).to_string();
+            tokens.replace(' ', "")
+        });
+        for item in &mut block.items {
+            if let syn::ImplItem::Fn(method) = item {
+                let label = format!("{type_label}::{}", method.sig.ident);
+                mutate_body(&label, &method.sig.output.clone(), &mut method.block);
+            }
+        }
+        quote! { #block }.into()
     } else {
         syn::Error::new(
             proc_macro2::Span::call_site(),
-            "#[mutate] applies to a function or method",
+            "#[mutate] applies to a function, a method, or an impl block",
         )
         .to_compile_error()
         .into()

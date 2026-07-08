@@ -41,8 +41,10 @@
 //! interactions between flips are out of scope, as they are for every mutation layer.
 
 use std::cell::RefCell;
+use std::collections::BTreeSet;
+use std::io::Write as _;
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use spec_lock::{Lock, Register};
 
@@ -68,6 +70,7 @@ impl Schemata {
     /// this is a cached `None` comparison — the instrumented functions run their
     /// original expressions.
     pub fn active(site: &'static str) -> bool {
+        Self::record(site);
         if let Some(forced) = FORCED.with(|f| *f.borrow()) {
             return forced == site;
         }
@@ -76,6 +79,44 @@ impl Schemata {
             .get_or_init(|| std::env::var("PROBE_MUTANT").ok())
             .as_deref()
             == Some(site)
+    }
+
+    /// COVERAGE recording: with `SCHEMATA_RECORD=<dir>` set, every site whose guard
+    /// executes is appended (once) to a per-process file headed by this process's
+    /// test filter (nextest runs one test per process, so the file IS the site→test
+    /// edge list). The map makes the sweep EXACT and selective: a mutant can only
+    /// change behaviour where its guard executes, so running just the covering tests
+    /// loses nothing — and a site no test reaches is a survivor before any run.
+    /// Without the variable this is one cached `None` check.
+    fn record(site: &'static str) {
+        struct Recorder {
+            file: Mutex<(std::fs::File, BTreeSet<&'static str>)>,
+        }
+        static RECORDER: OnceLock<Option<Recorder>> = OnceLock::new();
+        let recorder = RECORDER.get_or_init(|| {
+            let dir = std::env::var("SCHEMATA_RECORD").ok()?;
+            let path = PathBuf::from(dir).join(format!("{}.touch", std::process::id()));
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .ok()?;
+            // the test names in this process's argv (nextest passes the exact
+            // filter; test paths are the `::`-carrying arguments).
+            let tests: Vec<String> = std::env::args().filter(|a| a.contains("::")).collect();
+            writeln!(file, "T {}", tests.join(" ")).ok()?;
+            Some(Recorder {
+                file: Mutex::new((file, BTreeSet::new())),
+            })
+        });
+        if let Some(recorder) = recorder {
+            if let Ok(mut guard) = recorder.file.lock() {
+                if guard.1.insert(site) {
+                    let (file, _) = &mut *guard;
+                    let _ = writeln!(file, "S {site}");
+                }
+            }
+        }
     }
 
     /// Run `probe` with one site's flip forced on THIS thread — the drill hook, so a
