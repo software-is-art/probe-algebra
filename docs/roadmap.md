@@ -1001,6 +1001,32 @@ ratified survivor count read from the committed mutation locks, byte-stable betw
 ratifications — the agent wakes knowing how many named degrees of freedom are open
 and where the addresses are.
 
+## Candidate: retiring the source-level mutator
+
+The four layers exist to be composed, and their composition points at full
+elimination of the external mutation tool — aspirationally fast enough to be a LOCAL
+check, not a CI economics problem. The pieces, each already proven in miniature:
+(1) WIDEN the flip catalog — `<`/`<=`/`>`/`>=`, arithmetic, `!`-deletion are the same
+transformation `#[mutate]` already does for `==`/`&&`. (2) WHOLE-FUNCTION deafness as
+a schemata form — the macro reads the return TYPE syntax (`Result<A, B>` →
+`Ok(A::default())`/`Err(B::default())`, `Option` → `None`, `bool` → both constants,
+Shaped values → `inhabitant()`), which is the source tool's biggest mutant class,
+compiled behind the same selector. (3) CFG-GATED emission (`--features schemata`
+builds carry the branches; normal builds carry literally nothing), so even hot-path
+code like the engine can be instrumented without taxing every test run — the sweep
+pays one extra build, once. (4) COMPLETENESS DERIVED, not hoped: the qualify machinery
+already parses the tree, so "every eligible interior function carries `#[mutate]` or a
+register-exempted reason" is a census gate, the same move that closed every other
+hand-list. (5) SITE→TEST coverage recorded from one instrumented baseline run — the
+one-binary property means the map survives, so each mutant runs only the tests that
+reach it (the source tool rebuilds away any such map), and mutants fan out as
+parallel processes against one build. Timeouts are already detections (the sweep
+script kills at 300s and counts the kill). What the source tool keeps until earned
+otherwise: exotic operators, match-arm/statement deletion, and zero-annotation
+operation on arbitrary crates — the weekly sweeps stay until they go quiet on the
+classes schemata covers, and every weekly survivor is a signpost naming the next
+function to instrument.
+
 ## Candidate: shape pressure in the hook voice
 
 Field feedback from an agent running the hook day to day: the voices pay their way —

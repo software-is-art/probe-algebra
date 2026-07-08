@@ -15,7 +15,9 @@ cargo run -q --example schemata -- list >"${dir}/sites.txt"
 
 : >"${dir}/survivors.txt"
 while IFS= read -r site; do
-  if PROBE_MUTANT="${site}" cargo test -q -p boundary-spec --lib >/dev/null 2>&1; then
+  # a flip that never terminates is a DETECTION, not a hang: the suite provably
+  # distinguishes it (same doctrine as the source sweeps' timeout handling).
+  if timeout 300 env PROBE_MUTANT="${site}" cargo test -q -p boundary-spec --lib >/dev/null 2>&1; then
     echo "SURVIVED ${site}"
     echo "${site}" >>"${dir}/survivors.txt"
   else
