@@ -1116,6 +1116,55 @@ field reports — bricks first (a hook, a register, a judge), worldview later. T
 crates.io publish is the first prerequisite (done); the one-page mental-model document
 is the open one.
 
+## Candidate: the apparatus pointed at the consumer — probes derived, sensitivity validated
+
+Today the meta-layer is entirely INTERNAL. `discover::schemata` (the compiled mutant
+population) and the judge engines (`discover::floor`, `discover::relation`) harden THIS
+repo's own probes and locks; a downstream crate cannot run either against itself. What
+a consumer gets is genesis scaffolding a probe suite from a `system!` declaration, or
+`boundary-enforce` attaching the structural discipline through `build.rs`. Neither
+answers the question the whole method turns on — *are the probes you have SENSITIVE?* —
+which is the mutation-adequacy question, and it is exactly the one we kept for ourselves.
+
+The candidate ships it outward, in the shape the mutation-is-for-us conversation settled
+on. Two moves, in order:
+
+1. **Probes DERIVED for the consumer, not hand-written.** The sweep of the real code is
+   already what tells US which behaviours a probe must pin — "after the sweep of the real
+   code determines what the probes are, we just need to explore N instantiations." Point
+   the same derivation at the consumer's declared boundary/theory and the probe suite is a
+   derived, freezable artifact like every other census, not a diligence exercise. Genesis
+   scaffolds a suite; this DERIVES one and gates its drift.
+
+2. **Sensitivity validated by the ARBITRARY-ORACLE system, not by mutating their code.**
+   The insight that makes this deployable anywhere: do not mutate the consumer's source
+   (invasive — needs their build, our attributes in their tree, one process per mutant).
+   GENERATE arbitrary alternative behaviours as DATA — a sampled state machine, an operator
+   table, a synthetic conduct that straddles the declared spec boundary — and check the
+   probes PARTITION them: hold on the ones the spec admits, refuse the ones it forbids. A
+   probe that cannot tell a compliant oracle from a violating one is INSENSITIVE, named as a
+   gap. Because the oracle is data checked by the ONE interpreter (`discover::floor` /
+   `discover::relation`), never code inside the consumer's module, it "could be compiled and
+   run anywhere" — no attribute, no rebuild, no reach into their tree. The generation-based
+   layer we already run in-process on theories (`discover::mutation`) is this move at the
+   theory scale; the candidate is its arbitrary-behaviour generalisation, packaged as a
+   consumer entry point.
+
+The honest frame is the method's own and does not soften: generation REFUTES, never proves.
+The oracle grid is bounded and the arbitrary behaviours are samples, so a probe that
+partitions the sampled oracles is EVIDENCE of sensitivity over that sample, not a proof it
+catches everything — the same green-is-evidence discipline that governs discovery and the
+sweeps. An insensitive probe is a fact; a sensitive one is a bounded observation.
+
+Open design pieces, none built: the consumer's declaration surface (likely the existing
+`theory!`/`system!`/boundary vocabulary, so the derivation reads what genesis already
+parses); the arbitrary-oracle representation and its grid economics (how many oracles, how
+they are sampled to straddle the boundary deterministically — the splitmix64 discipline the
+warrant sampler already uses); and whether this is a library entry point a consumer calls or
+a genesis-emitted gate that rides `cargo test` like the internal sweeps. This is the single
+change that most moves the consumer experience: the gap between what the method can do and
+what a consumer can invoke is currently the whole meta-layer, and this closes it.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
