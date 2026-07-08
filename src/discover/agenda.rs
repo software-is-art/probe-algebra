@@ -58,6 +58,9 @@ pub enum Ratification {
     /// The git substrate moved (`substrate.spec`): a tag meaning or history law
     /// changed — what the repository's own tags and history are declared to mean.
     Substrate,
+    /// The schemata census moved (`schemata.spec`): the compiled-mutant population
+    /// changed — a function was instrumented or its flip sites moved.
+    Schemata,
     /// A CONSUMER-registered lock class moved: the class and its ratification question
     /// are the consumer's own data (see [`Agenda::of_with`]) — the routing machinery is
     /// generic; the class table is not upstream's to own.
@@ -115,6 +118,11 @@ impl Ratification {
             Ratification::Substrate => {
                 "the git substrate moved — a tag meaning or history law changed; \
                  re-read what the repository's tags now claim."
+                    .to_string()
+            }
+            Ratification::Schemata => {
+                "the schemata census moved — the compiled-mutant population changed; \
+                 is each instrumented function and site set intended?"
                     .to_string()
             }
             Ratification::Custom { class, question } => format!("`{class}`: {question}"),
@@ -317,6 +325,7 @@ enum Class {
 /// One path to its review class. The spec-directory refusal is the router's own
 /// completeness gate: an unrecognized `spec/` artifact means a lock class the router
 /// was never taught, and misfiling it as machinery would silently drop a ratification.
+#[crate::mutate("classify")]
 fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
     let file = path.rsplit('/').next().unwrap_or(path);
     // consumer-taught classes match FIRST — the register is the consumer's own
@@ -350,6 +359,8 @@ fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
             Ratification::Perimeter
         } else if file == "substrate.spec" {
             Ratification::Substrate
+        } else if file == "schemata.spec" {
+            Ratification::Schemata
         } else if file == "shapes.spec" {
             Ratification::Vocabulary
         } else if file.ends_with(".infra.spec") {
@@ -528,6 +539,17 @@ mod probes {
         assert!(agenda.ratifications[0]
             .question()
             .contains("git substrate moved"));
+    }
+
+    /// The schemata census routes to ITS OWN class — an exact-name arm, like the
+    /// perimeter's and the substrate's, ahead of the `.spec` law catch-all.
+    #[test]
+    fn the_schemata_census_routes_to_its_own_class() {
+        let agenda = Agenda::of(["spec/schemata.spec"]).expect("a known lock class");
+        assert_eq!(agenda.ratifications, vec![Ratification::Schemata]);
+        assert!(agenda.ratifications[0]
+            .question()
+            .contains("schemata census moved"));
     }
 
     /// An unknown spec-directory artifact REFUSES — a new lock class must be taught to

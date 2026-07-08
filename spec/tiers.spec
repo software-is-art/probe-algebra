@@ -5,7 +5,7 @@
 # reachability's tier. KERNEL is a decision, never derived: it is ratified in the
 # consumer's own tree (the build.rs allowlist, or a register it parses).
 # Regenerate with `BLESS_TIERS=1 cargo build`.
-# 51 files: 3 boundary, 4 interior, 34 algebra, 10 kernel.
+# 52 files: 3 boundary, 4 interior, 35 algebra, 10 kernel.
 
 - src/boundary.rs: KERNEL (registered — a decision, never derived)
 - src/capability.rs: KERNEL (registered — a decision, never derived)
@@ -37,6 +37,7 @@
 - src/discover/residue.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/router.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/scaffold.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
+- src/discover/schemata.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/shape.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/substrate.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/system.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)

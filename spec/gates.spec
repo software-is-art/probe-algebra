@@ -55,6 +55,10 @@
       .github/perimeter.sh
       promises: the LIVE repository perimeter — branch rules on the default branch, merge methods, private vulnerability reporting — still satisfies the declared floor (spec/perimeter.spec). Settings are configuration that drifts silently and that no one re-audits; this gate reads them back on the weekly clock and refuses by name. READ-ONLY: the write stays human — a privilege is ratified, never self-served
 
+- mutation (schemata) (weekly + manual, sharded; pure)
+      .github/schemata.sh
+      promises: no compiled expression-flip mutant survives the lib suite: every `#[mutate]` site (spec/schemata.spec — the judges, the router's classifier, the reliance judge) ships in ONE build behind the PROBE_MUTANT selector, and the sweep runs the suite once per site — a green run with a flip active is a survivor, ratified by key in spec/schemata.register or killed with a probe. The rebuild-per-mutant price is gone: a verdict costs a test run
+
 - substrate (git drift) (weekly + manual, sharded; EFFECTFUL)
       .github/substrate.sh
       promises: the LIVE repository's tags and history still satisfy the declared git substrate (spec/substrate.spec): the tags the machinery leans on exist and sit on the certified line, every published root-crate version carries its v<version> marker (instances DERIVED from the crates.io index, never named in the declaration), and the default branch stays linear after the declared epoch — the perimeter's squash-only rule, judged backward. READ-ONLY and credential-free: git plumbing against the checkout's own origin plus one anonymous sparse-index read

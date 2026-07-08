@@ -16,6 +16,7 @@
 
 use boundary_spec::discover::gates::GateRegistry;
 use boundary_spec::discover::perimeter::Perimeter;
+use boundary_spec::discover::schemata::Schemata;
 use boundary_spec::discover::substrate::Substrate;
 
 fn main() {
@@ -26,12 +27,13 @@ fn main() {
         perimeter.lock(),
         perimeter.ruleset_lock(),
         Substrate::declared().lock(),
+        Schemata::lock().expect("the schemata census renders"),
     ];
     spec_lock::bless(&locks).expect("write the pipeline, perimeter, and substrate locks");
     for lock in &locks {
         println!("froze {}", lock.path.display());
     }
     println!(
-        "the diff to those files IS the pipeline/perimeter/substrate change — ratify it in review."
+        "the diff to those files IS the pipeline/perimeter/substrate/schemata change — ratify it in review."
     );
 }

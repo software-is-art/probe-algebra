@@ -69,6 +69,7 @@ pub struct TagLaw {
 impl TagLaw {
     /// Does a live tag name match this law? Exact match, or prefix for a family —
     /// `v2*` matches `v2026.07.07` and never `v0.1.0`.
+    #[crate::mutate("tag_law::matches")]
     pub fn matches(&self, tag: &str) -> bool {
         match self.pattern.strip_suffix('*') {
             Some(prefix) => tag.starts_with(prefix),
@@ -271,6 +272,7 @@ impl Substrate {
     /// Hold the LIVE repository to the declared substrate. `Ok` carries the held
     /// facts; `Err` refuses each departure by name — the missing tag, the stray tag,
     /// the merge commit, the unreadable read.
+    #[crate::mutate("substrate::judge")]
     pub fn judge(&self, live: &LiveSubstrate) -> Result<Vec<String>, Vec<String>> {
         let mut held = Vec::new();
         let mut violations = Vec::new();

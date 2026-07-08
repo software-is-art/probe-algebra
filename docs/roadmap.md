@@ -955,9 +955,27 @@ check-judged layers trade the appearing-law kill direction for every-change econ
 delta-render in the dev-profile opt-level override — measured 8.5× on the mutation
 suite (22.8s → 2.7s) — so the widened batteries ride `cargo test` at compute speed.
 
-Remaining rung: **mutant schemata** for the opaque remainder (compile all expression
-flips into one binary behind a runtime selector via the macro layer — one build, N
-test runs — demoting the rebuild-per-mutant grind to a certifier).
+## Mutant schemata: the compiled population (BUILT)
+
+The rebuild-per-mutant price is gone for the expression flips. `#[mutate]`
+(boundary-spec-macros) rewrites each `==`, `!=`, `&&`, `||` in an instrumented
+function as `if Schemata::active("<site>") { flipped } else { original }` — the left
+operand binds once, so laziness is preserved and left-leaning chains grow linearly —
+and every site registers into a link-time slice (`discover::schemata::MUTANT_SITES`)
+whose sorted census freezes as `spec/schemata.spec`: instrumenting a function is a
+ratified diff, a label collision refuses by name, and the router routes the census to
+its own class. The weekly `mutation (schemata)` gate (Pure — a countersign input,
+unlike the world gates) builds ONCE and runs the lib suite once per site with
+`PROBE_MUTANT` selecting the flip; survivors are ratified by key in
+`spec/schemata.register` or killed with a probe. First full sweep, measured: 23 sites
+across the three world judges, the router's classifier, the reliance judge, and the
+tag grammar — 23 killed, 0 survivors, 82 seconds end to end (the same population as
+rebuilds: ~12+ minutes). The zero is not luck: the sensitivity drills are the killers
+for every judge site — the layers compose. Honest frame: schemata covers what a
+runtime branch can express; whole-function replacements and type-level mutations stay
+with the source sweeps, `matches!`/`assert!` interiors are opaque tokens (disclosed in
+the macro docs), and one mutant runs per process — flip interactions are out of scope,
+as they are for every mutation layer here.
 
 ## The sensitivity drill: judges deaf to nothing (BUILT)
 

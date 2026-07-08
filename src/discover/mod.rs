@@ -44,6 +44,7 @@ pub mod protocol;
 pub mod residue;
 pub mod router;
 pub mod scaffold;
+pub mod schemata;
 pub mod shape;
 pub mod substrate;
 pub mod system;

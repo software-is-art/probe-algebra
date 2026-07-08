@@ -132,6 +132,7 @@ impl Dependence {
     /// judge — one line each in `downstream-fixture/tests/reliances.rs`.
     ///
     /// Capability: Effectful — reads the register and the committed spec locks.
+    #[crate::mutate("judge_register")]
     pub fn judge_register(
         register: &spec_lock::Register,
         spec_dir: &Path,

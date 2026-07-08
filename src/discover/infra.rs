@@ -323,6 +323,7 @@ impl Infra {
     /// declarable half; the TTL half is unrepresentable by construction — see
     /// [`Meaning`]). `Ok` carries the held facts; `Err` refuses each incoherence by
     /// name.
+    #[crate::mutate("infra::coherent")]
     pub fn coherent(&self) -> Result<Vec<String>, Vec<String>> {
         let mut held = Vec::new();
         let mut refusals = Vec::new();
@@ -406,6 +407,7 @@ impl Infra {
     /// Hold the LIVE state to the declared laws. Refusals name the store, the origin,
     /// the surface, the secret — the incident report written BEFORE the incident.
     /// An incoherent declaration refuses before any live fact is consulted.
+    #[crate::mutate("infra::judge")]
     pub fn judge(&self, live: &LiveInfra) -> Result<Vec<String>, Vec<String>> {
         let mut held = self.coherent()?;
         let mut violations = Vec::new();

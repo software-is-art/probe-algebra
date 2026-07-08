@@ -647,6 +647,21 @@ impl GateRegistry {
                 sharded: false,
             },
             Gate {
+                name: "mutation (schemata)",
+                verifies: "no compiled expression-flip mutant survives the lib suite: \
+                           every `#[mutate]` site (spec/schemata.spec — the judges, the \
+                           router's classifier, the reliance judge) ships in ONE build \
+                           behind the PROBE_MUTANT selector, and the sweep runs the \
+                           suite once per site — a green run with a flip active is a \
+                           survivor, ratified by key in spec/schemata.register or \
+                           killed with a probe. The rebuild-per-mutant price is gone: \
+                           a verdict costs a test run",
+                command: &[".github/schemata.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                sharded: false,
+            },
+            Gate {
                 name: "substrate (git drift)",
                 verifies: "the LIVE repository's tags and history still satisfy the \
                            declared git substrate (spec/substrate.spec): the tags the \
@@ -1070,11 +1085,12 @@ mod tests {
         assert!(fmt.command.contains(&"--all"));
     }
 
-    /// The registry's SHAPE is pinned: thirteen gates — three every-change, one
-    /// per-diff, one default-branch incremental, seven weekly (the sharded whole-tree
-    /// sweep, four member/corpus companions, and the two world gates), and the release
-    /// gate on the certification cadence — and every declared command reappears
-    /// verbatim in the rendered workflow (nothing declared can fall out of execution).
+    /// The registry's SHAPE is pinned: fourteen gates — three every-change, one
+    /// per-diff, one default-branch incremental, eight weekly (the sharded whole-tree
+    /// sweep, four member/corpus companions, the compiled-mutant schemata sweep, and
+    /// the two world gates), and the release gate on the certification cadence — and
+    /// every declared command reappears verbatim in the rendered workflow (nothing
+    /// declared can fall out of execution).
     /// Every gate is Pure except exactly three, each wearing the EFFECTFUL tag for its
     /// own reason: the release WRITES the world (tags, a GitHub release, crates.io),
     /// the perimeter READS state the tree cannot contain (the live repository
@@ -1083,13 +1099,13 @@ mod tests {
     #[test]
     fn every_declared_gate_is_rendered_into_the_workflow() {
         let gates = GateRegistry::declared();
-        assert_eq!(gates.len(), 13);
+        assert_eq!(gates.len(), 14);
         assert_eq!(
             gates
                 .iter()
                 .filter(|g| g.cadence == Cadence::Weekly)
                 .count(),
-            7
+            8
         );
         assert_eq!(
             gates.iter().filter(|g| g.sharded).count(),
@@ -1184,7 +1200,7 @@ mod tests {
         assert!(workflow.contains(
             "needs: [mutants-full, mutants-delta-render-plumbing, \
              mutants-statement-bites-lean-corpus, mutants-fire-drill-plumbing, \
-             mutants-layout-probe-plumbing]"
+             mutants-layout-probe-plumbing, mutants-schemata]"
         ));
         let advances = workflow
             .matches(&format!("git push -f origin {GREEN_TAG}"))

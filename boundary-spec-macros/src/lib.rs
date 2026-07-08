@@ -774,6 +774,134 @@ fn enum_body(name: &Ident, data: &DataEnum) -> syn::Result<(TokenStream2, TokenS
     Ok((inhabitant, classes))
 }
 
+/// `#[mutate]` / `#[mutate("label")]` — MUTANT SCHEMATA: every operator-flip mutant of
+/// this function is compiled into the binary behind a runtime selector, so the whole
+/// mutant population costs ONE build and each verdict is a test run, not a rebuild.
+///
+/// Each `==`, `!=`, `&&`, `||` in the body becomes
+/// `if Schemata::active("<site>") { <flipped> } else { <original> }`, and the site
+/// registers itself into the census slice (`discover::schemata::MUTANT_SITES`) the
+/// schemata lock freezes. Site ids are `<label>:<index>: <op> -> <flip>` in body
+/// visit order; the label defaults to the function name — pass one wherever the bare
+/// name is ambiguous (three types have a `judge`). Evaluation order is preserved: the
+/// left operand binds once (so `&&`/`||` stay lazy in the right operand and
+/// left-leaning chains grow linearly, not exponentially), equality operands bind by
+/// reference. Nested items are not descended into (a const's comparison must stay
+/// const), and macro invocations (`matches!`, `assert!`) are opaque tokens — their
+/// interiors stay uninstrumented, disclosed here rather than silently.
+#[proc_macro_attribute]
+pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let label: Option<LitStr> = if attr.is_empty() {
+        None
+    } else {
+        Some(parse_macro_input!(attr as LitStr))
+    };
+    // a free fn or an impl method — same signature/body shape, different item type.
+    if let Ok(mut f) = syn::parse::<ItemFn>(item.clone()) {
+        let label = label
+            .map(|l| l.value())
+            .unwrap_or_else(|| f.sig.ident.to_string());
+        mutate_body(&label, &mut f.block);
+        quote! { #f }.into()
+    } else if let Ok(mut f) = syn::parse::<syn::ImplItemFn>(item) {
+        let label = label
+            .map(|l| l.value())
+            .unwrap_or_else(|| f.sig.ident.to_string());
+        mutate_body(&label, &mut f.block);
+        quote! { #f }.into()
+    } else {
+        syn::Error::new(
+            proc_macro2::Span::call_site(),
+            "#[mutate] applies to a function or method",
+        )
+        .to_compile_error()
+        .into()
+    }
+}
+
+/// Rewrite a function body's flip sites and prepend their census registrations
+/// (fn-scope statics, so the same expansion serves free fns and impl methods).
+fn mutate_body(label: &str, block: &mut syn::Block) {
+    let mut mutator = FlipMutator {
+        label: label.to_string(),
+        count: 0,
+        sites: Vec::new(),
+    };
+    syn::visit_mut::VisitMut::visit_block_mut(&mut mutator, block);
+    for (i, site) in mutator.sites.iter().enumerate() {
+        let ident = format_ident!("__MUTANT_SITE_{i}");
+        let registration: syn::Stmt = syn::parse_quote! {
+            #[::linkme::distributed_slice(crate::discover::schemata::MUTANT_SITES)]
+            static #ident: &'static str = #site;
+        };
+        block.stmts.insert(i, registration);
+    }
+}
+
+/// The expression folder: children first (so a chain's inner sites are numbered
+/// before the outer), then the four flips. Nested items are deliberately skipped.
+struct FlipMutator {
+    label: String,
+    count: usize,
+    sites: Vec<String>,
+}
+
+impl syn::visit_mut::VisitMut for FlipMutator {
+    fn visit_item_mut(&mut self, _: &mut Item) {
+        // a nested item (const, fn, static) keeps its original text: a comparison in
+        // a const context cannot become a runtime branch.
+    }
+
+    fn visit_expr_mut(&mut self, expr: &mut syn::Expr) {
+        syn::visit_mut::visit_expr_mut(self, expr);
+        let syn::Expr::Binary(binary) = expr else {
+            return;
+        };
+        let (orig, flip): (&str, &str) = match binary.op {
+            syn::BinOp::Eq(_) => ("==", "!="),
+            syn::BinOp::Ne(_) => ("!=", "=="),
+            syn::BinOp::And(_) => ("&&", "||"),
+            syn::BinOp::Or(_) => ("||", "&&"),
+            _ => return,
+        };
+        let site = format!("{}:{}: {} -> {}", self.label, self.count, orig, flip);
+        self.count += 1;
+        self.sites.push(site.clone());
+        let left = (*binary.left).clone();
+        let right = (*binary.right).clone();
+        let op = binary.op;
+        let flipped: syn::BinOp = match binary.op {
+            syn::BinOp::Eq(_) => syn::parse_quote!(!=),
+            syn::BinOp::Ne(_) => syn::parse_quote!(==),
+            syn::BinOp::And(_) => syn::parse_quote!(||),
+            _ => syn::parse_quote!(&&),
+        };
+        *expr = match binary.op {
+            // equality: bind BOTH operands by reference, once — `&A == &B` derefs to
+            // the underlying comparison, and neither side is moved or re-evaluated.
+            syn::BinOp::Eq(_) | syn::BinOp::Ne(_) => syn::parse_quote!({
+                let __mutant_l = &(#left);
+                let __mutant_r = &(#right);
+                if crate::discover::schemata::Schemata::active(#site) {
+                    __mutant_l #flipped __mutant_r
+                } else {
+                    __mutant_l #op __mutant_r
+                }
+            }),
+            // lazy connectives: the left operand was eager anyway, so it binds once;
+            // the right stays a lazy expression in both branches.
+            _ => syn::parse_quote!({
+                let __mutant_l = #left;
+                if crate::discover::schemata::Schemata::active(#site) {
+                    __mutant_l #flipped (#right)
+                } else {
+                    __mutant_l #op (#right)
+                }
+            }),
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
