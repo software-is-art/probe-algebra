@@ -1281,6 +1281,24 @@ the logical end state: the judges collapsed to data plus one interpreter, the se
 proofs collapsed to one question with two mechanisms, and the whole thing a census a
 downstream crate can compute about itself.
 
+**Rung 1 is BUILT** (`discover::probes`, `spec/probes.spec`). The census now exists and
+enumerates every frozen probe lock with its sensitivity mechanism: the eight behavioural
+theories (the seven in `all_specs()` plus the mounted bridged theory) as `oracle-swap`; the
+three world judges (`perimeter`/`infra`/`substrate`) as `live-dent`; and the byte-locks
+(`surface`/`tiers`/`shape`/`seams`/`catalog`/`pipeline`/`schemata`/`world`) as `drift-gate`.
+It is gated for COMPLETENESS against the committed `spec/` directory — every artifact that
+backs a probe must be covered and every named probe must have a committed lock, so a new
+lock that no probe covers fails the census, and the roster can only grow honestly (the
+tiers-ladder rung-1 move: derive-and-disclose, no coherence to argue with). The disclosure
+IS the finding: eight structural probes rest on freshness alone, with no active proof they
+can REFUSE a planted fixture — exactly the pressure rung 2 turns into a gate. Honest scope,
+carried in the module docs: the census covers frozen probe LOCKS, not the discipline /
+pipeline fire-drill gates (which live in `fire_drill::Battery`, not `spec/`) — folding those
+in, with `Mechanism::FireDrill`, is rung 1.5; and the router classifies `spec/probes.spec`
+through the `.spec` catch-all (`Laws`) for now, a dedicated `Ratification` arm being the
+same rung's small follow-up. RUNG 2, still ahead: normative — a `spec/probes.register` that
+ratifies each drift-gate-only probe with a reason, so the drift-gate set can only shrink.
+
 ## Framing: the real domain is stability under containment
 
 Worth stating plainly, because it reframes what the method is FOR. Probe-algebra's real

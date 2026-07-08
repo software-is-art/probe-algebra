@@ -23,6 +23,7 @@ use boundary_spec::discover::arithmetic::Arithmetic;
 use boundary_spec::discover::bridge::{Bridged, Export, Triage};
 use boundary_spec::discover::date::Calendar;
 use boundary_spec::discover::mutation::MutationReport;
+use boundary_spec::discover::probes::ProbeCensus;
 use boundary_spec::discover::router::Router;
 use boundary_spec::discover::shape::ShapeReport;
 use boundary_spec::discover::system::SystemReport;
@@ -66,6 +67,9 @@ fn main() {
     locks.push(Spec::of::<Bridged<0>>().lock_in(&spec_dir));
     locks.push(MutationReport::of::<Bridged<0>>().lock_in(&spec_dir));
     locks.push(triage.lock_in(&spec_dir));
+    // the PROBE CENSUS: every probe lock this crate upholds, with the mechanism that proves
+    // it sensitive — the unified roster (see `discover::probes`).
+    locks.push(ProbeCensus::of().lock());
     spec_lock::bless(&locks).expect("write spec locks");
     for (lock, spec) in locks.iter().zip(&specs) {
         println!("froze {} ({} laws)", lock.path.display(), spec.laws.len());
@@ -84,6 +88,7 @@ fn main() {
         "the bridged theory's spec",
         "algebra mutation: bridged-bool",
         "the bridge triage (obligations)",
+        "the probe census",
     ]) {
         println!("froze {} ({label})", lock.path.display());
     }

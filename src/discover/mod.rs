@@ -41,6 +41,7 @@ pub mod layering;
 pub mod modularize;
 pub mod mutation;
 pub mod perimeter;
+pub mod probes;
 pub mod protocol;
 pub mod relation;
 pub mod residue;
