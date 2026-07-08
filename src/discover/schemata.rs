@@ -8,14 +8,17 @@
 //! tables, live states — but free-form interior Rust remained the rebuild-priced
 //! remainder. Schemata is the classic answer, built on the one interface we control:
 //! the macro layer. `#[mutate]` (boundary-spec-macros) rewrites each `==`, `!=`,
-//! `&&`, `||` in an instrumented function as
+//! `<`, `<=`, `>`, `>=`, `&&`, `||` (and each `!`, as a deletion) in an instrumented
+//! function as
 //!
 //! ```text
 //! if Schemata::active("<site>") { <flipped> } else { <original> }
 //! ```
 //!
-//! so every flip ships in the same build, inert until selected. The
-//! `mutation (schemata)` gate then builds ONCE and runs the lib suite once per site
+//! plus one DEAFNESS mutant per constructible form of the return type (`Ok(default)`,
+//! `Err(default)`, `None`, both booleans — the whole-body replacement class, read from
+//! the type syntax), so every mutant ships in the same build, inert until selected.
+//! The `mutation (schemata)` gate then builds ONCE and runs the lib suite once per site
 //! with `PROBE_MUTANT=<site>` — cheap enough (~a minute warm) to ride EVERY change,
 //! not a weekly clock: a run that goes green with a flip active is a SURVIVOR
 //! — a probe hole (or a ratified equivalence, one line in `spec/schemata.register`
@@ -29,9 +32,10 @@
 //! `#[mutate]` is itself reviewable data: the ones whose survivor species kept
 //! recurring — the judges, the router's classifier, the reliance register's judge.
 //!
-//! Honest frame: schemata covers the flips a runtime branch can express — it does not
-//! replace `cargo mutants`' whole-function replacements or type-level mutations, so
-//! the source sweeps remain the outer certifier. Sites inside `matches!`/`assert!`
+//! Honest frame: schemata covers what a runtime branch can express — with the
+//! deafness forms that now includes the whole-body replacement class, leaving the
+//! source sweeps type-level mutations, statement deletion, and the uninstrumented
+//! remainder as their earned territory. Sites inside `matches!`/`assert!`
 //! macro bodies are opaque tokens and stay uninstrumented (disclosed by the macro's
 //! docs). And the selector is read ONCE per process: one mutant per run, by design —
 //! interactions between flips are out of scope, as they are for every mutation layer.
@@ -204,6 +208,16 @@ mod probes {
             assert!(law.matches("something-else"));
         });
         assert!(law.matches("mutants-green"), "the force is dropped");
+        // the DEAFNESS form, same plumbing: the function returns the constant.
+        Schemata::force("tag_law::matches:deaf -> true", || {
+            assert!(law.matches("anything-at-all"), "deaf-true hears nothing");
+        });
+        Schemata::force("tag_law::matches:deaf -> false", || {
+            assert!(
+                !law.matches("mutants-green"),
+                "deaf-false denies everything"
+            );
+        });
     }
 
     /// The committed schemata lock is FRESH — instrumentation and census move

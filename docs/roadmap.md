@@ -973,7 +973,20 @@ tag grammar — 23 killed, 0 survivors, 82 seconds end to end (the same populati
 rebuilds: ~12+ minutes). Cheap enough that it was promoted from the weekly clock to
 EVERY change on arrival — expression mutants now gate PRs, inside the same required
 check as fmt/clippy/test. The zero is not luck: the sensitivity drills are the
-killers for every judge site — the layers compose. Honest frame: schemata covers what a
+killers for every judge site — the layers compose.
+
+Vertical integration, same arc: the flip catalog grew the orderings (`<` → `>=` and
+kin — the negation, disturbing both edge and direction) and `!`-deletion; every
+instrumented function gained DEAFNESS forms read from its return-type syntax
+(`Ok(default)`, `Err(default)`, both booleans — the whole-body replacement class,
+source mutation's biggest, now compiled behind the same selector); and the sweep's
+economics are all derived — nextest fail-fast stops a killed mutant at its first
+failing probe, and the timeout prices itself from a timed green baseline (5x + 10s;
+a hand-picked constant was the antipattern wearing a number). Second sweep: 38
+sites, 38 killed, 0 survivors — including the census catching its own growth (the
+router arm taught for `schemata.spec` added a `==` that immediately became site
+`classify:9`). The nextest install step in the check job DERIVES from the
+declaration: a consumer pipeline with no schemata gate carries no extra step. Honest frame: schemata covers what a
 runtime branch can express; whole-function replacements and type-level mutations stay
 with the source sweeps, `matches!`/`assert!` interiors are opaque tokens (disclosed in
 the macro docs), and one mutant runs per process — flip interactions are out of scope,

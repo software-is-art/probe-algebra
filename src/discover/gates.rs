@@ -387,6 +387,22 @@ impl Pipeline {
             sp8 = "        ",
             sp10 = "          ",
         ));
+        // the schemata sweep runs INSIDE this job, and its fail-fast economics need
+        // nextest — the install step derives from the declaration (a pipeline with no
+        // schemata gate carries no extra step).
+        if self
+            .gates
+            .iter()
+            .any(|g| g.command.iter().any(|c| c.contains("schemata")))
+        {
+            out.push_str(
+                "      # nextest: the schemata sweep's fail-fast runner — a killed mutant\n\
+                 \x20     # stops at its first failing probe instead of running out the suite.\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-nextest\n",
+            );
+        }
         for gate in self
             .gates
             .iter()
@@ -811,6 +827,20 @@ impl GateRegistry {
             sp8 = "        ",
             sp10 = "          ",
         );
+        // the schemata sweep runs INSIDE this job; its fail-fast economics need
+        // nextest, so the install step derives from the declaration.
+        if every_change
+            .iter()
+            .any(|g| g.command.iter().any(|c| c.contains("schemata")))
+        {
+            out.push_str(
+                "      # nextest: the schemata sweep's fail-fast runner — a killed mutant\n\
+                 \x20     # stops at its first failing probe instead of running out the suite.\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-nextest\n",
+            );
+        }
         for gate in &every_change {
             out.push_str(&format!("      - run: {}\n", gate.command_line()));
         }

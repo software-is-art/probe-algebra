@@ -778,17 +778,24 @@ fn enum_body(name: &Ident, data: &DataEnum) -> syn::Result<(TokenStream2, TokenS
 /// this function is compiled into the binary behind a runtime selector, so the whole
 /// mutant population costs ONE build and each verdict is a test run, not a rebuild.
 ///
-/// Each `==`, `!=`, `&&`, `||` in the body becomes
-/// `if Schemata::active("<site>") { <flipped> } else { <original> }`, and the site
-/// registers itself into the census slice (`discover::schemata::MUTANT_SITES`) the
-/// schemata lock freezes. Site ids are `<label>:<index>: <op> -> <flip>` in body
-/// visit order; the label defaults to the function name — pass one wherever the bare
-/// name is ambiguous (three types have a `judge`). Evaluation order is preserved: the
-/// left operand binds once (so `&&`/`||` stay lazy in the right operand and
-/// left-leaning chains grow linearly, not exponentially), equality operands bind by
-/// reference. Nested items are not descended into (a const's comparison must stay
-/// const), and macro invocations (`matches!`, `assert!`) are opaque tokens — their
-/// interiors stay uninstrumented, disclosed here rather than silently.
+/// Each `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||` in the body becomes
+/// `if Schemata::active("<site>") { <negated> } else { <original> }`, each `!`
+/// gains a deletion mutant, and the function gains one DEAFNESS mutant per
+/// constructible form of its return type (`Result<A, B>` → `Ok(default)` and
+/// `Err(default)` where the payloads are recognisable, `Option` → `None`, `bool` →
+/// both constants, `Vec`/`String` → empty) — the whole-body replacement class, read
+/// from the return TYPE syntax; an unrecognised type simply grows no deaf form.
+/// Every site registers itself into the census slice
+/// (`discover::schemata::MUTANT_SITES`) the schemata lock freezes. Site ids are
+/// `<label>:<index>: <op> -> <flip>` in body visit order (deaf forms:
+/// `<label>:deaf -> <value>`); the label defaults to the function name — pass one
+/// wherever the bare name is ambiguous (three types have a `judge`). Evaluation
+/// order is preserved: the left operand binds once (so `&&`/`||` stay lazy in the
+/// right operand and left-leaning chains grow linearly, not exponentially),
+/// comparison operands bind by reference. Nested items are not descended into (a
+/// const's comparison must stay const), and macro invocations (`matches!`,
+/// `assert!`) are opaque tokens — their interiors stay uninstrumented, disclosed
+/// here rather than silently.
 #[proc_macro_attribute]
 pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
     let label: Option<LitStr> = if attr.is_empty() {
@@ -801,13 +808,13 @@ pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
         let label = label
             .map(|l| l.value())
             .unwrap_or_else(|| f.sig.ident.to_string());
-        mutate_body(&label, &mut f.block);
+        mutate_body(&label, &f.sig.output.clone(), &mut f.block);
         quote! { #f }.into()
     } else if let Ok(mut f) = syn::parse::<syn::ImplItemFn>(item) {
         let label = label
             .map(|l| l.value())
             .unwrap_or_else(|| f.sig.ident.to_string());
-        mutate_body(&label, &mut f.block);
+        mutate_body(&label, &f.sig.output.clone(), &mut f.block);
         quote! { #f }.into()
     } else {
         syn::Error::new(
@@ -819,22 +826,99 @@ pub fn mutate(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
-/// Rewrite a function body's flip sites and prepend their census registrations
+/// Rewrite a function body's flip sites, prepend the deafness prologue (one early
+/// return per constructible form of the return type), and register every site
 /// (fn-scope statics, so the same expansion serves free fns and impl methods).
-fn mutate_body(label: &str, block: &mut syn::Block) {
+fn mutate_body(label: &str, output: &ReturnType, block: &mut syn::Block) {
     let mut mutator = FlipMutator {
         label: label.to_string(),
         count: 0,
         sites: Vec::new(),
     };
     syn::visit_mut::VisitMut::visit_block_mut(&mut mutator, block);
-    for (i, site) in mutator.sites.iter().enumerate() {
+    let mut sites = mutator.sites;
+    let mut prologue: Vec<syn::Stmt> = Vec::new();
+    if let ReturnType::Type(_, ty) = output {
+        for (desc, value) in deaf_values(ty) {
+            let site = format!("{label}:deaf -> {desc}");
+            sites.push(site.clone());
+            prologue.push(syn::parse_quote! {
+                if crate::discover::schemata::Schemata::active(#site) {
+                    return #value;
+                }
+            });
+        }
+    }
+    for stmt in prologue.into_iter().rev() {
+        block.stmts.insert(0, stmt);
+    }
+    for (i, site) in sites.iter().enumerate() {
         let ident = format_ident!("__MUTANT_SITE_{i}");
         let registration: syn::Stmt = syn::parse_quote! {
             #[::linkme::distributed_slice(crate::discover::schemata::MUTANT_SITES)]
             static #ident: &'static str = #site;
         };
         block.stmts.insert(i, registration);
+    }
+}
+
+/// The constructible deafness values of a return type, by SYNTAX — the same move the
+/// whole-body replacement class of source-level mutation makes, done at expansion.
+/// Unrecognised types return no forms: a deaf mutant that cannot be constructed is
+/// not emitted, never guessed.
+fn deaf_values(ty: &Type) -> Vec<(String, TokenStream2)> {
+    let Type::Path(path) = ty else {
+        return Vec::new();
+    };
+    let Some(segment) = path.path.segments.last() else {
+        return Vec::new();
+    };
+    let type_args = || -> Vec<&Type> {
+        match &segment.arguments {
+            syn::PathArguments::AngleBracketed(a) => a
+                .args
+                .iter()
+                .filter_map(|g| match g {
+                    syn::GenericArgument::Type(t) => Some(t),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    match segment.ident.to_string().as_str() {
+        "bool" => vec![
+            ("true".to_string(), quote!(true)),
+            ("false".to_string(), quote!(false)),
+        ],
+        "String" => vec![(
+            "String::new()".to_string(),
+            quote!(::std::string::String::new()),
+        )],
+        "Vec" => vec![("vec![]".to_string(), quote!(::std::vec::Vec::new()))],
+        "Option" => vec![("None".to_string(), quote!(::std::option::Option::None))],
+        "Result" => {
+            let args = type_args();
+            let mut out = Vec::new();
+            if let Some(ok_ty) = args.first() {
+                if let Some((desc, value)) = deaf_values(ok_ty).into_iter().next() {
+                    out.push((
+                        format!("Ok({desc})"),
+                        quote!(::std::result::Result::Ok(#value)),
+                    ));
+                }
+            }
+            if let Some(err_ty) = args.get(1) {
+                if let Some((desc, value)) = deaf_values(err_ty).into_iter().next() {
+                    out.push((
+                        format!("Err({desc})"),
+                        quote!(::std::result::Result::Err(#value)),
+                    ));
+                }
+            }
+            out
+        }
+        _ => Vec::new(),
     }
 }
 
@@ -854,12 +938,39 @@ impl syn::visit_mut::VisitMut for FlipMutator {
 
     fn visit_expr_mut(&mut self, expr: &mut syn::Expr) {
         syn::visit_mut::visit_expr_mut(self, expr);
+
+        // `!`-DELETION: the negation drops, its operand (already folded) stands bare.
+        if let syn::Expr::Unary(unary) = expr {
+            if matches!(unary.op, syn::UnOp::Not(_)) {
+                let site = format!("{}:{}: ! -> (deleted)", self.label, self.count);
+                self.count += 1;
+                self.sites.push(site.clone());
+                let inner = (*unary.expr).clone();
+                *expr = syn::parse_quote!({
+                    let __mutant_v = #inner;
+                    if crate::discover::schemata::Schemata::active(#site) {
+                        __mutant_v
+                    } else {
+                        !__mutant_v
+                    }
+                });
+                return;
+            }
+        }
+
         let syn::Expr::Binary(binary) = expr else {
             return;
         };
+        // each operator's single strongest alternate: the NEGATION for equality and
+        // ordering (`<` -> `>=` disturbs both the strict/inclusive edge and the
+        // direction), the dual for the lazy connectives.
         let (orig, flip): (&str, &str) = match binary.op {
             syn::BinOp::Eq(_) => ("==", "!="),
             syn::BinOp::Ne(_) => ("!=", "=="),
+            syn::BinOp::Lt(_) => ("<", ">="),
+            syn::BinOp::Le(_) => ("<=", ">"),
+            syn::BinOp::Gt(_) => (">", "<="),
+            syn::BinOp::Ge(_) => (">=", "<"),
             syn::BinOp::And(_) => ("&&", "||"),
             syn::BinOp::Or(_) => ("||", "&&"),
             _ => return,
@@ -873,29 +984,34 @@ impl syn::visit_mut::VisitMut for FlipMutator {
         let flipped: syn::BinOp = match binary.op {
             syn::BinOp::Eq(_) => syn::parse_quote!(!=),
             syn::BinOp::Ne(_) => syn::parse_quote!(==),
+            syn::BinOp::Lt(_) => syn::parse_quote!(>=),
+            syn::BinOp::Le(_) => syn::parse_quote!(>),
+            syn::BinOp::Gt(_) => syn::parse_quote!(<=),
+            syn::BinOp::Ge(_) => syn::parse_quote!(<),
             syn::BinOp::And(_) => syn::parse_quote!(||),
             _ => syn::parse_quote!(&&),
         };
         *expr = match binary.op {
-            // equality: bind BOTH operands by reference, once — `&A == &B` derefs to
-            // the underlying comparison, and neither side is moved or re-evaluated.
-            syn::BinOp::Eq(_) | syn::BinOp::Ne(_) => syn::parse_quote!({
+            // lazy connectives: the left operand was eager anyway, so it binds once;
+            // the right stays a lazy expression in both branches.
+            syn::BinOp::And(_) | syn::BinOp::Or(_) => syn::parse_quote!({
+                let __mutant_l = #left;
+                if crate::discover::schemata::Schemata::active(#site) {
+                    __mutant_l #flipped (#right)
+                } else {
+                    __mutant_l #op (#right)
+                }
+            }),
+            // equality and ordering: bind BOTH operands by reference, once — `&A op
+            // &B` derefs to the underlying comparison, and neither side is moved or
+            // re-evaluated.
+            _ => syn::parse_quote!({
                 let __mutant_l = &(#left);
                 let __mutant_r = &(#right);
                 if crate::discover::schemata::Schemata::active(#site) {
                     __mutant_l #flipped __mutant_r
                 } else {
                     __mutant_l #op __mutant_r
-                }
-            }),
-            // lazy connectives: the left operand was eager anyway, so it binds once;
-            // the right stays a lazy expression in both branches.
-            _ => syn::parse_quote!({
-                let __mutant_l = #left;
-                if crate::discover::schemata::Schemata::active(#site) {
-                    __mutant_l #flipped (#right)
-                } else {
-                    __mutant_l #op (#right)
                 }
             }),
         };
