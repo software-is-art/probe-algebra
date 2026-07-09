@@ -1387,6 +1387,75 @@ Remaining, disclosed: three-plus DISTINCT carriers (the `LiftedN` ladder or the
 N conceptual sorts as one enum are already single-carrier `Lifted`). The byte-lock register
 has reached its honest floor — surface and tiers, covered cross-crate.
 
+## Candidate: differential-certify — the published artifact as the judge (the bootstrap floor)
+
+The `#[mutate]` retirement (above, "on the table") stalls on ONE residual role: source
+mutation of the non-theory PLUMBING — the parser, the engine's structural transforms, and at
+the bottom the interpreter that judges the oracles. Two obstructions were named for it: the
+plumbing's carrier is structural (ASTs, theories) not a flat grid, and its spec is
+EXTENSIONAL (the frozen bytes on the repo's own sample) not a law-set. The first dissolves —
+enumerate the STRUCTURED side (bounded ASTs, built as data) and lift with structural laws
+(round trip `parse ∘ render = id`, idempotence, the placer's already-named fixed point). What
+survives as genuinely irreducible is smaller than "the plumbing": it is the JUDGE. To
+oracle-sweep a core function you need a grid and an observation that must not route through
+the function under test; for the interpreter, the observation IS the interpreter, so using it
+to validate itself is circular — the proof-checker-kernel / self-hosting-compiler floor.
+
+The move that unties the knot: **the last certified release is the independent judge.** A
+published release binary carries auto-lift, was built from different source, is frozen, and
+already passed certification (mutants-green). So release N's core is judged by release N−1's
+binary — "X validates X" becomes "X_{n−1} validates X_n", a regress with a base case, i.e.
+INDUCTION. The predecessor's auto-lift ingests the current core's plain-Rust surface, lifts
+it, runs discovery + the oracle sweep, and the PREDECESSOR's engine renders the verdict. No
+self-reference. This is the repo's existing SECOND-SOURCE pattern (the compiled theory as the
+ticker's second source `step_theory`; the crates.io index as the substrate's second source)
+applied to the bootstrap floor itself — idiomatic, not a bolt-on.
+
+And the "mutants" get strictly better. Synthetic `#[mutate]` flips carry the equivalent-mutant
+problem (is this flip even meaningful?). Here the perturbation under test is the REAL
+inter-release diff — every change is one a human actually made, so there are no equivalent
+mutants by construction. That is the method's own "generate against the spec boundary, not the
+code's neighbourhood," reached from the other side: the boundary crossed is the diff since the
+last green.
+
+Proposed gate — `differential-certify`: (1) pull the latest certified release binary; (2)
+auto-lift the working-tree core against it; (3) any un-ratified behavioural divergence is a
+red check. Divergence routes into the EXISTING discipline: an INTENDED change (new law shape,
+fixed bug, deliberate semantics move) makes the predecessor disagree, and that disagreement is
+admitted iff it drifts a lock the commit ratifies — "differential divergence → ratify a lock
+diff" is the same shape as "mutation survivor → ratify a degree of freedom", so the
+ratification machinery already exists. An UNINTENDED divergence is a regression the certified
+predecessor catches for free.
+
+Honest limits, none fatal but all load-bearing:
+
+- **Differential, so blind to common-mode faults.** The predecessor is independent w.r.t. the
+  DIFF since that release, not w.r.t. shared ancestry. A bug present in both N−1 and N
+  (inherited, never noticed) produces no disagreement — the standard N-version correlated-fault
+  hole. Only re-baselining against an independently-reasoned implementation reaches it.
+- **The floor moves; it does not vanish.** Release 0 was validated by a non-self method
+  (`floor`/`relation` are generation-tested, not mutated). The trick AMORTIZES that expensive
+  check to the base case and periodic re-baselines; the root is still there. And it inherits
+  TRUSTING-TRUST: a compromised release validates its successor into agreeing with the
+  compromise. The defense is provenance — the past binary reproducible from frozen source under
+  an independent toolchain; the substrate lock is the start of that story, not the whole of it.
+- **Auto-lift reach and version skew bound what the predecessor can see.** N−1's scanner lifts
+  N's surface only as far as auto-lift reaches (`Shaped`, ≤2 carriers) and as far as N−1
+  recognizes N's syntax; the higher-order judge core still needs the hand-built AST-grid-as-data
+  lift (the predecessor is its JUDGE, but does not auto-generate it). A large refactor closes
+  the adjacent-release window.
+- **Per-diff, not whole-code.** It exercises only code that CHANGED; unchanged core "agrees"
+  trivially and is covered transitively (checked against its own predecessor when introduced) —
+  the same "coverage carries forward as a property" the oracle sweep already runs on, but a
+  DIFFERENT guarantee than synthetic mutation's "every line is observed by some probe". It PAIRS
+  with the probe census (Rung 3's "a deleted drill breaks the gate" catches a diff that WEAKENS
+  coverage of unchanged code — behaviour would not diverge, but the census fires), it does not
+  replace it.
+
+The one thing it does not buy, stated so it is not oversold: escape from the base case.
+Someone, once, still trusts release 0 by a method that is not "ask release 0." Everything after
+that, the published artifact can carry.
+
 ## Framing: the real domain is stability under containment
 
 Worth stating plainly, because it reframes what the method is FOR. Probe-algebra's real
