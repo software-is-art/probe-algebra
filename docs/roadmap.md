@@ -595,8 +595,9 @@ The observation that named them: every arbitrary ceremony in software is a deriv
 fact wearing a ritual's clothes — and the operator's phrase for the programme,
 "replacing implied service from a platform with specification". All three BUILT:
 
-1. **The bridge alarm in the agent loop** (`Ticker::hook_line`,
-   `.claude/hooks/shape-watch.sh`). The mechanism question settled by token economics:
+1. **The bridge alarm in the agent loop** (`Ticker::hook_line`, now carried by the shipped
+   `probe-hook` binary — see the eleventh ask; originally the retired `shape-watch.sh`).
+   The mechanism question settled by token economics:
    LSP is the human surface (pull-based, verbose, free for eyes); the lock is the CI
    surface (late); the agent surface is a PostToolUse hook, because it prices feedback
    right — zero tokens when silent, one line when the shape moved, no instruction
@@ -632,7 +633,9 @@ conduct — that is self-attestation) and belongs in a `kernel.register`
 unjustified key refuses, a stale entry is a lie — strictly better than
 marker-plus-allowlist, because the reason becomes reviewable text). The reader-service
 the markers provide moves to the edit hook (one injected line on first edit of a file:
-its tier and rules); genesis v2 emits one tiers artifact instead of a header per file.
+its tier and rules) — BUILT, now `probe-hook`'s third voice (`tier_voice`, reading
+`spec/tiers.spec`, paid once per file); genesis v2 emits one tiers artifact instead of a
+header per file.
 
 Step one landed with the candidate: `boundary-enforce` computes the tier census in the
 same walk as the qualify census (`Config::tiers_spec`, `BLESS_TIERS`), frozen to
@@ -830,6 +833,17 @@ carries the binary's version, and advisory/fail-open means skew degrades to weak
 advice, never a false refusal. Re-execing a repo-local build stays deliberately
 unbuilt until skew is observed hurting. It publishes with the other four on every
 certification release.
+
+**The antipattern closed on our own tree (follow-up):** the eleventh ask was filed
+because the antipattern was wearing THIS repo's `settings.json` — and yet the repo kept
+using `shape-watch.sh`, the very bash-wrapper-plus-inline-Python glue the crate exists to
+retire. Fixed: `probe-hook::respond` grew the SECOND voice (the shape ticker —
+`discover::watch::Ticker`, folded in from what `place_watch --event` did), so the shipped
+binary is now the WHOLE edit-time envelope (guard + ticker), not just the guard;
+`.claude/settings.json` invokes `probe-hook` (the exact entry `install` writes); and
+`shape-watch.sh` is deleted. The repo now dogfoods the guard it ships — the antipattern
+gone from the one place it was most visible. Local activation is the shipped consumer flow
+(`cargo install --path probe-hook`, wired into the session-start hook for the remote env).
 
 ## The perimeter is a lock (BUILT)
 
@@ -1373,6 +1387,75 @@ Remaining, disclosed: three-plus DISTINCT carriers (the `LiftedN` ladder or the
 N conceptual sorts as one enum are already single-carrier `Lifted`). The byte-lock register
 has reached its honest floor — surface and tiers, covered cross-crate.
 
+## Candidate: differential-certify — the published artifact as the judge (the bootstrap floor)
+
+The `#[mutate]` retirement (above, "on the table") stalls on ONE residual role: source
+mutation of the non-theory PLUMBING — the parser, the engine's structural transforms, and at
+the bottom the interpreter that judges the oracles. Two obstructions were named for it: the
+plumbing's carrier is structural (ASTs, theories) not a flat grid, and its spec is
+EXTENSIONAL (the frozen bytes on the repo's own sample) not a law-set. The first dissolves —
+enumerate the STRUCTURED side (bounded ASTs, built as data) and lift with structural laws
+(round trip `parse ∘ render = id`, idempotence, the placer's already-named fixed point). What
+survives as genuinely irreducible is smaller than "the plumbing": it is the JUDGE. To
+oracle-sweep a core function you need a grid and an observation that must not route through
+the function under test; for the interpreter, the observation IS the interpreter, so using it
+to validate itself is circular — the proof-checker-kernel / self-hosting-compiler floor.
+
+The move that unties the knot: **the last certified release is the independent judge.** A
+published release binary carries auto-lift, was built from different source, is frozen, and
+already passed certification (mutants-green). So release N's core is judged by release N−1's
+binary — "X validates X" becomes "X_{n−1} validates X_n", a regress with a base case, i.e.
+INDUCTION. The predecessor's auto-lift ingests the current core's plain-Rust surface, lifts
+it, runs discovery + the oracle sweep, and the PREDECESSOR's engine renders the verdict. No
+self-reference. This is the repo's existing SECOND-SOURCE pattern (the compiled theory as the
+ticker's second source `step_theory`; the crates.io index as the substrate's second source)
+applied to the bootstrap floor itself — idiomatic, not a bolt-on.
+
+And the "mutants" get strictly better. Synthetic `#[mutate]` flips carry the equivalent-mutant
+problem (is this flip even meaningful?). Here the perturbation under test is the REAL
+inter-release diff — every change is one a human actually made, so there are no equivalent
+mutants by construction. That is the method's own "generate against the spec boundary, not the
+code's neighbourhood," reached from the other side: the boundary crossed is the diff since the
+last green.
+
+Proposed gate — `differential-certify`: (1) pull the latest certified release binary; (2)
+auto-lift the working-tree core against it; (3) any un-ratified behavioural divergence is a
+red check. Divergence routes into the EXISTING discipline: an INTENDED change (new law shape,
+fixed bug, deliberate semantics move) makes the predecessor disagree, and that disagreement is
+admitted iff it drifts a lock the commit ratifies — "differential divergence → ratify a lock
+diff" is the same shape as "mutation survivor → ratify a degree of freedom", so the
+ratification machinery already exists. An UNINTENDED divergence is a regression the certified
+predecessor catches for free.
+
+Honest limits, none fatal but all load-bearing:
+
+- **Differential, so blind to common-mode faults.** The predecessor is independent w.r.t. the
+  DIFF since that release, not w.r.t. shared ancestry. A bug present in both N−1 and N
+  (inherited, never noticed) produces no disagreement — the standard N-version correlated-fault
+  hole. Only re-baselining against an independently-reasoned implementation reaches it.
+- **The floor moves; it does not vanish.** Release 0 was validated by a non-self method
+  (`floor`/`relation` are generation-tested, not mutated). The trick AMORTIZES that expensive
+  check to the base case and periodic re-baselines; the root is still there. And it inherits
+  TRUSTING-TRUST: a compromised release validates its successor into agreeing with the
+  compromise. The defense is provenance — the past binary reproducible from frozen source under
+  an independent toolchain; the substrate lock is the start of that story, not the whole of it.
+- **Auto-lift reach and version skew bound what the predecessor can see.** N−1's scanner lifts
+  N's surface only as far as auto-lift reaches (`Shaped`, ≤2 carriers) and as far as N−1
+  recognizes N's syntax; the higher-order judge core still needs the hand-built AST-grid-as-data
+  lift (the predecessor is its JUDGE, but does not auto-generate it). A large refactor closes
+  the adjacent-release window.
+- **Per-diff, not whole-code.** It exercises only code that CHANGED; unchanged core "agrees"
+  trivially and is covered transitively (checked against its own predecessor when introduced) —
+  the same "coverage carries forward as a property" the oracle sweep already runs on, but a
+  DIFFERENT guarantee than synthetic mutation's "every line is observed by some probe". It PAIRS
+  with the probe census (Rung 3's "a deleted drill breaks the gate" catches a diff that WEAKENS
+  coverage of unchanged code — behaviour would not diverge, but the census fires), it does not
+  replace it.
+
+The one thing it does not buy, stated so it is not oversold: escape from the base case.
+Someone, once, still trusts release 0 by a method that is not "ask release 0." Everything after
+that, the published artifact can carry.
+
 ## Framing: the real domain is stability under containment
 
 Worth stating plainly, because it reframes what the method is FOR. Probe-algebra's real
@@ -1404,6 +1487,90 @@ toleranced judgment over containment. The consumer guarantee reads the same in a
 swap the pipeline's implementation, and we catch the swap unless the difference is a
 ratified degree of freedom (a legitimate non-local effect) or a spec symmetry. Migration
 just happens to be the instance where that fine print is empty.
+
+## The lock narrates its own movement: `delta()` (BUILT)
+
+The build/text boundary, resolved from the emitter's side. Distance, cohesion, and
+placement need the compiled theory (running `eval`), so a text edit cannot re-derive them —
+but the drift gate already re-derives them on every freeze, and at the compare it holds BOTH
+sides: the committed text and the freshly derived live text (`spec-lock`'s `check`, the line
+`committed == lock.live`). The gate collapsed that to a bool and threw the difference away.
+
+`spec_lock::Lock::delta` keeps it. For a lock whose lines ARE recommendations — the shape's
+placement verdict (`7 of 7 settled` → `6 of 7`) and seam candidates, the tier assignments —
+the committed→live line diff IS the updated recommendation, and it is produced by the same
+run that emits the lock, from the two sides that run holds at that instant. Nothing watches a
+file write; nothing reconstructs a diff from git after the fact. The multiset line diff
+(`LockDelta::between`, blank lines dropped) is the same set-diff honesty as `RegisterDrift`,
+one altitude down: an in-place line cancels, a moved line shows as one removal and one
+addition.
+
+The wiring closes the loop without moving the derivation off the build:
+
+- **`examples/freeze_spec`** captures `spec_lock::deltas(&locks)` BEFORE `bless` overwrites
+  the committed side, prints the movement for whoever ran the freeze, and writes the rendered
+  narration to `target/probe-hook/freeze-delta` (empty on no movement — a stale delta never
+  lingers).
+- **probe-hook** gains a FOURTH voice, the freeze-delta courier — the only one it does not
+  compute. It reads that file, inserts the movement ONCE into the next context window, and
+  clears it. The mechanism is native to `delta()`, run at freeze time; the hook is only the
+  wire. This is the honest resolution of "should the hook re-derive cohesion" — no: the hook
+  cannot afford `eval`, so the recommendation movement is derived where it is cheap (the build
+  that emits the locks) and couriered to where it is read.
+
+Why this shape and not a session-start `git diff` of the shape lock: a git diff would
+RECONSTRUCT downstream a delta the emitter already had in hand and deleted. Surfacing it from
+`delta()` keeps one derivation, at the build, in the grain of the one rule — the committed
+diff is the ratification, and now the run that produces that diff also narrates it.
+
+### The tier voice reads its rules from the lock (dogfooding caught the last copy)
+
+Exercising the installed hook surfaced an oversight against our own "derive everything from
+the locks" claim: `tiers.spec` carried the DATA (which file is which tier) but the tier voice
+recited the MEANINGS ("KERNEL — the trusted floor, exempt from the structural rules") from a
+`match` in `probe-hook`'s own source. So the lock never went stale, but the reader did — an
+older binary against a fresh lock would recite rules that no longer matched what the enforcer
+forbids. Fixed by rendering a `# rule <TIER>:` legend into `tiers.spec` (`boundary-enforce`
+owns what a tier forbids, so it owns the legend), and having the hook READ the matching line
+instead of holding a copy. Proven live: reword the legend in the lock and the hook echoes the
+new words; a lock without the legend names the tier and points at regeneration rather than
+guessing. The remaining reader-skew is the linked `boundary-spec` (the guard and ticker are
+called at probe-hook's own pin, not the consumer's) — the honest fix there is re-execing the
+repo-pinned build, the same nicer form the crate docs already flag, deferred until skew is
+seen hurting.
+
+## The sixth sense: the coupling ticker on any Rust edit (BUILT)
+
+The build/text split said structure is text-derivable and behaviour needs the build. The
+coupling recommendation (split / cohesion) is STRUCTURE — placement is "two operators share a
+net when a sort appears in both signatures," pure signature text — so it never needed the
+build, and it is most useful at the moment of the edit, when intent is freshest ("this
+function I just wrote couples Order and Invoice — intended?"). The ticker already proved the
+text path for theories (`parse_ops`, no compile); this widens it to a THIRD front,
+`parse_rust_sigs`: an ordinary module nets on its OWN declared types (structs, enums — the
+plain-Rust analog of a theory's sorts), so its functions place into clusters and an edit that
+first spans two of them BRIDGES them.
+
+The noise answer is the whole design: ubiquitous types (`String`, `Result`, `Vec`, generics,
+references) are NEVER nets — netting on them would wire every function to every other and drown
+the sense. A function is an operator only when it mentions one of the module's own types (Self
+resolved to the impl target). The existing noise policy carries over unchanged: an edit inside
+one cluster is silence, only a bridge or a new net-disjoint component speaks. Both fronts share
+one core (`hook_line_signatures`), so theory and plain Rust get the identical live sense, and
+the hook's `shape_voice` picks the front by content (`ops {` → sorts, else own types).
+
+What stays on the build, correctly: distance, discovered laws, cohesion-as-behaviour — they
+need `eval`, and mid-edit the code does not even compile, so a behavioural verdict then would
+be noise about a half-written function. The courier (above) delivers those. So the edit hook
+now carries the STRUCTURAL half as a sixth sense, and the build carries the BEHAVIOURAL half as
+a narrated delta — the split the build/text boundary always implied, finally on both sides.
+
+Follow-up worth naming: the plain-Rust net model is a first cut. It nets on the module's own
+types by name; it does not yet see cross-module coupling (a function wiring THIS module's type
+to an imported one), and name-collision across modules is possible. The theory front has the
+compiled second source to cross-check against (`step_theory`); the plain-Rust front has only
+text. A build-time cross-check (parsed placement vs a compiled reachability view) is the honest
+next tightening, deferred until the text model is seen misleading.
 
 ## Standing follow-ups
 

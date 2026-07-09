@@ -36,6 +36,12 @@
 //! # std::fs::remove_dir_all(&dir).ok();
 //! ```
 //!
+//! The gate collapses that compare to a bool, but the compare holds both sides — the committed
+//! text and the freshly derived live text — at one instant. For a lock whose lines ARE
+//! recommendations (a placement verdict, a seam candidate, a tier), the diff between those sides
+//! is the updated recommendation, and [`Lock::delta`] hands it back instead of discarding it: the
+//! same run that emits the lock narrates its own movement, with nothing to watch or reconstruct.
+//!
 //! What it buys: the derived artifact can never rot silently, and behaviour review happens where
 //! review already happens — in the diff. What it costs: the determinism obligation above, and some
 //! churn when the *deriving engine* changes (every lock regenerates at once; that diff still wants
@@ -108,6 +114,94 @@ pub fn bless(locks: &[Lock]) -> std::io::Result<()> {
         fs::write(&lock.path, &lock.live)?;
     }
     Ok(())
+}
+
+/// The committed→live movement of one [`Lock`]: the lines a re-derivation would REMOVE from
+/// the ratified text and the lines it would ADD. This is the diff [`check`] already computes
+/// (`committed == lock.live`) and discards into a pass/fail bool — held onto instead.
+///
+/// A [`Lock`]'s live text is the derivation's current output; for a lock whose lines ARE
+/// recommendations (a placement verdict, a seam candidate, a tier assignment), this delta IS
+/// the updated recommendation — produced by the same run that emits the lock, from the two
+/// sides it holds at that instant. There is nothing to watch and nothing to reconstruct: the
+/// emitter narrates its own movement.
+///
+/// The diff is a MULTISET difference at line granularity — the same set-diff honesty as
+/// [`RegisterDrift`], one altitude down — so a line unchanged in place never appears, and a
+/// line that moved shows as one removal and one addition. Blank lines are ignored (a
+/// section-separator shift is never a recommendation change).
+#[derive(Debug, PartialEq, Eq)]
+pub struct LockDelta {
+    /// Lines in the committed baseline that the live derivation no longer produces.
+    pub removed: Vec<String>,
+    /// Lines the live derivation produces that the committed baseline did not carry.
+    pub added: Vec<String>,
+}
+
+impl LockDelta {
+    /// The line-level multiset difference between a committed baseline and a live derivation.
+    /// A live line cancels one matching committed line (order-preserving); the uncancelled
+    /// remainder on each side is the movement. Blank lines are dropped before diffing.
+    pub fn between(committed: &str, live: &str) -> Self {
+        let mut removed: Vec<String> = committed
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .map(str::to_string)
+            .collect();
+        let mut added: Vec<String> = Vec::new();
+        for line in live.lines().filter(|l| !l.trim().is_empty()) {
+            if let Some(i) = removed.iter().position(|l| l == line) {
+                removed.remove(i);
+            } else {
+                added.push(line.to_string());
+            }
+        }
+        LockDelta { removed, added }
+    }
+
+    /// No movement: the live derivation reproduces the committed baseline line-for-line
+    /// (blank lines aside). A fresh lock has an empty delta.
+    pub fn is_empty(&self) -> bool {
+        self.removed.is_empty() && self.added.is_empty()
+    }
+
+    /// The movement, rendered — removals then additions, each line prefixed, under a
+    /// `lock <name> moved:` header. The shape the freeze run prints and the hook injects.
+    pub fn render(&self, name: &str) -> String {
+        let mut out = format!("lock `{name}` moved:");
+        for line in &self.removed {
+            out.push_str(&format!("\n  - {}", line.trim_end()));
+        }
+        for line in &self.added {
+            out.push_str(&format!("\n  + {}", line.trim_end()));
+        }
+        out
+    }
+}
+
+impl Lock {
+    /// This lock's committed→live movement, or `None` when there is none to narrate.
+    ///
+    /// `None` covers two cases the caller need not distinguish for narration: the lock is
+    /// FRESH (live reproduces the committed text) or it was NEVER FROZEN (the file is
+    /// missing/unreadable — a delta against a baseline that does not exist is not a
+    /// recommendation movement but a stale gate, which [`check`] already reports). A lock
+    /// that exists and differs returns `Some` with the movement.
+    pub fn delta(&self) -> Option<LockDelta> {
+        let committed = fs::read_to_string(&self.path).ok()?;
+        let delta = LockDelta::between(&committed, &self.live);
+        (!delta.is_empty()).then_some(delta)
+    }
+}
+
+/// Every lock that MOVED, paired with its display name, in the given order — the batch
+/// form of [`Lock::delta`] for a freeze run that wants to narrate the whole regeneration.
+/// Fresh and never-frozen locks are absent (they have no movement to report).
+pub fn deltas(locks: &[Lock]) -> Vec<(&str, LockDelta)> {
+    locks
+        .iter()
+        .filter_map(|lock| lock.delta().map(|d| (lock.name.as_str(), d)))
+        .collect()
 }
 
 /// One anchored artifact: a live derivation held against a FOREIGN committed file — an
@@ -514,6 +608,80 @@ mod tests {
         assert_eq!(check(std::slice::from_ref(&nested)), Ok(vec!["nested"]));
         // the file holds exactly the live text — bless writes, check re-reads, nothing rewrites.
         assert_eq!(fs::read_to_string(&nested.path).unwrap(), nested.live);
+    }
+
+    // ===== deltas: the movement the check discards ==========================
+
+    /// The delta IS the diff `check` collapses to a bool: a moved lock reports exactly the
+    /// lines a re-derivation would remove and add, in-place lines cancel, and the render
+    /// shows removals before additions.
+    #[test]
+    fn a_moved_lock_narrates_its_committed_to_live_movement() {
+        let scratch = Scratch::new("delta-moved");
+        // a stand-in shape lock: a verdict line that moves, a seam line that vanishes, a
+        // settled line that stays put.
+        let committed =
+            "verdict: 7 of 7 settled\n- interpreter: settled\nseam: date <-> ttl on Duration\n";
+        let live = "verdict: 6 of 7 settled\n- interpreter: settled\n";
+        let lock = Lock {
+            name: "boundary-spec".to_string(),
+            path: scratch.0.join("shape.spec"),
+            live: live.to_string(),
+        };
+        fs::write(&lock.path, committed).unwrap();
+        let delta = lock.delta().expect("the lock moved");
+        assert_eq!(
+            delta.removed,
+            vec![
+                "verdict: 7 of 7 settled".to_string(),
+                "seam: date <-> ttl on Duration".to_string(),
+            ]
+        );
+        assert_eq!(delta.added, vec!["verdict: 6 of 7 settled".to_string()]);
+        // the unchanged `- interpreter: settled` line never appears (multiset cancel).
+        let rendered = delta.render(&lock.name);
+        assert!(rendered.starts_with("lock `boundary-spec` moved:"));
+        assert!(rendered.contains("\n  - verdict: 7 of 7 settled"));
+        assert!(rendered.contains("\n  + verdict: 6 of 7 settled"));
+        assert!(
+            !rendered.contains("interpreter"),
+            "in-place line stays silent: {rendered}"
+        );
+    }
+
+    /// A fresh lock has no movement, and a never-frozen lock has none either — both are
+    /// `None`: a delta is a recommendation change against a ratified baseline that exists,
+    /// not a stale-gate signal (that is `check`'s job).
+    #[test]
+    fn a_fresh_or_never_frozen_lock_has_no_delta() {
+        let scratch = Scratch::new("delta-none");
+        let fresh = lock(&scratch.0, "fresh", "verdict: settled\n\nseam: none\n");
+        fs::write(&fresh.path, &fresh.live).unwrap();
+        assert_eq!(
+            fresh.delta(),
+            None,
+            "blank-line-only difference is no movement"
+        );
+
+        let never = lock(&scratch.0, "never", "anything\n");
+        assert_eq!(never.delta(), None, "no baseline to move against");
+    }
+
+    /// The batch form narrates a whole regeneration: only the locks that moved appear, each
+    /// paired with its name, in call order.
+    #[test]
+    fn deltas_reports_only_the_locks_that_moved() {
+        let scratch = Scratch::new("delta-batch");
+        let stayed = lock(&scratch.0, "stayed", "same\n");
+        fs::write(&stayed.path, &stayed.live).unwrap();
+        let moved = lock(&scratch.0, "moved", "new line\n");
+        fs::write(&moved.path, "old line\n").unwrap();
+        let batch = [stayed, moved];
+        let reported = deltas(&batch);
+        assert_eq!(reported.len(), 1);
+        assert_eq!(reported[0].0, "moved");
+        assert_eq!(reported[0].1.removed, vec!["old line".to_string()]);
+        assert_eq!(reported[0].1.added, vec!["new line".to_string()]);
     }
 
     // ===== cross-locks =====================================================

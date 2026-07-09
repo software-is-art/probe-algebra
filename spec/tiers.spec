@@ -6,6 +6,10 @@
 # consumer's own tree (the build.rs allowlist, or a register it parses).
 # Regenerate with `BLESS_TIERS=1 cargo build`.
 # 56 files: 3 boundary, 4 interior, 39 algebra, 10 kernel.
+# rule KERNEL: the trusted floor — exempt from the structural rules; a ratified privilege
+# rule BOUNDARY: tier 1 — a domain's strict value-object surface; no loose `pub fn`
+# rule INTERIOR: tier 2 — the workshop; mutation and raw collections allowed; no loose `pub fn`
+# rule ALGEBRA: the discovered-law / report layer; exempt from the inward rule; no loose `pub fn`
 
 - src/boundary.rs: KERNEL (registered — a decision, never derived)
 - src/capability.rs: KERNEL (registered — a decision, never derived)

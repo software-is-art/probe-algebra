@@ -12,6 +12,14 @@
 //! a compiled theory ([`Ticker::step_theory`]): the engine's signature table feeds the
 //! same source-agnostic core, and code-modeled theories get the identical layout sense.
 //!
+//! And PLAIN RUST is a third source ([`Ticker::parse_rust_sigs`]): an ordinary module with no
+//! `ops { }` stanza still has a coupling structure — its functions wire its own types together
+//! — so the placer nets on the module's declared types (its structs and enums are its sorts;
+//! ubiquitous types like `String` are never nets, or every function would couple to every
+//! other). That is what lets the edit hook carry the coupling sense on any file, not just a
+//! theory: write a function that first spans two of your types' clusters and the ticker says so
+//! as you save it.
+//!
 //! Placement is monotone (an operator can seed a component, join one, or bridge two —
 //! never re-split what it does not touch), so three verbs are the COMPLETE event
 //! vocabulary of an edit session. [`Ticker::step`] diffs consecutive placements into
@@ -23,6 +31,8 @@
 //! Parsing is refusal-shaped, house style: a line that looks like an operator but does
 //! not parse is a named error, never a silent skip — a watcher that silently drops an
 //! operator would narrate a wrong shape with full confidence.
+
+use std::collections::BTreeSet;
 
 use super::engine::Theory;
 use super::shape::{NetSignature, Placement};
@@ -37,6 +47,171 @@ impl Ticker {
     /// renders sorts by their Debug name.
     pub fn parse_ops(source: &str) -> Result<Vec<NetSignature>, String> {
         parse_ops(source)
+    }
+
+    /// Extract placement signatures from PLAIN RUST — the third front onto the same placer
+    /// core, so an ordinary module gets the live coupling sense with no `ops { }` stanza and
+    /// no compiled theory. See [`rust_sigs`] for the net model (the module's own types are
+    /// the sorts).
+    pub fn parse_rust_sigs(source: &str) -> Result<Vec<NetSignature>, String> {
+        rust_sigs(source)
+    }
+}
+
+/// Placement signatures from a plain Rust module's TEXT — the sixth-sense front.
+///
+/// The nets are the module's OWN declared types (structs, enums, unions, type aliases): the
+/// plain-Rust analog of a theory's sorts. Ubiquitous types (`String`, `Result`, `Vec`, `bool`,
+/// generics, references) are deliberately NOT nets — netting on them would wire every function
+/// to every other and drown the sense. A function becomes an operator only when it MENTIONS at
+/// least one own-type (in a parameter or the return, with `self`/`Self` resolved to the impl's
+/// target); its nets are exactly the own-types it mentions. So a component is a cluster of the
+/// module's types wired together by its functions, and the edit that first makes one function
+/// mention two previously-separate clusters BRIDGES them — the alarm the ticker exists for.
+///
+/// Methods are keyed `Type::method`, free functions by name, so the operator identity a later
+/// edit is diffed against is stable. A module that does not parse (a half-written edit) is a
+/// named refusal, exactly like the ops parser: the hook stays silent rather than narrate a
+/// shape from broken text.
+#[crate::mutate]
+fn rust_sigs(source: &str) -> Result<Vec<NetSignature>, String> {
+    let file =
+        syn::parse_file(source).map_err(|e| format!("rust placement: unparseable module: {e}"))?;
+    let mut own = BTreeSet::new();
+    own_types(&file.items, &mut own);
+    let mut sigs = Vec::new();
+    fn_sigs(&file.items, &own, &mut sigs);
+    Ok(sigs)
+}
+
+/// The module's own type names — the net vocabulary — recursing into inline modules.
+#[crate::mutate]
+fn own_types(items: &[syn::Item], out: &mut BTreeSet<String>) {
+    for item in items {
+        match item {
+            syn::Item::Struct(s) => drop(out.insert(s.ident.to_string())),
+            syn::Item::Enum(e) => drop(out.insert(e.ident.to_string())),
+            syn::Item::Union(u) => drop(out.insert(u.ident.to_string())),
+            syn::Item::Type(t) => drop(out.insert(t.ident.to_string())),
+            syn::Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    own_types(inner, out);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Every function's own-type nets as a placement signature — free functions and impl methods
+/// (Self resolved to the impl target), recursing into inline modules. A function that mentions
+/// none of the module's own types carries no domain coupling and is not an operator.
+#[crate::mutate]
+fn fn_sigs(items: &[syn::Item], own: &BTreeSet<String>, out: &mut Vec<NetSignature>) {
+    for item in items {
+        match item {
+            syn::Item::Fn(f) => push_sig(&f.sig, None, own, out),
+            syn::Item::Impl(im) => {
+                let ty = impl_ident(&im.self_ty);
+                for it in &im.items {
+                    if let syn::ImplItem::Fn(m) = it {
+                        push_sig(&m.sig, ty.as_deref(), own, out);
+                    }
+                }
+            }
+            syn::Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    fn_sigs(inner, own, out);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The impl target's type name, if it is a plain path (`impl Foo` / `impl Foo<T>`); `None`
+/// for the exotic self types (`impl Trait for &mut [T]`) placement does not net on.
+#[crate::mutate]
+fn impl_ident(ty: &syn::Type) -> Option<String> {
+    match ty {
+        syn::Type::Path(p) => p.path.segments.last().map(|s| s.ident.to_string()),
+        _ => None,
+    }
+}
+
+/// One function's signature to a placement signature, or nothing when it touches no own-type.
+/// `self_ty` is the impl target for a method (so `self`/`Self` resolve to it); `None` for a
+/// free function.
+#[crate::mutate]
+fn push_sig(
+    sig: &syn::Signature,
+    self_ty: Option<&str>,
+    own: &BTreeSet<String>,
+    out: &mut Vec<NetSignature>,
+) {
+    let mut raw = BTreeSet::new();
+    for arg in &sig.inputs {
+        match arg {
+            syn::FnArg::Receiver(_) => drop(raw.insert("Self".to_string())),
+            syn::FnArg::Typed(pt) => type_idents(&pt.ty, &mut raw),
+        }
+    }
+    if let syn::ReturnType::Type(_, t) = &sig.output {
+        type_idents(t, &mut raw);
+    }
+    // resolve Self to the impl target, then keep only the module's own types.
+    let mut nets: Vec<String> = raw
+        .into_iter()
+        .filter_map(|id| {
+            if id == "Self" {
+                self_ty.map(str::to_string)
+            } else {
+                Some(id)
+            }
+        })
+        .filter(|id| own.contains(id))
+        .collect();
+    nets.sort();
+    nets.dedup();
+    if nets.is_empty() {
+        return;
+    }
+    let name = match self_ty {
+        Some(t) => format!("{t}::{}", sig.ident),
+        None => sig.ident.to_string(),
+    };
+    // placement unions inputs with the output, so the split is immaterial; the whole net set
+    // rides `inputs`, and `output` names one member (never empty — the guard above).
+    let output = nets[0].clone();
+    out.push((Box::leak(name.into_boxed_str()), nets, output));
+}
+
+/// Every own-type name a `syn::Type` mentions — the last path segment of each type, recursing
+/// through generic arguments (`Vec<Order>` → `Order`) and the structural wrappers (references,
+/// tuples, slices, arrays). Intersection with the module's own types happens in [`push_sig`].
+#[crate::mutate]
+fn type_idents(ty: &syn::Type, out: &mut BTreeSet<String>) {
+    match ty {
+        syn::Type::Path(p) => {
+            if let Some(seg) = p.path.segments.last() {
+                out.insert(seg.ident.to_string());
+                if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
+                    for a in &args.args {
+                        if let syn::GenericArgument::Type(t) = a {
+                            type_idents(t, out);
+                        }
+                    }
+                }
+            }
+        }
+        syn::Type::Reference(r) => type_idents(&r.elem, out),
+        syn::Type::Tuple(t) => t.elems.iter().for_each(|e| type_idents(e, out)),
+        syn::Type::Slice(s) => type_idents(&s.elem, out),
+        syn::Type::Array(a) => type_idents(&a.elem, out),
+        syn::Type::Paren(p) => type_idents(&p.elem, out),
+        syn::Type::Group(g) => type_idents(&g.elem, out),
+        syn::Type::Ptr(p) => type_idents(&p.elem, out),
+        _ => {}
     }
 }
 
@@ -217,21 +392,33 @@ impl Ticker {
             .collect()
     }
 
-    /// The hook's one-line verdict for an edit, or `None` — the noise policy that makes
-    /// the agent surface affordable: `Bridged` always speaks (a coupling is the alarm),
-    /// a `Seeded` speaks only when it opens a SECOND component (a new disjoint feature —
-    /// the extraction becomes available), and everything else is silence, because the
-    /// common case must cost zero tokens.
+    /// The hook's one-line verdict for a THEORY edit (the `ops { }` front), or `None`.
+    /// Delegates to the source-agnostic [`Ticker::hook_line_signatures`] so the plain-Rust
+    /// front and the theory front share one noise policy.
     pub fn hook_line(&mut self, name: &'static str, source: &str) -> Option<String> {
-        let (placement, event) = self.step(name, source).ok()?;
+        self.hook_line_signatures(name, parse_ops(source).ok()?)
+    }
+
+    /// The hook's one-line verdict from already-parsed signatures — the SHARED core both
+    /// fronts (ops text, plain Rust) speak through. The noise policy that makes the agent
+    /// surface affordable, and the same for a theory or a module: `Bridged` always speaks (a
+    /// coupling is the alarm), a `Seeded` speaks only when it opens a SECOND component (a new
+    /// net-disjoint feature), and everything else is silence, because the common case — an
+    /// edit within one cluster — must cost zero tokens.
+    pub fn hook_line_signatures(
+        &mut self,
+        name: &'static str,
+        sigs: Vec<NetSignature>,
+    ) -> Option<String> {
+        let (placement, event) = self.step_signatures(name, sigs);
         match event? {
             ShapeEvent::Bridged { from, to } => Some(format!(
                 "shape: BRIDGED {from}->{to} in {name} — the edit coupled previously \
                  separate features (intended?)"
             )),
             ShapeEvent::Seeded { ops } if placement.components.len() > 1 => Some(format!(
-                "shape: {name} places as {} modules — {{ {} }} is net-disjoint; the \
-                 extraction is available (Architect::place)",
+                "shape: {name} places as {} net-disjoint components — {{ {} }} shares no \
+                 type with the rest (a separate feature)",
                 placement.components.len(),
                 ops.join(", ")
             )),
@@ -466,8 +653,11 @@ mod probes {
         let line = t
             .hook_line("bench", &stage(&two))
             .expect("a seed that splits speaks");
-        assert!(line.contains("places as 2 modules"), "{line}");
-        assert!(line.contains("extraction is available"));
+        assert!(
+            line.contains("places as 2 net-disjoint components"),
+            "{line}"
+        );
+        assert!(line.contains("a separate feature"));
 
         // a bridge: always one line, always the question.
         let coupled = format!("{counter}{bump}{flag}{bridge}");
@@ -486,6 +676,78 @@ mod probes {
         let mut t = Ticker::resume("bench", &Ticker::store(&stage(&coupled)).unwrap());
         assert_eq!(t.hook_line("bench", "ops { garbage"), None);
         assert_eq!(t.hook_line("bench", &stage(&coupled)), None);
+    }
+
+    /// THE THIRD FRONT: plain Rust nets on the module's OWN types, and only those. A module
+    /// whose functions wire two of its types into one cluster and leave a third standing alone
+    /// places as two components; the function that later touches both clusters BRIDGES them;
+    /// and a function that mentions no own-type (only `String`/`usize`) is never an operator,
+    /// so ubiquitous types cannot couple the whole module.
+    #[test]
+    fn plain_rust_nets_on_the_modules_own_types() {
+        // Order and Invoice are wired by `bill`; Ledger stands alone; `format_id` mentions no
+        // own type (String only) and must not appear.
+        let two = "\
+            struct Order; struct Invoice; struct Ledger;\n\
+            fn bill(o: Order) -> Invoice { todo!() }\n\
+            fn post(l: Ledger) -> Ledger { todo!() }\n\
+            fn format_id(s: String) -> String { todo!() }\n";
+        let sigs = Ticker::parse_rust_sigs(two).expect("parses");
+        let symbols: Vec<&str> = sigs.iter().map(|(s, _, _)| *s).collect();
+        assert!(
+            symbols.contains(&"bill") && symbols.contains(&"post"),
+            "{symbols:?}"
+        );
+        assert!(
+            !symbols.contains(&"format_id"),
+            "a String-only fn is no operator: {symbols:?}"
+        );
+        let placement = Placement::over("mod", sigs);
+        assert_eq!(
+            placement.components.len(),
+            2,
+            "Order|Invoice cluster, Ledger cluster"
+        );
+
+        // the ticker, live: the two-cluster module announces itself once, an in-cluster edit is
+        // silent, and the function that spans both clusters bridges them.
+        let mut t = Ticker::new();
+        let first = t.hook_line_signatures("mod", Ticker::parse_rust_sigs(two).unwrap());
+        assert!(first
+            .unwrap()
+            .contains("places as 2 net-disjoint components"));
+        let added_local = format!("{two}fn refund(o: Order) -> Order {{ todo!() }}\n");
+        assert_eq!(
+            t.hook_line_signatures("mod", Ticker::parse_rust_sigs(&added_local).unwrap()),
+            None,
+            "an edit inside one cluster is silent"
+        );
+        let bridge = format!("{added_local}fn reconcile(i: Invoice) -> Ledger {{ todo!() }}\n");
+        let line = t
+            .hook_line_signatures("mod", Ticker::parse_rust_sigs(&bridge).unwrap())
+            .expect("the spanning fn bridges");
+        assert!(
+            line.contains("BRIDGED") && line.contains("intended?"),
+            "{line}"
+        );
+
+        // Self resolves to the impl target, and a wrapped generic (`Vec<Order>`) still nets.
+        let methods = "\
+            struct Order; struct Cart;\n\
+            impl Cart { fn items(&self) -> Vec<Order> { todo!() } }\n";
+        let sigs = Ticker::parse_rust_sigs(methods).unwrap();
+        let coupled = Placement::over("m", sigs);
+        assert_eq!(coupled.components.len(), 1, "one cluster");
+        // the coupling is BOTH types: `self` resolved to Cart (impl target) and the return
+        // netted Order — so the component carries both nets, not just the return.
+        let nets = &coupled.components[0].nets;
+        assert!(
+            nets.contains(&"Cart".to_string()) && nets.contains(&"Order".to_string()),
+            "Cart::items wires Cart to Order: {nets:?}"
+        );
+
+        // a half-written module refuses by name (the hook will fall silent, never guess).
+        assert!(Ticker::parse_rust_sigs("fn oops(").is_err());
     }
 
     /// A line that looks like an operator but does not parse is a NAMED refusal — a

@@ -70,6 +70,13 @@ fn main() {
     // the PROBE CENSUS: every probe lock this crate upholds, with the mechanism that proves
     // it sensitive — the unified roster (see `discover::probes`).
     locks.push(ProbeCensus::of().lock());
+    // NARRATE THE MOVEMENT before blessing: `spec_lock::deltas` holds each lock's committed
+    // text against the live text this run derived — the diff the drift gate would collapse to
+    // a bool. For a lock whose lines are recommendations (the shape's placement verdict and
+    // seam candidates, the tier assignments), this is the updated recommendation, produced by
+    // the same run that emits the lock. Captured now because `bless` is about to overwrite the
+    // committed side.
+    let moved = spec_lock::deltas(&locks);
     spec_lock::bless(&locks).expect("write spec locks");
     for (lock, spec) in locks.iter().zip(&specs) {
         println!("froze {} ({} laws)", lock.path.display(), spec.laws.len());
@@ -92,4 +99,37 @@ fn main() {
     ]) {
         println!("froze {} ({label})", lock.path.display());
     }
+
+    // The emitter narrating its own movement: each lock whose recommendation changed, rendered
+    // from the two sides `delta()` held. Printed for whoever ran the freeze, and persisted for
+    // probe-hook to courier into a later context window (the hook only inserts; the mechanism is
+    // `delta()`, run here, at the build that produced the change). A build with no movement
+    // clears the courier, so a stale delta never lingers.
+    let narration: String = moved
+        .iter()
+        .map(|(name, delta)| delta.render(name))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if moved.is_empty() {
+        println!("\nno recommendation moved — every lock reproduces its ratified baseline.");
+    } else {
+        println!("\n{narration}");
+    }
+    let courier = spec_dir
+        .parent()
+        .unwrap_or(&spec_dir)
+        .join("target/probe-hook/freeze-delta");
+    if let Some(parent) = courier.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    // best-effort: an unwritable target never fails a freeze (the narration above already
+    // reached whoever ran it). Empty movement writes an empty file, clearing any prior delta.
+    let _ = std::fs::write(
+        &courier,
+        if narration.is_empty() {
+            String::new()
+        } else {
+            format!("{narration}\n")
+        },
+    );
 }
