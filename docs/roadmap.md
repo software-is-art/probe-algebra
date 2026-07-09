@@ -1454,6 +1454,22 @@ RECONSTRUCT downstream a delta the emitter already had in hand and deleted. Surf
 `delta()` keeps one derivation, at the build, in the grain of the one rule — the committed
 diff is the ratification, and now the run that produces that diff also narrates it.
 
+### The tier voice reads its rules from the lock (dogfooding caught the last copy)
+
+Exercising the installed hook surfaced an oversight against our own "derive everything from
+the locks" claim: `tiers.spec` carried the DATA (which file is which tier) but the tier voice
+recited the MEANINGS ("KERNEL — the trusted floor, exempt from the structural rules") from a
+`match` in `probe-hook`'s own source. So the lock never went stale, but the reader did — an
+older binary against a fresh lock would recite rules that no longer matched what the enforcer
+forbids. Fixed by rendering a `# rule <TIER>:` legend into `tiers.spec` (`boundary-enforce`
+owns what a tier forbids, so it owns the legend), and having the hook READ the matching line
+instead of holding a copy. Proven live: reword the legend in the lock and the hook echoes the
+new words; a lock without the legend names the tier and points at regeneration rather than
+guessing. The remaining reader-skew is the linked `boundary-spec` (the guard and ticker are
+called at probe-hook's own pin, not the consumer's) — the honest fix there is re-execing the
+repo-pinned build, the same nicer form the crate docs already flag, deferred until skew is
+seen hurting.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

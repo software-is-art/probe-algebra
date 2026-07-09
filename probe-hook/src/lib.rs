@@ -163,13 +163,16 @@ fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
     line
 }
 
-/// The TIER voice — one line on the FIRST edit of a file: its DERIVED tier (read from the
-/// committed `spec/tiers.spec`, the single source the build's rule dispatch also consumes)
-/// and the rules that tier carries. This is the reader-service the deleted `//! Tier:`
-/// per-file markers provided, moved to the edit hook exactly as the tiers ladder designed.
-/// Fires once per file (a persisted marker under `<project>/target/probe-hook`), so the
-/// orientation is paid once, not on every save. Silent for a file the partition does not
-/// name, and fail-open on any read/write failure.
+/// The TIER voice — one line on the FIRST edit of a file: its DERIVED tier and what that
+/// tier's membership means, BOTH read from the committed `spec/tiers.spec` (the single source
+/// the build's rule dispatch also consumes). The tier comes from the file's `- <path>: <TIER>`
+/// row; the meaning comes from the lock's `# rule <TIER>:` legend, which `boundary-enforce`
+/// renders — so the hook recites what is ENFORCED, from disk, never a compiled-in copy that
+/// could drift from a newer enforcer. (An older lock without the legend still names the tier
+/// and points at regeneration; it never guesses the rules.) This is the reader-service the
+/// deleted `//! Tier:` markers gave, moved to the edit hook. Fires once per file (a persisted
+/// marker under `<project>/target/probe-hook`), so the orientation is paid once, not on every
+/// save. Silent for a file the partition does not name, and fail-open on any read/write failure.
 ///
 /// Capability: Effectful — reads `spec/tiers.spec`, reads and writes the seen-marker.
 fn tier_voice(project_dir: &Path, rel: &str) -> Option<String> {
@@ -192,20 +195,20 @@ fn tier_voice(project_dir: &Path, rel: &str) -> Option<String> {
         return None;
     }
 
-    let rules = match tier {
-        "KERNEL" => "the trusted floor — exempt from the structural rules; a ratified privilege",
-        "BOUNDARY" => "tier 1 — a domain's strict value-object surface; no loose `pub fn`",
-        "INTERIOR" => {
-            "tier 2 — the workshop; mutation and raw collections allowed; no loose `pub fn`"
-        }
-        "ALGEBRA" => {
-            "the discovered-law / report layer; exempt from the inward rule; no loose `pub fn`"
-        }
-        _ => "see boundary-enforce for this tier's rules",
+    // the rule prose is READ from the lock's legend, never held here — so what the hook recites
+    // is exactly what the enforcer that wrote the lock forbids. A lock without the legend (an
+    // older enforcer, a consumer yet to regenerate) gets the tier and a pointer, not a guess.
+    let legend = format!("# rule {tier}: ");
+    let line = match tiers
+        .lines()
+        .find_map(|l| l.trim_start().strip_prefix(&legend))
+    {
+        Some(rules) => format!("tier: {rel} is {tier} — {}", rules.trim()),
+        None => format!("tier: {rel} is {tier} — regenerate spec/tiers.spec for this tier's rules"),
     };
     std::fs::create_dir_all(seen.parent()?).ok()?;
     std::fs::write(&seen, "").ok()?;
-    Some(format!("tier: {rel} is {tier} — {rules}"))
+    Some(line)
 }
 
 /// The FREEZE-DELTA courier — the fourth voice, and the only one the hook does NOT compute.
@@ -412,16 +415,18 @@ mod drills {
     }
 
     /// THE THIRD VOICE, drilled — a file's derived tier and rules on FIRST edit, paid once
-    /// (a second edit is silent), and silent for a file the partition does not name. The
-    /// reader-service the deleted `//! Tier:` markers gave, in the hook.
+    /// (a second edit is silent), and silent for a file the partition does not name. The rule
+    /// prose is READ from the lock's `# rule <TIER>:` legend, never compiled in — so a lock
+    /// WITHOUT the legend names the tier and points at regeneration rather than guessing.
     #[test]
-    fn the_tier_voice_orients_once_on_first_edit() {
+    fn the_tier_voice_reads_its_rules_from_the_lock_legend() {
         let root = tree(
             "tier",
             &[
                 (
                     "spec/tiers.spec",
-                    "# the partition\n- src/engine.rs: BOUNDARY (a door)\n",
+                    "# the partition\n# rule BOUNDARY: tier 1 — a domain's surface; no loose `pub fn`\n\
+                     - src/engine.rs: BOUNDARY (a door)\n",
                 ),
                 ("src/engine.rs", "pub struct X;\n"),
             ],
@@ -429,13 +434,31 @@ mod drills {
         let ev = event(&root.join("src/engine.rs"));
         let first = respond(&ev, &root).expect("the first edit orients");
         assert!(first.contains("tier: src/engine.rs is BOUNDARY"), "{first}");
-        assert!(first.contains("no loose"), "{first}");
+        // the rule text came from the lock's legend, not a copy in the binary:
+        assert!(first.contains("no loose `pub fn`"), "{first}");
         // the orientation was paid — a second edit of the same file is silence.
         assert_eq!(respond(&ev, &root), None);
         // a file the partition does not name: silence.
         let other = root.join("src/unlisted.rs");
         std::fs::write(&other, "pub struct Y;\n").unwrap();
         assert_eq!(respond(&event(&other), &root), None);
+
+        // a lock that names the tier but carries NO legend line: the tier still surfaces, and
+        // the hook points at regeneration instead of reciting a rule it no longer holds.
+        let bare = tree(
+            "tier-no-legend",
+            &[
+                (
+                    "spec/tiers.spec",
+                    "# the partition\n- src/x.rs: ALGEBRA (remainder)\n",
+                ),
+                ("src/x.rs", "pub struct Z;\n"),
+            ],
+        );
+        let voice =
+            respond(&event(&bare.join("src/x.rs")), &bare).expect("tier still names itself");
+        assert!(voice.contains("tier: src/x.rs is ALGEBRA"), "{voice}");
+        assert!(voice.contains("regenerate spec/tiers.spec"), "{voice}");
     }
 
     /// THE FOURTH VOICE, drilled — the courier carries a movement `delta()` derived at freeze

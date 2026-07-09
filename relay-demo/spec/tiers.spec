@@ -6,6 +6,10 @@
 # consumer's own tree (the build.rs allowlist, or a register it parses).
 # Regenerate with `BLESS_RELAY_APP_TIERS=1 cargo build`.
 # 8 files: 2 boundary, 2 interior, 3 algebra, 1 kernel.
+# rule KERNEL: the trusted floor — exempt from the structural rules; a ratified privilege
+# rule BOUNDARY: tier 1 — a domain's strict value-object surface; no loose `pub fn`
+# rule INTERIOR: tier 2 — the workshop; mutation and raw collections allowed; no loose `pub fn`
+# rule ALGEBRA: the discovered-law / report layer; exempt from the inward rule; no loose `pub fn`
 
 - src/gates.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/gauge.rs: BOUNDARY (pub-reachable, fronts an interior sibling)
