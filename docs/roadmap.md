@@ -1326,11 +1326,30 @@ PLANTING the probe's known-bad fixture — so `verdict()` refuses a FireDrill pr
 live drill (UNPROVEN) and a drill that stopped firing (VACUOUS). A deleted drill breaks the
 gate; the "a FireDrill claim pinned only by a test that could vanish" gap is closed. Each
 module owns its drill (the seam graph's non-homomorphic conversion, the placer's disagreeing
-placement); the catalog and world drills build from the public API. Remaining, disclosed:
-the four byte-lock drills (surface/tiers are covered cross-crate by `boundary-enforce`'s
-mutation tests — a ratified reliance, not a debt; pipeline/schemata are the tractable ones
-worth building), and the headline auto-lift — point the census at a consumer's plain Rust
-module.
+placement); the catalog and world drills build from the public API.
+
+AUTO-LIFT (BUILT — the headline): the apparatus now points at a consumer's PLAIN RUST
+module. `discover::lift` is a generic `Lifted<C>` — a single-carrier `Theory` over any
+`Shaped` carrier, one sort, the carrier's `shadow_grid`, identity observation — written
+ONCE; the only per-module thing is the operator table (`impl Liftable`: names, arities, thin
+wrappers). So a consumer who wrote only ordinary Rust gets `Spec::of::<Lifted<C>>()` (the
+probes) and `MutationReport::of::<Lifted<C>>()` (their sensitivity proof), zero declaration.
+The worked example runs it end to end: a plain `bool` module (`and`/`or`/`not`/`tru`) lifts,
+discovers its algebra (≥3 laws, no uncovered operators), and is sensitivity-swept (deaf
+floor + dents, deaf mutants caught). `AutoLift::scan_module` is the build-time half — it
+`syn`-scans a module's public functions, infers the single carrier (a second carrier is a
+named refusal — multi-sort is out of scope), and generates the `impl Liftable` a consumer's
+`build.rs` `include!`s; a reconciliation test ties the scan's output, by (name, arity), to
+the runtime-proven table, so the generated table IS the proven table and the only glue left
+is the `include!`. Scope, disclosed: one `Shaped` carrier (single-sorted); multi-sort needs
+a `Value` enum and per-sort dispatch (the next widening); a non-`Shaped` carrier has no grid,
+exactly where discovery itself stops. This is the consumer end state the "sweep discovers,
+oracle proves sensitivity" arc was aiming at: probes derived from a plain module, and each
+proven sensitive, with nothing written.
+
+Remaining, disclosed: the four byte-lock drills (surface/tiers are covered cross-crate by
+`boundary-enforce`'s mutation tests — a ratified reliance, not a debt; pipeline/schemata are
+tractable when wanted), and auto-lift's multi-sort widening (the `Value`-enum carrier).
 
 ## Framing: the real domain is stability under containment
 
