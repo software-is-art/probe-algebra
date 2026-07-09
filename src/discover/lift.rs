@@ -12,13 +12,16 @@
 //! (`shadow_grid` over the carrier's `Shaped` structure), the identity observation — is
 //! derived here.
 //!
-//! Scope, disclosed (the enumerability edge the roadmap names): this lifts a module whose
-//! functions are total-ish maps over ONE enumerable (`Shaped`) carrier — a single-sorted
-//! theory. Multiple carriers (a heterogeneous, multi-sorted signature) need a `Value` enum
-//! and per-sort dispatch, the next widening; a non-`Shaped` carrier has no grid and is out
-//! of reach, exactly where discovery itself stops. Within that edge the lift is total: the
-//! consumer writes types and Rust, the scan writes the table, and `Spec::of::<Lifted<C>>()`
-//! plus `MutationReport::of::<Lifted<C>>()` are the probes and their sensitivity proof.
+//! ONE carrier is [`Lifted`]; TWO carriers (a heterogeneous, multi-SORTED signature — a
+//! cross-sort map, a round trip) is [`Lifted2`], the same shape one level up with a tagged
+//! [`Either`] value and per-sort grids. Scope, disclosed (the enumerability edge the roadmap
+//! names): a non-`Shaped` carrier has no grid and is out of reach, exactly where discovery
+//! itself stops; carriers beyond two would generalise the tag to an N-way enum, mechanical
+//! from here. Within that edge the lift is total: the consumer writes types and Rust, the
+//! scan writes the table, and `Spec::of::<Lifted<C>>()` / `Lifted2` plus `MutationReport` are
+//! the probes and their sensitivity proof. (The build-time scan currently emits the
+//! single-carrier table; the two-carrier emission — `Either`-tagged wrappers by inferred slot
+//! sort — is the mechanical remainder, the machinery here being what it targets.)
 //!
 //! Not mutated: the generic machinery is characterized by GENERATION — the worked example's
 //! discovery and sensitivity sweep route every path through it — like `discover::floor`
@@ -99,6 +102,125 @@ impl<C: Liftable> Theory for Lifted<C> {
     fn sort_of(_v: &C) {}
 
     fn observe(v: &C) -> C {
+        v.clone()
+    }
+}
+
+// ---- multi-sort: two carriers ------------------------------------------------------------
+//
+// The single-carrier lift covers a module over ONE type. A module whose functions range over
+// TWO types (a cross-sort map like `is_on: Bit -> bool`, a round-trip `wrap`/`unwrap`) is a
+// two-SORTED theory. The generic machinery is the same shape, one level up: a tagged value
+// [`Either`] with a [`Duo`] sort, per-sort grids from each carrier's `shadow_grid`, and an
+// operator table whose slots carry sorts. `Either` needs only `Clone`/`Eq`/`Ord`/`Hash` —
+// NOT `Shaped` — because the grid is supplied per sort, not closed over the pair.
+
+/// A two-sorted lifted value: the left carrier or the right, tagged. The Value AND Obs of a
+/// [`Lifted2`] theory.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Either<A, B> {
+    /// The left (first) carrier.
+    L(A),
+    /// The right (second) carrier.
+    R(B),
+}
+
+/// The two sorts of a [`Lifted2`] theory — which carrier a slot ranges over.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Duo {
+    /// The left carrier's sort.
+    L,
+    /// The right carrier's sort.
+    R,
+}
+
+/// A two-sorted operator's evaluator — the wrapper over tagged values a scan emits.
+pub type Eval2<A, B> = fn(&[Either<A, B>]) -> Option<Either<A, B>>;
+
+/// One two-sorted lifted operator: like [`LiftedOp`] but its slots carry sorts, so a
+/// cross-sort map (`Duo::L` in, `Duo::R` out) is expressible. `eval` unwraps each argument to
+/// its carrier, calls the consumer's function, and re-tags the result.
+pub struct LiftedOp2<A: 'static, B: 'static> {
+    /// Human name for prose.
+    pub name: &'static str,
+    /// Symbol for equations.
+    pub symbol: &'static str,
+    pub fixity: Fixity,
+    /// The sort of each input slot.
+    pub inputs: Vec<Duo>,
+    /// The sort of the output.
+    pub output: Duo,
+    /// The wrapper over tagged values.
+    pub eval: Eval2<A, B>,
+}
+
+/// A module over TWO `Shaped` carriers — it names the theory, its two carrier types, and the
+/// operator table. The counterpart of [`Liftable`] one sort up; the scan generates the table
+/// and the `Either`-tagged wrappers.
+pub trait Liftable2: Sized + 'static {
+    /// The left carrier.
+    type A: Shaped + Eq + Ord + Hash + Debug + 'static;
+    /// The right carrier.
+    type B: Shaped + Eq + Ord + Hash + Debug + 'static;
+    /// The lifted theory's display name.
+    fn theory_name() -> &'static str;
+    /// The operator table.
+    fn ops() -> Vec<LiftedOp2<Self::A, Self::B>>;
+    /// The grid cap for each carrier's `shadow_grid` closure.
+    fn grid_cap() -> usize {
+        16
+    }
+}
+
+/// The two-carrier `Theory` over a [`Liftable2`] module: sorts [`Duo`], value [`Either`], each
+/// sort's grid the carrier's `shadow_grid`, identity observation. Written once, like
+/// [`Lifted`].
+pub struct Lifted2<T>(PhantomData<T>);
+
+impl<T: Liftable2> Theory for Lifted2<T> {
+    type Sort = Duo;
+    type Value = Either<T::A, T::B>;
+    type Obs = Either<T::A, T::B>;
+
+    fn name() -> &'static str {
+        T::theory_name()
+    }
+
+    fn operators() -> Vec<Operator<Self>> {
+        T::ops()
+            .into_iter()
+            .map(|op| Operator {
+                name: op.name,
+                symbol: op.symbol,
+                fixity: op.fixity,
+                inputs: op.inputs,
+                output: op.output,
+                eval: op.eval,
+            })
+            .collect()
+    }
+
+    fn inhabitants(sort: Duo) -> Vec<Either<T::A, T::B>> {
+        match sort {
+            Duo::L => shadow_grid::<T::A>(T::grid_cap())
+                .into_iter()
+                .map(Either::L)
+                .collect(),
+            Duo::R => shadow_grid::<T::B>(T::grid_cap())
+                .into_iter()
+                .map(Either::R)
+                .collect(),
+        }
+    }
+
+    fn sort_of(v: &Either<T::A, T::B>) -> Duo {
+        match v {
+            Either::L(_) => Duo::L,
+            Either::R(_) => Duo::R,
+        }
+    }
+
+    fn observe(v: &Either<T::A, T::B>) -> Either<T::A, T::B> {
         v.clone()
     }
 }
@@ -356,12 +478,91 @@ mod probes {
         assert_eq!(proven.len(), 4, "and, or, not, tru");
     }
 
-    /// The scan REFUSES a multi-carrier module by name — multi-sort is out of the
-    /// single-carrier scope, disclosed rather than mis-lifted.
+    /// The scan REFUSES a multi-carrier module by name — the single-carrier scan is
+    /// single-sort; the two-sorted lift is `Lifted2` (below), whose scan is the widening.
     #[test]
     fn the_scan_refuses_a_second_carrier() {
         let two = "pub fn mix(a: bool, b: u8) -> bool { a }";
         let err = AutoLift::scan_module(two, "mixed").expect_err("two carriers refuse");
         assert!(err.contains("multi-sort is out of scope"), "{err}");
+    }
+
+    // A CONSUMER'S plain code over TWO types — a cross-sort map and a round trip. Ordinary
+    // Rust; nothing here knows about probe-algebra.
+    fn both(a: bool, b: bool) -> bool {
+        a && b
+    }
+    fn wrap(x: bool) -> Box<bool> {
+        Box::new(x)
+    }
+    #[allow(clippy::boxed_local)] // the Box param is the point — the R carrier is Box<bool>.
+    fn unwrap(x: Box<bool>) -> bool {
+        *x
+    }
+
+    // The two-sorted lift: the table a multi-sort scan generates — each op's slot sorts and a
+    // wrapper that unwraps `Either`, calls the consumer function, and re-tags.
+    struct BoolBox;
+    impl Liftable2 for BoolBox {
+        type A = bool;
+        type B = Box<bool>;
+        fn theory_name() -> &'static str {
+            "lifted bool/box"
+        }
+        fn ops() -> Vec<LiftedOp2<bool, Box<bool>>> {
+            vec![
+                LiftedOp2 {
+                    name: "both",
+                    symbol: "both",
+                    fixity: Fixity::Infix,
+                    inputs: vec![Duo::L, Duo::L],
+                    output: Duo::L,
+                    eval: |a| match (&a[0], &a[1]) {
+                        (Either::L(x), Either::L(y)) => Some(Either::L(both(*x, *y))),
+                        _ => None,
+                    },
+                },
+                LiftedOp2 {
+                    name: "wrap",
+                    symbol: "wrap",
+                    fixity: Fixity::Prefix,
+                    inputs: vec![Duo::L],
+                    output: Duo::R,
+                    eval: |a| match &a[0] {
+                        Either::L(x) => Some(Either::R(wrap(*x))),
+                        _ => None,
+                    },
+                },
+                LiftedOp2 {
+                    name: "unwrap",
+                    symbol: "unwrap",
+                    fixity: Fixity::Prefix,
+                    inputs: vec![Duo::R],
+                    output: Duo::L,
+                    eval: |a| match &a[0] {
+                        Either::R(x) => Some(Either::L(unwrap(x.clone()))),
+                        _ => None,
+                    },
+                },
+            ]
+        }
+    }
+
+    /// A TWO-CARRIER module lifts to a two-sorted theory that discovers its algebra —
+    /// including the CROSS-SORT round trip `unwrap(wrap(x)) = x` no single-carrier lift can
+    /// express — and is sensitivity-swept, all from the plain functions.
+    #[test]
+    fn a_two_carrier_module_lifts_and_discovers_cross_sort_laws() {
+        let spec = Spec::of::<Lifted2<BoolBox>>();
+        let laws: Vec<String> = spec.laws.iter().map(|l| l.prose().to_string()).collect();
+        assert!(
+            laws.len() >= 2,
+            "the two-sorted module discovers its algebra: {laws:?}"
+        );
+        let report = MutationReport::of::<Lifted2<BoolBox>>();
+        assert!(
+            !report.deaf.is_empty() && report.deaf.iter().any(|(_, killed)| *killed),
+            "the lifted two-sorted laws catch a deaf operator"
+        );
     }
 }

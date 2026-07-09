@@ -1344,14 +1344,22 @@ floor + dents, deaf mutants caught). `AutoLift::scan_module` is the build-time h
 named refusal — multi-sort is out of scope), and generates the `impl Liftable` a consumer's
 `build.rs` `include!`s; a reconciliation test ties the scan's output, by (name, arity), to
 the runtime-proven table, so the generated table IS the proven table and the only glue left
-is the `include!`. Scope, disclosed: one `Shaped` carrier (single-sorted); multi-sort needs
-a `Value` enum and per-sort dispatch (the next widening); a non-`Shaped` carrier has no grid,
-exactly where discovery itself stops. This is the consumer end state the "sweep discovers,
-oracle proves sensitivity" arc was aiming at: probes derived from a plain module, and each
-proven sensitive, with nothing written.
+is the `include!`. And MULTI-SORT is built too: `Lifted2<T>` lifts a module over TWO
+`Shaped` carriers — a tagged `Either` value, a `Duo` sort, per-sort grids from each carrier's
+`shadow_grid` — so a cross-sort map and a ROUND TRIP are expressible. The worked example
+(`bool ⋈ Box<bool>` with `wrap`/`unwrap`/`both`) discovers the cross-sort round trip
+`unwrap(wrap(x)) = x` no single-carrier lift can state, and is sensitivity-swept. Scope,
+disclosed: a non-`Shaped` carrier has no grid, exactly where discovery itself stops; carriers
+beyond two generalise the tag to an N-way enum, mechanical from here; and the build-time scan
+currently emits the single-carrier table — the two-carrier emission (`Either`-tagged wrappers
+by inferred slot sort) is the mechanical remainder, the `Lifted2` machinery being what it
+targets. This is the consumer end state the "sweep discovers, oracle proves sensitivity" arc
+was aiming at: probes derived from a plain module — single- or two-sorted — each proven
+sensitive, with nothing written.
 
-Remaining, disclosed: auto-lift's multi-sort widening (the `Value`-enum carrier). The
-byte-lock register has reached its honest floor — surface and tiers, covered cross-crate.
+Remaining, disclosed: the two-carrier SCAN emission (the machinery it targets is built), and
+carriers beyond two (the N-way tag). The byte-lock register has reached its honest floor —
+surface and tiers, covered cross-crate.
 
 ## Framing: the real domain is stability under containment
 
