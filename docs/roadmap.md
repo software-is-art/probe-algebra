@@ -1572,6 +1572,43 @@ compiled second source to cross-check against (`step_theory`); the plain-Rust fr
 text. A build-time cross-check (parsed placement vs a compiled reachability view) is the honest
 next tightening, deferred until the text model is seen misleading.
 
+## The edit-time lock delta: the qualify census re-derived at the edit (BUILT)
+
+Why the spec-lock workflow lets review be coarse: every behavioural change surfaces as a lock
+delta, so reviewing the diff of the locks reviews the behaviour — and, because each probe carries
+a can-fail proof (a green probe that cannot fail is a lie), the mirror is complete over what it
+locks. Agents don't err on purpose; they err where nothing reflects the mistake back. So the
+lever is reflection LATENCY: push each mirror as close to the edit as it will go. The coupling
+ticker moved the STRUCTURAL reflection (placement) to the edit; this moves the first LOCK-DELTA
+reflection there too.
+
+The behavioural locks can't come along — distance, discovered laws, cohesion need `eval`, and
+mid-edit the code doesn't compile — which is why the freeze-delta courier exists: it derives those
+deltas at the build and couriers them into the next window. But one lock is not behavioural:
+`spec/qualify.spec`, the surface census, is a STRUCTURAL property (a module qualifies when its
+functions are operator-shaped — bare named value types, no I/O), so its line is text-derivable
+from the file alone. `boundary_enforce::qualify_line` is that census's own per-file emitter,
+factored to ONE source (the operator-shape rule is stated once and served to both the frozen
+census and the hook — never restated), and the hook's fifth voice computes the line the census
+WOULD carry for the file's current text and renders the delta against the committed line with the
+same `spec_lock::LockDelta` the courier uses. So the agent learns "this edit adds/removes an
+operator — the qualify census will move, re-bless" AT the edit, where the intent is freshest,
+instead of at the red gate the build would otherwise be first to raise.
+
+Silent by construction, the sixth-sense discipline: scoped to `.rs` under `src/` (the census's
+own tree — a file it does not scan has no committed line, so a delta there would be a false
+alarm); a half-written file that does not parse is silence (`Err`, distinct from a parsed
+no-algebra file's `Ok(None)`, so never a spurious "stopped qualifying"); and no movement is
+silence.
+
+The split is now explicit and on both sides: the STRUCTURAL half of the mirror (placement,
+qualification) lives at the edit as a live sense; the BEHAVIOURAL half lives at the build and is
+couriered forward. Follow-up worth naming: qualify is the ONLY committed lock a single text edit
+can honestly re-derive today. `tiers.spec` is text-derivable but CROSS-file (a file's tier depends
+on the dependency graph, not its own text), so an edit-time tier DELTA would need the whole tree,
+not one file — deferred until that's worth the walk. Everything behavioural stays couriered by
+design, not omission.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

@@ -630,28 +630,58 @@ fn collect_qualifications(dir: &Path, manifest: &Path, scanned: &mut usize, out:
         }
         let Ok(file) = parse(&path) else { continue };
         *scanned += 1;
-        let imports = std_effect_imports(&file.items);
-        let mut ops: Vec<Op> = Vec::new();
-        qualify_items(&file.items, &imports, &mut ops);
-        if ops.is_empty() {
-            continue;
+        let loc = path
+            .strip_prefix(manifest)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        if let Some(line) = qualify_line_from_items(&file.items, &loc) {
+            out.push(line);
         }
-        let loc = path.strip_prefix(manifest).unwrap_or(&path).display();
-        let mut names: Vec<&str> = ops.iter().map(|o| o.name.as_str()).collect();
-        names.sort_unstable();
-        let mut sorts: Vec<&str> = ops
-            .iter()
-            .flat_map(|o| o.args.iter().chain(std::iter::once(&o.ret)))
-            .map(|s| s.as_str())
-            .collect();
-        sorts.sort_unstable();
-        sorts.dedup();
-        out.push(format!(
-            "{loc}: QUALIFIES — operators [{}] over sorts {{{}}}",
-            names.join(", "),
-            sorts.join(", ")
-        ));
     }
+}
+
+/// The qualify census line one file's items contribute, or `None` if its functions do not form an
+/// algebra — the EXACT per-file emitter [`collect_qualifications`] walks with, factored to ONE
+/// source so the operator-shape rule is stated once and served both to the frozen census and to
+/// any caller that needs the same line from a file's items. `loc` is the path as it appears in
+/// the census line.
+fn qualify_line_from_items(items: &[Item], loc: &str) -> Option<String> {
+    let imports = std_effect_imports(items);
+    let mut ops: Vec<Op> = Vec::new();
+    qualify_items(items, &imports, &mut ops);
+    if ops.is_empty() {
+        return None;
+    }
+    let mut names: Vec<&str> = ops.iter().map(|o| o.name.as_str()).collect();
+    names.sort_unstable();
+    let mut sorts: Vec<&str> = ops
+        .iter()
+        .flat_map(|o| o.args.iter().chain(std::iter::once(&o.ret)))
+        .map(|s| s.as_str())
+        .collect();
+    sorts.sort_unstable();
+    sorts.dedup();
+    Some(format!(
+        "{loc}: QUALIFIES — operators [{}] over sorts {{{}}}",
+        names.join(", "),
+        sorts.join(", ")
+    ))
+}
+
+/// The qualify census line a file's SOURCE TEXT would contribute — the edit-time entry point.
+///
+/// This is [`collect_qualifications`]'s per-file emitter reached from text rather than a walked
+/// path, so an editor hook can compute exactly the line the frozen census would carry for a file
+/// it just changed and narrate the movement BEFORE the build — one vocabulary with the census, the
+/// operator-shape rule never restated. `loc` is the path as it should appear in the line
+/// (repo-relative). The three outcomes are distinct on purpose: `Ok(Some(line))` qualifies,
+/// `Ok(None)` parses but forms no algebra (a real "does not / no longer qualifies"), and `Err`
+/// is a file that does not parse — a half-written edit, which a caller must treat as "no signal
+/// yet", never as a qualification change.
+pub fn qualify_line(source: &str, loc: &str) -> Result<Option<String>, String> {
+    let file = syn::parse_file(source).map_err(|e| format!("unparseable: {e}"))?;
+    Ok(qualify_line_from_items(&file.items, loc))
 }
 
 /// An operator read off a function: name, argument sorts, return sort.
@@ -1500,5 +1530,43 @@ impl<'ast> Visit<'ast> for PurityVisitor {
             ));
         }
         visit::visit_path(self, node);
+    }
+}
+
+#[cfg(test)]
+mod qualify_line_tests {
+    use super::qualify_line;
+
+    /// The public per-file emitter produces EXACTLY the census line — the operator names and
+    /// sorts sorted and deduped, the same format `collect_qualifications` pushes — so the
+    /// edit-time hook and the frozen census can never disagree about one file.
+    #[test]
+    fn qualify_line_matches_the_census_format() {
+        let src = "pub struct A; pub struct B;\n\
+                   pub fn f(x: A) -> B { todo!() }\n\
+                   pub fn g(y: B) -> A { todo!() }\n";
+        assert_eq!(
+            qualify_line(src, "src/m.rs").unwrap().as_deref(),
+            Some("src/m.rs: QUALIFIES — operators [f, g] over sorts {A, B}"),
+        );
+    }
+
+    /// A module whose functions are not operator-shaped (a primitive return, an effect) forms no
+    /// algebra: `Ok(None)`, the honest "does not / no longer qualify" the census reflects by the
+    /// absence of a line.
+    #[test]
+    fn a_non_algebra_module_is_ok_none() {
+        assert_eq!(
+            qualify_line("pub fn n(x: u32) -> u32 { x }\n", "src/m.rs"),
+            Ok(None)
+        );
+        assert_eq!(qualify_line("// just a comment\n", "src/m.rs"), Ok(None));
+    }
+
+    /// A file that does not PARSE (a half-written edit) is `Err`, distinct from `Ok(None)` — a
+    /// caller must treat it as "no signal yet", never as a qualification change.
+    #[test]
+    fn an_unparseable_file_is_err_not_none() {
+        assert!(qualify_line("pub fn broken( -> {", "src/m.rs").is_err());
     }
 }

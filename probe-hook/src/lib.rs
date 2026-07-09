@@ -7,18 +7,25 @@
 //! * the SHAPE TICKER (`discover::watch::Ticker`) — a coupling move on ANY Rust edit: a theory
 //!   nets on its sorts, a plain module on its own declared types, and the ticker speaks only
 //!   when the edit bridges two clusters or opens a new one — a sixth sense, not a firehose;
+//! * the QUALIFY voice (`spec/qualify.spec`) — the edit-time LOCK DELTA: this edit's effect on the
+//!   surface census, computed from the file's own text via `boundary_enforce::qualify_line` (the
+//!   census's own per-file emitter) and rendered against the committed line — the behavioural
+//!   mirror moved to the moment of the edit, for the one lock a text edit can re-derive;
 //! * the TIER voice (`spec/tiers.spec`) — on first edit of a file, its derived tier and the
 //!   rules it carries (the reader-service the deleted `//! Tier:` markers gave);
 //! * the FREEZE-DELTA courier (`freeze_delta_voice`) — the recommendation movement the last
 //!   build derived via `spec_lock::Lock::delta` (a placement re-settling, a seam candidate
 //!   appearing), inserted once into the window and then cleared.
 //!
-//! The first three voices the hook DERIVES from a single text edit. The fourth it does not
+//! The first four voices the hook DERIVES from a single text edit. The fifth it does not
 //! compute at all: distance, cohesion, and placement need the compiled theory (running `eval`),
 //! which a text edit cannot afford — so the movement of those recommendations is derived where
 //! it is cheap, at the build that emits the locks (`spec_lock::Lock::delta` holds both sides at
-//! that instant), and the hook only COURIERS the result into the next context window. Nothing is
-//! watched or reconstructed: the emitter narrates its own delta, the hook carries it. (The
+//! that instant), and the hook only COURIERS the result into the next context window. The qualify
+//! voice is the boundary case that DOES fit a text edit: qualification is a structural property
+//! (operator-shaped functions), so its lock delta is computed live here, while the behavioural
+//! locks stay couriered. Nothing is watched or reconstructed: the emitter narrates its own delta,
+//! the hook carries it (or, for qualify, derives it). (The
 //! freedom/survivor census stays at session start, read from the committed mutation locks.) All
 //! the voices are mutation-tested and register-driven, and before this crate every
 //! consumer wrapped them in the same four pieces of unjudged glue: a bash wrapper, inline
@@ -86,8 +93,8 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
         .to_string();
     let source = std::fs::read_to_string(&path).unwrap_or_default();
 
-    // FOUR voices, each priced in silence — the whole edit-time envelope, so the shipped
-    // binary fully replaces the bash wrapper it descends from (the fourth, the freeze-delta
+    // FIVE voices, each priced in silence — the whole edit-time envelope, so the shipped
+    // binary fully replaces the bash wrapper it descends from (the last, the freeze-delta
     // courier, the hook carries rather than computes):
     let mut blocks: Vec<String> = Vec::new();
 
@@ -109,6 +116,14 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
     // net-disjoint component) on ANY Rust file, stateful across invocations (see [`shape_voice`]).
     if let Some(shape) = shape_voice(project_dir, &rel, &source) {
         blocks.push(shape);
+    }
+
+    // the QUALIFY voice — the edit-time lock delta: this edit's effect on `spec/qualify.spec`,
+    // computed from the file's own text (the census's own per-file emitter), narrated BEFORE the
+    // build that would otherwise be the first to notice. The behavioural mirror at the moment of
+    // the edit, for the one lock a single text edit can re-derive (see [`qualify_voice`]).
+    if let Some(qualify) = qualify_voice(project_dir, &rel, &source) {
+        blocks.push(qualify);
     }
 
     // the TIER voice — on FIRST edit of a file, its derived tier and the rules that tier
@@ -178,6 +193,63 @@ fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
     std::fs::create_dir_all(&state_dir).ok()?;
     std::fs::write(&state, Ticker::store_signatures(&sigs)).ok()?;
     line
+}
+
+/// The QUALIFY voice — the edit-time LOCK DELTA, and the first voice to compute a committed
+/// lock's MOVEMENT from a single edit rather than courier it from the build. The qualify census
+/// (`spec/qualify.spec`) is text-derivable per file — a module qualifies by the SHAPE of its
+/// functions (operator-shaped, no I/O), no `eval` — so [`boundary_enforce::qualify_line`] re-derives
+/// exactly the line the frozen census would carry for this file's current text, and the delta
+/// against the committed line IS the movement the next `BLESS_QUALIFY=1` build would ratify. It is
+/// narrated at the edit, where the intent is freshest ("this function makes the module stop
+/// qualifying — meant to?"), instead of surfacing first as a red gate. The behavioural half of the
+/// mirror — distance, discovered laws — still needs the compiled theory and stays at the build (the
+/// freeze-delta courier carries it); this is the one lock a single text edit can honestly re-derive.
+///
+/// Silent by construction, the sixth-sense discipline:
+/// * only `.rs` under `src/` — the census's own tree; a file it does not scan has no committed
+///   line, so a delta there would be a false alarm (`tests.rs` is census-excluded too);
+/// * a half-written file that does not PARSE is silence (`Err` from `qualify_line`), never a
+///   spurious "stopped qualifying" — distinct from a parsed file that forms no algebra;
+/// * no movement (the live line equals the committed line, or the file qualifies in neither) is
+///   silence.
+///
+/// The movement renders through `spec_lock::LockDelta`, the same renderer the freeze-delta courier
+/// uses, so the edit-time preview and the build-time narration read alike.
+///
+/// Capability: Effectful — reads `spec/qualify.spec` under `project_dir`.
+fn qualify_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
+    // scope to what the census covers: `.rs` under `src/`, never a `tests.rs` (basename). A file
+    // outside the scanned tree has no committed line, so a delta for it would be a false alarm.
+    let basename = rel.rsplit('/').next().unwrap_or(rel);
+    if !rel.ends_with(".rs") || !rel.starts_with("src/") || basename == "tests.rs" {
+        return None;
+    }
+    // the line the census WOULD carry for this text; an unparseable (half-written) file is silence
+    // (`Err` -> None -> `?`), distinct from a parsed file that forms no algebra (`Ok(None)`).
+    let live = boundary_enforce::qualify_line(source, rel).ok()?;
+    // the committed line for this file, if the census currently carries one (0 or 1 per file).
+    let committed_text = std::fs::read_to_string(project_dir.join("spec/qualify.spec")).ok()?;
+    let prefix = format!("{rel}: ");
+    let committed = committed_text
+        .lines()
+        .find(|l| l.starts_with(&prefix))
+        .map(str::to_string);
+
+    // the movement is the delta between the committed line (or none) and the live line (or none):
+    // an appearance (+), a disappearance (-), or a reshape (both). No movement is silence.
+    let delta = spec_lock::LockDelta::between(
+        committed.as_deref().unwrap_or(""),
+        live.as_deref().unwrap_or(""),
+    );
+    if delta.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "{}\nyour edit moves the qualify census — re-bless with `BLESS_QUALIFY=1 cargo build` \
+         and commit the diff.",
+        delta.render("qualify census (spec/qualify.spec)")
+    ))
 }
 
 /// The TIER voice — one line on the FIRST edit of a file: its DERIVED tier and what that
@@ -503,6 +575,57 @@ mod drills {
             respond(&event(&bare.join("src/x.rs")), &bare).expect("tier still names itself");
         assert!(voice.contains("tier: src/x.rs is ALGEBRA"), "{voice}");
         assert!(voice.contains("regenerate spec/tiers.spec"), "{voice}");
+    }
+
+    /// THE QUALIFY VOICE, drilled — the edit-time LOCK DELTA. A committed qualify line and an
+    /// edit that reshapes the module's operators makes the voice narrate the census movement (with
+    /// the re-bless pointer); an edit reproducing the committed line is silence; a half-written
+    /// file that does not parse is silence (never a spurious "stopped qualifying"); and a file
+    /// OUTSIDE the census tree (`src/`) never speaks even when its shape would qualify.
+    #[test]
+    fn the_qualify_voice_narrates_the_census_delta_at_the_edit() {
+        let root = tree(
+            "qualify",
+            &[
+                (
+                    "spec/qualify.spec",
+                    "# census\nsrc/algebra.rs: QUALIFIES — operators [add] over sorts {N}\n",
+                ),
+                (
+                    "src/algebra.rs",
+                    "pub struct N;\npub fn add(a: N, b: N) -> N { todo!() }\n",
+                ),
+            ],
+        );
+        let ev = event(&root.join("src/algebra.rs"));
+        // unchanged shape: the live line equals the committed line — silence.
+        assert_eq!(respond(&ev, &root), None);
+        // an edit that adds an operator moves the census: the voice narrates the delta and the fix.
+        std::fs::write(
+            root.join("src/algebra.rs"),
+            "pub struct N;\npub fn add(a: N, b: N) -> N { todo!() }\n\
+             pub fn neg(a: N) -> N { todo!() }\n",
+        )
+        .unwrap();
+        let voice = respond(&ev, &root).expect("the reshaped census speaks");
+        assert!(
+            voice.contains("qualify census (spec/qualify.spec)"),
+            "{voice}"
+        );
+        assert!(voice.contains("operators [add, neg]"), "{voice}");
+        assert!(voice.contains("BLESS_QUALIFY=1"), "{voice}");
+        // a half-written file (does not parse) is silence, never a spurious "stopped qualifying".
+        std::fs::write(root.join("src/algebra.rs"), "pub fn add( -> {\n").unwrap();
+        assert_eq!(respond(&ev, &root), None);
+        // a file OUTSIDE the census tree never speaks, even if its shape would qualify.
+        let outside = root.join("examples/demo.rs");
+        std::fs::create_dir_all(outside.parent().unwrap()).unwrap();
+        std::fs::write(
+            &outside,
+            "pub struct N;\npub fn add(a: N, b: N) -> N { todo!() }\n",
+        )
+        .unwrap();
+        assert_eq!(respond(&event(&outside), &root), None);
     }
 
     /// THE FOURTH VOICE, drilled — the courier carries a movement `delta()` derived at freeze

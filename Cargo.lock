@@ -262,6 +262,7 @@ dependencies = [
 name = "probe-hook"
 version = "0.1.1"
 dependencies = [
+ "boundary-enforce",
  "boundary-spec",
  "serde_json",
  "spec-lock",
