@@ -1419,6 +1419,41 @@ swap the pipeline's implementation, and we catch the swap unless the difference 
 ratified degree of freedom (a legitimate non-local effect) or a spec symmetry. Migration
 just happens to be the instance where that fine print is empty.
 
+## The lock narrates its own movement: `delta()` (BUILT)
+
+The build/text boundary, resolved from the emitter's side. Distance, cohesion, and
+placement need the compiled theory (running `eval`), so a text edit cannot re-derive them —
+but the drift gate already re-derives them on every freeze, and at the compare it holds BOTH
+sides: the committed text and the freshly derived live text (`spec-lock`'s `check`, the line
+`committed == lock.live`). The gate collapsed that to a bool and threw the difference away.
+
+`spec_lock::Lock::delta` keeps it. For a lock whose lines ARE recommendations — the shape's
+placement verdict (`7 of 7 settled` → `6 of 7`) and seam candidates, the tier assignments —
+the committed→live line diff IS the updated recommendation, and it is produced by the same
+run that emits the lock, from the two sides that run holds at that instant. Nothing watches a
+file write; nothing reconstructs a diff from git after the fact. The multiset line diff
+(`LockDelta::between`, blank lines dropped) is the same set-diff honesty as `RegisterDrift`,
+one altitude down: an in-place line cancels, a moved line shows as one removal and one
+addition.
+
+The wiring closes the loop without moving the derivation off the build:
+
+- **`examples/freeze_spec`** captures `spec_lock::deltas(&locks)` BEFORE `bless` overwrites
+  the committed side, prints the movement for whoever ran the freeze, and writes the rendered
+  narration to `target/probe-hook/freeze-delta` (empty on no movement — a stale delta never
+  lingers).
+- **probe-hook** gains a FOURTH voice, the freeze-delta courier — the only one it does not
+  compute. It reads that file, inserts the movement ONCE into the next context window, and
+  clears it. The mechanism is native to `delta()`, run at freeze time; the hook is only the
+  wire. This is the honest resolution of "should the hook re-derive cohesion" — no: the hook
+  cannot afford `eval`, so the recommendation movement is derived where it is cheap (the build
+  that emits the locks) and couriered to where it is read.
+
+Why this shape and not a session-start `git diff` of the shape lock: a git diff would
+RECONSTRUCT downstream a delta the emitter already had in hand and deleted. Surfacing it from
+`delta()` keeps one derivation, at the build, in the grain of the one rule — the committed
+diff is the ratification, and now the run that produces that diff also narrates it.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

@@ -6,11 +6,19 @@
 //! * the GUARD (`Agenda::edit_guard`) — refusals that already exist downstream, pre-fired;
 //! * the SHAPE TICKER (`discover::watch::Ticker`) — a layout move on a theory edit;
 //! * the TIER voice (`spec/tiers.spec`) — on first edit of a file, its derived tier and the
-//!   rules it carries (the reader-service the deleted `//! Tier:` markers gave).
+//!   rules it carries (the reader-service the deleted `//! Tier:` markers gave);
+//! * the FREEZE-DELTA courier (`freeze_delta_voice`) — the recommendation movement the last
+//!   build derived via `spec_lock::Lock::delta` (a placement re-settling, a seam candidate
+//!   appearing), inserted once into the window and then cleared.
 //!
-//! (Distance, cohesion, and the freedom/survivor census are NOT here: they need the compiled
-//! theory or the whole tree, not a single text edit — they live at session start and in the
-//! locks.) All the voices are mutation-tested and register-driven, and before this crate every
+//! The first three voices the hook DERIVES from a single text edit. The fourth it does not
+//! compute at all: distance, cohesion, and placement need the compiled theory (running `eval`),
+//! which a text edit cannot afford — so the movement of those recommendations is derived where
+//! it is cheap, at the build that emits the locks (`spec_lock::Lock::delta` holds both sides at
+//! that instant), and the hook only COURIERS the result into the next context window. Nothing is
+//! watched or reconstructed: the emitter narrates its own delta, the hook carries it. (The
+//! freedom/survivor census stays at session start, read from the committed mutation locks.) All
+//! the voices are mutation-tested and register-driven, and before this crate every
 //! consumer wrapped them in the same four pieces of unjudged glue: a bash wrapper, inline
 //! JSON-parsing Python, a build-on-demand fallback that could run a stale binary, and
 //! hand-authored `settings.json` plumbing. This crate is that envelope, inside the boundary —
@@ -76,8 +84,9 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
         .to_string();
     let source = std::fs::read_to_string(&path).unwrap_or_default();
 
-    // THREE voices, each priced in silence — the whole edit-time envelope, so the shipped
-    // binary fully replaces the bash wrapper it descends from:
+    // FOUR voices, each priced in silence — the whole edit-time envelope, so the shipped
+    // binary fully replaces the bash wrapper it descends from (the fourth, the freeze-delta
+    // courier, the hook carries rather than computes):
     let mut blocks: Vec<String> = Vec::new();
 
     // the GUARD — refusals that already exist downstream (a hand-edited generated lock, a
@@ -104,6 +113,13 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
     // carries (the reader-service the deleted `//! Tier:` markers gave, moved to the hook).
     if let Some(tier) = tier_voice(project_dir, &rel) {
         blocks.push(tier);
+    }
+
+    // the FREEZE-DELTA courier — the recommendation movement the last build derived (via
+    // `spec_lock::Lock::delta`) and left at `target/probe-hook/freeze-delta`. The hook does
+    // not COMPUTE it — it inserts it once into this context window and clears the courier.
+    if let Some(delta) = freeze_delta_voice(project_dir) {
+        blocks.push(delta);
     }
 
     if blocks.is_empty() {
@@ -190,6 +206,35 @@ fn tier_voice(project_dir: &Path, rel: &str) -> Option<String> {
     std::fs::create_dir_all(seen.parent()?).ok()?;
     std::fs::write(&seen, "").ok()?;
     Some(format!("tier: {rel} is {tier} — {rules}"))
+}
+
+/// The FREEZE-DELTA courier — the fourth voice, and the only one the hook does NOT compute.
+/// It carries a recommendation movement (`interpreter arithmetic` re-placed as two, a seam
+/// candidate on `Int` appeared) that `spec_lock::Lock::delta` already derived at the build
+/// which produced it: `examples/freeze_spec` holds each lock's committed text against the live
+/// text it just derived — the diff the drift gate collapses to a bool — and writes the rendered
+/// movement to `target/probe-hook/freeze-delta`. The hook reads that courier, injects it ONCE,
+/// and clears it, so the movement reaches the next context window after the build that caused it
+/// and never lingers. Nothing here re-derives or watches: the mechanism is native to `delta()`,
+/// run at freeze time; this is only the wire into the window.
+///
+/// Fail-open: a missing/empty/unreadable courier is silence, and if the clear-on-consume write
+/// fails the voice stays silent rather than risk repeating the same movement every edit.
+///
+/// Capability: Effectful — reads and truncates the courier under `project_dir/target`.
+fn freeze_delta_voice(project_dir: &Path) -> Option<String> {
+    let courier = project_dir.join("target/probe-hook/freeze-delta");
+    let narration = std::fs::read_to_string(&courier).ok()?;
+    let narration = narration.trim();
+    if narration.is_empty() {
+        return None;
+    }
+    // consume before speaking: if the courier cannot be cleared, stay silent — better an
+    // unseen movement than the same one re-injected on every subsequent edit.
+    std::fs::write(&courier, "").ok()?;
+    Some(format!(
+        "your last freeze moved these recommendations (from spec_lock::Lock::delta):\n{narration}"
+    ))
 }
 
 /// The settings entry this crate wires for itself.
@@ -391,6 +436,38 @@ mod drills {
         let other = root.join("src/unlisted.rs");
         std::fs::write(&other, "pub struct Y;\n").unwrap();
         assert_eq!(respond(&event(&other), &root), None);
+    }
+
+    /// THE FOURTH VOICE, drilled — the courier carries a movement `delta()` derived at freeze
+    /// time into the window ONCE, then clears itself, and an empty/absent courier is silence.
+    /// The hook computes nothing here; it only wires the emitter's narration into context.
+    #[test]
+    fn the_freeze_delta_courier_injects_once_then_clears() {
+        let root = tree("courier", &[("src/plain.rs", "pub struct X;\n")]);
+        // an empty courier (a build with no movement) is silence.
+        let courier = root.join("target/probe-hook/freeze-delta");
+        std::fs::create_dir_all(courier.parent().unwrap()).unwrap();
+        std::fs::write(&courier, "").unwrap();
+        assert_eq!(respond(&event(&root.join("src/plain.rs")), &root), None);
+        // a real movement (as `spec_lock::LockDelta::render` would write it) is carried once.
+        std::fs::write(
+            &courier,
+            "lock `boundary-spec` moved:\n  - verdict: 7 of 7 settled\n  + verdict: 6 of 7 settled\n",
+        )
+        .unwrap();
+        let voice = respond(&event(&root.join("src/plain.rs")), &root).expect("the courier speaks");
+        assert!(
+            voice.contains("your last freeze moved these recommendations"),
+            "{voice}"
+        );
+        assert!(voice.contains("6 of 7 settled"), "{voice}");
+        // consumed: the very next edit is silent — the movement is injected once, not per save.
+        assert_eq!(respond(&event(&root.join("src/plain.rs")), &root), None);
+        assert_eq!(
+            std::fs::read_to_string(&courier).unwrap(),
+            "",
+            "the courier is cleared on consume"
+        );
     }
 
     /// `install` is derived plumbing: creates the file from nothing, is idempotent,
