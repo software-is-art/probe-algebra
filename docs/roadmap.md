@@ -1349,17 +1349,29 @@ is the `include!`. And MULTI-SORT is built too: `Lifted2<T>` lifts a module over
 `shadow_grid` — so a cross-sort map and a ROUND TRIP are expressible. The worked example
 (`bool ⋈ Box<bool>` with `wrap`/`unwrap`/`both`) discovers the cross-sort round trip
 `unwrap(wrap(x)) = x` no single-carrier lift can state, and is sensitivity-swept. Scope,
-disclosed: a non-`Shaped` carrier has no grid, exactly where discovery itself stops; carriers
-beyond two generalise the tag to an N-way enum, mechanical from here; and the build-time scan
-currently emits the single-carrier table — the two-carrier emission (`Either`-tagged wrappers
-by inferred slot sort) is the mechanical remainder, the `Lifted2` machinery being what it
-targets. This is the consumer end state the "sweep discovers, oracle proves sensitivity" arc
-was aiming at: probes derived from a plain module — single- or two-sorted — each proven
-sensitive, with nothing written.
+disclosed: a non-`Shaped` carrier has no grid, exactly where discovery itself stops. The
+build-time scan (`AutoLift::scan_module`) now emits BOTH the single-carrier `impl Liftable`
+AND the two-carrier marker `struct` + `impl Liftable2` (each op's slots tagged by their `Duo`
+sort, an `Either`-unwrapping wrapper), reconciled by (name, input sorts, output sort) against
+the runtime-proven `BoolBox` table — so for one and two sorts the zero-annotation loop is
+closed end to end, the only glue being the consumer's `include!`.
 
-Remaining, disclosed: the two-carrier SCAN emission (the machinery it targets is built), and
-carriers beyond two (the N-way tag). The byte-lock register has reached its honest floor —
-surface and tiers, covered cross-crate.
+THREE OR MORE distinct carriers is a principled named refusal, not an oversight: arbitrary N
+cannot reach the same rigor as one/two without variadic generics — it needs per-N codegen (a
+`Lifted3`/`Lifted4`/… ladder, each mechanical but bounded, or a scan that emits a bespoke
+`theory!` invocation, which the engine's existing multi-sort theories prove viable but which
+a unit test can only parse-check, not run). And the practical pressure is low: N conceptual
+sorts modelled as ONE `Shaped` enum are already single-carrier `Lifted`. So the honest end
+state is: one and two distinct carriers fully built and proven; three-plus a named refusal
+with the two paths (the `LiftedN` ladder, the `theory!`-generating scan) recorded for when a
+real consumer needs them. This is the consumer end state the "sweep discovers, oracle proves
+sensitivity" arc was aiming at: probes derived from a plain module — single- or two-sorted —
+each proven sensitive, with nothing written.
+
+Remaining, disclosed: three-plus DISTINCT carriers (the `LiftedN` ladder or the
+`theory!`-generating scan — a principled named refusal until a real consumer needs it, since
+N conceptual sorts as one enum are already single-carrier `Lifted`). The byte-lock register
+has reached its honest floor — surface and tiers, covered cross-crate.
 
 ## Framing: the real domain is stability under containment
 
