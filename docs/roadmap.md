@@ -595,8 +595,9 @@ The observation that named them: every arbitrary ceremony in software is a deriv
 fact wearing a ritual's clothes — and the operator's phrase for the programme,
 "replacing implied service from a platform with specification". All three BUILT:
 
-1. **The bridge alarm in the agent loop** (`Ticker::hook_line`,
-   `.claude/hooks/shape-watch.sh`). The mechanism question settled by token economics:
+1. **The bridge alarm in the agent loop** (`Ticker::hook_line`, now carried by the shipped
+   `probe-hook` binary — see the eleventh ask; originally the retired `shape-watch.sh`).
+   The mechanism question settled by token economics:
    LSP is the human surface (pull-based, verbose, free for eyes); the lock is the CI
    surface (late); the agent surface is a PostToolUse hook, because it prices feedback
    right — zero tokens when silent, one line when the shape moved, no instruction
@@ -830,6 +831,17 @@ carries the binary's version, and advisory/fail-open means skew degrades to weak
 advice, never a false refusal. Re-execing a repo-local build stays deliberately
 unbuilt until skew is observed hurting. It publishes with the other four on every
 certification release.
+
+**The antipattern closed on our own tree (follow-up):** the eleventh ask was filed
+because the antipattern was wearing THIS repo's `settings.json` — and yet the repo kept
+using `shape-watch.sh`, the very bash-wrapper-plus-inline-Python glue the crate exists to
+retire. Fixed: `probe-hook::respond` grew the SECOND voice (the shape ticker —
+`discover::watch::Ticker`, folded in from what `place_watch --event` did), so the shipped
+binary is now the WHOLE edit-time envelope (guard + ticker), not just the guard;
+`.claude/settings.json` invokes `probe-hook` (the exact entry `install` writes); and
+`shape-watch.sh` is deleted. The repo now dogfoods the guard it ships — the antipattern
+gone from the one place it was most visible. Local activation is the shipped consumer flow
+(`cargo install --path probe-hook`, wired into the session-start hook for the remote env).
 
 ## The perimeter is a lock (BUILT)
 

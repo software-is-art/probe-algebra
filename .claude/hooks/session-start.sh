@@ -63,4 +63,7 @@ fi
 
 command -v rtk >/dev/null 2>&1 ||
   cargo install --git https://github.com/rtk-ai/rtk --rev d823aaf7 --locked
-cargo build -q --example place_watch --example review_agenda 2>/dev/null || true
+# the edit-time envelope is the SHIPPED binary now (probe-hook), not a bash wrapper:
+# put it on PATH so the PostToolUse `command: "probe-hook"` resolves. Fail-open.
+command -v probe-hook >/dev/null 2>&1 ||
+  cargo install --path probe-hook --quiet 2>/dev/null || true

@@ -1,11 +1,14 @@
-//! probe-hook — the edit guard as a SHIPPED envelope (the eleventh ask).
+//! probe-hook — the edit-time ENVELOPE as a SHIPPED binary (the eleventh ask).
 //!
-//! `Agenda::edit_guard` and `GuardVoices::for_edit` are mutation-tested and
-//! register-driven — and before this crate, every consumer wrapped them in the same
-//! four pieces of unjudged glue: a bash wrapper, inline JSON-parsing Python, a
-//! build-on-demand fallback that could run a stale binary, and hand-authored
-//! `settings.json` plumbing. All of it outside the mutation boundary, each consumer
-//! with different bugs. This crate is that envelope, inside the boundary:
+//! Two voices, both priced in silence: the GUARD (`Agenda::edit_guard` — refusals that
+//! already exist downstream) and the SHAPE TICKER (`discover::watch::Ticker` — a layout
+//! move on a theory edit). Both are mutation-tested and register-driven — and before this
+//! crate, every consumer wrapped them in the same four pieces of unjudged glue: a bash
+//! wrapper, inline JSON-parsing Python, a build-on-demand fallback that could run a stale
+//! binary, and hand-authored `settings.json` plumbing. All of it outside the mutation
+//! boundary, each consumer with different bugs. This crate is that envelope, inside the
+//! boundary — and this repo now dogfoods it in its own `.claude/settings.json`, the retired
+//! `shape-watch.sh` being exactly the glue described:
 //!
 //! * **speaks the Claude Code hook protocol natively** — reads the PostToolUse JSON
 //!   from stdin, extracts `tool_input.file_path`, honours `CLAUDE_PROJECT_DIR`;
@@ -29,6 +32,7 @@
 use std::path::Path;
 
 use boundary_spec::discover::agenda::{Agenda, GuardVoices};
+use boundary_spec::discover::watch::Ticker;
 
 /// The version tag every non-silent voice block carries — the skew floor.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -46,11 +50,11 @@ pub fn extract_path(hook_json: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// The whole envelope, total: hook JSON in, at most one voice block out. Every
-/// failure path is `None` — the fail-open contract as a return type. The voices are
-/// derived from `project_dir` (the register, the shim evidence), the classes come
-/// from `spec/agenda.register`, and the edited path is normalized repo-relative so
-/// messages match what the repo's own gates would say.
+/// The whole envelope, total: hook JSON in, the guard and/or shape-ticker voices out
+/// (joined, one version footer), or `None`. Every failure path is `None` — the fail-open
+/// contract as a return type. The voices are derived from `project_dir` (the register, the
+/// shim evidence), the classes come from `spec/agenda.register`, and the edited path is
+/// normalized repo-relative so messages match what the repo's own gates would say.
 ///
 /// Capability: Effectful — reads the edited file, the registers, and `build.rs`
 /// under `project_dir`.
@@ -64,19 +68,70 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
         .unwrap_or(path.as_str())
         .to_string();
     let source = std::fs::read_to_string(&path).unwrap_or_default();
+
+    // TWO voices, both priced in silence — the whole edit-time envelope, so the shipped
+    // binary fully replaces the bash wrapper it descends from:
+    let mut blocks: Vec<String> = Vec::new();
+
+    // the GUARD — refusals that already exist downstream (a hand-edited generated lock, a
+    // loose `pub fn` the shim refuses), voices derived from the tree, classes taught from
+    // spec/agenda.register (a refused register fails open to "no taught classes").
     let voices = GuardVoices::for_edit(project_dir, &rel);
-    // a refused class register is the routing gate's problem; the advisory guard
-    // fails open to "no taught classes".
     let classes = spec_lock::Register {
         name: "agenda".to_string(),
         path: project_dir.join("spec/agenda.register"),
     }
     .entries()
     .unwrap_or_default();
-    let guard = Agenda::edit_guard(&rel, &source, &voices, &classes)?;
+    if let Some(guard) = Agenda::edit_guard(&rel, &source, &voices, &classes) {
+        blocks.push(guard);
+    }
+
+    // the SHAPE TICKER — speaks only when a theory edit moves the layout (a bridge, a new
+    // net-disjoint component), stateful across invocations (see [`shape_voice`]).
+    if let Some(shape) = shape_voice(project_dir, &rel, &source) {
+        blocks.push(shape);
+    }
+
+    if blocks.is_empty() {
+        return None;
+    }
     Some(format!(
-        "{guard}\n(probe-hook {VERSION} — advisory, fail-open)"
+        "{}\n(probe-hook {VERSION} — advisory, fail-open)",
+        blocks.join("\n")
     ))
+}
+
+/// The shape ticker's voice for one edit — the second half of the envelope, folded in from
+/// what the retired `place_watch --event` wrapper did. Silent for anything but a theory file
+/// (a `.rs` carrying `ops {` stanzas); otherwise re-derives the placement from the file's
+/// TEXT (no compilation), diffs it against the previous placement kept in a per-file state
+/// slug under `<project>/target/probe-hook`, and narrates a move in the monotone vocabulary
+/// (seeded / joined / BRIDGED). Fail-open throughout: any unreadable/unwritable state is
+/// silence (`.ok()?`), never a broken edit loop.
+///
+/// Capability: Effectful — reads and writes the ticker state under `project_dir/target`.
+fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
+    if !rel.ends_with(".rs") || !source.contains("ops {") {
+        return None;
+    }
+    let state_dir = project_dir.join("target/probe-hook");
+    let slug: String = rel
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let state = state_dir.join(format!("{slug}.sigs"));
+    // the ticker keys on a `&'static` name; the process is short-lived, so a leak per hook
+    // invocation is the price of the borrow (the same trade the example made).
+    let name: &'static str = Box::leak(rel.to_string().into_boxed_str());
+    let line = match std::fs::read_to_string(&state) {
+        Ok(stored) => Ticker::resume(name, &stored).hook_line(name, source),
+        // first sight: capture the baseline; a multi-component file announces itself once.
+        Err(_) => Ticker::new().hook_line(name, source),
+    };
+    std::fs::create_dir_all(&state_dir).ok()?;
+    std::fs::write(&state, Ticker::store(source).ok()?).ok()?;
+    line
 }
 
 /// The settings entry this crate wires for itself.
@@ -225,6 +280,32 @@ mod drills {
             voice.contains("`pub fn pipeline` is a loose public function"),
             "{voice}"
         );
+    }
+
+    /// THE SECOND VOICE, drilled — a theory edit that splits into net-disjoint features
+    /// makes the shape ticker speak (the half folded in from the retired `place_watch`
+    /// wrapper), while an ordinary `.rs` with no `ops {` stanza stays silent. The version
+    /// footer rides both voices.
+    #[test]
+    fn a_theory_edit_speaks_the_shape_voice() {
+        let root = tree("shape", &[]);
+        let thy = root.join("src/workbench.rs");
+        std::fs::create_dir_all(thy.parent().unwrap()).unwrap();
+        // two net-disjoint features in one bundle: the ticker announces the split on sight.
+        let ops = "    ops {\n        Nullary \"zero\" \"zero\" () -> S::A = zero;\n        \
+                   Nullary \"off\" \"off\" () -> S::B = off;\n    }\n";
+        std::fs::write(&thy, ops).unwrap();
+        let voice =
+            respond(&event(&thy), &root).expect("a multi-component theory announces its shape");
+        assert!(
+            voice.contains("net-disjoint") || voice.contains("modules"),
+            "{voice}"
+        );
+        assert!(voice.contains(&format!("probe-hook {VERSION}")), "{voice}");
+        // a plain .rs (no `ops {`) is silence — the ticker speaks only for theories.
+        let plain = root.join("src/plain.rs");
+        std::fs::write(&plain, "pub struct X;\n").unwrap();
+        assert_eq!(respond(&event(&plain), &root), None);
     }
 
     /// `install` is derived plumbing: creates the file from nothing, is idempotent,
