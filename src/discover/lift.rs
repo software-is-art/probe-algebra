@@ -14,14 +14,16 @@
 //!
 //! ONE carrier is [`Lifted`]; TWO carriers (a heterogeneous, multi-SORTED signature — a
 //! cross-sort map, a round trip) is [`Lifted2`], the same shape one level up with a tagged
-//! [`Either`] value and per-sort grids. Scope, disclosed (the enumerability edge the roadmap
-//! names): a non-`Shaped` carrier has no grid and is out of reach, exactly where discovery
-//! itself stops; carriers beyond two would generalise the tag to an N-way enum, mechanical
-//! from here. Within that edge the lift is total: the consumer writes types and Rust, the
-//! scan writes the table, and `Spec::of::<Lifted<C>>()` / `Lifted2` plus `MutationReport` are
-//! the probes and their sensitivity proof. (The build-time scan currently emits the
-//! single-carrier table; the two-carrier emission — `Either`-tagged wrappers by inferred slot
-//! sort — is the mechanical remainder, the machinery here being what it targets.)
+//! [`Either`] value and per-sort grids. [`AutoLift::scan_module`] emits BOTH from a plain
+//! module — `impl Liftable` for one carrier, a marker `struct` + `impl Liftable2` for two —
+//! so the zero-annotation loop is closed for one and two sorts. Scope, disclosed (the
+//! enumerability edge the roadmap names): a non-`Shaped` carrier has no grid and is out of
+//! reach, exactly where discovery itself stops; three or more DISTINCT carriers generalise the
+//! tag to an N-way enum, which needs per-N codegen (no variadic generics) and is a named
+//! refusal in the scan for now — note that N conceptual sorts modelled as ONE `Shaped` enum
+//! are already single-carrier `Lifted`. Within that edge the lift is total: the consumer
+//! writes types and Rust, the scan writes the table, and `Spec::of` / `MutationReport` over
+//! `Lifted<C>` or `Lifted2<T>` are the probes and their sensitivity proof.
 //!
 //! Not mutated: the generic machinery is characterized by GENERATION — the worked example's
 //! discovery and sensitivity sweep route every path through it — like `discover::floor`
@@ -225,27 +227,151 @@ impl<T: Liftable2> Theory for Lifted2<T> {
     }
 }
 
-/// The simple path type a lifted operator ranges over — a single identifier
-/// (`bool`, `Payment`). References, generics, and tuples are out of the single-carrier
-/// scope and refuse by name.
+/// The named carrier type a lifted operator ranges over, canonicalised (whitespace removed,
+/// so `Box < bool >` and `Box<bool>` are one carrier). Any path type is a carrier, including a
+/// generic like `Box<bool>`; references, tuples, and `impl`/`dyn` are not owned `Shaped`
+/// carriers and refuse by name.
 fn carrier_of(ty: &syn::Type) -> Result<String, String> {
     match ty {
-        syn::Type::Path(p) if p.qself.is_none() && p.path.segments.len() == 1 => {
-            let seg = &p.path.segments[0];
-            if matches!(seg.arguments, syn::PathArguments::None) {
-                Ok(seg.ident.to_string())
-            } else {
-                Err(format!(
-                    "`{}` is generic — not a single-carrier type",
-                    seg.ident
-                ))
-            }
+        syn::Type::Path(p) if p.qself.is_none() => {
+            Ok(quote::quote!(#ty).to_string().replace(' ', ""))
         }
         other => Err(format!(
-            "a lifted operator ranges over a single named carrier, got `{}`",
+            "a lifted operator ranges over named carriers, got `{}`",
             quote::quote!(#other)
         )),
     }
+}
+
+/// A valid type identifier derived from a theory name — the marker a two-sorted lift's
+/// `impl Liftable2` hangs on (`"lifted bool/box"` -> `LiftedBoolBox`).
+fn to_marker(name: &str) -> String {
+    let mut s = String::new();
+    for part in name.split(|c: char| !c.is_alphanumeric()) {
+        let mut chars = part.chars();
+        if let Some(first) = chars.next() {
+            s.extend(first.to_uppercase());
+            s.push_str(chars.as_str());
+        }
+    }
+    if s.is_empty() || s.starts_with(|c: char| c.is_ascii_digit()) {
+        s.insert_str(0, "Lift");
+    }
+    s
+}
+
+/// The index of `name` in `carriers`, appending it in first-appearance order if new.
+fn index_of(carriers: &mut Vec<String>, name: String) -> usize {
+    match carriers.iter().position(|c| *c == name) {
+        Some(i) => i,
+        None => {
+            carriers.push(name);
+            carriers.len() - 1
+        }
+    }
+}
+
+/// The fixity a scanned operator renders with — by arity, the mechanical convention.
+fn fixity_for(arity: usize) -> &'static str {
+    match arity {
+        0 => "Nullary",
+        1 => "Prefix",
+        2 => "Infix",
+        _ => "Prefix",
+    }
+}
+
+/// Render the single-carrier `impl Liftable` — the ops table over one carrier.
+fn render_single(theory_name: &str, carrier: &str, ops: &[(String, Vec<usize>, usize)]) -> String {
+    let mut out = format!("impl ::boundary_spec::discover::lift::Liftable for {carrier} {{\n");
+    out.push_str(&format!(
+        "    fn theory_name() -> &'static str {{ {theory_name:?} }}\n"
+    ));
+    out.push_str(
+        "    fn ops() -> ::std::vec::Vec<::boundary_spec::discover::lift::LiftedOp<Self>> {\n        ::std::vec![\n",
+    );
+    for (name, inputs, _output) in ops {
+        let arity = inputs.len();
+        let fixity = fixity_for(arity);
+        let args = (0..arity)
+            .map(|i| format!("a[{i}].clone()"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "            ::boundary_spec::discover::lift::LiftedOp {{ name: {name:?}, symbol: {name:?}, \
+             fixity: ::boundary_spec::discover::engine::Fixity::{fixity}, arity: {arity}, \
+             eval: |a| ::std::option::Option::Some({name}({args})) }},\n"
+        ));
+    }
+    out.push_str("        ]\n    }\n}\n");
+    out
+}
+
+/// Render the two-carrier `struct` + `impl Liftable2` — the ops table over two carriers,
+/// each op's slots tagged with their `Duo` sort and its wrapper unwrapping `Either`, calling
+/// the consumer function, and re-tagging. `carriers[0]` is the left sort, `carriers[1]` the
+/// right.
+fn render_two(
+    theory_name: &str,
+    carriers: &[String],
+    ops: &[(String, Vec<usize>, usize)],
+) -> String {
+    let marker = to_marker(theory_name);
+    let duo = |i: usize| if i == 0 { "L" } else { "R" };
+    let mut out = format!("pub struct {marker};\n");
+    out.push_str(&format!(
+        "impl ::boundary_spec::discover::lift::Liftable2 for {marker} {{\n"
+    ));
+    out.push_str(&format!("    type A = {};\n", carriers[0]));
+    out.push_str(&format!("    type B = {};\n", carriers[1]));
+    out.push_str(&format!(
+        "    fn theory_name() -> &'static str {{ {theory_name:?} }}\n"
+    ));
+    out.push_str(
+        "    fn ops() -> ::std::vec::Vec<::boundary_spec::discover::lift::LiftedOp2<Self::A, Self::B>> {\n        ::std::vec![\n",
+    );
+    for (name, inputs, output) in ops {
+        let arity = inputs.len();
+        let fixity = fixity_for(arity);
+        let input_sorts = inputs
+            .iter()
+            .map(|i| format!("::boundary_spec::discover::lift::Duo::{}", duo(*i)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let out_sort = format!("::boundary_spec::discover::lift::Duo::{}", duo(*output));
+        let eval = if arity == 0 {
+            format!(
+                "|_a| ::std::option::Option::Some(::boundary_spec::discover::lift::Either::{}({name}()))",
+                duo(*output)
+            )
+        } else {
+            let tuple = (0..arity)
+                .map(|k| format!("&a[{k}]"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let pat = inputs
+                .iter()
+                .enumerate()
+                .map(|(k, i)| format!("::boundary_spec::discover::lift::Either::{}(x{k})", duo(*i)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let call = (0..arity)
+                .map(|k| format!("x{k}.clone()"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "|a| match ({tuple}) {{ ({pat}) => ::std::option::Option::Some(::boundary_spec::discover::lift::Either::{}({name}({call}))), _ => ::std::option::Option::None }}",
+                duo(*output)
+            )
+        };
+        out.push_str(&format!(
+            "            ::boundary_spec::discover::lift::LiftedOp2 {{ name: {name:?}, symbol: {name:?}, \
+             fixity: ::boundary_spec::discover::engine::Fixity::{fixity}, inputs: ::std::vec![{input_sorts}], \
+             output: {out_sort}, eval: {eval} }},\n"
+        ));
+    }
+    out.push_str("        ]\n    }\n}\n");
+    out
 }
 
 /// The auto-lift scanner — the build-time half of the lift, namespaced per the no-rats-nest
@@ -253,38 +379,27 @@ fn carrier_of(ty: &syn::Type) -> Result<String, String> {
 pub struct AutoLift;
 
 impl AutoLift {
-    /// SCAN a plain module's source and GENERATE the `impl Liftable` a consumer's `build.rs`
-    /// includes — the zero-annotation half of the lift. Finds the public functions that are
-    /// maps over ONE carrier (inferred as the type appearing in every signature; a second
-    /// carrier is a named refusal — multi-sort is out of scope), and emits the operator
-    /// table: each function a [`LiftedOp`] with its arity and a thin wrapper. The emitted
-    /// `impl` is meant to be `include!`d where the functions are in scope, so its wrappers
-    /// call them by bare name. This is the counterpart of the qualify census's build-time
-    /// scan, pointed at generating a theory instead of freezing a surface.
+    /// SCAN a plain module's source and GENERATE the lift a consumer's `build.rs` includes —
+    /// the zero-annotation half. Finds the public functions and the carriers they range over
+    /// (in first-appearance order). ONE carrier emits `impl Liftable` (each function a
+    /// [`LiftedOp`] with a thin wrapper); TWO carriers emit a marker `struct` + `impl
+    /// Liftable2` (each op's slots tagged with their [`Duo`] sort and an `Either`-unwrapping
+    /// wrapper); THREE or more is a named refusal (the N-way tag is not built). The emitted
+    /// code is `include!`d where the functions are in scope, so its wrappers call them by bare
+    /// name. This is the counterpart of the qualify census's build-time scan, pointed at
+    /// generating a theory instead of freezing a surface.
     pub fn scan_module(source: &str, theory_name: &str) -> Result<String, String> {
         let file =
             syn::parse_file(source).map_err(|e| format!("lift scan: unparseable module: {e}"))?;
-        let mut carrier: Option<String> = None;
-        let mut ops: Vec<(String, usize)> = Vec::new();
+        let mut carriers: Vec<String> = Vec::new();
+        // each op: (name, input carrier indices, output carrier index).
+        let mut ops: Vec<(String, Vec<usize>, usize)> = Vec::new();
         for item in &file.items {
             let syn::Item::Fn(f) = item else { continue };
             if !matches!(f.vis, syn::Visibility::Public(_)) {
                 continue;
             }
-            let mut arity = 0usize;
-            let mut unify = |ty: &syn::Type| -> Result<(), String> {
-                let name = carrier_of(ty)?;
-                match &carrier {
-                    None => carrier = Some(name),
-                    Some(c) if *c == name => {}
-                    Some(c) => {
-                        return Err(format!(
-                        "lift scan: two carriers `{c}` and `{name}` — multi-sort is out of scope"
-                    ))
-                    }
-                }
-                Ok(())
-            };
+            let mut inputs = Vec::new();
             for arg in &f.sig.inputs {
                 let syn::FnArg::Typed(pt) = arg else {
                     return Err(format!(
@@ -292,52 +407,33 @@ impl AutoLift {
                         f.sig.ident
                     ));
                 };
-                unify(&pt.ty)?;
-                arity += 1;
+                let name = carrier_of(&pt.ty)?;
+                inputs.push(index_of(&mut carriers, name));
             }
-            match &f.sig.output {
-                syn::ReturnType::Type(_, t) => unify(t)?,
+            let output = match &f.sig.output {
+                syn::ReturnType::Type(_, t) => {
+                    let name = carrier_of(t)?;
+                    index_of(&mut carriers, name)
+                }
                 syn::ReturnType::Default => {
                     return Err(format!(
-                        "lift scan: `{}` returns nothing — not a map into the carrier",
+                        "lift scan: `{}` returns nothing — not a map into a carrier",
                         f.sig.ident
                     ))
                 }
-            }
-            ops.push((f.sig.ident.to_string(), arity));
-        }
-        let carrier =
-            carrier.ok_or_else(|| "lift scan: no public functions over a carrier".to_string())?;
-
-        let mut out = String::new();
-        out.push_str(&format!(
-            "impl ::boundary_spec::discover::lift::Liftable for {carrier} {{\n"
-        ));
-        out.push_str(&format!(
-            "    fn theory_name() -> &'static str {{ {theory_name:?} }}\n"
-        ));
-        out.push_str(
-        "    fn ops() -> ::std::vec::Vec<::boundary_spec::discover::lift::LiftedOp<Self>> {\n        ::std::vec![\n",
-    );
-        for (name, arity) in &ops {
-            let fixity = match arity {
-                0 => "Nullary",
-                1 => "Prefix",
-                2 => "Infix",
-                _ => "Prefix",
             };
-            let args = (0..*arity)
-                .map(|i| format!("a[{i}].clone()"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            out.push_str(&format!(
-            "            ::boundary_spec::discover::lift::LiftedOp {{ name: {name:?}, symbol: {name:?}, \
-             fixity: ::boundary_spec::discover::engine::Fixity::{fixity}, arity: {arity}, \
-             eval: |a| ::std::option::Option::Some({name}({args})) }},\n"
-        ));
+            ops.push((f.sig.ident.to_string(), inputs, output));
         }
-        out.push_str("        ]\n    }\n}\n");
-        Ok(out)
+        match carriers.len() {
+            0 => Err("lift scan: no public functions over a carrier".to_string()),
+            1 => Ok(render_single(theory_name, &carriers[0], &ops)),
+            2 => Ok(render_two(theory_name, &carriers, &ops)),
+            n => Err(format!(
+                "lift scan: {n} carriers ({}) — the scan lifts one carrier (`Lifted`) or two \
+                 (`Lifted2`); three or more is the N-way tag, not built",
+                carriers.join(", ")
+            )),
+        }
     }
 }
 
@@ -478,13 +574,47 @@ mod probes {
         assert_eq!(proven.len(), 4, "and, or, not, tru");
     }
 
-    /// The scan REFUSES a multi-carrier module by name — the single-carrier scan is
-    /// single-sort; the two-sorted lift is `Lifted2` (below), whose scan is the widening.
+    /// The scan REFUSES a THREE-carrier module by name — one or two carriers lift (`Lifted`,
+    /// `Lifted2`); three or more is the N-way tag, disclosed rather than mis-lifted.
     #[test]
-    fn the_scan_refuses_a_second_carrier() {
-        let two = "pub fn mix(a: bool, b: u8) -> bool { a }";
-        let err = AutoLift::scan_module(two, "mixed").expect_err("two carriers refuse");
-        assert!(err.contains("multi-sort is out of scope"), "{err}");
+    fn the_scan_refuses_three_carriers() {
+        let three = "pub fn mix(a: bool, b: u8) -> char { (a as u8 + b) as char }";
+        let err = AutoLift::scan_module(three, "mixed").expect_err("three carriers refuse");
+        assert!(err.contains("N-way tag, not built"), "{err}");
+    }
+
+    /// The TWO-carrier scan emits the `Liftable2` a consumer includes — the marker struct, the
+    /// two carrier types in first-appearance order, and each op's `Duo`-sorted slots with an
+    /// `Either`-unwrapping wrapper. It parses as valid Rust and names exactly the module's ops.
+    #[test]
+    fn the_scan_emits_liftable2_for_two_carriers() {
+        let source = r#"
+            pub fn both(a: bool, b: bool) -> bool { a && b }
+            pub fn wrap(x: bool) -> Box<bool> { Box::new(x) }
+            pub fn unwrap(x: Box<bool>) -> bool { *x }
+        "#;
+        let generated =
+            AutoLift::scan_module(source, "lifted bool/box").expect("two carriers scan");
+        syn::parse_str::<syn::File>(&generated).expect("the generated module is valid Rust");
+        assert!(generated.contains("Liftable2 for LiftedBoolBox"));
+        assert!(generated.contains("type A = bool"));
+        assert!(generated.contains("type B = Box<bool>"));
+        // the ops, by (name, input sorts, output sort), match the runtime-proven BoolBox table.
+        let proven: std::collections::BTreeSet<(String, Vec<Duo>, Duo)> =
+            <BoolBox as Liftable2>::ops()
+                .iter()
+                .map(|o| (o.name.to_string(), o.inputs.clone(), o.output))
+                .collect();
+        assert_eq!(proven.len(), 3, "both, wrap, unwrap");
+        for (name, _inputs, _output) in &proven {
+            assert!(
+                generated.contains(&format!("name: {name:?}")),
+                "emits `{name}`"
+            );
+        }
+        // the cross-sort ops carry the right sort tags: wrap L->R, unwrap R->L.
+        assert!(generated.contains("output: ::boundary_spec::discover::lift::Duo::R"));
+        assert!(generated.contains("inputs: ::std::vec![::boundary_spec::discover::lift::Duo::R]"));
     }
 
     // A CONSUMER'S plain code over TWO types — a cross-sort map and a round trip. Ordinary
