@@ -39,6 +39,7 @@ pub struct Scaffold {
     pub seams: Vec<SeamObligation>,
 }
 
+#[crate::mutate]
 impl Scaffold {
     /// Generate the split for a theory's discovered cohesion components. Returns `None` when the
     /// module is cohesive (a single algebra — nothing to split). The generation is an associated
@@ -111,6 +112,7 @@ impl Scaffold {
 
 /// Generate the split for a theory's discovered cohesion components. Returns `None` when the module
 /// is cohesive (a single algebra — nothing to split). (Private — reached as `Scaffold::of`.)
+#[crate::mutate]
 fn scaffold<T: Theory>() -> Option<Scaffold> {
     let report = CohesionReport::of::<T>();
     if report.is_cohesive() {
@@ -161,6 +163,7 @@ fn scaffold<T: Theory>() -> Option<Scaffold> {
 
 /// Render one sub-module as a `theory!` skeleton — operators faithful, the value-level plumbing the
 /// engine cannot see at runtime left as fill-in.
+#[crate::mutate]
 fn render_module<T: Theory>(idx: usize, ops: &[&super::engine::OpDeclaration<T::Sort>]) -> String {
     // the sorts this sub-module touches, with their variable names (those the engine DOES know).
     let mut sorts: Vec<T::Sort> = Vec::new();

@@ -58,12 +58,19 @@ pub enum Ratification {
     /// The git substrate moved (`substrate.spec`): a tag meaning or history law
     /// changed — what the repository's own tags and history are declared to mean.
     Substrate,
+    /// The schemata census moved (`schemata.spec`): the compiled-mutant population
+    /// changed — a function was instrumented or its flip sites moved.
+    Schemata,
+    /// The probe census moved (`probes.spec`): a probe was added, removed, or its
+    /// sensitivity mechanism changed — is every probe still sensitivity-proven?
+    Probes,
     /// A CONSUMER-registered lock class moved: the class and its ratification question
     /// are the consumer's own data (see [`Agenda::of_with`]) — the routing machinery is
     /// generic; the class table is not upstream's to own.
     Custom { class: String, question: String },
 }
 
+#[crate::mutate("ratification")]
 impl Ratification {
     /// The one question this ratification asks the reviewer.
     pub fn question(&self) -> String {
@@ -117,6 +124,17 @@ impl Ratification {
                  re-read what the repository's tags now claim."
                     .to_string()
             }
+            Ratification::Schemata => {
+                "the schemata census moved — the compiled-mutant population changed; \
+                 is each instrumented function and site set intended?"
+                    .to_string()
+            }
+            Ratification::Probes => {
+                "the probe census moved — a probe was added, removed, or re-mechanised; \
+                 is every probe still sensitivity-proven (and each drift-gate reliance \
+                 ratified in spec/probes.register)?"
+                    .to_string()
+            }
             Ratification::Custom { class, question } => format!("`{class}`: {question}"),
         }
     }
@@ -134,6 +152,7 @@ pub struct Agenda {
     pub machinery: Vec<String>,
 }
 
+#[crate::mutate("agenda")]
 impl Agenda {
     /// Route a changed-path list (repo-relative, e.g. `git diff --name-only`) into the
     /// review agenda. Path classification is by the repo's own artifact conventions;
@@ -227,6 +246,7 @@ pub struct GuardVoices {
     pub rats_nest: bool,
 }
 
+#[crate::mutate]
 impl GuardVoices {
     /// Derive the voices from the tree itself — a declaration would drift; the
     /// evidence cannot. Kernel-exemption is a register lookup (`spec/kernel.register`,
@@ -255,6 +275,7 @@ impl GuardVoices {
     }
 }
 
+#[crate::mutate("agenda_render")]
 impl Agenda {
     /// The EDIT-TIME guard — the hook's second voice: move EXISTING refusals earlier,
     /// never add judgments. Two pre-fires: the one rule (an edit landing on a generated
@@ -317,6 +338,7 @@ enum Class {
 /// One path to its review class. The spec-directory refusal is the router's own
 /// completeness gate: an unrecognized `spec/` artifact means a lock class the router
 /// was never taught, and misfiling it as machinery would silently drop a ratification.
+#[crate::mutate("classify")]
 fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
     let file = path.rsplit('/').next().unwrap_or(path);
     // consumer-taught classes match FIRST — the register is the consumer's own
@@ -350,6 +372,10 @@ fn classify(path: &str, classes: &[(String, String)]) -> Result<Class, String> {
             Ratification::Perimeter
         } else if file == "substrate.spec" {
             Ratification::Substrate
+        } else if file == "schemata.spec" {
+            Ratification::Schemata
+        } else if file == "probes.spec" {
+            Ratification::Probes
         } else if file == "shapes.spec" {
             Ratification::Vocabulary
         } else if file.ends_with(".infra.spec") {
@@ -459,6 +485,24 @@ mod probes {
         assert!(text.contains("machinery-verified (the gates hold these — listed, not read):"));
     }
 
+    /// The probe census routes to its OWN class, and its register routes as an exception —
+    /// the unified probe roster is a lock class the router names, not an unknown `.spec`
+    /// swallowed by the law-lock catch-all.
+    #[test]
+    fn the_probe_census_routes_to_its_own_class() {
+        let agenda = Agenda::of(["spec/probes.spec", "spec/probes.register"]).expect("known");
+        assert_eq!(
+            agenda.ratifications,
+            vec![
+                Ratification::Probes,
+                Ratification::Exceptions {
+                    register: "spec/probes.register".to_string()
+                },
+            ]
+        );
+        assert!(agenda.render().contains("the probe census moved"));
+    }
+
     /// An interior-only diff requires NO ratification — the agenda says so instead of
     /// implying "read it all", because that sentence is the whole point of the router.
     #[test]
@@ -528,6 +572,17 @@ mod probes {
         assert!(agenda.ratifications[0]
             .question()
             .contains("git substrate moved"));
+    }
+
+    /// The schemata census routes to ITS OWN class — an exact-name arm, like the
+    /// perimeter's and the substrate's, ahead of the `.spec` law catch-all.
+    #[test]
+    fn the_schemata_census_routes_to_its_own_class() {
+        let agenda = Agenda::of(["spec/schemata.spec"]).expect("a known lock class");
+        assert_eq!(agenda.ratifications, vec![Ratification::Schemata]);
+        assert!(agenda.ratifications[0]
+            .question()
+            .contains("schemata census moved"));
     }
 
     /// An unknown spec-directory artifact REFUSES — a new lock class must be taught to

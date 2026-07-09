@@ -41,6 +41,7 @@ pub struct ProposedModule {
     pub atomic: bool,
 }
 
+#[crate::mutate]
 impl ProposedModule {
     /// A genuine algebraic SHAPE — the functions cohere into at least one law. A cluster with no law
     /// is not a module, it is a misfit.
@@ -56,6 +57,7 @@ pub struct Proposal {
     pub modules: Vec<ProposedModule>,
 }
 
+#[crate::mutate]
 impl Proposal {
     /// Propose a modular decomposition of a theory's (flat) algebra. The analysis is an
     /// associated function of its PROPOSAL — the public surface is the value object, not a
@@ -103,6 +105,7 @@ impl Proposal {
 }
 
 /// Collect the operator indices a term mentions.
+#[crate::mutate]
 fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
     if let Term::App(op, args) = t {
         out.insert(*op);
@@ -115,6 +118,7 @@ fn ops_in(t: &Term, out: &mut BTreeSet<usize>) {
 /// Propose a modular decomposition of a theory's (flat) algebra. Partition by law-connectivity, score
 /// each cluster by the laws it holds, mark its tightness, and rank the shapes ahead of the misfits.
 /// (Private — reached as `Proposal::of`.)
+#[crate::mutate]
 fn modularize<T: Theory>() -> Proposal {
     let engine = Engine::<T>::new();
     let sigs = engine.signatures();

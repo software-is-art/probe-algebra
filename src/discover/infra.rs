@@ -66,6 +66,7 @@ pub enum Meaning {
     Drafts,
 }
 
+#[crate::mutate]
 impl Meaning {
     /// One word plus the TTL where one exists — the render and register vocabulary.
     pub fn describe(&self) -> String {
@@ -179,7 +180,7 @@ pub struct Infra {
 /// APIs (CORS rules, secret-name listings, project build settings). An ABSENT entry
 /// means the endpoint could not be read; the judge refuses that by name, never
 /// assumes it held.
-#[derive(Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LiveInfra {
     /// Store name → the origins its CORS allow-list currently permits.
     pub cors: Vec<(String, Vec<String>)>,
@@ -189,12 +190,136 @@ pub struct LiveInfra {
     pub build_commands: Vec<(String, String)>,
 }
 
+#[crate::mutate]
 impl LiveInfra {
-    fn lookup<'a, T>(map: &'a [(String, T)], key: &str) -> Option<&'a T> {
-        map.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
+    /// the declaration exactly — no extra origins or secrets, or a widening dent stops
+    /// being refusal-worthy). One dent per refusal-worthy single-fact perturbation;
+    /// the destructure below is the completeness pin — a new live field refuses to
+    /// compile until its dent is decided (see `discover::judgment`).
+    pub fn dents(&self) -> Vec<super::judgment::LiveDent<LiveInfra>> {
+        let LiveInfra {
+            cors,
+            secret_names,
+            build_commands,
+        } = self;
+        let mut dents = Vec::new();
+        let mut dent = |what: String, must_name: String, live: LiveInfra| {
+            dents.push(super::judgment::LiveDent {
+                what,
+                live,
+                must_name,
+            });
+        };
+        for (store, origins) in cors {
+            dent(
+                format!("the CORS read of `{store}` lost"),
+                format!("CORS allow-list of `{store}` could not be READ"),
+                {
+                    let mut l = self.clone();
+                    l.cors.retain(|(s, _)| s != store);
+                    l
+                },
+            );
+            for origin in origins {
+                dent(
+                    format!("origin `{origin}` dropped from `{store}`"),
+                    format!("store `{store}` does not allow origin `{origin}`"),
+                    {
+                        let mut l = self.clone();
+                        for (s, list) in &mut l.cors {
+                            if s == store {
+                                list.retain(|o| o != origin);
+                            }
+                        }
+                        l
+                    },
+                );
+            }
+        }
+        for (surface, names) in secret_names {
+            dent(
+                format!("the secret-name read of `{surface}` lost"),
+                format!("secret names of `{surface}` could not be READ"),
+                {
+                    let mut l = self.clone();
+                    l.secret_names.retain(|(s, _)| s != surface);
+                    l
+                },
+            );
+            for name in names {
+                dent(
+                    format!("secret `{name}` dropped from `{surface}`"),
+                    format!("surface `{surface}` does not hold secret `{name}`"),
+                    {
+                        let mut l = self.clone();
+                        for (s, list) in &mut l.secret_names {
+                            if s == surface {
+                                list.retain(|n| n != name);
+                            }
+                        }
+                        l
+                    },
+                );
+            }
+        }
+        for (surface, _) in build_commands {
+            dent(
+                format!("the build-command read of `{surface}` lost"),
+                format!("build command of `{surface}` could not be READ"),
+                {
+                    let mut l = self.clone();
+                    l.build_commands.retain(|(s, _)| s != surface);
+                    l
+                },
+            );
+            dent(
+                format!("the build command of `{surface}` drifted"),
+                format!("build command of `{surface}` is"),
+                {
+                    let mut l = self.clone();
+                    for (s, command) in &mut l.build_commands {
+                        if s == surface {
+                            command.push_str(" && echo drifted");
+                        }
+                    }
+                    l
+                },
+            );
+        }
+        dents
+    }
+
+    /// The live infra as keyed observations for the one interpreter — the extraction
+    /// half, pure field reads. Keys are `<kind>:<name>` (`cors:<store>`,
+    /// `secrets:<surface>`, `build:<surface>`); a requirement whose key is absent here
+    /// reads as unread, refused by name.
+    fn observe(&self) -> std::collections::BTreeMap<String, crate::discover::floor::Observed> {
+        use crate::discover::floor::Observed;
+        let mut world = std::collections::BTreeMap::new();
+        for (store, origins) in &self.cors {
+            world.insert(
+                format!("cors:{store}"),
+                Observed::Names(Some(origins.clone())),
+            );
+        }
+        for (surface, names) in &self.secret_names {
+            world.insert(
+                format!("secrets:{surface}"),
+                Observed::Names(Some(names.clone())),
+            );
+        }
+        for (surface, command) in &self.build_commands {
+            world.insert(
+                format!("build:{surface}"),
+                Observed::Text(Some(command.clone())),
+            );
+        }
+        world
     }
 }
 
+#[crate::mutate]
 impl Infra {
     fn surface(&self, name: &str) -> Option<&Surface> {
         self.surfaces.iter().find(|s| s.name == name)
@@ -309,14 +434,35 @@ impl Infra {
     /// the surface, the secret — the incident report written BEFORE the incident.
     /// An incoherent declaration refuses before any live fact is consulted.
     pub fn judge(&self, live: &LiveInfra) -> Result<Vec<String>, Vec<String>> {
+        // coherence is a DECLARATION check (no live state) — it runs first and stays
+        // hand-written; the live-state judgment below is the one interpreter.
         let mut held = self.coherent()?;
         let mut violations = Vec::new();
+        for line in self.requirements().outcomes(&live.observe()) {
+            let message = self.render_line(&line);
+            match line.verdict {
+                Ok(()) => held.push(message),
+                Err(_) => violations.push(message),
+            }
+        }
+        if violations.is_empty() {
+            Ok(held)
+        } else {
+            Err(violations)
+        }
+    }
 
-        // cors-covers-origins: every store presigned against must allow every origin
-        // of every surface that presigns into it. Extra live origins are NOT drift
-        // under floor semantics; the law is coverage.
+    /// The live-state floor, DERIVED from the declaration, as DATA for the one
+    /// interpreter: cors coverage per presigned-against store (its needed origins come
+    /// from the presign seams), a secret-name census per credential, and the exact
+    /// build command per built surface — in the order their lines are spoken. The
+    /// derivation is declaration-only, so it keeps `#[mutate]`; the JUDGMENT it feeds
+    /// is the interpreter's.
+    fn requirements(&self) -> crate::discover::floor::Floor {
+        use crate::discover::floor::{Check, Floor, Requirement};
+        let mut reqs = Vec::new();
         for store in &self.stores {
-            let mut needed: Vec<&String> = Vec::new();
+            let mut needed: Vec<String> = Vec::new();
             for seam in &self.seams {
                 if let Seam::Presign {
                     surface, store: s, ..
@@ -324,7 +470,7 @@ impl Infra {
                 {
                     if *s == store.name {
                         if let Some(surface) = self.surface(surface) {
-                            needed.extend(surface.origins.iter());
+                            needed.extend(surface.origins.iter().cloned());
                         }
                     }
                 }
@@ -332,88 +478,84 @@ impl Infra {
             if needed.is_empty() {
                 continue;
             }
-            match LiveInfra::lookup(&live.cors, &store.name) {
-                None => violations.push(format!(
-                    "the CORS allow-list of `{}` could not be READ — refused by name, \
-                     never assumed to cover its presigning origins",
-                    store.name
-                )),
-                Some(allowed) => {
-                    for origin in needed {
-                        if allowed.iter().any(|a| a == origin) {
-                            held.push(format!(
-                                "cors: `{}` allows presigning origin `{origin}`",
-                                store.name
-                            ));
-                        } else {
-                            violations.push(format!(
-                                "store `{}` does not allow origin `{origin}`, which \
-                                 presigns against it — uploads from that origin will \
-                                 fail in the customer's browser",
-                                store.name
-                            ));
-                        }
-                    }
-                }
-            }
+            reqs.push(Requirement::new(
+                format!("cors:{}", store.name),
+                Check::Covers(needed),
+            ));
         }
-
-        // secrets-census: every declared secret NAME must exist on its surface.
-        // Extra configured names are not drift; a missing name is a surface running
-        // on absence.
         for credential in &self.credentials {
-            match LiveInfra::lookup(&live.secret_names, &credential.surface) {
-                None => violations.push(format!(
-                    "the secret names of `{}` could not be READ — refused by name, \
-                     never assumed configured",
-                    credential.surface
-                )),
-                Some(configured) => {
-                    for name in &credential.names {
-                        if configured.iter().any(|c| c == name) {
-                            held.push(format!("secret: `{}` holds `{name}`", credential.surface));
-                        } else {
-                            violations.push(format!(
-                                "surface `{}` does not hold secret `{name}` — declared \
-                                 in the census, absent from the platform",
-                                credential.surface
-                            ));
-                        }
-                    }
-                }
-            }
+            reqs.push(Requirement::new(
+                format!("secrets:{}", credential.surface),
+                Check::Covers(credential.names.clone()),
+            ));
         }
-
-        // build-command-is-derived: the dashboard's build command equals the declared
-        // render, exactly — the one exact match, like the perimeter's approvals.
         for surface in &self.surfaces {
-            let Some(declared) = &surface.build else {
-                continue;
-            };
-            match LiveInfra::lookup(&live.build_commands, &surface.name) {
-                None => violations.push(format!(
-                    "the build command of `{}` could not be READ — refused by name, \
-                     never assumed derived",
-                    surface.name
-                )),
-                Some(command) if command == declared => {
-                    held.push(format!(
-                        "build: `{}` runs the declared command",
-                        surface.name
-                    ));
-                }
-                Some(command) => violations.push(format!(
-                    "the build command of `{}` is `{command}`, declared `{declared}` — \
-                     a gate defined where no drift gate can see it, unless this one",
-                    surface.name
-                )),
+            if let Some(build) = &surface.build {
+                reqs.push(Requirement::new(
+                    format!("build:{}", surface.name),
+                    Check::Is(build.clone()),
+                ));
             }
         }
+        Floor::of(reqs)
+    }
 
-        if violations.is_empty() {
-            Ok(held)
+    /// The prose for one judged line — PRESENTATION, not judgment. The interpreter
+    /// decides held-vs-why; this renders the decision to the exact message the infra
+    /// judge has always spoken, keyed by the `<kind>:<name>` requirement it concerns.
+    fn render_line(&self, l: &crate::discover::floor::Line) -> String {
+        use crate::discover::floor::Fail;
+        if let Some(store) = l.key.strip_prefix("cors:") {
+            let origin = &l.subject;
+            match &l.verdict {
+                Ok(()) => format!("cors: `{store}` allows presigning origin `{origin}`"),
+                Err(Fail::Missing) => format!(
+                    "store `{store}` does not allow origin `{origin}`, which presigns \
+                     against it — uploads from that origin will fail in the customer's \
+                     browser"
+                ),
+                Err(Fail::Unread) => format!(
+                    "the CORS allow-list of `{store}` could not be READ — refused by \
+                     name, never assumed to cover its presigning origins"
+                ),
+                other => panic!("unmapped cors line: {other:?}"),
+            }
+        } else if let Some(surface) = l.key.strip_prefix("secrets:") {
+            let name = &l.subject;
+            match &l.verdict {
+                Ok(()) => format!("secret: `{surface}` holds `{name}`"),
+                Err(Fail::Missing) => format!(
+                    "surface `{surface}` does not hold secret `{name}` — declared in the \
+                     census, absent from the platform"
+                ),
+                Err(Fail::Unread) => format!(
+                    "the secret names of `{surface}` could not be READ — refused by \
+                     name, never assumed configured"
+                ),
+                other => panic!("unmapped secrets line: {other:?}"),
+            }
+        } else if let Some(surface) = l.key.strip_prefix("build:") {
+            match &l.verdict {
+                Ok(()) => format!("build: `{surface}` runs the declared command"),
+                Err(Fail::Wrong(command)) => {
+                    let declared = self
+                        .surface(surface)
+                        .and_then(|s| s.build.as_deref())
+                        .unwrap_or_default();
+                    format!(
+                        "the build command of `{surface}` is `{command}`, declared \
+                         `{declared}` — a gate defined where no drift gate can see it, \
+                         unless this one"
+                    )
+                }
+                Err(Fail::Unread) => format!(
+                    "the build command of `{surface}` could not be READ — refused by \
+                     name, never assumed derived"
+                ),
+                other => panic!("unmapped build line: {other:?}"),
+            }
         } else {
-            Err(violations)
+            panic!("unmapped infra requirement key: {}", l.key)
         }
     }
 
@@ -834,6 +976,23 @@ mod probes {
         assert!(violations
             .iter()
             .any(|v| v.contains("build command of `app (preview)` could not be READ")));
+    }
+
+    /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied
+    /// fixture moves the verdict and names its fact — lost reads, dropped origins,
+    /// dropped secrets, drifted build commands (see `discover::judgment`).
+    #[test]
+    fn the_judge_is_deaf_to_nothing() {
+        let infra = Infra::exemplar();
+        let live = applied();
+        let held =
+            crate::discover::judgment::LiveDent::drill(|l| infra.judge(l), &live, live.dents())
+                .expect("the infra judge distinguishes every fact");
+        assert_eq!(held.len(), 15, "{held:#?}");
+        assert!(held
+            .iter()
+            .any(|h| h
+                == "sensitive to secret `STORE_SECRET_ACCESS_KEY` dropped from `app (preview)`"));
     }
 
     /// An incoherent declaration refuses BEFORE any live fact is consulted.

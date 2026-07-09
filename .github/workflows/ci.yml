@@ -43,30 +43,15 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      # nextest: the schemata sweep's fail-fast runner — a killed mutant
+      # stops at its first failing probe instead of running out the suite.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-targets
-
-  # Per-change dogfood: mutate only the lines this PR touches. New code that a
-  # probe cannot kill fails the gate; pre-existing documented equivalents are
-  # not in the diff, so they never re-trip it.
-  mutants-diff:
-    name: dogfood (changed lines)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@1.94.1
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-mutants,cargo-nextest
-      - name: mutate the diff
-        run: |
-          git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
-          .github/mutants-gate.sh --in-diff pr.diff
+      - run: cargo run --features schemata --example schemata -- sweep
 
   # Incremental dogfood on the default branch: a green sweep is a lock over the
   # tree at that sha (the `mutants-green` tag), so a merge mutates only the diff
@@ -74,8 +59,9 @@ jobs:
   # one effect. A red gate leaves the tag put, so the next merge re-verifies the
   # accumulated drift. The weekly sharded sweep re-certifies from scratch.
   mutants-incremental:
-    name: dogfood (since green)
+    name: certify (mutants-green)
     if: github.event_name == 'push'
+    needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -85,15 +71,7 @@ jobs:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@1.94.1
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-mutants,cargo-nextest
-      - name: mutate the drift since the certified tree
-        run: |
-          git rev-parse -q --verify refs/tags/mutants-green >/dev/null || { echo "::error::no mutants-green tag - bootstrap by dispatching this workflow (Actions -> ci -> Run workflow): the full sweep's countersign plants the tag it earns"; exit 1; }
-          git diff "mutants-green...HEAD" > since-green.diff
-          .github/mutants-gate.sh --in-diff since-green.diff
-      - name: countersign — advance the certified-tree tag
+      - name: countersign — the fully-gated tree marks itself certified
         run: |
           git tag -f mutants-green
           git push -f origin mutants-green

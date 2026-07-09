@@ -87,6 +87,7 @@ pub enum Sort {
     Verdict,
 }
 
+#[crate::mutate]
 fn parts(v: &Net) -> (BTreeSet<Link>, BTreeSet<Link>) {
     match v {
         Net::Fabric { allows, denies } => (allows.clone(), denies.clone()),
@@ -94,6 +95,7 @@ fn parts(v: &Net) -> (BTreeSet<Link>, BTreeSet<Link>) {
     }
 }
 
+#[crate::mutate]
 fn route(v: &Net) -> Link {
     match v {
         Net::Route(l) => *l,
@@ -102,6 +104,7 @@ fn route(v: &Net) -> Link {
 }
 
 /// Transitive closure of a link set (the universe is small; iterate to fixpoint).
+#[crate::mutate]
 fn closure(links: &BTreeSet<Link>) -> BTreeSet<Link> {
     let mut out = links.clone();
     loop {
@@ -121,11 +124,13 @@ fn closure(links: &BTreeSet<Link>) -> BTreeSet<Link> {
 }
 
 /// The connections a fabric actually delivers: the closure of its effective links.
+#[crate::mutate]
 fn delivered(v: &Net) -> BTreeSet<Link> {
     let (allows, denies) = parts(v);
     closure(&allows.difference(&denies).copied().collect())
 }
 
+#[crate::mutate]
 fn mesh(_: &[Net]) -> Option<Net> {
     Some(Net::Fabric {
         allows: BTreeSet::new(),
@@ -135,6 +140,7 @@ fn mesh(_: &[Net]) -> Option<Net> {
 
 /// Merge two fabrics: grants union, denies union — a deny is standing policy and
 /// survives every merge (deny-wins by construction).
+#[crate::mutate]
 fn join(vs: &[Net]) -> Option<Net> {
     let (a1, d1) = parts(&vs[0]);
     let (a2, d2) = parts(&vs[1]);
@@ -144,12 +150,14 @@ fn join(vs: &[Net]) -> Option<Net> {
     })
 }
 
+#[crate::mutate]
 fn grant(vs: &[Net]) -> Option<Net> {
     let (mut allows, denies) = parts(&vs[0]);
     allows.insert(route(&vs[1]));
     Some(Net::Fabric { allows, denies })
 }
 
+#[crate::mutate]
 fn revoke(vs: &[Net]) -> Option<Net> {
     let (allows, mut denies) = parts(&vs[0]);
     denies.insert(route(&vs[1]));
@@ -158,6 +166,7 @@ fn revoke(vs: &[Net]) -> Option<Net> {
 
 /// Everything the fabric delivers, as a fabric: allows become the closure of the
 /// effective links; the standing denies ride along unchanged.
+#[crate::mutate]
 fn reach(vs: &[Net]) -> Option<Net> {
     let (_, denies) = parts(&vs[0]);
     Some(Net::Fabric {
@@ -168,12 +177,14 @@ fn reach(vs: &[Net]) -> Option<Net> {
 
 /// Behavioural containment: every connection the first fabric delivers, the second
 /// delivers too.
+#[crate::mutate]
 fn within(vs: &[Net]) -> Option<Net> {
     Some(Net::Verdict(
         delivered(&vs[0]).is_subset(&delivered(&vs[1])),
     ))
 }
 
+#[crate::mutate]
 fn tru(_: &[Net]) -> Option<Net> {
     Some(Net::Verdict(true))
 }
@@ -181,6 +192,7 @@ fn tru(_: &[Net]) -> Option<Net> {
 /// A spread that exercises every semantic decision: the empty overlay, single routes, a
 /// CHAIN (so `reach` derives a route no one granted), a granted-and-denied route (the
 /// tombstone shadow deny-wins is about), and a pure standing policy with no grants.
+#[crate::mutate]
 fn fabrics() -> Vec<Net> {
     let f = |allows: &[Link], denies: &[Link]| Net::Fabric {
         allows: allows.iter().copied().collect(),

@@ -56,6 +56,7 @@ pub struct Component {
     pub nets: Vec<String>,
 }
 
+#[crate::mutate]
 impl Component {
     /// The component on one line: `{ ops } over nets { nets }`.
     fn render(&self) -> String {
@@ -83,6 +84,7 @@ pub struct Placement {
 pub type NetSignature = (&'static str, Vec<String>, String);
 
 /// Union-find: the root of `x`, with path compression.
+#[crate::mutate]
 fn find(parent: &mut [usize], mut x: usize) -> usize {
     while parent[x] != x {
         parent[x] = parent[parent[x]];
@@ -91,6 +93,7 @@ fn find(parent: &mut [usize], mut x: usize) -> usize {
     x
 }
 
+#[crate::mutate]
 impl Placement {
     /// Is the boundary settled — one component (or none), nothing indisputably apart?
     pub fn is_settled(&self) -> bool {
@@ -209,6 +212,7 @@ pub struct ShapeReport {
     pub candidates: Vec<SeamCandidate>,
 }
 
+#[crate::mutate]
 impl ShapeReport {
     /// Compute a system's derived shape: place every registry module, then scan module
     /// pairs for net-name coincidences no declared seam covers.
@@ -341,7 +345,7 @@ impl ShapeReport {
 }
 
 #[cfg(test)]
-mod probes {
+pub(crate) mod probes {
     use super::*;
     use crate::discover::arithmetic::Arithmetic;
     use crate::discover::coherence::{GcdMerge, MaxMerge};
@@ -349,6 +353,22 @@ mod probes {
     use crate::discover::date::Calendar;
     use crate::discover::protocol::DocFlow;
     use crate::discover::BoundarySpec;
+
+    /// The `shape` probe's individual sensitivity drill, exposed for the unified probe
+    /// census's rung-3 reconciliation (`discover::probes`): a placement disagreeing with the
+    /// declaration must render UNSETTLED. Fires (returns `true`) when the report is not
+    /// settled — the fixture `a_disagreeing_shape_renders_loud` pins the render.
+    pub(crate) fn shape_sensitivity_drill_fires() -> bool {
+        !ShapeReport {
+            system: "disagreeing",
+            placements: vec![
+                Placement::over("bundle", bundle()),
+                Placement::of::<DocFlow>(),
+            ],
+            candidates: vec![],
+        }
+        .is_settled()
+    }
 
     fn sig(symbol: &'static str, inputs: &[&str], output: &str) -> NetSignature {
         (

@@ -39,6 +39,7 @@ pub struct Doc {
     pub rev: u8,
 }
 
+#[crate::mutate]
 impl Doc {
     /// Mint a document.
     pub fn of(body: &str, rev: u8) -> Doc {
@@ -50,23 +51,27 @@ impl Doc {
 }
 
 /// Submission demands substance: an empty draft is REJECTED — definedness, not a flag.
+#[crate::mutate]
 fn submit(d: &Doc) -> Option<Doc> {
     (!d.body.is_empty()).then(|| d.clone())
 }
 
 /// Revision sends a document back to drafting, payload intact (the round-trip's
 /// other half).
+#[crate::mutate]
 fn revise(d: &Doc) -> Option<Doc> {
     Some(d.clone())
 }
 
 /// Approval demands at least one edit round — a document nobody touched is refused.
+#[crate::mutate]
 fn approve(d: &Doc) -> Option<Doc> {
     (d.rev >= 1).then(|| d.clone())
 }
 
 /// An edit bumps the revision counter (saturating: the grid stays finite through the
 /// closure bound regardless).
+#[crate::mutate]
 fn edit(d: &Doc) -> Option<Doc> {
     Some(Doc {
         body: d.body.clone(),
@@ -76,6 +81,7 @@ fn edit(d: &Doc) -> Option<Doc> {
 
 /// The draft seeds — the only entry point; Review and Published are populated by the
 /// CLOSURE, so their inhabitants are exactly what the protocol can reach.
+#[crate::mutate]
 fn draft_seeds() -> Vec<Doc> {
     vec![Doc::of("", 0), Doc::of("hello", 0), Doc::of("spec", 1)]
 }

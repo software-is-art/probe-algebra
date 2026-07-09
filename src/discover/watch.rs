@@ -27,6 +27,7 @@
 use super::engine::Theory;
 use super::shape::{NetSignature, Placement};
 
+#[crate::mutate("ticker")]
 impl Ticker {
     /// Extract the operator signatures from a source file's `ops { ... }` stanzas.
     ///
@@ -40,6 +41,7 @@ impl Ticker {
 }
 
 /// The parser body (private — reached as `Ticker::parse_ops`).
+#[crate::mutate]
 fn parse_ops(source: &str) -> Result<Vec<NetSignature>, String> {
     let mut sigs = Vec::new();
     let mut depth = 0usize; // > 0 while inside an `ops {` block
@@ -74,6 +76,7 @@ fn parse_ops(source: &str) -> Result<Vec<NetSignature>, String> {
 }
 
 /// One accumulated ops entry (ending in `;`) to a raw signature, or a named refusal.
+#[crate::mutate]
 fn parse_entry(entry: &str, line: usize) -> Result<NetSignature, String> {
     let refuse = |what: &str| format!("line {line}: {what} in ops entry `{entry}`");
     let mut quoted = entry.split('"');
@@ -120,6 +123,7 @@ fn parse_entry(entry: &str, line: usize) -> Result<NetSignature, String> {
 }
 
 /// A sort's net name: the final path segment, trimmed (`Sort::Int` → `Int`).
+#[crate::mutate]
 fn net_name(raw: &str) -> String {
     raw.trim()
         .rsplit("::")
@@ -143,6 +147,7 @@ pub enum ShapeEvent {
     Rederived,
 }
 
+#[crate::mutate("shape_event")]
 impl ShapeEvent {
     /// The event as a ticker line.
     pub fn render(&self) -> String {
@@ -167,6 +172,7 @@ pub struct Ticker {
     previous: Option<Placement>,
 }
 
+#[crate::mutate("ticker_speak")]
 impl Ticker {
     /// A fresh ticker (the first step reports the whole shape as `Seeded`).
     pub fn new() -> Ticker {
@@ -279,6 +285,7 @@ impl Ticker {
 
 /// Classify one step against the previous placement. Additive edits use the monotone
 /// vocabulary; anything non-additive (an operator renamed or removed) is `Rederived`.
+#[crate::mutate]
 fn diff(prev: &Placement, next: &Placement) -> Option<ShapeEvent> {
     let ops_of = |p: &Placement| -> Vec<String> {
         p.components

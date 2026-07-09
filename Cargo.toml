@@ -1,6 +1,6 @@
 [package]
 name = "boundary-spec"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A module boundary specified precisely enough that its validating tests — and the proof their interior is correct — derive themselves."
 license = "MIT OR Apache-2.0"
@@ -33,14 +33,25 @@ members = [
 name = "demo"
 path = "src/main.rs"
 
+[features]
+# schemata: the compiled-mutant build. #[mutate] emits its instrumented copies only
+# here; every other build carries the original items byte for byte (zero overhead —
+# what lets the hot paths be instrumented at all). The sweep (.github/schemata.sh)
+# builds with this feature; the census lock freezes from it.
+schemata = []
+
 [dependencies]
-boundary-spec-macros = { path = "boundary-spec-macros", version = "0.1.0" }
+boundary-spec-macros = { path = "boundary-spec-macros", version = "0.2.0" }
 # The freeze/drift-gate mechanics (`discover::freeze` is a thin adapter over it) — extracted so
 # any project can lift the "frozen spec + drift gate" discipline without the discovery engine.
 spec-lock = { path = "spec-lock", version = "0.1.0" }
 # `TypeEq` witnesses that PROVE the type-level capability-lattice laws at compile time (the
 # `Join` table has no runtime body, so mutation cannot reach it). Tiny, no-std-friendly.
 typewit = "1"
+# The schemata census: `#[mutate]`-instrumented functions register their flip sites
+# into one distributed slice (`discover::schemata::MUTANT_SITES`) at link time, so the
+# site inventory is derived from the code that carries it — never a hand list.
+linkme = "0.3"
 # GENESIS (`discover::scaffold::genesis`) PARSES the blank-slate `system! { ... }` declaration
 # from its token stream — the declaration is Rust surface syntax, never a bespoke DSL — and the
 # generator's tests hold every emitted `.rs` body to `syn::parse_file` (syn-clean output).
@@ -61,6 +72,8 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 # discipline's gates can still fire.
 fire-drill = { path = "fire-drill" }
 proptest = "1"
+# the instrumentation-completeness census parses the tree (schemata builds only).
+syn = { version = "2", features = ["full"] }
 trybuild = "1.0.117"
 # Only the `suite_audit` example uses these — to parse cargo-mutants' `outcomes.json`
 # and feed the real kill matrix into `select`. Not a library dependency.
@@ -85,3 +98,11 @@ opt-level = 2
 
 [profile.dev.package.delta-render]
 opt-level = 2
+
+# The discovery engine is grid-bounded compute: in debug it dominates `cargo test`
+# (each in-process mutant re-checks laws over the grid). Optimising JUST this crate in
+# dev/test keeps the edit-compile loop honest for everything else while the probe
+# batteries run at compute speed. Ratified trade-off: slightly slower lib compiles,
+# several-fold faster suites — including each cargo-mutants iteration (build+test).
+[profile.dev.package.boundary-spec]
+opt-level = 1

@@ -20,3 +20,19 @@
 - killed    `tick` becomes undefined everywhere
 - killed    `zero` becomes undefined everywhere
 - killed    `+` becomes undefined everywhere
+
+# deafness floor: 14 constant-return mutants (every operator × every distinct
+# output), judged by re-checking the discovered laws — all killed: every operator's output provably depends on its input.
+
+# dent sweep: 96 one-point mutants (first 16 grid points per operator,
+# 2 wrong outputs per point — a resource bound, not a curated list), judged by
+# re-checking the discovered laws — 9 SURVIVED — each an UNPINNED COORDINATE, the exact input a missing probe would constrain.
+- SURVIVED  `<+` dented at [(0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0)), (0, Snapshot([]), Ttl(0))]: (0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0)) -> (0, Snapshot([]), Ttl(0))
+- SURVIVED  `<+` dented at [(0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0)), (0, Snapshot([(Key("a"), Val(2), Ttl(5))]), Ttl(0))]: (0, Snapshot([(Key("a"), Val(2), Ttl(5))]), Ttl(0)) -> (0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0))
+- SURVIVED  `<+` dented at [(0, Snapshot([(Key("a"), Val(2), Ttl(5))]), Ttl(0)), (0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0))]: (0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0)) -> (0, Snapshot([(Key("a"), Val(2), Ttl(5))]), Ttl(0))
+- SURVIVED  `tick` dented at [(0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0)), (1, Snapshot([]), Ttl(1))]: (0, Snapshot([(Key("a"), Val(1), Ttl(1))]), Ttl(0)) -> (0, Snapshot([]), Ttl(0))
+- SURVIVED  `tick` dented at [(0, Snapshot([(Key("a"), Val(2), Ttl(5))]), Ttl(0)), (1, Snapshot([]), Ttl(5))]: (0, Snapshot([]), Ttl(0)) -> (0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0))
+- SURVIVED  `tick` dented at [(0, Snapshot([(Key("b"), Val(3), Ttl(3))]), Ttl(0)), (1, Snapshot([]), Ttl(1))]: (0, Snapshot([(Key("b"), Val(3), Ttl(2))]), Ttl(0)) -> (0, Snapshot([]), Ttl(0))
+- SURVIVED  `tick` dented at [(0, Snapshot([(Key("b"), Val(3), Ttl(3))]), Ttl(0)), (1, Snapshot([]), Ttl(1))]: (0, Snapshot([(Key("b"), Val(3), Ttl(2))]), Ttl(0)) -> (0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0))
+- SURVIVED  `tick` dented at [(0, Snapshot([(Key("b"), Val(3), Ttl(3))]), Ttl(0)), (1, Snapshot([]), Ttl(2))]: (0, Snapshot([(Key("b"), Val(3), Ttl(1))]), Ttl(0)) -> (0, Snapshot([]), Ttl(0))
+- SURVIVED  `tick` dented at [(0, Snapshot([(Key("b"), Val(3), Ttl(3))]), Ttl(0)), (1, Snapshot([]), Ttl(5))]: (0, Snapshot([]), Ttl(0)) -> (0, Snapshot([(Key("a"), Val(1), Ttl(2))]), Ttl(0))

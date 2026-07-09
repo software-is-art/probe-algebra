@@ -52,7 +52,7 @@ pub struct Perimeter {
 
 /// What the world reports, extracted from the GitHub API by `examples/perimeter.rs`
 /// (the extraction is field reads; the JUDGMENT lives here, where the probes reach).
-#[derive(Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LivePerimeter {
     /// A `deletion` rule is active on the default branch.
     pub deletion_blocked: bool,
@@ -67,6 +67,115 @@ pub struct LivePerimeter {
     pub required_checks: Vec<String>,
     /// `None` = the endpoint could not be read; refused by name, never assumed.
     pub private_vulnerability_reporting: Option<bool>,
+}
+
+impl LivePerimeter {
+    /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
+    /// the floor exactly — no extra protections, or a widening dent stops being
+    /// refusal-worthy). One dent per refusal-worthy single-fact perturbation; the
+    /// destructure below is the completeness pin — a new live field refuses to
+    /// compile until its dent is decided (see `discover::judgment`).
+    pub fn dents(&self) -> Vec<super::judgment::LiveDent<LivePerimeter>> {
+        let LivePerimeter {
+            deletion_blocked: _,
+            force_push_blocked: _,
+            required_approvals: _,
+            merge_methods: _,
+            required_checks,
+            private_vulnerability_reporting: _,
+        } = self;
+        let mut dents = Vec::new();
+        let mut dent = |what: &str, must_name: &str, live: LivePerimeter| {
+            dents.push(super::judgment::LiveDent {
+                what: what.to_string(),
+                live,
+                must_name: must_name.to_string(),
+            });
+        };
+        dent("deletion unblocked", "can be DELETED", {
+            let mut l = self.clone();
+            l.deletion_blocked = false;
+            l
+        });
+        dent("force pushes unblocked", "FORCE PUSHES", {
+            let mut l = self.clone();
+            l.force_push_blocked = false;
+            l
+        });
+        dent("the pull-request rule dropped", "no pull-request rule", {
+            let mut l = self.clone();
+            l.required_approvals = None;
+            l
+        });
+        dent(
+            "required approvals raised above the floor",
+            "deadlocks a solo maintainer",
+            {
+                let mut l = self.clone();
+                l.required_approvals = l.required_approvals.map(|n| n + 1);
+                l
+            },
+        );
+        dent("a widened merge method", "merge method `rebase`", {
+            let mut l = self.clone();
+            l.merge_methods.push("rebase".to_string());
+            l
+        });
+        for check in required_checks {
+            dent(
+                &format!("required check `{check}` removed"),
+                &format!("`{check}` is not required"),
+                {
+                    let mut l = self.clone();
+                    l.required_checks.retain(|c| c != check);
+                    l
+                },
+            );
+        }
+        dent("vulnerability reporting disabled", "DISABLED", {
+            let mut l = self.clone();
+            l.private_vulnerability_reporting = Some(false);
+            l
+        });
+        dent("vulnerability reporting unreadable", "could not be READ", {
+            let mut l = self.clone();
+            l.private_vulnerability_reporting = None;
+            l
+        });
+        dents
+    }
+
+    /// The live perimeter as keyed observations for the one interpreter — the extraction
+    /// half, pure field reads. Each fact carries its own readability (`None` = unread).
+    fn observe(&self) -> std::collections::BTreeMap<String, crate::discover::floor::Observed> {
+        use crate::discover::floor::Observed;
+        let mut world = std::collections::BTreeMap::new();
+        world.insert(
+            "deletion".to_string(),
+            Observed::Flag(self.deletion_blocked),
+        );
+        world.insert(
+            "force_push".to_string(),
+            Observed::Flag(self.force_push_blocked),
+        );
+        world.insert(
+            "approvals".to_string(),
+            Observed::Count(self.required_approvals),
+        );
+        world.insert(
+            "merge_methods".to_string(),
+            Observed::Names(Some(self.merge_methods.clone())),
+        );
+        world.insert(
+            "required_checks".to_string(),
+            Observed::Names(Some(self.required_checks.clone())),
+        );
+        world.insert(
+            "vuln".to_string(),
+            Observed::Toggle(self.private_vulnerability_reporting),
+        );
+        world
+    }
 }
 
 impl Perimeter {
@@ -198,98 +307,86 @@ impl Perimeter {
     /// each naming the rule and what to do — including the never-applied state, which
     /// is how the one manual act stays a red gate instead of a forgotten checklist.
     pub fn judge(&self, live: &LivePerimeter) -> Result<Vec<String>, Vec<String>> {
-        fn fact(
-            held: &mut Vec<String>,
-            violations: &mut Vec<String>,
-            ok: bool,
-            held_line: String,
-            violation: String,
-        ) {
-            if ok {
-                held.push(held_line);
-            } else {
-                violations.push(violation);
-            }
-        }
         let mut held = Vec::new();
         let mut violations = Vec::new();
-
-        fact(
-            &mut held,
-            &mut violations,
-            live.deletion_blocked,
-            "deletion of the default branch: blocked".to_string(),
-            "the default branch can be DELETED — the declared perimeter blocks deletion \
-             (apply spec/perimeter.ruleset.json)"
-                .to_string(),
-        );
-        fact(
-            &mut held,
-            &mut violations,
-            live.force_push_blocked,
-            "force pushes: blocked".to_string(),
-            "the default branch accepts FORCE PUSHES — the declared perimeter blocks them \
-             (apply spec/perimeter.ruleset.json)"
-                .to_string(),
-        );
-        match live.required_approvals {
-            None => violations.push(
-                "no pull-request rule is active — direct pushes to the default branch are \
-                 unguarded (apply spec/perimeter.ruleset.json)"
-                    .to_string(),
-            ),
-            Some(n) if n == self.required_approvals => {
-                held.push(format!("pull requests required; approvals: {n}"));
+        for line in self.floor().outcomes(&live.observe()) {
+            let message = self.render_line(&line);
+            match line.verdict {
+                Ok(()) => held.push(message),
+                Err(_) => violations.push(message),
             }
-            Some(n) => violations.push(format!(
-                "required approvals is {n}, declared {} — above the floor this is not \
-                 stricter, it deadlocks a solo maintainer (no one can approve their own PR)",
-                self.required_approvals
-            )),
         }
-        for method in &live.merge_methods {
-            fact(
-                &mut held,
-                &mut violations,
-                self.merge_methods.contains(&method.as_str()),
-                format!("merge method allowed: {method}"),
-                format!(
-                    "merge method `{method}` is allowed — the declared perimeter permits \
-                     only: {}",
-                    self.merge_methods.join(", ")
-                ),
-            );
-        }
-        for check in &self.required_checks {
-            fact(
-                &mut held,
-                &mut violations,
-                live.required_checks.iter().any(|c| c == check),
-                format!("required check: {check}"),
-                format!(
-                    "status check `{check}` is not required on the default branch — a PR \
-                     can merge without it (apply spec/perimeter.ruleset.json)"
-                ),
-            );
-        }
-        match live.private_vulnerability_reporting {
-            Some(true) => held.push("private vulnerability reporting: enabled".to_string()),
-            Some(false) => violations.push(
-                "private vulnerability reporting is DISABLED — SECURITY.md instructs \
-                 reporters to use it (enable in the repository's security settings)"
-                    .to_string(),
-            ),
-            None => violations.push(
-                "private vulnerability reporting could not be READ — refused by name, \
-                 never assumed enabled; verify the endpoint and the token's read access"
-                    .to_string(),
-            ),
-        }
-
         if violations.is_empty() {
             Ok(held)
         } else {
             Err(violations)
+        }
+    }
+
+    /// The floor as DATA for the one interpreter — the whole judgment as six
+    /// requirements, in the order their held/violation lines are spoken.
+    fn floor(&self) -> crate::discover::floor::Floor {
+        use crate::discover::floor::{Check, Floor, Requirement};
+        let allowed: Vec<String> = self.merge_methods.iter().map(|s| s.to_string()).collect();
+        Floor::of(vec![
+            Requirement::new("deletion", Check::True),
+            Requirement::new("force_push", Check::True),
+            Requirement::new("approvals", Check::Exactly(self.required_approvals)),
+            Requirement::new("merge_methods", Check::Within(allowed)),
+            Requirement::new(
+                "required_checks",
+                Check::Covers(self.required_checks.clone()),
+            ),
+            Requirement::new("vuln", Check::Enabled),
+        ])
+    }
+
+    /// The prose for one judged line — PRESENTATION, not judgment. The interpreter
+    /// (`Floor::outcomes`) decides held-vs-why; this renders the decision to the exact
+    /// message the perimeter has always spoken, pinned byte-for-byte by the message
+    /// probes. A match to strings, no logic: nothing free-form decides pass/fail here.
+    fn render_line(&self, l: &crate::discover::floor::Line) -> String {
+        use crate::discover::floor::Fail;
+        match (l.key.as_str(), &l.verdict) {
+            ("deletion", Ok(())) => "deletion of the default branch: blocked".to_string(),
+            ("deletion", Err(Fail::Off)) => "the default branch can be DELETED — the \
+                 declared perimeter blocks deletion (apply spec/perimeter.ruleset.json)"
+                .to_string(),
+            ("force_push", Ok(())) => "force pushes: blocked".to_string(),
+            ("force_push", Err(Fail::Off)) => "the default branch accepts FORCE PUSHES — \
+                 the declared perimeter blocks them (apply spec/perimeter.ruleset.json)"
+                .to_string(),
+            ("approvals", Ok(())) => format!("pull requests required; approvals: {}", l.subject),
+            ("approvals", Err(Fail::Unread)) => "no pull-request rule is active — direct \
+                 pushes to the default branch are unguarded (apply spec/perimeter.ruleset.json)"
+                .to_string(),
+            ("approvals", Err(Fail::Wrong(n))) => format!(
+                "required approvals is {n}, declared {} — above the floor this is not \
+                 stricter, it deadlocks a solo maintainer (no one can approve their own PR)",
+                self.required_approvals
+            ),
+            ("merge_methods", Ok(())) => format!("merge method allowed: {}", l.subject),
+            ("merge_methods", Err(Fail::Outside)) => format!(
+                "merge method `{}` is allowed — the declared perimeter permits only: {}",
+                l.subject,
+                self.merge_methods.join(", ")
+            ),
+            ("required_checks", Ok(())) => format!("required check: {}", l.subject),
+            ("required_checks", Err(Fail::Missing)) => format!(
+                "status check `{}` is not required on the default branch — a PR can merge \
+                 without it (apply spec/perimeter.ruleset.json)",
+                l.subject
+            ),
+            ("vuln", Ok(())) => "private vulnerability reporting: enabled".to_string(),
+            ("vuln", Err(Fail::Off)) => "private vulnerability reporting is DISABLED — \
+                 SECURITY.md instructs reporters to use it (enable in the repository's \
+                 security settings)"
+                .to_string(),
+            ("vuln", Err(Fail::Unread)) => "private vulnerability reporting could not be \
+                 READ — refused by name, never assumed enabled; verify the endpoint and \
+                 the token's read access"
+                .to_string(),
+            other => panic!("unmapped perimeter line: {other:?}"),
         }
     }
 }
@@ -319,19 +416,16 @@ mod probes {
     #[test]
     fn the_required_checks_come_from_the_registry() {
         let p = Perimeter::declared();
-        assert_eq!(
-            p.required_checks,
-            vec!["fmt + clippy + test", "dogfood (changed lines)"]
-        );
+        assert_eq!(p.required_checks, vec!["fmt + clippy + test"]);
         assert_eq!(p.merge_methods, &["squash"]);
         assert_eq!(p.required_approvals, 0);
         // both renders carry the derived checks verbatim:
         assert!(p
             .render()
-            .contains("fmt + clippy + test, dogfood (changed lines)"));
+            .contains("required status checks: fmt + clippy + test"));
         assert!(p
             .ruleset_json()
-            .contains("\"context\": \"dogfood (changed lines)\""));
+            .contains("\"context\": \"fmt + clippy + test\""));
     }
 
     /// An applied floor holds — and the held facts name everything defended. Extra
@@ -386,23 +480,23 @@ mod probes {
             .iter()
             .any(|v| v.contains("merge method `merge`")));
 
-        // ONE declared check missing while another is present refuses by the missing
-        // check's name — the membership test must match the check itself, not merely
-        // notice that some other context differs (`==` vs `!=` in the `any`).
+        // the declared check missing while ANOTHER context is present refuses by the
+        // missing check's name — the membership test must match the check itself,
+        // not merely notice that some context exists (`==` vs `!=` in the `any`).
         let mut partial = applied_floor();
-        partial.required_checks = vec!["fmt + clippy + test".to_string()];
+        partial.required_checks = vec!["some other job".to_string()];
         let violations = p.judge(&partial).unwrap_err();
         assert!(
             violations
                 .iter()
-                .any(|v| v.contains("`dogfood (changed lines)` is not required")),
+                .any(|v| v.contains("`fmt + clippy + test` is not required")),
             "{violations:#?}"
         );
         assert!(
             !violations
                 .iter()
-                .any(|v| v.contains("`fmt + clippy + test` is not required")),
-            "the present check must not be reported missing: {violations:#?}"
+                .any(|v| v.contains("`some other job` is not required")),
+            "an extra live context is not a missing one: {violations:#?}"
         );
 
         // vulnerability reporting explicitly off is its own violation:
@@ -410,6 +504,25 @@ mod probes {
         off.private_vulnerability_reporting = Some(false);
         let violations = p.judge(&off).unwrap_err();
         assert!(violations.iter().any(|v| v.contains("DISABLED")));
+    }
+
+    /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied
+    /// floor moves the verdict and names its fact — the derived battery that closes,
+    /// as a class, the survivor species the source sweeps kept finding here (a
+    /// membership check that stops distinguishing one element among present ones).
+    #[test]
+    fn the_judge_is_deaf_to_nothing() {
+        let applied = applied_floor();
+        let held = crate::discover::judgment::LiveDent::drill(
+            |l| Perimeter::declared().judge(l),
+            &applied,
+            applied.dents(),
+        )
+        .expect("the perimeter judge distinguishes every fact");
+        assert_eq!(held.len(), 8, "{held:#?}");
+        assert!(held
+            .iter()
+            .any(|h| h == "sensitive to required check `fmt + clippy + test` removed"));
     }
 
     /// The committed perimeter locks are FRESH — declaration, render, and ruleset move

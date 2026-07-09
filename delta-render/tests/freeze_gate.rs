@@ -16,7 +16,12 @@ fn spec_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec")
 }
 
-fn check_theory<T: Theory>() {
+fn check_theory<T>()
+where
+    T: Theory + 'static,
+    T::Value: 'static,
+    T::Obs: std::fmt::Debug + 'static,
+{
     let locks = [
         Spec::of::<T>().lock_in(&spec_dir()),
         MutationReport::of::<T>().lock_in(&spec_dir()),

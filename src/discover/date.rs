@@ -25,6 +25,7 @@ pub enum Sort {
     Duration,
 }
 
+#[crate::mutate]
 fn date(v: &Time) -> u32 {
     match v {
         Time::Date(d) => *d,
@@ -32,22 +33,28 @@ fn date(v: &Time) -> u32 {
     }
 }
 
+#[crate::mutate]
 fn zero(_: &[Time]) -> Option<Time> {
     Some(Time::Dur(0))
 }
+#[crate::mutate]
 fn plus(v: &[Time]) -> Option<Time> {
     Some(Time::Dur(date(&v[0]) + date(&v[1])))
 }
+#[crate::mutate]
 fn add(v: &[Time]) -> Option<Time> {
     Some(Time::Date(date(&v[0]) + date(&v[1])))
 }
+#[crate::mutate]
 fn diff(v: &[Time]) -> Option<Time> {
     let (a, b) = (date(&v[0]), date(&v[1]));
     (a >= b).then(|| Time::Dur(a - b)) // PARTIAL: no negative durations
 }
+#[crate::mutate]
 fn since(v: &[Time]) -> Option<Time> {
     Some(Time::Dur(date(&v[0])))
 }
+#[crate::mutate]
 fn at(v: &[Time]) -> Option<Time> {
     Some(Time::Date(date(&v[0])))
 }

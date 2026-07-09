@@ -66,6 +66,7 @@ pub struct TagLaw {
     pub required: bool,
 }
 
+#[crate::mutate]
 impl TagLaw {
     /// Does a live tag name match this law? Exact match, or prefix for a family —
     /// `v2*` matches `v2026.07.07` and never `v0.1.0`.
@@ -96,7 +97,7 @@ pub struct Substrate {
 /// What the world reports — parsed from `git tag --list`, per-tag
 /// `git merge-base --is-ancestor`, and `git rev-list --min-parents=2 --count` by
 /// `examples/substrate.rs`. `None` = the read failed; refused by name, never assumed.
-#[derive(Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LiveSubstrate {
     /// Every tag name the repository carries.
     pub tags: Option<Vec<String>>,
@@ -108,6 +109,137 @@ pub struct LiveSubstrate {
     pub published_versions: Option<Vec<String>>,
 }
 
+#[crate::mutate]
+impl LiveSubstrate {
+    /// The judge's dent battery, derived from an APPLIED fixture (`self` must satisfy
+    /// the declaration exactly). One dent per refusal-worthy single-fact
+    /// perturbation; the destructure below is the completeness pin — a new live field
+    /// refuses to compile until its dent is decided (see `discover::judgment`).
+    pub fn dents(&self) -> Vec<super::judgment::LiveDent<LiveSubstrate>> {
+        let LiveSubstrate {
+            tags,
+            ancestry,
+            merges_after_epoch: _,
+            published_versions,
+        } = self;
+        let mut dents = Vec::new();
+        let mut dent = |what: String, must_name: String, live: LiveSubstrate| {
+            dents.push(super::judgment::LiveDent {
+                what,
+                live,
+                must_name,
+            });
+        };
+        dent(
+            "the tag list read lost".to_string(),
+            "tag list could not be READ".to_string(),
+            {
+                let mut l = self.clone();
+                l.tags = None;
+                l
+            },
+        );
+        dent(
+            "the ancestry read lost".to_string(),
+            "could not be READ".to_string(),
+            {
+                let mut l = self.clone();
+                l.ancestry = None;
+                l
+            },
+        );
+        // refusal-worthiness is DECLARATION knowledge: deleting a tag only refuses if
+        // some required law or publish marker demands it (an empty optional family is
+        // "nothing minted, nothing claimed"), while knocking a tag off the certified
+        // line refuses for anything that carries a declared meaning at all.
+        let declared = Substrate::declared();
+        let is_marker = |tag: &str| {
+            published_versions
+                .iter()
+                .flatten()
+                .any(|v| format!("v{v}") == tag)
+        };
+        for tag in tags.iter().flatten() {
+            if declared.tags.iter().any(|l| l.required && l.matches(tag)) || is_marker(tag) {
+                dent(format!("tag `{tag}` deleted"), format!("`{tag}`"), {
+                    let mut l = self.clone();
+                    if let Some(t) = &mut l.tags {
+                        t.retain(|x| x != tag);
+                    }
+                    if let Some(a) = &mut l.ancestry {
+                        a.retain(|(x, _)| x != tag);
+                    }
+                    l
+                });
+            }
+            if declared.tags.iter().any(|l| l.matches(tag)) || is_marker(tag) {
+                dent(
+                    format!("tag `{tag}` knocked off the certified line"),
+                    format!("`{tag}` is not on the default branch"),
+                    {
+                        let mut l = self.clone();
+                        if let Some(a) = &mut l.ancestry {
+                            for (x, on) in a.iter_mut() {
+                                if x == tag {
+                                    *on = false;
+                                }
+                            }
+                        }
+                        l
+                    },
+                );
+            }
+        }
+        let _ = ancestry;
+        dent(
+            "the merge count read lost".to_string(),
+            "merge-commit count".to_string(),
+            {
+                let mut l = self.clone();
+                l.merges_after_epoch = None;
+                l
+            },
+        );
+        dent(
+            "a merge commit landed after the epoch".to_string(),
+            "merge commit(s)".to_string(),
+            {
+                let mut l = self.clone();
+                l.merges_after_epoch = Some(1);
+                l
+            },
+        );
+        dent(
+            "the index read lost".to_string(),
+            "published versions".to_string(),
+            {
+                let mut l = self.clone();
+                l.published_versions = None;
+                l
+            },
+        );
+        for version in published_versions.iter().flatten() {
+            dent(
+                format!("published {version} lost its marker"),
+                format!("tag `v{version}` does not exist"),
+                {
+                    let mut l = self.clone();
+                    let marker = format!("v{version}");
+                    if let Some(t) = &mut l.tags {
+                        t.retain(|x| *x != marker);
+                    }
+                    if let Some(a) = &mut l.ancestry {
+                        a.retain(|(x, _)| *x != marker);
+                    }
+                    l
+                },
+            );
+        }
+        dents
+    }
+}
+
+#[crate::mutate]
 impl Substrate {
     /// The declared substrate: the two tag meanings the machinery leans on (each
     /// NAMED once, here or in the gate registry — `mutants-green` is
@@ -148,8 +280,12 @@ impl Substrate {
 
         match (&live.tags, &live.ancestry) {
             (Some(tags), Some(ancestry)) => {
+                // the tags ⋈ ancestry left join, assembled once — the relational
+                // primitive the flat floor could not express (discover::relation).
+                let joined = crate::discover::relation::Joined::left(tags, ancestry);
+
                 for law in &self.tags {
-                    let matching: Vec<&String> = tags.iter().filter(|t| law.matches(t)).collect();
+                    let matching = joined.matching(|t| law.matches(t));
                     if matching.is_empty() {
                         if law.required {
                             violations.push(format!(
@@ -164,29 +300,28 @@ impl Substrate {
                         }
                         continue;
                     }
-                    for tag in matching {
-                        match ancestry.iter().find(|(t, _)| t == tag) {
-                            None => violations.push(format!(
-                                "the ancestry of tag `{tag}` could not be READ — \
-                                 refused by name, never assumed on the certified line"
-                            )),
-                            Some((_, true)) => {
+                    for (tag, _) in matching {
+                        match joined.annotation(tag) {
+                            Some(Some(true)) => {
                                 held.push(format!("tag `{tag}` is on the certified line"))
                             }
-                            Some((_, false)) => violations.push(format!(
+                            Some(Some(false)) => violations.push(format!(
                                 "tag `{tag}` is not on the default branch — its declared \
                                  meaning names a certified default-branch tree, and a \
                                  stray tag claims one it never earned"
+                            )),
+                            _ => violations.push(format!(
+                                "the ancestry of tag `{tag}` could not be READ — \
+                                 refused by name, never assumed on the certified line"
                             )),
                         }
                     }
                 }
 
-                // the publish-marker law, instances DERIVED: every version the index
-                // reports published demands its `v<version>` tag on the certified
-                // line. The declaration names no version, so a new publish extends
-                // the judgment with no edit — and no declared prose can go stale
-                // against the registry.
+                // the publish-marker law, instances DERIVED from the live index via the
+                // derive-then-judge typestate: every published version demands its
+                // `v<version>` tag on the certified line. A new publish extends the
+                // judgment with no declaration edit; no declared prose can go stale.
                 match &live.published_versions {
                     None => violations.push(format!(
                         "the published versions of `{}` could not be READ from the \
@@ -194,9 +329,10 @@ impl Substrate {
                         self.publish_marker_crate
                     )),
                     Some(versions) => {
-                        for version in versions {
-                            let marker = format!("v{version}");
-                            if !tags.contains(&marker) {
+                        let markers =
+                            crate::discover::relation::Requirements::awaiting().derive(versions);
+                        for (marker, version) in markers.members().iter().zip(versions) {
+                            if !joined.has(marker) {
                                 violations.push(format!(
                                     "tag `{marker}` does not exist, but `{}` {version} \
                                      is on crates.io — every published version marks \
@@ -207,20 +343,20 @@ impl Substrate {
                                 ));
                                 continue;
                             }
-                            match ancestry.iter().find(|(t, _)| t == &marker) {
-                                None => violations.push(format!(
-                                    "the ancestry of tag `{marker}` could not be READ — \
-                                     refused by name, never assumed on the certified line"
-                                )),
-                                Some((_, true)) => held.push(format!(
+                            match joined.annotation(marker) {
+                                Some(Some(true)) => held.push(format!(
                                     "tag `{marker}` marks published version {version} \
                                      on the certified line"
                                 )),
-                                Some((_, false)) => violations.push(format!(
+                                Some(Some(false)) => violations.push(format!(
                                     "tag `{marker}` is not on the default branch — a \
                                      publish marker names the certified tree that \
                                      shipped, and a stray one claims a tree it never \
                                      earned"
+                                )),
+                                _ => violations.push(format!(
+                                    "the ancestry of tag `{marker}` could not be READ — \
+                                     refused by name, never assumed on the certified line"
                                 )),
                             }
                         }
@@ -322,6 +458,120 @@ mod probes {
             merges_after_epoch: Some(0),
             published_versions: Some(vec!["0.1.0".to_string()]),
         }
+    }
+
+    /// substrate's judgment reformulated over the RELATIONAL primitive — the tag/marker
+    /// verdict is a JOIN (tags ⋈ ancestry) plus a live-DERIVED marker floor, not a flat
+    /// floor. This reformulation reproduces the incumbent judge's accept/reject across a
+    /// grid of live substrates (tags/ancestry/markers/linearity, straddling the floor),
+    /// proving the relational engine faithfully holds substrate before the message work.
+    /// The incumbent is the transitional oracle; no hand-written oracle.
+    #[test]
+    fn the_relational_reformulation_reproduces_the_substrate_judge() {
+        use crate::discover::relation::{Joined, Requirements};
+
+        fn relational_ok(sub: &Substrate, live: &LiveSubstrate) -> bool {
+            let (tags, ancestry) = match (&live.tags, &live.ancestry) {
+                (Some(t), Some(a)) => (t, a),
+                _ => return false,
+            };
+            let joined = Joined::left(tags, ancestry);
+            // tag laws: for each, the matching tags must all be on the certified line;
+            // a required law with no match refuses (an optional one is vacuously held).
+            for law in &sub.tags {
+                let matching = joined.matching(|t| law.matches(t));
+                if matching.is_empty() {
+                    if law.required {
+                        return false;
+                    }
+                } else if matching.iter().any(|(_, on_line)| *on_line != Some(true)) {
+                    return false;
+                }
+            }
+            // publish markers, DERIVED from the live index: each must exist and sit on
+            // the certified line.
+            let versions = match &live.published_versions {
+                Some(v) => v,
+                None => return false,
+            };
+            let markers = Requirements::awaiting().derive(versions);
+            for marker in markers.members() {
+                if !joined.has(marker) || joined.annotation(marker) != Some(Some(true)) {
+                    return false;
+                }
+            }
+            // linearity: a flat scalar, exactly zero.
+            matches!(live.merges_after_epoch, Some(0))
+        }
+
+        let declared = Substrate::declared();
+        // ancestry with exactly one named tag knocked off the certified line (the rest
+        // on) — so each tag's line-status hinges on ITS OWN join lookup; a lookup that
+        // fetched a neighbour's status would flip the verdict on exactly these states.
+        let off_one = |off: &str| {
+            Some(
+                ["mutants-green", "v0.1.0", "v2026.07.07"]
+                    .iter()
+                    .map(|t| (t.to_string(), *t != off))
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let all_on = off_one("");
+        let tags_opts: Vec<Option<Vec<String>>> = vec![
+            Some(vec![
+                "mutants-green".to_string(),
+                "v0.1.0".to_string(),
+                "v2026.07.07".to_string(),
+            ]),
+            None,
+            Some(vec!["v0.1.0".to_string(), "v2026.07.07".to_string()]), // required green gone
+            Some(vec!["mutants-green".to_string(), "v2026.07.07".to_string()]), // marker v0.1.0 gone
+        ];
+        let ancestry_opts = vec![
+            all_on,
+            None,
+            off_one("mutants-green"),
+            off_one("v0.1.0"),
+            off_one("v2026.07.07"),
+        ];
+        let merges_opts = [Some(0u64), Some(1), None];
+        let versions_opts: Vec<Option<Vec<String>>> = vec![
+            Some(vec!["0.1.0".to_string()]),
+            None,
+            Some(vec!["0.1.0".to_string(), "0.2.0".to_string()]), // 0.2.0 unmarked
+        ];
+
+        let mut count = 0usize;
+        let mut caught = 0usize;
+        for tags in &tags_opts {
+            for ancestry in &ancestry_opts {
+                for merges in merges_opts {
+                    for versions in &versions_opts {
+                        let live = LiveSubstrate {
+                            tags: tags.clone(),
+                            ancestry: ancestry.clone(),
+                            merges_after_epoch: merges,
+                            published_versions: versions.clone(),
+                        };
+                        let incumbent = declared.judge(&live).is_ok();
+                        let relational = relational_ok(&declared, &live);
+                        assert_eq!(
+                            relational, incumbent,
+                            "relational disagrees with the judge on {live:?}"
+                        );
+                        count += 1;
+                        if !incumbent {
+                            caught += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(count >= 100, "the grid should be substantial: {count}");
+        assert!(
+            caught > 0 && caught < count,
+            "the grid must straddle the floor"
+        );
     }
 
     /// The pattern grammar, one arm at a time: an exact name matches only itself
@@ -501,6 +751,70 @@ mod probes {
         assert!(violations
             .iter()
             .any(|v| v.contains("merge-commit count") && v.contains("could not be READ")));
+    }
+
+    /// Each dent perturbs EXACTLY its fact: a deletion dent removes one tag and
+    /// keeps every other (a flipped `retain` would keep only the target and delete
+    /// the rest — the schemata survivor this probe exists to kill), and marker-loss
+    /// dents remove exactly the marker.
+    #[test]
+    fn each_dent_perturbs_exactly_its_fact() {
+        let base = applied();
+        let base_tags = base.tags.clone().unwrap();
+        for dent in base.dents() {
+            let Some(tags) = &dent.live.tags else {
+                continue; // the read-lost dents
+            };
+            if let Some(deleted) = dent
+                .what
+                .strip_prefix("tag `")
+                .and_then(|w| w.strip_suffix("` deleted"))
+            {
+                assert_eq!(tags.len(), base_tags.len() - 1, "{}", dent.what);
+                assert!(!tags.iter().any(|t| t == deleted), "{}", dent.what);
+                for kept in base_tags.iter().filter(|t| *t != deleted) {
+                    assert!(
+                        tags.contains(kept),
+                        "{}: `{kept}` wrongly removed",
+                        dent.what
+                    );
+                }
+                let ancestry = dent.live.ancestry.as_ref().unwrap();
+                assert_eq!(ancestry.len(), base_tags.len() - 1, "{}", dent.what);
+            }
+            if dent.what.contains("lost its marker") {
+                assert_eq!(tags.len(), base_tags.len() - 1, "{}", dent.what);
+                assert!(tags.contains(&"mutants-green".to_string()), "{}", dent.what);
+                let ancestry = dent.live.ancestry.as_ref().unwrap();
+                assert_eq!(ancestry.len(), base_tags.len() - 1, "{}", dent.what);
+                assert!(
+                    ancestry.iter().any(|(t, _)| t == "mutants-green"),
+                    "{}: the marker dent must keep every other ancestry line",
+                    dent.what
+                );
+            }
+        }
+    }
+
+    /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied
+    /// fixture moves the verdict and names its fact — lost reads, deleted required
+    /// tags and markers, tags knocked off the certified line, a merge after the epoch
+    /// (see `discover::judgment`). Deleting an OPTIONAL family tag is deliberately
+    /// not a dent: floor semantics say an empty family claims nothing.
+    #[test]
+    fn the_judge_is_deaf_to_nothing() {
+        let s = Substrate::declared();
+        let live = applied();
+        let held = crate::discover::judgment::LiveDent::drill(|l| s.judge(l), &live, live.dents())
+            .expect("the substrate judge distinguishes every fact");
+        assert_eq!(held.len(), 11, "{held:#?}");
+        assert!(held
+            .iter()
+            .any(|h| h == "sensitive to tag `v2026.07.07` knocked off the certified line"));
+        assert!(
+            !held.iter().any(|h| h.contains("tag `v2026.07.07` deleted")),
+            "an optional family tag's deletion is not refusal-worthy: {held:#?}"
+        );
     }
 
     /// The committed substrate lock is FRESH — declaration and spec move together or

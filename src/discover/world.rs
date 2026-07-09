@@ -74,6 +74,7 @@ pub struct Trace(pub Vec<Command>);
 /// The grid grows a trace two ways: APPEND each reachable command (via `Command`'s own
 /// derived grid — every constructor, both keys, both values), and DROP the last command
 /// (back toward `empty`). The closure under these reaches every short session shape.
+#[crate::mutate]
 impl Shaped for Trace {
     fn inhabitant() -> Self {
         Trace(Vec::new())
@@ -105,6 +106,7 @@ pub type State = BTreeMap<Key, Val>;
 /// world lock freezes its predictions.
 pub struct StoreModel;
 
+#[crate::mutate]
 impl StoreModel {
     /// Replay a trace against the model: `Put` overwrites, `Del` removes (absent tolerated).
     pub fn replay(trace: &Trace) -> State {
@@ -130,9 +132,11 @@ impl StoreModel {
     }
 }
 
+#[crate::mutate]
 fn empty_trace(_: &[Trace]) -> Option<Trace> {
     Some(Trace(Vec::new()))
 }
+#[crate::mutate]
 fn concat_traces(v: &[Trace]) -> Option<Trace> {
     let mut commands = v[0].0.clone();
     commands.extend(v[1].0.iter().copied());
@@ -182,6 +186,7 @@ pub struct WorldReport {
     pub rows: Vec<(String, String)>,
 }
 
+#[crate::mutate]
 impl WorldReport {
     /// Record an observer over the canonical battery of `V` (derived from the value's own
     /// `Shaped` surface, structure-first). Deterministic given a deterministic observer —
@@ -283,6 +288,7 @@ pub struct FakeRemoteStore {
     journal: Vec<Command>,
 }
 
+#[crate::mutate]
 impl FakeRemoteStore {
     /// Accept a command (the vendor's write path: append-only).
     pub fn apply(&mut self, command: Command) {

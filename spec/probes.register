@@ -1,0 +1,13 @@
+# probes register — the ratified drift-gate probes (rung 2 of the unified probe census,
+# discover::probes). Every probe here leans only on the SHARED `spec-lock drift gate`
+# fire-drill (a tampered or missing committed lock is caught) and has NO individual
+# refutation drill of its own. Writing a line IS the ratification; the reason is the one
+# thing no derivation produces. Held by set difference against the live drift-gate set
+# (`every_probe_has_an_individual_drill_or_is_ratified`): an un-ratified byte-lock refuses,
+# and a line for a probe that earned an individual drill is stale — so this set can only
+# shrink. To remove a line, give that probe its own drill.
+#
+# Format: <probe key>: <why it leans on the shared drift gate rather than an individual drill>
+
+surface: the public-surface census (qualify.spec) is derived by boundary-enforce over the source tree; its DERIVATION is mutation-tested in that crate, but no in-crate fire-drill plants a surface that changed without a re-bless. An individual drill would run the census over a synthetic tree with an added public item and demand the line appears.
+tiers: the derived tier partition (tiers.spec) is derived by boundary-enforce; its derivation is mutation-tested there, but no in-crate fire-drill plants a mis-derived partition. An individual drill would run derive_partition over a synthetic file that should change tier and demand the move.

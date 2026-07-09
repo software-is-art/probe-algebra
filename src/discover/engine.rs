@@ -135,6 +135,7 @@ pub enum Polarity {
 
 /// A discovered law: its plain-language and symbolic renderings, plus the two terms it equates
 /// (so the spec can be re-probed over a fresh grid, where mutation judges its kill power).
+#[derive(Clone)]
 pub struct DiscoveredLaw {
     /// The ratified catalog shape this law instantiates — EXACTLY a `ShapeCatalog::inventory()`
     /// name, set at the `templates()` push site that minted the law. The tag is what the
@@ -154,6 +155,7 @@ pub struct DiscoveredLaw {
     pub premise: Option<(Term, Term)>,
 }
 
+#[crate::mutate]
 impl DiscoveredLaw {
     /// The distinct operator symbols participating in this law, in first-appearance order
     /// (lhs pre-order, then rhs). `symbols` is the theory's symbol table in operator-index
@@ -231,6 +233,7 @@ type Sig<T> = Vec<Option<<T as Theory>::Obs>>;
 /// The sampling stride for a grid space too large to enumerate: the first integer at or above the
 /// golden-ratio point `space · φ⁻¹` (the classic low-discrepancy multiplier) that is coprime to
 /// the space, so `k · step (mod space)` visits distinct, well-spread assignments.
+#[crate::mutate]
 fn coprime_step(space: u128) -> u128 {
     let mut step = (space.saturating_mul(618) / 1000).max(1);
     while gcd(step, space) != 1 {
@@ -239,6 +242,7 @@ fn coprime_step(space: u128) -> u128 {
     step
 }
 
+#[crate::mutate]
 fn gcd(a: u128, b: u128) -> u128 {
     if b == 0 {
         a
@@ -259,10 +263,12 @@ pub type OpDeclaration<S> = (&'static str, &'static str, Fixity, Vec<S>, S);
 
 /// Is `op` a homogeneous binary operator on sort `s` (`s × s -> s`)? Used by every shape that needs
 /// a binary on a given sort, so a mutation to this predicate breaks laws across all theories.
+#[crate::mutate]
 fn is_binary_on<T: Theory>(op: &Operator<T>, s: T::Sort) -> bool {
     op.inputs.len() == 2 && op.inputs[0] == s && op.inputs[1] == s && op.output == s
 }
 
+#[crate::mutate]
 impl<T: Theory> Engine<T> {
     /// Build the engine for a theory: collect the sorts that appear in the signature, mint `num_vars`
     /// variables per sort, and lay out a deterministic spread of grid assignments.
@@ -623,6 +629,7 @@ pub enum SchemaTerm {
     App(u8, &'static [SchemaTerm]),
 }
 
+#[crate::mutate]
 impl SchemaTerm {
     /// Render over concrete operators: `ops[slot]` is that slot's `(symbol, fixity)`;
     /// `vars[sort_var][ord]` names the variables. Mirrors `Engine::render` case for case.
@@ -681,6 +688,7 @@ pub enum Slot {
     Relation(u8, u8),
 }
 
+#[crate::mutate]
 impl ShapeGate {
     /// Do these operator signatures satisfy the gate? `sigs[i]` is slot `i`'s
     /// `(input sorts, output sort)` and `names[i]` its display name; sorts are any comparable
@@ -787,6 +795,7 @@ impl ShapeGate {
     }
 }
 
+#[crate::mutate]
 impl ShapeInfo {
     /// Does a discovered law's prose instantiate this shape's template? The template's literal
     /// fragments (around the `{...}` holes) must appear in the prose IN ORDER — the first as a
@@ -882,6 +891,7 @@ impl ShapeInfo {
 /// hangs off a typestate.
 pub struct ShapeCatalog;
 
+#[crate::mutate]
 impl ShapeCatalog {
     /// The full inventory — the order IS the order discovery tries (and therefore renders)
     /// the shapes within each polarity band, and `spec/shapes.spec` locks it. This is the
@@ -1777,6 +1787,7 @@ impl ShapeCatalog {
     }
 }
 
+#[crate::mutate]
 impl<T: Theory> Engine<T> {
     /// The id of the variable for `(sort, ord)`, if it exists.
     fn var(&self, sort: T::Sort, ord: usize) -> Option<Term> {
@@ -2249,6 +2260,7 @@ impl<T: Theory> Engine<T> {
     }
 }
 
+#[crate::mutate]
 impl<T: Theory> Default for Engine<T> {
     fn default() -> Self {
         Self::new()
@@ -2276,6 +2288,7 @@ impl<T: Theory> Default for Engine<T> {
 /// returns — phase 1 is then exhaustive only up to the cap (depth-bounded structure), the same
 /// bound term enumeration already lives with. `grid_gaps` is the audit that a grid's structural
 /// closure actually completed.
+#[crate::mutate]
 pub fn shadow_grid<V: crate::boundary::Shaped>(cap: usize) -> Vec<V> {
     let mut grid: Vec<V> = ::std::vec![V::inhabitant()];
     // PHASE 1 — structure, exhaustively: close under structural perturbations alone, so every
@@ -2290,6 +2303,7 @@ pub fn shadow_grid<V: crate::boundary::Shaped>(cap: usize) -> Vec<V> {
 /// One closure pass: walk the frontier, admitting unseen `neighbours` until `cap`. The `cap`
 /// bound lives in the inner break (the only place new values are added); the outer loop just
 /// walks the frontier. `i` indexes into `grid`, so `i <= grid.len()` would read past the end.
+#[crate::mutate]
 fn close<V: PartialEq>(grid: &mut Vec<V>, cap: usize, neighbours: impl Fn(&V) -> Vec<V>) {
     let mut i = 0;
     while i < grid.len() {
@@ -2312,6 +2326,7 @@ fn close<V: PartialEq>(grid: &mut Vec<V>, cap: usize, neighbours: impl Fn(&V) ->
 /// the library so every downstream `#[derive(Shaped)]` grid can be held to it as an invariant
 /// (`assert!(grid_gaps(&grid).is_empty())`) instead of by convention. Discriminants, never a
 /// hand-written variant list — a hand list would just move the gap.
+#[crate::mutate]
 pub fn grid_gaps<V: crate::boundary::Shaped>(grid: &[V]) -> Vec<core::mem::Discriminant<V>> {
     let exhibited: Vec<_> = grid.iter().map(core::mem::discriminant).collect();
     let mut gaps = Vec::new();

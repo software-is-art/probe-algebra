@@ -11,7 +11,7 @@
 
 - pull requests required before merging; required approvals: 0 (a solo
   maintainer cannot approve their own PR — the gates are the reviewer)
-- required status checks: fmt + clippy + test, dogfood (changed lines)
+- required status checks: fmt + clippy + test
 - merge methods: squash only
 - force pushes to the default branch: blocked
 - deletion of the default branch: blocked

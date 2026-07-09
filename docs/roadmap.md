@@ -925,6 +925,183 @@ crates.io with no `v0.1.0` marker in the repository (the one publish that predat
 the minting machinery) — the reminder that never expires, computed instead of
 declared; push the tag at the published tree and the gate goes green.
 
+## Mutation as a distance dial: the deafness floor and the dent sweep (BUILT)
+
+A function on a bounded grid IS its value table, so "how different from the real
+thing" is a distance, and mutation layers sit at points on that dial.
+`discover::mutation` grew two, both in-process, both inside every `cargo test`:
+**deafness** (farthest — an operator returns one constant everywhere, one mutant per
+distinct output: is its output constrained to depend on its input at all? random
+noise derandomised — on enumerable codomains, every constant beats a coin flip) and
+the **dent sweep** (nearest — the minimal meaning change: exactly one input tuple
+returns a wrong value). The existing table battery (confusion, projection,
+partiality) sits between them. The mutants carry captured state a bare `fn` cannot,
+so a thread-local surgery + trampoline evaluator plants them without touching the
+engine's fn-pointer design; judgment is `Engine::check` over the laws NAMING the
+mutated operator (exact, not approximate: a term evaluates only the operators it
+names), which is why hundreds of mutants per theory cost tenths of a second.
+
+The feedback changed kind, not just amount: a surviving dent is not a source line, it
+is a COORDINATE — the exact input whose output no ratified law constrains. The
+committed `.mutation.spec` locks now carry each theory's unpinned-region map: fabric's
+`within` verdict is free at specific pairs, doc-flow's `edit` revision counter is
+largely unpinned, arithmetic's `<` is unconstrained at `(0, k)` off the law grid —
+each a ratified degree of freedom with an address, closable by a sharper shape or
+expectation and gated the moment it moves. Honest frame: dent adequacy is per-point —
+coordinated multi-point changes that preserve every law are the spec's symmetries
+(relational probes pin meaning up to isomorphism, their theoretical ceiling), and the
+check-judged layers trade the appearing-law kill direction for every-change economics
+(disclosed in the lock headers). Alongside: `boundary-spec` joined layout-probe and
+delta-render in the dev-profile opt-level override — measured 8.5× on the mutation
+suite (22.8s → 2.7s) — so the widened batteries ride `cargo test` at compute speed.
+
+## Mutant schemata: the compiled population (BUILT)
+
+The rebuild-per-mutant price is gone for the expression flips. `#[mutate]`
+(boundary-spec-macros) rewrites each `==`, `!=`, `&&`, `||` in an instrumented
+function as `if Schemata::active("<site>") { flipped } else { original }` — the left
+operand binds once, so laziness is preserved and left-leaning chains grow linearly —
+and every site registers into a link-time slice (`discover::schemata::MUTANT_SITES`)
+whose sorted census freezes as `spec/schemata.spec`: instrumenting a function is a
+ratified diff, a label collision refuses by name, and the router routes the census to
+its own class. The `mutation (schemata)` gate (Pure) builds ONCE and runs the lib
+suite once per site with
+`PROBE_MUTANT` selecting the flip; survivors are ratified by key in
+`spec/schemata.register` or killed with a probe. First full sweep, measured: 23 sites
+across the three world judges, the router's classifier, the reliance judge, and the
+tag grammar — 23 killed, 0 survivors, 82 seconds end to end (the same population as
+rebuilds: ~12+ minutes). Cheap enough that it was promoted from the weekly clock to
+EVERY change on arrival — expression mutants now gate PRs, inside the same required
+check as fmt/clippy/test. The zero is not luck: the sensitivity drills are the
+killers for every judge site — the layers compose.
+
+Vertical integration, same arc: the flip catalog grew the orderings (`<` → `>=` and
+kin — the negation, disturbing both edge and direction) and `!`-deletion; every
+instrumented function gained DEAFNESS forms read from its return-type syntax
+(`Ok(default)`, `Err(default)`, both booleans — the whole-body replacement class,
+source mutation's biggest, now compiled behind the same selector); and the sweep's
+economics are all derived — nextest fail-fast stops a killed mutant at its first
+failing probe, and the timeout prices itself from a timed green baseline (5x + 10s;
+a hand-picked constant was the antipattern wearing a number). Second sweep: 38
+sites, 38 killed, 0 survivors — including the census catching its own growth (the
+router arm taught for `schemata.spec` added a `==` that immediately became site
+`classify:9`). The nextest install step in the check job DERIVES from the
+declaration: a consumer pipeline with no schemata gate carries no extra step. Honest frame: schemata covers what a
+runtime branch can express; whole-function replacements and type-level mutations stay
+with the source sweeps, `matches!`/`assert!` interiors are opaque tokens (disclosed in
+the macro docs), and one mutant runs per process — flip interactions are out of scope,
+as they are for every mutation layer here.
+
+## The sensitivity drill: judges deaf to nothing (BUILT)
+
+The dent idea reached the world-lock judges without table-izing them: a judge's
+domain is its LIVE state, so the minimal meaning change is a LIVE DENT — one field of
+an applied fixture perturbed, and the verdict must both move and NAME the fact
+(`discover::judgment`, `LiveDent::drill`). Each `Live*` struct enumerates its own
+dents, and completeness is a compile-time pin: the enumerator opens with a full
+destructure naming every field, so a new live field refuses to compile until its dent
+is decided. The enumerators encode one reviewable judgment — which perturbations are
+refusal-worthy (floor semantics accept widenings; an optional tag family's deletion
+claims nothing) — and the drill catches both failure modes by name: a judge DEAF to a
+fact (verdict stays green) and a judge that moves without naming it (a refusal nobody
+can act on). All three judges pass: perimeter 9 dents, infra 15, substrate 11. Under
+the source-level sweeps the drill is itself a probe, so the survivor species that
+kept recurring — a membership check that stops distinguishing one element among
+present ones — is closed as a CLASS: a mutant that deafens any judge to any fact now
+dies here, and a fact added tomorrow arrives with its dent or does not compile.
+Alongside, the session-start hook gained a FREEDOM sense next to the topography: the
+ratified survivor count read from the committed mutation locks, byte-stable between
+ratifications — the agent wakes knowing how many named degrees of freedom are open
+and where the addresses are.
+
+## The first retirement, taken: the per-diff source gate is gone
+
+The census went 70 → 371 → 697: cfg-gated dual emission (`--features schemata`
+builds carry the branches; every other build compiles the ORIGINAL items byte for
+byte) let the engine and the whole discover tree join, impl-level plus free-fn
+blanket annotation, all site ids module-path-qualified at expansion (two theories
+both had an `add`; the collision refused, as designed). Completeness is now a
+CENSUS, not an intention: every top-level fn and impl either carries `#[mutate]`,
+is `cfg(test)`/`const`, or its file holds a reasoned line in
+`spec/instrumentation.register` — judged two-way, so exemptions can only shrink
+honestly. The 697-site sweep (parallel workers over one build, coverage-mapped,
+~8 minutes at 4 cores) found six survivors, each ratified with its reason in
+`spec/schemata.register`: two equivalences in the mutation harness's own mutant
+vocabulary, one conservative-direction freedom, the doc-flow edit freedom seen
+through a second lens, and two genesis sites uncovered by the lib suite — the
+owed lib-side twins, disclosed. On that basis the `mutation (changed lines)`
+per-diff gate is RETIRED from the registry (13 gates; the perimeter's required
+checks derive down to the one job — re-apply the ruleset after merge). Still
+earning rent: the since-green incremental and the weekly shards (type-level
+mutations, statement deletion, the exempted files) and the member-crate
+companions. They retire the same way this one did: when the census closes the
+territory they cover.
+
+## Retiring the source-level mutator: the enablers (BUILT), the retirement (staged)
+
+The two enablers landed. `#[mutate]` applies to WHOLE impl blocks (labels
+`<Type>::<method>` — coverage grows per block, not per function), and the sweep is
+COVERAGE-MAPPED: the baseline run doubles as the recording run (`SCHEMATA_RECORD`;
+nextest's one-process-per-test makes each touch-file a site→test edge list), so every
+mutant runs only the tests whose execution reaches its guard. That selection is
+EXACT, not sampled — a flip cannot change behaviour where its guard never executes —
+and a site no test reaches is a survivor before any run: unexecuted is unkillable,
+disclosed, never assumed. Measured at 70 sites (the judges, the full review router,
+the dependence judge and report, the ticker): 70 killed, 0 survivors, 0 uncovered,
+~68s end to end with sub-second marginal cost per mutant — the population can grow
+an order of magnitude and stay inside the every-change budget, two orders with
+process-level fan-out.
+
+The retirement itself is DATA-driven, in stages: (1) keep widening instrumentation
+through the cold interior (impl-level attributes make each module a one-line diff,
+each ratified in the census lock); (2) the completeness census — "every eligible
+interior function carries `#[mutate]` or a register-exempted line" — turns coverage
+from intention into a gate; (3) the engine (hot paths) needs CFG-GATED emission
+(`--features schemata` builds carry the branches, normal builds carry nothing) — the
+one remaining design piece, priced at one extra cached CI build; (4) each source-gate
+retires when the sweeps go quiet on the classes schemata covers where it covers them
+— the changed-lines PR gate first (its diff is almost always instrumented territory
+once the census gate exists), the weekly shards last. Every source-sweep survivor
+until then is a signpost naming the next function to instrument.
+
+## Candidate (superseded): retiring the source-level mutator
+
+The four layers exist to be composed, and their composition points at full
+elimination of the external mutation tool — aspirationally fast enough to be a LOCAL
+check, not a CI economics problem. The pieces, each already proven in miniature:
+(1) WIDEN the flip catalog — `<`/`<=`/`>`/`>=`, arithmetic, `!`-deletion are the same
+transformation `#[mutate]` already does for `==`/`&&`. (2) WHOLE-FUNCTION deafness as
+a schemata form — the macro reads the return TYPE syntax (`Result<A, B>` →
+`Ok(A::default())`/`Err(B::default())`, `Option` → `None`, `bool` → both constants,
+Shaped values → `inhabitant()`), which is the source tool's biggest mutant class,
+compiled behind the same selector. (3) CFG-GATED emission (`--features schemata`
+builds carry the branches; normal builds carry literally nothing), so even hot-path
+code like the engine can be instrumented without taxing every test run — the sweep
+pays one extra build, once. (4) COMPLETENESS DERIVED, not hoped: the qualify machinery
+already parses the tree, so "every eligible interior function carries `#[mutate]` or a
+register-exempted reason" is a census gate, the same move that closed every other
+hand-list. (5) SITE→TEST coverage recorded from one instrumented baseline run — the
+one-binary property means the map survives, so each mutant runs only the tests that
+reach it (the source tool rebuilds away any such map), and mutants fan out as
+parallel processes against one build. Timeouts are already detections (the sweep
+script kills at 300s and counts the kill). What the source tool keeps until earned
+otherwise: exotic operators, match-arm/statement deletion, and zero-annotation
+operation on arbitrary crates — the weekly sweeps stay until they go quiet on the
+classes schemata covers, and every weekly survivor is a signpost naming the next
+function to instrument.
+
+## Candidate: shape pressure in the hook voice
+
+Field feedback from an agent running the hook day to day: the voices pay their way —
+cheap, attached to the real changed files, never a separate review ritual — and the
+one addition it would want is SHAPE PRESSURE: a whisper naming which seam to split
+next when one file accumulates several operator families; not a hard rule, ranked
+coupling evidence. The machinery half-exists: cohesion reports and the placer already compute
+clusters and placements; the ticker already narrates shape events on theory edits.
+Shape pressure is their composition at edit time — when the edited file's derived
+clusters exceed one, the hook whispers the ranked split (which operators cohere,
+which seam the placer would draw), advisory like every voice, priced in silence.
+
 ## Candidate: the audience is the agent
 
 Adoption of this method is chosen inside agentic sessions, by whichever instance is
@@ -938,6 +1115,295 @@ the committed locks, the fire-drill); and the adoption gradient already proven b
 field reports — bricks first (a hook, a register, a judge), worldview later. The
 crates.io publish is the first prerequisite (done); the one-page mental-model document
 is the open one.
+
+## Candidate: the sweep discovers, the oracle proves sensitivity
+
+The whole candidate in one line: **the sweep discovers the laws, the oracle proves they are
+sensitive.** What a consumer is handed is a GUARANTEE, stated the way they would hear it:
+swap this module's implementation for any other with the same interface, and a law refuses
+the swap — we catch it. The method's honesty bounds that promise exactly, and the bound is
+not a footnote but a COMMITTED artifact: the swap is caught wherever it differs from the
+real behaviour at a grid coordinate some law pins; it is missed only where the difference
+lands entirely in a ratified DEGREE OF FREEDOM (a named dent survivor — the coordinate no
+law constrains) or is a SYMMETRY of the spec (a coordinated change every law tolerates —
+meaning pinned up to isomorphism, the theoretical ceiling). Both exception classes already
+live in `spec/<theory>.mutation.spec`, enumerated and ratified. So the guarantee ships with
+its own fine print: green is evidence over the enumerable grid, the survivors ARE the list
+of swaps we would miss, and there is nowhere else for one to hide.
+
+Two distinctions keep that guarantee honest. First, DETECTION is not sampled: what catches
+a swapped implementation is `check(discovered laws)` run against it over the bounded
+term-CLOSURE of the grid (seeds plus every operator composition up to the depth bound —
+`surgical_eval` answers on whatever intermediate values `check` feeds it), so any law it
+violates anywhere in that closure is caught deterministically, not at coordinates we
+happened to try. The dent/deaf SWEEP is a separate, offline thing: evidence that the laws
+are worth running — tight enough to catch meaningful deviations, with the gaps enumerated
+where they are not. Second, the grid is the JUDGE's observational universe, not a limit of
+the oracle: a swap that differs from the real module only OUTSIDE the closure is, by this
+repo's observation-function quotient, the SAME behaviour as far as the spec is concerned —
+not a coverage gap but the definition of what the spec means, and the reason arbitrary-CODE
+oracles add no detection power over perturbed tables (`check` cannot tell apart two
+implementations that agree on the closure). The bound widens MONOTONICALLY with the grid —
+more inhabitants, more rounds — so the guarantee only ever grows, never silently shrinks.
+
+A different, blunter guarantee is possible and worth NOT conflating: a DIFFERENTIAL mode
+that generates oracles as actual code (or fuzzes the real module) over an open input space
+and compares against the real implementation directly rather than against the laws. It
+catches off-closure differences the spec is blind to, but it has no spec to consult, so it
+OVER-reports — flagging every behavioural difference including the ratified degrees of
+freedom the spec deliberately left free. It answers "does this differ anywhere?", not "does
+this violate the contract?" The spec-check guarantee is the right default (contract
+violation, enumerated fine print, monotone in the grid); the differential mode is an opt-in
+second net answering a weaker question.
+
+Deriving a consumer's spec is BUILT: discovery runs their code, `spec-lock` freezes the
+laws/census, genesis scaffolds the suite, drift is gated. That half needs no new brick.
+The half nobody outside this repo can reach is the one the whole method turns on — *are
+the probes you have SENSITIVE?* — the mutation-adequacy question. Internally we answer it
+by mutating our own code: `discover::schemata` (the compiled population) gates every PR,
+`discover::mutation` rides every `cargo test`. Both edit an implementation and ask "did a
+probe catch it?", and both inherit mutation testing's tax — a survivor's spec-status is
+unknown, so every one needs the equivalent-mutant ratification dance.
+
+The candidate answers the sensitivity question WITHOUT mutating anything, which is what
+lets it replace mutation testing on PRs rather than merely speed it up. Do not perturb the
+consumer's source (invasive — needs their build, our attributes in their tree, one process
+per mutant). GENERATE an alternative behaviour as DATA — a sampled state machine, an
+operator table, a synthetic conduct — CONSTRUCTED to violate a named law L (or to conform
+to all of them), and check the probes PARTITION it: refuse the constructed-to-violate
+oracle, hold on the conforming one. A probe suite that fails to refuse a
+constructed-to-violate-L oracle is DEAF to L — named, no litigation, because the oracle
+carries its ground-truth label BY CONSTRUCTION. That is the move that dissolves the
+equivalent-mutant problem: you generate against the spec boundary, not the code's
+neighbourhood, so a behaviour is admitted or forbidden by definition, never an unknown to
+ratify. And because the oracle is data judged by the frozen spec (`Engine::check` over a theory
+carrier), never code inside the consumer's module, it "could be compiled and run
+anywhere" — no per-mutant build, no coverage map, no process fan-out, no attribute. That
+is precisely why it can be a PR gate without the schemata machinery.
+
+The core is not a future generalisation — it is BUILT and rides every `cargo test`:
+`discover::mutation` already IS this. A mutant there is a perturbed operator TABLE (a
+`Deaf` constant, or a one-point `Dent` returning a wrong value at one grid coordinate) —
+a behaviour as DATA, labelled by construction — installed over the real evaluator and
+judged by `Engine::check` over the laws that name the operator, the real `fn` never
+touched. A surviving dent is the insensitive coordinate: the input no ratified law pins.
+So "generate a behaviour constructed to violate a law, check the spec partitions it" is
+the dent sweep, running today for every declared theory (fabric's twenty-two, the bridge,
+the protocol). Its reach is EXACTLY discovery's reach, because it is discovery's own
+judgment pointed at generated tables: wherever a carrier is enumerable (`#[derive(Shaped)]`
+gives a grid and a function becomes a finite table) it works, and where the carrier is not
+enumerable there is no table, no discovery, and no oracle — the same boundary discovery
+has always had, not a new one.
+
+That reach reframes the two consumer cases. The NON-Rust encoding — `theory!`,
+`protocol!`, `bridge`, `fabric` — is already done, because the declaration bounds the
+carrier and the sweep runs on it now. The NATIVE-Rust case is where the one gap sits, and
+it is narrow: a plain module's public functions over `Shaped` types already carry
+everything the `Theory` trait needs (sorts are the distinct `Shaped` types in the
+signatures, `inhabitants` is the grid, `observe` is the value's own observation, operators
+are the functions with their `eval`), so the missing brick is an AUTO-LIFT — synthesize the
+`Theory` impl from the inferred module surface — after which discovery and the dent / deaf
+sweep run with zero declaration and the consumer has written only types and Rust. Minting a
+table that fails one NAMED law (the inverse of `check`) is a reporting refinement on top,
+not a missing capability: the blanket dent sweep already finds every insensitive
+coordinate.
+
+Honest frame, the method's own and unsoftened — but NOT the two-regimes hedge it is tempting
+to reach for. There is no separate "implementation neighbourhood" that mutation keeps
+covering and the oracle grid does not: the neighbourhood is ALREADY sampled by the probes
+that survive the sweep. Making the sweep go green is a one-time selection pressure that
+leaves the probe set sensitive; a passing suite CARRIES that coverage as a property, not as
+something to redraw every PR. And the only part of the neighbourhood that matters is the
+part that crosses the spec boundary — a mutant that does not cross it is an equivalent
+mutant, i.e. noise. So the meaningful mutation coverage and the spec-boundary coverage are
+the SAME coverage, and the oracle grid samples it directly. The one real caveat is the
+shared one: the oracle grid is bounded, so a suite that partitions every sampled oracle is
+EVIDENCE of sensitivity over that sample near each law's boundary, never proof it catches
+everything (the green-is-evidence discipline discovery and the sweeps already live under).
+This removes the coverage-based reason to keep the internal schemata engine standing: its
+job was to make the probes sensitive once, and the oracle-partition maintains that against
+the spec going forward. What residual role schemata keeps, if any, is a bootstrap or a
+periodic audit of the interpreter that judges the oracles — and even that interpreter is
+generation-tested, not mutated (`discover::floor` / `discover::relation` are GENERATED
+against), so it is not a standing mutation dependency. Retiring schemata is on the table,
+not deferred by a coverage argument.
+
+The consumer writes NOTHING new — the zero-annotation posture the rest of the method
+already holds: the public surface is auto-inferred (the qualify census), the grid comes
+from their types, discovery finds the laws, and the sweep judges generated tables against
+them. So the remaining work is one brick and a few genuinely-open questions, no longer the
+whole engine:
+
+- **The brick: auto-lift** — synthesize the `Theory` impl by SCANNING the tree the qualify
+  census already walks: functions over `Shaped` types → operators, the `Shaped` types →
+  sorts and the grid. No macro, no `lift!`, no declaration — the consumer writes types and
+  Rust and the surface is read, the same zero-annotation inference the census already does.
+  This is the whole distance between "built for our theories" and "a Rust consumer runs it
+  on their own PRs having written nothing extra."
+- **Open: the enumerability edge** — the honest limit, inherited from discovery: a public
+  function over a non-`Shaped` carrier has no table to lift, so auto-lift must name what it
+  skips (the census move) rather than silently cover a subset. How far the common Rust
+  shapes reach before that edge is the thing to measure first.
+- **Open: the entry point** — a library call the consumer wires into their suite, or a
+  genesis-emitted gate riding `cargo test` like the internal sweeps.
+
+Not open, contrary to an earlier draft: the oracle representation (a perturbed table) and
+minting a violate-the-law oracle (the dent sweep) are BUILT. This is the single change that
+most moves the consumer experience — it takes the sensitivity guarantee we keep for
+ourselves and makes it a thing a downstream crate runs on its own PRs, with no mutation
+tooling in its tree at all.
+
+### The end state: one probe census, every probe sensitivity-proven
+
+The deliverable is not "some autogenerated probes, mutation-tested." It is a UNIFIED PROBE
+CENSUS for a crate — every probe the module upholds, structural and behavioural, each
+carrying a sensitivity proof — and the degrees of freedom enumerated. Two families, and
+the split matters because sensitivity is ONE concept ("can this probe fail? — a green probe
+that cannot is a lie") with two mechanisms by probe kind:
+
+- **Structural probes** — what the module upholds by its SHAPE: the public-surface census
+  (`qualify.spec`), the tier partition (`tiers.spec`), the placement (`shape.spec`), the
+  boundary grammar, the seams. Sensitivity is FIRE-DRILL: plant a known-bad fixture, demand
+  the gate refuses.
+- **Behavioural probes** — what it upholds by its CONDUCT: the discovered laws
+  (`<theory>.spec`). Sensitivity is the ORACLE SWAP: plant a perturbed behaviour, demand a
+  law refuses (`<theory>.mutation.spec` is exactly this today).
+
+Fire-drill and the mutation sweep were built separately — one for pipelines, one for
+theories — and never said out loud to be the two arms of one thing: the vacuousness hunt.
+Both halves already restrict to the FOUND set for performance (discovery keeps only holding
+laws; the sweep perturbs only operators a found law names), so the census is a subset of a
+fully-enumerable probe space, taken on the real set. Pre-enumerating EVERY probe in this
+crate with its sensitivity verdict is the dogfood and the existence proof — the unified
+census run on ourselves, the way `downstream-fixture` proves the public-API loop — and it
+is the same census a consumer gets pointed at their module, having written nothing. That is
+the logical end state: the judges collapsed to data plus one interpreter, the sensitivity
+proofs collapsed to one question with two mechanisms, and the whole thing a census a
+downstream crate can compute about itself.
+
+**Rung 1 is BUILT** (`discover::probes`, `spec/probes.spec`). The census now exists and
+enumerates every frozen probe lock with its sensitivity mechanism: the eight behavioural
+theories (the seven in `all_specs()` plus the mounted bridged theory) as `oracle-swap`; the
+three world judges (`perimeter`/`infra`/`substrate`) as `live-dent`; and the byte-locks
+(`surface`/`tiers`/`shape`/`seams`/`catalog`/`pipeline`/`schemata`/`world`) as `drift-gate`.
+It is gated for COMPLETENESS against the committed `spec/` directory — every artifact that
+backs a probe must be covered and every named probe must have a committed lock, so a new
+lock that no probe covers fails the census, and the roster can only grow honestly (the
+tiers-ladder rung-1 move: derive-and-disclose, no coherence to argue with). The disclosure
+IS the finding, and reading the fire-drill battery sharpened it: the byte-locks are not
+sensitivity-UNPROVEN — they lean on the SHARED `spec-lock drift gate` fire-drill (a
+tampered or missing committed lock is caught), which proves the drift mechanism fires but
+not that each lock's own derivation is individually sensitive.
+
+**Rungs 1.5 and 2 are BUILT too.** Rung 1.5: `Mechanism::FireDrill` now distinguishes the
+probe with an INDIVIDUAL drill (the catalog — the `shape data gate` and `expectation
+vocabulary` drills) from the byte-locks on the shared gate, and the review router files
+`spec/probes.spec` under its own `Ratification::Probes` class (not the `.spec` catch-all).
+Rung 2: the census is NORMATIVE — `every_probe_has_an_individual_drill_or_is_ratified` holds
+the drift-gate set to `spec/probes.register` by SET DIFFERENCE, so a byte-lock leaning only
+on the shared gate must be a ratified line with a reason (an un-ratified one refuses, a line
+for a probe that earned an individual drill is stale), and the drift-gate set can only
+shrink as byte-locks earn their own drills.
+
+The register already SHRANK 7 → 4 on first honest review — the tiers-ladder lesson ("was
+the derivation missing evidence?") applied to sensitivity. Reading the suites showed the
+seam graph, the placer, and the world lock each ALREADY carry a plant-a-bad-fixture drill:
+a non-homomorphic conversion leaves the transform seam UNEARNED and names it
+(`a_broken_conversion_leaves_the_transform_seam_unearned`), a placement disagreeing with the
+declaration renders "DISAGREES" and is unsettled (`a_disagreeing_shape_renders_loud`), a
+broken vendor / mismatched battery is refused and named
+(`reports_over_different_batteries_are_refused`). All three moved to `Mechanism::FireDrill`
+(joining the catalog). Then pipeline and schemata earned individual drills too — a
+`Pipeline` declaring a bespoke-tier cadence refuses to render a consumer workflow
+(`Pipeline::render_workflow`), and the completeness census names a planted uninstrumented
+function (`schemata::uninstrumented`, extracted to a shared `cfg(test)` helper) — both wired
+into the rung-3 battery. So only TWO byte-locks now lean on the shared gate: surface and
+tiers, whose derivations are mutation-tested cross-crate in `boundary-enforce` (a ratified
+reliance, not a debt — an in-crate drill would duplicate coverage that already exists one
+crate over). That is the register's honest floor.
+
+RUNG 3 (BUILT): the `FireDrill` claims are now NON-VACUOUS.
+`every_fire_drill_probe_has_a_live_drill_that_fires` reconciles the census's FireDrill set
+through a `fire_drill::Battery` that `requires` exactly those keys and drills each by
+PLANTING the probe's known-bad fixture — so `verdict()` refuses a FireDrill probe with no
+live drill (UNPROVEN) and a drill that stopped firing (VACUOUS). A deleted drill breaks the
+gate; the "a FireDrill claim pinned only by a test that could vanish" gap is closed. Each
+module owns its drill (the seam graph's non-homomorphic conversion, the placer's disagreeing
+placement); the catalog and world drills build from the public API.
+
+AUTO-LIFT (BUILT — the headline): the apparatus now points at a consumer's PLAIN RUST
+module. `discover::lift` is a generic `Lifted<C>` — a single-carrier `Theory` over any
+`Shaped` carrier, one sort, the carrier's `shadow_grid`, identity observation — written
+ONCE; the only per-module thing is the operator table (`impl Liftable`: names, arities, thin
+wrappers). So a consumer who wrote only ordinary Rust gets `Spec::of::<Lifted<C>>()` (the
+probes) and `MutationReport::of::<Lifted<C>>()` (their sensitivity proof), zero declaration.
+The worked example runs it end to end: a plain `bool` module (`and`/`or`/`not`/`tru`) lifts,
+discovers its algebra (≥3 laws, no uncovered operators), and is sensitivity-swept (deaf
+floor + dents, deaf mutants caught). `AutoLift::scan_module` is the build-time half — it
+`syn`-scans a module's public functions, infers the single carrier (a second carrier is a
+named refusal — multi-sort is out of scope), and generates the `impl Liftable` a consumer's
+`build.rs` `include!`s; a reconciliation test ties the scan's output, by (name, arity), to
+the runtime-proven table, so the generated table IS the proven table and the only glue left
+is the `include!`. And MULTI-SORT is built too: `Lifted2<T>` lifts a module over TWO
+`Shaped` carriers — a tagged `Either` value, a `Duo` sort, per-sort grids from each carrier's
+`shadow_grid` — so a cross-sort map and a ROUND TRIP are expressible. The worked example
+(`bool ⋈ Box<bool>` with `wrap`/`unwrap`/`both`) discovers the cross-sort round trip
+`unwrap(wrap(x)) = x` no single-carrier lift can state, and is sensitivity-swept. Scope,
+disclosed: a non-`Shaped` carrier has no grid, exactly where discovery itself stops. The
+build-time scan (`AutoLift::scan_module`) now emits BOTH the single-carrier `impl Liftable`
+AND the two-carrier marker `struct` + `impl Liftable2` (each op's slots tagged by their `Duo`
+sort, an `Either`-unwrapping wrapper), reconciled by (name, input sorts, output sort) against
+the runtime-proven `BoolBox` table — so for one and two sorts the zero-annotation loop is
+closed end to end, the only glue being the consumer's `include!`.
+
+THREE OR MORE distinct carriers is a principled named refusal, not an oversight: arbitrary N
+cannot reach the same rigor as one/two without variadic generics — it needs per-N codegen (a
+`Lifted3`/`Lifted4`/… ladder, each mechanical but bounded, or a scan that emits a bespoke
+`theory!` invocation, which the engine's existing multi-sort theories prove viable but which
+a unit test can only parse-check, not run). And the practical pressure is low: N conceptual
+sorts modelled as ONE `Shaped` enum are already single-carrier `Lifted`. So the honest end
+state is: one and two distinct carriers fully built and proven; three-plus a named refusal
+with the two paths (the `LiftedN` ladder, the `theory!`-generating scan) recorded for when a
+real consumer needs them. This is the consumer end state the "sweep discovers, oracle proves
+sensitivity" arc was aiming at: probes derived from a plain module — single- or two-sorted —
+each proven sensitive, with nothing written.
+
+Remaining, disclosed: three-plus DISTINCT carriers (the `LiftedN` ladder or the
+`theory!`-generating scan — a principled named refusal until a real consumer needs it, since
+N conceptual sorts as one enum are already single-carrier `Lifted`). The byte-lock register
+has reached its honest floor — surface and tiers, covered cross-crate.
+
+## Framing: the real domain is stability under containment
+
+Worth stating plainly, because it reframes what the method is FOR. Probe-algebra's real
+domain isn't "migration" or "diagrams" or "HTML". It is stability verification over any
+DECLARATIVE-MODEL → CONSTRAINT-LAYOUT pipeline where containment makes local edits have
+non-local — and sometimes LEGITIMATELY non-local — effects. The hard part of every such
+pipeline is the same: a local change ripples through the layout, and you cannot tell a bug
+from a correct-but-far-reaching consequence by looking at the diff. That is exactly the
+distinction the apparatus already draws — a refuted law is the bug, a surviving dent is the
+legitimate degree of freedom — so the method is not analogising to these domains, it is
+their native shape.
+
+Three instances make the generality concrete, and their ORACLES are what differ:
+
+- **CALM + ELK** (architecture model → graph layout): a node moves and the whole diagram
+  reflows; which reflows are correct is a stability question, not a structural one.
+- **DOM + CSS** (document model → box layout): an element's style changes and containment
+  propagates; the same non-local, sometimes-legitimate effect.
+- **Migration** (schema/model → byte-identical SQL): the THIRD instance, and the reason it
+  worked first and cleanly is that its oracle is TRIVIAL — byte-identity is a total,
+  decidable equality, so there is no "sometimes-legitimate" band to adjudicate. The layout
+  instances have no such luck; their oracle is metamorphic (rename-then-render =
+  render-then-relabel) and toleranced (insertion locality within ε), which is precisely the
+  vocabulary `layout-probe` built.
+
+So the layout-probe brick is not a second domain bolted on — it is the method meeting its
+general case, where the oracle stops being byte-identity and becomes a metamorphic /
+toleranced judgment over containment. The consumer guarantee reads the same in all three:
+swap the pipeline's implementation, and we catch the swap unless the difference is a
+ratified degree of freedom (a legitimate non-local effect) or a spec symmetry. Migration
+just happens to be the instance where that fine print is empty.
 
 ## Standing follow-ups
 

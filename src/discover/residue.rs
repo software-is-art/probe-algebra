@@ -41,6 +41,7 @@ pub struct Inert {
     pub note: &'static str,
 }
 
+#[crate::mutate]
 impl Inert {
     /// The action this finding calls for.
     pub fn remedy(&self) -> &'static str {

@@ -69,6 +69,7 @@ pub struct DependenceReport {
     pub verdicts: Vec<(String, Standing)>,
 }
 
+#[crate::mutate("dependence")]
 impl Dependence {
     /// A reliance on `theory`'s law with this `equation`.
     pub fn on(theory: impl Into<String>, equation: impl Into<String>) -> Dependence {
@@ -116,6 +117,7 @@ impl Dependence {
     }
 }
 
+#[crate::mutate]
 impl Dependence {
     /// Judge a DOWNSTREAM-RELIANCE register against this repo's own committed locks —
     /// the owner-side receiving surface that retires open text as the ask channel.
@@ -175,6 +177,7 @@ impl Dependence {
     }
 }
 
+#[crate::mutate("dependence_report")]
 impl DependenceReport {
     /// Did every declared dependence survive intact?
     pub fn is_intact(&self) -> bool {
@@ -220,6 +223,7 @@ impl DependenceReport {
 }
 
 /// Append a line (tiny helper keeping `render` allocation-light and total).
+#[crate::mutate]
 fn writeln(out: &mut String, line: String) {
     out.push_str(&line);
     out.push('\n');

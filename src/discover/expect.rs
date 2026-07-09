@@ -88,6 +88,7 @@ pub struct Expectation {
     pub ops: Vec<String>,
 }
 
+#[crate::mutate]
 impl Expectation {
     /// Build an expectation from a declaration key (`"commutative"`, `"bias_later"`, ...) or an
     /// exact catalog name (`"bias (right-regular)"`). An unknown name FAILS LOUDLY, listing the
@@ -174,6 +175,7 @@ pub struct Distance {
     pub surprises: Vec<Expectation>,
 }
 
+#[crate::mutate]
 impl Distance {
     /// Compare a theory's declaration against what discovery actually finds: run the engine,
     /// and match declared `(shape, ops)` pairs against each discovered law's shape tag and
@@ -252,6 +254,7 @@ impl Distance {
     }
 }
 
+#[crate::mutate]
 fn render_list(expectations: &[Expectation]) -> String {
     expectations
         .iter()
@@ -263,6 +266,7 @@ fn render_list(expectations: &[Expectation]) -> String {
 /// Distinct symbols in first-appearance order — the same normalisation `DiscoveredLaw::ops`
 /// applies, so a declaration like `homomorphism(esc, ++, ++)` (the shape's three parameter
 /// slots, two coinciding) compares equal to the discovered law's fingerprint `[esc, ++]`.
+#[crate::mutate]
 fn dedup(ops: Vec<String>) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for op in ops {

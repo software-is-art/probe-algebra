@@ -1,0 +1,31 @@
+# instrumentation exemptions — the completeness census's register. Every file named
+# here contains functions or impl blocks WITHOUT #[mutate], each with its reason; a
+# file whose debt is paid (fully instrumented) makes its line STALE and the census
+# refuses it. Judged two-way by `every_eligible_item_is_instrumented_or_exempted`
+# (schemata builds). The register can only shrink honestly.
+#
+# Format: <path relative to crate root>: <reason>
+
+src/discover/floor.rs: the ONE floor interpreter — not mutated, GENERATED against; every declared-floor judge routes through it, and its correctness is characterized by the byte-pinned message probes of the judges that route through it (perimeter, infra), a fold bug under one dying under another. The diversity of client grids is its coverage (see docs/roadmap.md)
+src/discover/relation.rs: the relational primitive (the tags-ancestry left join, the derive-then-judge typestate) — like floor.rs, not mutated but GENERATED against: its own probes plus substrate's differential when it routes through (see docs/roadmap.md)
+src/discover/lift.rs: the auto-lift machinery — a generic single-carrier Theory over a Shaped carrier; its correctness is characterized by GENERATION (the worked example's discovery and sensitivity sweep route every operator path through it), not mutation, like floor.rs (see docs/roadmap.md)
+src/discover/probes.rs: the unified probe census — aggregation whose decisions (behavioural probes from all_specs, the structural roster and its mechanisms) are pinned by its byte-render probes and the completeness gate against the committed spec/ directory; GENERATED against, not mutated, like floor.rs (see docs/roadmap.md)
+src/discover/perimeter.rs: the judge collapses to floor-data fed to discover::floor::judge — characterized by GENERATION not mutation, the one interpreter reproducing this judge across a bounded grid (probes::the_one_interpreter_reproduces_the_perimeter_judge), plus the LiveDent drill; render/declared/ruleset are byte-pinned by the freshness and derivation probes. The pilot for judges leaving schemata (see docs/roadmap.md)
+src/tests.rs: test scaffolding — the mod declaration is cfg(test) in lib.rs; nothing here ships
+src/harness.rs: probe harness — test-facing scaffolding exercised only from suites
+src/main.rs: demo binary entry — banner and I/O, no lock rests on it
+src/gdp.rs: kernel — brand/proof machinery is type-level; guarded by trybuild and the fixture suites
+src/boundary.rs: kernel — the probe algebra itself; guarded by the interpreter/kvstore harnesses and trybuild
+src/capability.rs: kernel — capability observers; guarded by the same suites as boundary.rs
+src/interp/boundary.rs: worked example — guarded by its derived probe surface (harness.rs); next widening target
+src/interp/internal.rs: worked example — same surface as interp/boundary.rs; next widening target
+src/kvstore/probes.rs: probe suite for the worked example — probes are not product code
+src/kvstore/theory.rs: theory operators — mutated in-process on every test (spec/*.mutation.spec)
+src/kvstore/internal.rs: worked example — guarded by the ttl-store theory's in-process mutation and the layer probes; next widening target
+src/kvstore/store.rs: worked example — same guard as kvstore/internal.rs; next widening target
+src/select/boundary.rs: audit tooling — consumes cargo-mutants outcomes.json; retires with the source sweeps
+src/select/internal.rs: audit tooling — same as select/boundary.rs
+src/discover/mod.rs: theory declarations and spec tables — data mutated in-process, plus the theory!/system! macros
+src/discover/derived.rs: theory operators in inline algebra modules — mutated in-process on every test
+src/discover/modularize.rs: sample corpus for the placer probes — the placer itself is instrumented
+src/discover/schemata.rs: the selector — instrumenting the mutant switch with mutants is self-reference

@@ -22,3 +22,18 @@
 - killed    `plus` becomes undefined everywhere
 - killed    `neg` becomes undefined everywhere
 - killed    `min` becomes undefined everywhere
+
+# deafness floor: 24 constant-return mutants (every operator × every distinct
+# output), judged by re-checking the discovered laws — 1 SURVIVED.
+- SURVIVED  `min` goes deaf: always []
+
+# dent sweep: 64 one-point mutants (first 16 grid points per operator,
+# 2 wrong outputs per point — a resource bound, not a curated list), judged by
+# re-checking the discovered laws — 7 SURVIVED — each an UNPINNED COORDINATE, the exact input a missing probe would constrain.
+- SURVIVED  `min` dented at [[(Row(0), -1)]]: [] -> [(Row(0), 1)]
+- SURVIVED  `min` dented at [[(Row(0), -1)]]: [] -> [(Row(0), -1)]
+- SURVIVED  `min` dented at [[(Row(0), 3)]]: [(Row(0), 1)] -> []
+- SURVIVED  `min` dented at [[(Row(0), 2)]]: [(Row(0), 1)] -> []
+- SURVIVED  `min` dented at [[(Row(0), -2)]]: [] -> [(Row(0), 1)]
+- SURVIVED  `min` dented at [[(Row(0), 1), (Row(1), 1)]]: [(Row(0), 1)] -> []
+- SURVIVED  `min` dented at [[(Row(0), 1), (Row(1), -2)]]: [(Row(0), 1)] -> []
