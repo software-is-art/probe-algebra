@@ -633,7 +633,9 @@ conduct — that is self-attestation) and belongs in a `kernel.register`
 unjustified key refuses, a stale entry is a lie — strictly better than
 marker-plus-allowlist, because the reason becomes reviewable text). The reader-service
 the markers provide moves to the edit hook (one injected line on first edit of a file:
-its tier and rules); genesis v2 emits one tiers artifact instead of a header per file.
+its tier and rules) — BUILT, now `probe-hook`'s third voice (`tier_voice`, reading
+`spec/tiers.spec`, paid once per file); genesis v2 emits one tiers artifact instead of a
+header per file.
 
 Step one landed with the candidate: `boundary-enforce` computes the tier census in the
 same walk as the qualify census (`Config::tiers_spec`, `BLESS_TIERS`), frozen to

@@ -1,13 +1,20 @@
 //! probe-hook — the edit-time ENVELOPE as a SHIPPED binary (the eleventh ask).
 //!
-//! Two voices, both priced in silence: the GUARD (`Agenda::edit_guard` — refusals that
-//! already exist downstream) and the SHAPE TICKER (`discover::watch::Ticker` — a layout
-//! move on a theory edit). Both are mutation-tested and register-driven — and before this
-//! crate, every consumer wrapped them in the same four pieces of unjudged glue: a bash
-//! wrapper, inline JSON-parsing Python, a build-on-demand fallback that could run a stale
-//! binary, and hand-authored `settings.json` plumbing. All of it outside the mutation
-//! boundary, each consumer with different bugs. This crate is that envelope, inside the
-//! boundary — and this repo now dogfoods it in its own `.claude/settings.json`, the retired
+//! The whole edit-time sense organ, every voice priced in silence — this hook is FOR the
+//! agent, so it surfaces everything a path-and-text edit can derive:
+//!
+//! * the GUARD (`Agenda::edit_guard`) — refusals that already exist downstream, pre-fired;
+//! * the SHAPE TICKER (`discover::watch::Ticker`) — a layout move on a theory edit;
+//! * the TIER voice (`spec/tiers.spec`) — on first edit of a file, its derived tier and the
+//!   rules it carries (the reader-service the deleted `//! Tier:` markers gave).
+//!
+//! (Distance, cohesion, and the freedom/survivor census are NOT here: they need the compiled
+//! theory or the whole tree, not a single text edit — they live at session start and in the
+//! locks.) All the voices are mutation-tested and register-driven, and before this crate every
+//! consumer wrapped them in the same four pieces of unjudged glue: a bash wrapper, inline
+//! JSON-parsing Python, a build-on-demand fallback that could run a stale binary, and
+//! hand-authored `settings.json` plumbing. This crate is that envelope, inside the boundary —
+//! and this repo now dogfoods it in its own `.claude/settings.json`, the retired
 //! `shape-watch.sh` being exactly the glue described:
 //!
 //! * **speaks the Claude Code hook protocol natively** — reads the PostToolUse JSON
@@ -50,8 +57,8 @@ pub fn extract_path(hook_json: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// The whole envelope, total: hook JSON in, the guard and/or shape-ticker voices out
-/// (joined, one version footer), or `None`. Every failure path is `None` — the fail-open
+/// The whole envelope, total: hook JSON in, whichever of the guard / shape-ticker / tier
+/// voices fire out (joined, one version footer), or `None`. Every failure path is `None` — the fail-open
 /// contract as a return type. The voices are derived from `project_dir` (the register, the
 /// shim evidence), the classes come from `spec/agenda.register`, and the edited path is
 /// normalized repo-relative so messages match what the repo's own gates would say.
@@ -69,7 +76,7 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
         .to_string();
     let source = std::fs::read_to_string(&path).unwrap_or_default();
 
-    // TWO voices, both priced in silence — the whole edit-time envelope, so the shipped
+    // THREE voices, each priced in silence — the whole edit-time envelope, so the shipped
     // binary fully replaces the bash wrapper it descends from:
     let mut blocks: Vec<String> = Vec::new();
 
@@ -91,6 +98,12 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
     // net-disjoint component), stateful across invocations (see [`shape_voice`]).
     if let Some(shape) = shape_voice(project_dir, &rel, &source) {
         blocks.push(shape);
+    }
+
+    // the TIER voice — on FIRST edit of a file, its derived tier and the rules that tier
+    // carries (the reader-service the deleted `//! Tier:` markers gave, moved to the hook).
+    if let Some(tier) = tier_voice(project_dir, &rel) {
+        blocks.push(tier);
     }
 
     if blocks.is_empty() {
@@ -132,6 +145,51 @@ fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
     std::fs::create_dir_all(&state_dir).ok()?;
     std::fs::write(&state, Ticker::store(source).ok()?).ok()?;
     line
+}
+
+/// The TIER voice — one line on the FIRST edit of a file: its DERIVED tier (read from the
+/// committed `spec/tiers.spec`, the single source the build's rule dispatch also consumes)
+/// and the rules that tier carries. This is the reader-service the deleted `//! Tier:`
+/// per-file markers provided, moved to the edit hook exactly as the tiers ladder designed.
+/// Fires once per file (a persisted marker under `<project>/target/probe-hook`), so the
+/// orientation is paid once, not on every save. Silent for a file the partition does not
+/// name, and fail-open on any read/write failure.
+///
+/// Capability: Effectful — reads `spec/tiers.spec`, reads and writes the seen-marker.
+fn tier_voice(project_dir: &Path, rel: &str) -> Option<String> {
+    let tiers = std::fs::read_to_string(project_dir.join("spec/tiers.spec")).ok()?;
+    // the committed format is `- <path>: <TIER> (<reason>)`, one line per file.
+    let prefix = format!("- {rel}: ");
+    let rest = tiers
+        .lines()
+        .find_map(|line| line.trim_start().strip_prefix(&prefix))?;
+    let tier = rest.split_whitespace().next()?;
+
+    let slug: String = rel
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let seen = project_dir
+        .join("target/probe-hook")
+        .join(format!("{slug}.tier"));
+    if seen.exists() {
+        return None;
+    }
+
+    let rules = match tier {
+        "KERNEL" => "the trusted floor — exempt from the structural rules; a ratified privilege",
+        "BOUNDARY" => "tier 1 — a domain's strict value-object surface; no loose `pub fn`",
+        "INTERIOR" => {
+            "tier 2 — the workshop; mutation and raw collections allowed; no loose `pub fn`"
+        }
+        "ALGEBRA" => {
+            "the discovered-law / report layer; exempt from the inward rule; no loose `pub fn`"
+        }
+        _ => "see boundary-enforce for this tier's rules",
+    };
+    std::fs::create_dir_all(seen.parent()?).ok()?;
+    std::fs::write(&seen, "").ok()?;
+    Some(format!("tier: {rel} is {tier} — {rules}"))
 }
 
 /// The settings entry this crate wires for itself.
@@ -306,6 +364,33 @@ mod drills {
         let plain = root.join("src/plain.rs");
         std::fs::write(&plain, "pub struct X;\n").unwrap();
         assert_eq!(respond(&event(&plain), &root), None);
+    }
+
+    /// THE THIRD VOICE, drilled — a file's derived tier and rules on FIRST edit, paid once
+    /// (a second edit is silent), and silent for a file the partition does not name. The
+    /// reader-service the deleted `//! Tier:` markers gave, in the hook.
+    #[test]
+    fn the_tier_voice_orients_once_on_first_edit() {
+        let root = tree(
+            "tier",
+            &[
+                (
+                    "spec/tiers.spec",
+                    "# the partition\n- src/engine.rs: BOUNDARY (a door)\n",
+                ),
+                ("src/engine.rs", "pub struct X;\n"),
+            ],
+        );
+        let ev = event(&root.join("src/engine.rs"));
+        let first = respond(&ev, &root).expect("the first edit orients");
+        assert!(first.contains("tier: src/engine.rs is BOUNDARY"), "{first}");
+        assert!(first.contains("no loose"), "{first}");
+        // the orientation was paid — a second edit of the same file is silence.
+        assert_eq!(respond(&ev, &root), None);
+        // a file the partition does not name: silence.
+        let other = root.join("src/unlisted.rs");
+        std::fs::write(&other, "pub struct Y;\n").unwrap();
+        assert_eq!(respond(&event(&other), &root), None);
     }
 
     /// `install` is derived plumbing: creates the file from nothing, is idempotent,
