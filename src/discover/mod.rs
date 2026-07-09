@@ -38,6 +38,7 @@ pub mod genesis;
 pub mod infra;
 pub mod judgment;
 pub mod layering;
+pub mod lift;
 pub mod modularize;
 pub mod mutation;
 pub mod perimeter;
