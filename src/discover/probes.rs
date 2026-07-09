@@ -13,19 +13,22 @@
 //!   - [`Mechanism::LiveDent`] — the world judges (perimeter, infra, substrate). Sensitivity
 //!     is `discover::judgment`'s `LiveDent` drill: one field of an applied fixture perturbed,
 //!     the verdict must move AND name the fact.
-//!   - [`Mechanism::DriftGate`] — the pure byte-locks (surface, tier, shape, seam, catalog).
-//!     Sensitivity is only freshness: a change is caught, but there is no active proof the
-//!     gate can REFUSE a planted bad fixture. This is disclosed, not hidden.
+//!   - [`Mechanism::FireDrill`] — the catalog, seam graph, placer, world lock, pipeline, and
+//!     schemata census: each plants a probe-specific known-bad fixture and demands refusal,
+//!     reconciled non-vacuously through a `fire_drill::Battery` (rung 3).
+//!   - [`Mechanism::DriftGate`] — the two remaining byte-locks (surface, tiers), whose
+//!     derivations are mutation-tested cross-crate in `boundary-enforce`; here they lean on
+//!     the shared `spec-lock drift gate`, ratified in `spec/probes.register`.
 //!
 //! RUNG 1 (BUILT): the census ENUMERATES every frozen probe lock and discloses its
 //! mechanism, gated for COMPLETENESS against the committed `spec/` directory so no probe lock
 //! can hide (`the_probe_census_covers_every_frozen_lock`).
 //!
 //! RUNG 1.5 (BUILT): `Mechanism::FireDrill` distinguishes the probes with an INDIVIDUAL
-//! fire-drill (the catalog, the seam graph, the placer, and the world lock — each with a
-//! plant-a-bad-fixture drill in its own suite, cited at [`STRUCTURAL`]) from the byte-locks
-//! that lean on the shared `spec-lock drift gate`. The router files `spec/probes.spec` under
-//! its own `Ratification::Probes` class.
+//! fire-drill (the catalog, seam graph, placer, world lock, pipeline, and schemata census —
+//! each with a plant-a-bad-fixture drill, cited at [`STRUCTURAL`]) from the byte-locks that
+//! lean on the shared `spec-lock drift gate`. The router files `spec/probes.spec` under its
+//! own `Ratification::Probes` class.
 //!
 //! RUNG 2 (BUILT): NORMATIVE — every probe must carry an INDIVIDUAL active mechanism
 //! (oracle-swap / live-dent / fire-drill), or be a ratified line in `spec/probes.register`
@@ -132,12 +135,16 @@ const STRUCTURAL: &[(&str, Mechanism)] = &[
     ("seams", Mechanism::FireDrill),
     ("shape", Mechanism::FireDrill),
     ("world", Mechanism::FireDrill),
+    //   pipeline — a Pipeline declaring a bespoke-tier cadence (default-branch/on-certify/
+    //              sharded) refuses to render a consumer workflow (`Pipeline::render_workflow`).
+    //   schemata — the completeness census names an uninstrumented, unexempted function
+    //              (`schemata::uninstrumented` over a planted source).
+    ("pipeline", Mechanism::FireDrill),
+    ("schemata", Mechanism::FireDrill),
     // byte-locks — only the shared `spec-lock drift gate` fire-drill; each ratified in
     // spec/probes.register (rung 2) until it earns an individual drill.
     ("surface", Mechanism::DriftGate),
     ("tiers", Mechanism::DriftGate),
-    ("pipeline", Mechanism::DriftGate),
-    ("schemata", Mechanism::DriftGate),
 ];
 
 /// The unified probe census — every probe lock with the mechanism that proves it sensitive.
@@ -465,6 +472,31 @@ mod probes_tests {
             ))
             .is_empty();
 
+        // pipeline — a Pipeline declaring a bespoke-tier cadence refuses to render a consumer
+        // workflow (that tier is the green-tag countersign economics, not a consumer gate).
+        let bad_pipeline = crate::discover::gates::Pipeline {
+            name: "drill",
+            toolchain: "x",
+            regen: "x",
+            cron: None,
+            gates: vec![crate::discover::gates::Gate {
+                name: "planted",
+                verifies: "",
+                command: &[],
+                cadence: crate::discover::gates::Cadence::DefaultBranch,
+                effect: crate::boundary::Capability::Pure,
+                sharded: false,
+            }],
+        };
+        let pipeline = bad_pipeline.render_workflow().is_err();
+
+        // schemata — the completeness census names an uninstrumented, unexempted function.
+        let planted = syn::parse_str::<syn::File>("fn planted_uninstrumented() {}")
+            .expect("planted source parses");
+        let mut flagged = Vec::new();
+        crate::discover::schemata::uninstrumented(&planted.items, &mut flagged);
+        let schemata = !flagged.is_empty();
+
         let battery = Battery::named("probe sensitivity")
             .requires(keys)
             .drill(
@@ -482,7 +514,17 @@ mod probes_tests {
                 "a placement disagreeing with the declaration",
                 fired(crate::discover::shape::probes::shape_sensitivity_drill_fires()),
             )
-            .drill("world", "a mismatched-size world battery", fired(world));
+            .drill("world", "a mismatched-size world battery", fired(world))
+            .drill(
+                "pipeline",
+                "a Pipeline declaring a bespoke-tier cadence",
+                fired(pipeline),
+            )
+            .drill(
+                "schemata",
+                "an uninstrumented, unexempted function",
+                fired(schemata),
+            );
 
         if let Err(why) = battery.verdict() {
             panic!(

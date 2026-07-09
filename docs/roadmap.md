@@ -1313,11 +1313,14 @@ a non-homomorphic conversion leaves the transform seam UNEARNED and names it
 declaration renders "DISAGREES" and is unsettled (`a_disagreeing_shape_renders_loud`), a
 broken vendor / mismatched battery is refused and named
 (`reports_over_different_batteries_are_refused`). All three moved to `Mechanism::FireDrill`
-(joining the catalog), so only FOUR byte-locks now lean on the shared gate — surface, tiers,
-pipeline, schemata — each ratified with the individual drill it awaits (surface/tiers'
-derivations are mutation-tested in `boundary-enforce`; pipeline's individual gates are
-fire-drilled but the census over them is not; schemata's completeness census refuses an
-uninstrumented item but no planted fixture proves that refusal fires).
+(joining the catalog). Then pipeline and schemata earned individual drills too — a
+`Pipeline` declaring a bespoke-tier cadence refuses to render a consumer workflow
+(`Pipeline::render_workflow`), and the completeness census names a planted uninstrumented
+function (`schemata::uninstrumented`, extracted to a shared `cfg(test)` helper) — both wired
+into the rung-3 battery. So only TWO byte-locks now lean on the shared gate: surface and
+tiers, whose derivations are mutation-tested cross-crate in `boundary-enforce` (a ratified
+reliance, not a debt — an in-crate drill would duplicate coverage that already exists one
+crate over). That is the register's honest floor.
 
 RUNG 3 (BUILT): the `FireDrill` claims are now NON-VACUOUS.
 `every_fire_drill_probe_has_a_live_drill_that_fires` reconciles the census's FireDrill set
@@ -1347,9 +1350,8 @@ exactly where discovery itself stops. This is the consumer end state the "sweep 
 oracle proves sensitivity" arc was aiming at: probes derived from a plain module, and each
 proven sensitive, with nothing written.
 
-Remaining, disclosed: the four byte-lock drills (surface/tiers are covered cross-crate by
-`boundary-enforce`'s mutation tests — a ratified reliance, not a debt; pipeline/schemata are
-tractable when wanted), and auto-lift's multi-sort widening (the `Value`-enum carrier).
+Remaining, disclosed: auto-lift's multi-sort widening (the `Value`-enum carrier). The
+byte-lock register has reached its honest floor — surface and tiers, covered cross-crate.
 
 ## Framing: the real domain is stability under containment
 

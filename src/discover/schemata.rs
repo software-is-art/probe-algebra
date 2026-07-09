@@ -207,6 +207,68 @@ impl Schemata {
     }
 }
 
+/// Whether an item's attributes mark it `cfg(test)` and/or `#[mutate]` — the eligibility
+/// test the completeness census uses, shared (plain `cfg(test)`, not schemata-gated) with the
+/// rung-3 probe-sensitivity drill.
+#[cfg(test)]
+pub(crate) fn is_test_or_mutate(attrs: &[syn::Attribute]) -> (bool, bool) {
+    let mut test = false;
+    let mut mutate = false;
+    for a in attrs {
+        let path = a
+            .path()
+            .segments
+            .iter()
+            .map(|s| s.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::");
+        if path == "cfg" {
+            let tokens = a.meta.require_list().map(|l| l.tokens.to_string());
+            if tokens.map(|t| t.contains("test")).unwrap_or(false) {
+                test = true;
+            }
+        }
+        if path.ends_with("mutate") {
+            mutate = true;
+        }
+    }
+    (test, mutate)
+}
+
+/// The eligible-but-uninstrumented top-level items in a parsed file — the census's core,
+/// exposed for the drill that plants an uninstrumented function and demands it be named.
+#[cfg(test)]
+pub(crate) fn uninstrumented(items: &[syn::Item], out: &mut Vec<String>) {
+    for item in items {
+        match item {
+            syn::Item::Fn(f) => {
+                let (test, mutate) = is_test_or_mutate(&f.attrs);
+                if !test && !mutate && f.sig.constness.is_none() {
+                    out.push(format!("fn {}", f.sig.ident));
+                }
+            }
+            syn::Item::Impl(i) => {
+                let (test, mutate) = is_test_or_mutate(&i.attrs);
+                let has_fn = i
+                    .items
+                    .iter()
+                    .any(|it| matches!(it, syn::ImplItem::Fn(m) if m.sig.constness.is_none()));
+                if !test && !mutate && has_fn {
+                    let ty = &i.self_ty;
+                    out.push(format!("impl {}", quote::ToTokens::to_token_stream(ty)));
+                }
+            }
+            syn::Item::Mod(m) => {
+                let (test, _) = is_test_or_mutate(&m.attrs);
+                if let (false, Some((_, items))) = (test, &m.content) {
+                    uninstrumented(items, out);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 #[cfg(all(test, feature = "schemata"))]
 mod probes {
     use super::*;
@@ -285,58 +347,6 @@ mod probes {
     /// refuses too — the register can only shrink honestly.
     #[test]
     fn every_eligible_item_is_instrumented_or_exempted() {
-        fn is_test_or_mutate(attrs: &[syn::Attribute]) -> (bool, bool) {
-            let mut test = false;
-            let mut mutate = false;
-            for a in attrs {
-                let path = a
-                    .path()
-                    .segments
-                    .iter()
-                    .map(|s| s.ident.to_string())
-                    .collect::<Vec<_>>()
-                    .join("::");
-                if path == "cfg" {
-                    let tokens = a.meta.require_list().map(|l| l.tokens.to_string());
-                    if tokens.map(|t| t.contains("test")).unwrap_or(false) {
-                        test = true;
-                    }
-                }
-                if path.ends_with("mutate") {
-                    mutate = true;
-                }
-            }
-            (test, mutate)
-        }
-        fn uninstrumented(items: &[syn::Item], out: &mut Vec<String>) {
-            for item in items {
-                match item {
-                    syn::Item::Fn(f) => {
-                        let (test, mutate) = is_test_or_mutate(&f.attrs);
-                        if !test && !mutate && f.sig.constness.is_none() {
-                            out.push(format!("fn {}", f.sig.ident));
-                        }
-                    }
-                    syn::Item::Impl(i) => {
-                        let (test, mutate) = is_test_or_mutate(&i.attrs);
-                        let has_fn = i.items.iter().any(
-                            |it| matches!(it, syn::ImplItem::Fn(m) if m.sig.constness.is_none()),
-                        );
-                        if !test && !mutate && has_fn {
-                            let ty = &i.self_ty;
-                            out.push(format!("impl {}", quote::ToTokens::to_token_stream(ty)));
-                        }
-                    }
-                    syn::Item::Mod(m) => {
-                        let (test, _) = is_test_or_mutate(&m.attrs);
-                        if let (false, Some((_, items))) = (test, &m.content) {
-                            uninstrumented(items, out);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let register = root.join("spec").join("instrumentation.register");
         let exempt: std::collections::BTreeMap<String, String> = std::fs::read_to_string(&register)

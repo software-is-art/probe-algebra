@@ -18,8 +18,8 @@
 - catalog: fire-drill
 - infra: live-dent
 - perimeter: live-dent
-- pipeline: drift-gate
-- schemata: drift-gate
+- pipeline: fire-drill
+- schemata: fire-drill
 - seams: fire-drill
 - shape: fire-drill
 - substrate: live-dent
