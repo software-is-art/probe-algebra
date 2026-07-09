@@ -4,7 +4,9 @@
 //! agent, so it surfaces everything a path-and-text edit can derive:
 //!
 //! * the GUARD (`Agenda::edit_guard`) — refusals that already exist downstream, pre-fired;
-//! * the SHAPE TICKER (`discover::watch::Ticker`) — a layout move on a theory edit;
+//! * the SHAPE TICKER (`discover::watch::Ticker`) — a coupling move on ANY Rust edit: a theory
+//!   nets on its sorts, a plain module on its own declared types, and the ticker speaks only
+//!   when the edit bridges two clusters or opens a new one — a sixth sense, not a firehose;
 //! * the TIER voice (`spec/tiers.spec`) — on first edit of a file, its derived tier and the
 //!   rules it carries (the reader-service the deleted `//! Tier:` markers gave);
 //! * the FREEZE-DELTA courier (`freeze_delta_voice`) — the recommendation movement the last
@@ -103,8 +105,8 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
         blocks.push(guard);
     }
 
-    // the SHAPE TICKER — speaks only when a theory edit moves the layout (a bridge, a new
-    // net-disjoint component), stateful across invocations (see [`shape_voice`]).
+    // the SHAPE TICKER — speaks only when an edit moves the coupling (a bridge, a new
+    // net-disjoint component) on ANY Rust file, stateful across invocations (see [`shape_voice`]).
     if let Some(shape) = shape_voice(project_dir, &rel, &source) {
         blocks.push(shape);
     }
@@ -131,19 +133,32 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
     ))
 }
 
-/// The shape ticker's voice for one edit — the second half of the envelope, folded in from
-/// what the retired `place_watch --event` wrapper did. Silent for anything but a theory file
-/// (a `.rs` carrying `ops {` stanzas); otherwise re-derives the placement from the file's
-/// TEXT (no compilation), diffs it against the previous placement kept in a per-file state
-/// slug under `<project>/target/probe-hook`, and narrates a move in the monotone vocabulary
-/// (seeded / joined / BRIDGED). Fail-open throughout: any unreadable/unwritable state is
-/// silence (`.ok()?`), never a broken edit loop.
+/// The shape ticker's voice for one edit — the coupling sense, folded in from the retired
+/// `place_watch --event` wrapper and now widened to ANY Rust file, not just theories. Two
+/// fronts onto one placer core: a `.rs` carrying `ops {` stanzas nets on its theory sorts
+/// (`parse_ops`); any other `.rs` nets on its OWN declared types (`parse_rust_sigs` — the
+/// module's structs/enums are its sorts, ubiquitous types never couple). Either way the
+/// placement is re-derived from TEXT (no compilation), diffed against the previous placement
+/// kept in a per-file state slug under `<project>/target/probe-hook`, and a move is narrated in
+/// the monotone vocabulary (a second net-disjoint component forming, or a BRIDGE coupling two).
+/// The noise policy lives in the ticker: an edit within one cluster is silence, so this stays a
+/// sixth sense, not a firehose. Fail-open throughout: an unparseable (half-written) file or any
+/// unreadable/unwritable state is silence (`.ok()?`), never a broken edit loop.
 ///
 /// Capability: Effectful — reads and writes the ticker state under `project_dir/target`.
 fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
-    if !rel.ends_with(".rs") || !source.contains("ops {") {
+    if !rel.ends_with(".rs") {
         return None;
     }
+    // pick the front by content: theory sorts if there is an `ops { }` stanza, else the
+    // module's own types. A half-written file that neither parser accepts falls silent.
+    let sigs = if source.contains("ops {") {
+        Ticker::parse_ops(source)
+    } else {
+        Ticker::parse_rust_sigs(source)
+    }
+    .ok()?;
+
     let state_dir = project_dir.join("target/probe-hook");
     let slug: String = rel
         .chars()
@@ -153,13 +168,15 @@ fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
     // the ticker keys on a `&'static` name; the process is short-lived, so a leak per hook
     // invocation is the price of the borrow (the same trade the example made).
     let name: &'static str = Box::leak(rel.to_string().into_boxed_str());
-    let line = match std::fs::read_to_string(&state) {
-        Ok(stored) => Ticker::resume(name, &stored).hook_line(name, source),
+    // the stored form is signature-level and parser-agnostic, so resume works for either front.
+    let mut ticker = match std::fs::read_to_string(&state) {
+        Ok(stored) => Ticker::resume(name, &stored),
         // first sight: capture the baseline; a multi-component file announces itself once.
-        Err(_) => Ticker::new().hook_line(name, source),
+        Err(_) => Ticker::new(),
     };
+    let line = ticker.hook_line_signatures(name, sigs.clone());
     std::fs::create_dir_all(&state_dir).ok()?;
-    std::fs::write(&state, Ticker::store(source).ok()?).ok()?;
+    std::fs::write(&state, Ticker::store_signatures(&sigs)).ok()?;
     line
 }
 
@@ -390,7 +407,7 @@ mod drills {
 
     /// THE SECOND VOICE, drilled — a theory edit that splits into net-disjoint features
     /// makes the shape ticker speak (the half folded in from the retired `place_watch`
-    /// wrapper), while an ordinary `.rs` with no `ops {` stanza stays silent. The version
+    /// wrapper), while an ordinary `.rs` with a single type cluster stays silent. The version
     /// footer rides both voices.
     #[test]
     fn a_theory_edit_speaks_the_shape_voice() {
@@ -403,15 +420,42 @@ mod drills {
         std::fs::write(&thy, ops).unwrap();
         let voice =
             respond(&event(&thy), &root).expect("a multi-component theory announces its shape");
-        assert!(
-            voice.contains("net-disjoint") || voice.contains("modules"),
-            "{voice}"
-        );
+        assert!(voice.contains("net-disjoint"), "{voice}");
         assert!(voice.contains(&format!("probe-hook {VERSION}")), "{voice}");
-        // a plain .rs (no `ops {`) is silence — the ticker speaks only for theories.
+        // a plain .rs with one type and no coupling structure is silence.
         let plain = root.join("src/plain.rs");
         std::fs::write(&plain, "pub struct X;\n").unwrap();
         assert_eq!(respond(&event(&plain), &root), None);
+    }
+
+    /// THE SIXTH SENSE, drilled — the coupling voice now fires on ANY Rust file, netting on the
+    /// module's OWN types. A two-cluster module announces itself once; then the function that
+    /// first spans both clusters BRIDGES them, as it is saved. The whole point of the widening:
+    /// no `ops { }`, no theory, just plain Rust getting the live coupling sense.
+    #[test]
+    fn a_plain_rust_edit_speaks_the_coupling_voice() {
+        let root = tree("coupling", &[]);
+        let m = root.join("src/billing.rs");
+        std::fs::create_dir_all(m.parent().unwrap()).unwrap();
+        // Order|Invoice one cluster, Ledger another — two net-disjoint components on first sight.
+        let two = "struct Order; struct Invoice; struct Ledger;\n\
+                   fn bill(o: Order) -> Invoice { todo!() }\n\
+                   fn post(l: Ledger) -> Ledger { todo!() }\n";
+        std::fs::write(&m, two).unwrap();
+        let voice = respond(&event(&m), &root).expect("a two-cluster module announces itself");
+        assert!(voice.contains("net-disjoint components"), "{voice}");
+        // an edit within one cluster: silence (the sixth sense, not a firehose).
+        let local = format!("{two}fn refund(o: Order) -> Order {{ todo!() }}\n");
+        std::fs::write(&m, &local).unwrap();
+        assert_eq!(respond(&event(&m), &root), None);
+        // the function that spans both clusters bridges them, at the moment it is written.
+        let bridge = format!("{local}fn reconcile(i: Invoice) -> Ledger {{ todo!() }}\n");
+        std::fs::write(&m, &bridge).unwrap();
+        let voice = respond(&event(&m), &root).expect("the spanning fn bridges");
+        assert!(
+            voice.contains("BRIDGED") && voice.contains("intended?"),
+            "{voice}"
+        );
     }
 
     /// THE THIRD VOICE, drilled — a file's derived tier and rules on FIRST edit, paid once

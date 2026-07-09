@@ -1470,6 +1470,39 @@ called at probe-hook's own pin, not the consumer's) — the honest fix there is 
 repo-pinned build, the same nicer form the crate docs already flag, deferred until skew is
 seen hurting.
 
+## The sixth sense: the coupling ticker on any Rust edit (BUILT)
+
+The build/text split said structure is text-derivable and behaviour needs the build. The
+coupling recommendation (split / cohesion) is STRUCTURE — placement is "two operators share a
+net when a sort appears in both signatures," pure signature text — so it never needed the
+build, and it is most useful at the moment of the edit, when intent is freshest ("this
+function I just wrote couples Order and Invoice — intended?"). The ticker already proved the
+text path for theories (`parse_ops`, no compile); this widens it to a THIRD front,
+`parse_rust_sigs`: an ordinary module nets on its OWN declared types (structs, enums — the
+plain-Rust analog of a theory's sorts), so its functions place into clusters and an edit that
+first spans two of them BRIDGES them.
+
+The noise answer is the whole design: ubiquitous types (`String`, `Result`, `Vec`, generics,
+references) are NEVER nets — netting on them would wire every function to every other and drown
+the sense. A function is an operator only when it mentions one of the module's own types (Self
+resolved to the impl target). The existing noise policy carries over unchanged: an edit inside
+one cluster is silence, only a bridge or a new net-disjoint component speaks. Both fronts share
+one core (`hook_line_signatures`), so theory and plain Rust get the identical live sense, and
+the hook's `shape_voice` picks the front by content (`ops {` → sorts, else own types).
+
+What stays on the build, correctly: distance, discovered laws, cohesion-as-behaviour — they
+need `eval`, and mid-edit the code does not even compile, so a behavioural verdict then would
+be noise about a half-written function. The courier (above) delivers those. So the edit hook
+now carries the STRUCTURAL half as a sixth sense, and the build carries the BEHAVIOURAL half as
+a narrated delta — the split the build/text boundary always implied, finally on both sides.
+
+Follow-up worth naming: the plain-Rust net model is a first cut. It nets on the module's own
+types by name; it does not yet see cross-module coupling (a function wiring THIS module's type
+to an imported one), and name-collision across modules is possible. The theory front has the
+compiled second source to cross-check against (`step_theory`); the plain-Rust front has only
+text. A build-time cross-check (parsed placement vs a compiled reachability view) is the honest
+next tightening, deferred until the text model is seen misleading.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

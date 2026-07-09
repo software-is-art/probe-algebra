@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 684 sites.
+# 691 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -664,6 +664,7 @@
 - boundary_spec::discover::watch::diff:2: < -> >=
 - boundary_spec::discover::watch::diff:3: > -> <=
 - boundary_spec::discover::watch::diff:deaf -> None
+- boundary_spec::discover::watch::impl_ident:deaf -> None
 - boundary_spec::discover::watch::net_name:deaf -> String::new()
 - boundary_spec::discover::watch::parse_entry:0: ! -> (deleted)
 - boundary_spec::discover::watch::parse_entry:deaf -> Err(String::new())
@@ -674,11 +675,17 @@
 - boundary_spec::discover::watch::parse_ops:4: ! -> (deleted)
 - boundary_spec::discover::watch::parse_ops:deaf -> Err(String::new())
 - boundary_spec::discover::watch::parse_ops:deaf -> Ok(vec![])
+- boundary_spec::discover::watch::push_sig:0: == -> !=
+- boundary_spec::discover::watch::rust_sigs:deaf -> Err(String::new())
+- boundary_spec::discover::watch::rust_sigs:deaf -> Ok(vec![])
 - boundary_spec::discover::watch::shape_event::render:deaf -> String::new()
 - boundary_spec::discover::watch::ticker::parse_ops:deaf -> Err(String::new())
 - boundary_spec::discover::watch::ticker::parse_ops:deaf -> Ok(vec![])
-- boundary_spec::discover::watch::ticker_speak::hook_line:0: > -> <=
+- boundary_spec::discover::watch::ticker::parse_rust_sigs:deaf -> Err(String::new())
+- boundary_spec::discover::watch::ticker::parse_rust_sigs:deaf -> Ok(vec![])
 - boundary_spec::discover::watch::ticker_speak::hook_line:deaf -> None
+- boundary_spec::discover::watch::ticker_speak::hook_line_signatures:0: > -> <=
+- boundary_spec::discover::watch::ticker_speak::hook_line_signatures:deaf -> None
 - boundary_spec::discover::watch::ticker_speak::resume:0: ! -> (deleted)
 - boundary_spec::discover::watch::ticker_speak::step:deaf -> Err(String::new())
 - boundary_spec::discover::watch::ticker_speak::store:deaf -> Err(String::new())
