@@ -2039,7 +2039,46 @@ purpose (each wants its own conversation before it becomes a disposition):
   rail.)
 - **Is the editor anything but a bundle viewer?** Once files are views and changes are
   verbs, an "editor" is a perception surface with a verb palette — the open-file
-  buffer, like the PR, survives only as a way of LOOKING.
+  buffer, like the PR, survives only as a way of LOOKING. SHARPENED with the operator
+  (who asked the dissolving form: what is a person trying to confirm that we are not
+  currently ratifying?): a person reaches for the editor exactly where the question
+  they are holding IS NOT YET A LOCK CLASS — the interior is the fallback
+  encyclopedia, consulted when derived answers run out. The enumeration: "how does
+  this behave on THIS input" is a missing perception verb (`trace`/`eval` — the
+  engine already holds both halves); "is this fast / allocation-free" is a missing
+  property vocabulary (toleranced BENCHMARK locks — the three-valued judgment's
+  shape, pointed at time); "is this safe" is the capability audit and fabric's
+  reachability brought down one altitude; "what is here that I can use" is the
+  library voice, built; "I don't trust the abstraction" dissolves only by track
+  record. The move: census the editor-reaches (the hand-work inventory pointed at
+  READING) — each reach names the next verb or the next lock class, and interior
+  reads go archaic the same way interior writes did: the answer set grows until the
+  fallback goes quiet.
+- **Do branches, merges, and the reflog survive the journal?** Sharpened with the
+  operator's three observations. (1) The freedom-to-explore that branching grants is
+  already here in different clothes: THE RED LOCK IS IN-PLACE BRANCHING — divergence
+  as declared intent with a judge attached, converging in public, instead of
+  divergence as a parallel tree; and the fear branching protects against shrinks
+  when every change is a judged transaction that lands whole or refuses. (2) The
+  coordination overhead ("who is changing what file") is an artifact of
+  files-as-storage: at verb level, disjoint `add`s COMMUTE by the placer's own
+  monotonicity, and the conflict surface collapses to same-item writes plus lock
+  ratifications — so FORK/JOIN AT SPEC-LOCK LEVEL is: join = replay both journal
+  segments, the judges name what does not commute, the lock diff is the merge
+  review. Merge stops being a textual operation performed in ignorance. (3) The
+  operator's indirection instinct completes the deletion: with CONTENT-ADDRESSED
+  items at add-time (the stage-4 item store, Unison's move), the item universe is a
+  grow-only set whose union is trivially conflict-free, and all remaining conflict
+  concentrates into the BINDING MAP (name → hash, a ratified decision) and the
+  locks — the remove-dissolution's shape again: the mechanical half derives, the
+  decision half signs. And the reflog answer, the startling one: git's reflog is
+  untyped snapshot pointers; the journal is TYPED — verbs are operators over the
+  bundle carrier, segments are terms, and "do these two segments join?" is a
+  COMMUTATION LAW. The merge algebra need not be designed: it can be DISCOVERED —
+  the engine run over the verb algebra itself, the change-history becoming a
+  registry theory whose laws are the fork/join rules. Losing code becomes
+  impossible not by hoarding states but because the journal never forgets and
+  un-materialize never un-exists.
 
 **Stage 2's first form landed with it: THE JOURNAL.** Every mutating verb appends one
 line to `bundle.journal` beside the nearest `Cargo.toml` — `<verb> <module> — <detail>`,
