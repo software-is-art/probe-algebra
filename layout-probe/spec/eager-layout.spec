@@ -2,6 +2,8 @@
 
 - render is equivariant — rename before it becomes relabel after it.
       render(rename(x, p)) = relabel(render(x), p)
+- reorder and theme may be applied in either order.
+      reorder(theme(x)) = theme(reorder(x))
 - reorder is equivariant — rename before it becomes rename after it.
       reorder(rename(x, p)) = rename(reorder(x), p)
 - theme twice returns the original value.

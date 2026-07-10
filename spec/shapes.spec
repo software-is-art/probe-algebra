@@ -140,6 +140,11 @@
       gate:     a pair of distinct unaries f : s → t and g : t → s
       template: {op} undoes {other} — the round trip is the identity.
 
+- commuting maps
+      schema:   f(g(x)) = g(f(x))
+      gate:     a pair of distinct unary endomorphisms on one sort, admitted in canonical name order (the equation is symmetric — one unordered pair is one law)
+      template: {op} and {other} may be applied in either order.
+
 - homomorphism
       schema:   h((x ⊕ y)) = (h(x) ⊗ h(y))
       gate:     unary h : s → t plus a homogeneous binary on s and one on t

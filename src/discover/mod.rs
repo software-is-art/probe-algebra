@@ -53,6 +53,7 @@ pub mod schemata;
 pub mod shape;
 pub mod substrate;
 pub mod system;
+pub mod verbs;
 pub mod watch;
 pub mod world;
 

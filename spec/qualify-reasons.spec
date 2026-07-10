@@ -6,7 +6,7 @@
 # receivers. The classes are evidence; reading them into value-object debt, missing
 # vocabulary, or a principled refusal is the ratification's job. Regenerate with
 # `BLESS_REASONS=1 cargo build`.
-# 56 files scanned, 16 qualify, 40 refuse.
+# 57 files scanned, 17 qualify, 40 refuse.
 
 src/discover/agenda.rs: REFUSES — borrowed types, effectful bodies, parameterised types, primitive signatures, unshaped types
 src/discover/architect.rs: REFUSES — borrowed types, effectful bodies, parameterised types, primitive signatures, zero-argument constants

@@ -16,18 +16,30 @@
       neg((s plus t)) = (neg(s) plus neg(t))
 - delay leaves zero fixed.
       delay(zero) = zero
+- delay and neg may be applied in either order.
+      delay(neg(s)) = neg(delay(s))
+- delay and i may be applied in either order.
+      delay(i(s)) = i(delay(s))
 - delay turns plus into plus.
       delay((s plus t)) = (delay(s) plus delay(t))
 - d leaves zero fixed.
       d(zero) = zero
 - d undoes i — the round trip is the identity.
       d(i(s)) = s
+- d and neg may be applied in either order.
+      d(neg(s)) = neg(d(s))
+- d and delay may be applied in either order.
+      d(delay(s)) = delay(d(s))
+- d and i may be applied in either order.
+      d(i(s)) = i(d(s))
 - d turns plus into plus.
       d((s plus t)) = (d(s) plus d(t))
 - i leaves zero fixed.
       i(zero) = zero
 - i undoes d — the round trip is the identity.
       i(d(s)) = s
+- i and neg may be applied in either order.
+      i(neg(s)) = neg(i(s))
 - i turns plus into plus.
       i((s plus t)) = (i(s) plus i(t))
 

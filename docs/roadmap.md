@@ -2105,12 +2105,36 @@ And the staged path from here to the operator's horizon — no files on disk or 
    rail). rustc and the ecosystem keep getting materialized trees; they just stop being
    the source.
 
-### Candidate: the verb algebra — the reflog as the sixteenth theory
+### The verb algebra — the reflog as a theory (BUILT)
 
-Promoted from the branch/merge dissolving question because it is buildable NOW and it is
-the method's deepest dogfood: the change-history as a registry theory, its laws the
-fork/join rules, discovered rather than designed. The design sketch, so the build session
-starts warm:
+Built the session after it was sketched, and the sketch held almost exactly. What landed:
+
+- **The catalog grew its stanza first** — `commuting maps` (`f(g(x)) = g(f(x))`, two
+  unary endomorphisms on one sort), with a new GATE datum rather than a guard:
+  `ordered_ops`, the symmetric-equation dedup (both orderings state one law, so only the
+  canonically-name-ordered binding is admitted — one unordered pair, one lock line).
+- **`discover::verbs`** — the miniature (two named slots × three states × the contract
+  flag, 18 inhabitants; verbs as total functions carrying the CLI's refusal semantics) —
+  and discovery returned 28 laws: EVERY verb a projection (replay safety as law — the
+  refusal semantics make re-applying a journal segment harmless by algebra, not luck),
+  every disjoint pair a commuting-maps JOIN RULE, `declare` commuting with everything,
+  and one finding nobody predicted in the sketch: `collect` ABSORBS `edit` on the same
+  name (the state forgets the edit — no conflict; remembering is the journal's job). The
+  two conflict classes are exactly the ABSENT pairs — add/edit and add/collect on one
+  name — pinned REFUSED the router's way, plus a drill proving the conflict cannot be
+  declared away (the wishful-merge distance stays red). Frozen as
+  `spec/verb-algebra.spec` + its mutation lock — the sweep reports every operator-table
+  mutant killed and every sampled dent pinned, so the fork/join rules of this system
+  carry a full can-fail proof. Embedded in `Locks` (a pin now carries its own merge
+  semantics), covered in the probe census as oracle-swap.
+- **The stanza paid for itself across the workspace the same hour**: delta-render's
+  stream calculus gained `d and i may be applied in either order` (the
+  differentiate/integrate commutation, sayable at last) plus delay/neg commutations, and
+  BOTH layout engines gained `commuting_maps(reorder, theme)` on their scorecards — the
+  growth dynamic (hostile domain → stanza → every theory benefits), demonstrated on
+  contact.
+
+The original sketch follows, kept for the record:
 
 - **The carrier is a small bundle-state value** — a `Shaped` miniature of a module (a
   bounded set of items with names, kinds, and component tags; the stream-carrier lesson:

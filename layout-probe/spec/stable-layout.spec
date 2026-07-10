@@ -6,6 +6,8 @@
       reorder(reorder(x)) = reorder(x)
 - reorder undoes theme — the round trip is the identity.
       reorder(theme(x)) = x
+- reorder and theme may be applied in either order.
+      reorder(theme(x)) = theme(reorder(x))
 - reorder leaves every value unchanged.
       reorder(x) = x
 - reorder is equivariant — rename before it becomes rename after it.

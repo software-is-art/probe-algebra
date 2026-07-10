@@ -299,6 +299,11 @@ static EMBEDDED: &[(&str, &str)] = &[
         "ttl-store.mutation",
         include_str!("../../spec/ttl-store.mutation.spec"),
     ),
+    ("verb-algebra", include_str!("../../spec/verb-algebra.spec")),
+    (
+        "verb-algebra.mutation",
+        include_str!("../../spec/verb-algebra.mutation.spec"),
+    ),
 ];
 
 #[crate::mutate("locks")]

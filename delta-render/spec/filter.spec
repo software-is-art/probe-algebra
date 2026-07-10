@@ -18,6 +18,8 @@
       filter(filter(x)) = filter(x)
 - filter leaves zero fixed.
       filter(zero) = zero
+- filter and neg may be applied in either order.
+      filter(neg(x)) = neg(filter(x))
 - filter turns plus into plus.
       filter((x plus y)) = (filter(x) plus filter(y))
 

@@ -112,6 +112,10 @@ pub struct Probe {
 /// `bridged-bool.spec`, so its probe key matches the slug read back to a theory name.
 const BRIDGED_THEORY: &str = "bridged bool";
 
+/// The verb algebra (`discover::verbs`) — mounted like the bridge, outside `all_specs()`:
+/// its lock is `verb-algebra.spec`, its oracle-swap sweep runs like any theory's.
+const VERB_ALGEBRA: &str = "verb algebra";
+
 /// Every structural probe lock this crate freezes, with its sensitivity mechanism. Static
 /// because a structural lock is a deliberate artifact, not a derived list; the completeness
 /// gate (`the_probe_census_covers_every_frozen_lock`) forces a NEW lock to be added here,
@@ -169,6 +173,11 @@ impl ProbeCensus {
             .collect();
         probes.push(Probe {
             key: BRIDGED_THEORY.to_string(),
+            kind: ProbeKind::Behavioural,
+            mechanism: Mechanism::OracleSwap,
+        });
+        probes.push(Probe {
+            key: VERB_ALGEBRA.to_string(),
             kind: ProbeKind::Behavioural,
             mechanism: Mechanism::OracleSwap,
         });
