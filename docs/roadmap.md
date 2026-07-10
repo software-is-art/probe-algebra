@@ -1880,6 +1880,50 @@ status, honestly: the MODULE level of the criterion is met (grown, declared, jud
 locked, CLI-only); the SYSTEM level (seams, transports, the two-lifecycle red commit)
 remains, so the genesis emitter stands for now.
 
+### The peak of the peak: review shifts left — the mech suit
+
+The operator's framing, recorded verbatim in spirit: the entire process that sits in PRs
+and code review exists because of POOR LOCAL SENSORY AWARENESS — automating code
+interaction through the CLI eliminates everything you could want to review, leaving a
+continuous process that supports the agent in perception, eliminates toil, and leaves
+only the important things behind. A MECH SUIT for the agent.
+
+This is the pipeline brick's sentence, applied one level up. That brick said: CI stops
+being where verification is defined and keeps only what cannot shift left. This says:
+REVIEW stops being where judgment happens and keeps only what cannot shift left. Review's
+three jobs, taken separately: VERIFICATION (break/duplicate/misplace?) dissolves entirely
+— every verb is a judged transaction, so a change that exists has already survived the
+collision refusal, the vocabulary gate, the placement, the censuses, and the distance
+judgment, by the same judges a reviewer would have to trust anyway; RATIFICATION
+concentrates — the review router's first run already routed a whole branch to "one
+ratification, seven machinery-verified," and the PR of the future is exactly that agenda,
+a stream of lock diffs each asking one signable question; INTENT never shifts left, by
+the method's own epistemology — "what did you mean" stays human, the suit only makes it
+legible (a declaration is one line, a distance report names the gap, a justification is
+the register text no derivation produces).
+
+The suit anatomy, in the parts already built: PERCEPTION is the six voices, the
+session-start topography, the distance and cohesion reports; ACTUATION is the verbs;
+PROTECTION is refusals that fire before damage instead of findings that arrive after.
+And the reason shift-left is SAFE — the load-bearing connection worth stating once —
+is the sensitivity program: you only climb into a suit whose sensors you trust, and
+every judge that moved left carries a can-fail proof (the probe census, the fire drills,
+zero ratified schemata survivors across the compiled population). The suit is
+trustworthy because it has been shot at.
+
+Honest bounds, the method's own: the suit covers the algebra-shaped fraction — which is
+why the 55/55 spike is load-bearing, not cosmetic (every file it converts is territory
+the suit's senses reach; the remainder still gets reviewed the old way); and "eliminates
+everything you could want to review" is precisely true of the MACHINE-CHECKABLE class —
+review does not disappear, it compresses to the ratification stream and the intent
+questions, which is the point.
+
+The rung this names: **the transaction log.** When every change arrives as a verb, the
+PR description stops being prose reconstructed from a diff — it IS the log. The verbs
+journal themselves; the agenda computes from the journal instead of re-deriving classes
+from changed paths; `bundle-demo/MANIFEST.md` is the hand-made prototype of exactly this
+artifact, and deriving it is the next brick of the vision.
+
 ## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
 
 The companion measurement, asked for by the operator in the same conversation, aimed at
