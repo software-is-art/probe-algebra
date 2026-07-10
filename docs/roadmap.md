@@ -2151,11 +2151,20 @@ Two follow-ons from the operator's read of the build:
 
 - **Restraint, calibrated**: the house rule is not "make do" — it is EVERY STANZA NAMES
   ITS CONSUMER (commuting maps named the verbs; inflation/deflation named fabric). The
-  COMPOSITION stanza (`f(g(x)) = h(x)` — three unary slots) now has its consumer named:
-  JOURNAL COMPACTION — squash as algebra. Which verb sequences reduce to a single verb is
-  exactly what a `squash` operation must know, and the engine can discover those
-  identities the way it found the join rules. Queued, legitimate, waiting on the squash
-  brick to pull it in.
+  COMPOSITION stanza (`f(g(x)) = h(x)` — three unary slots, h free to be f itself, the
+  absorption form) named its consumer — JOURNAL COMPACTION, squash as algebra — and then
+  LANDED, and it over-delivered the same way commuting maps did. The squash table came
+  back discovered (all six: add-then-collect, edit-then-collect, and collect-then-edit
+  each collapse to collect, both names — lock lines a future `squash` consults as data,
+  the join-verb precedent). And the stanza killed SIX RATIFIED SURVIVORS nobody aimed it
+  at: the verb algebra's four edit/collect confusions (invisible while both were merely
+  projections with identical partners — the composition laws tell them apart, 64 of 64
+  mutants now die) and delta-render's filter-as-zero and map-as-zero confusions, ratified
+  freedoms since that crate's first freeze, now dead. The freedom census SHRANK by six
+  because the vocabulary grew by one stanza — the bias-blindness hunt, industrialised,
+  paying out on theories built months apart. Layout's scorecards gained the composition
+  surprises too (`theme(reorder(x)) = reorder(x)` — theme's invisibility, said
+  compositionally).
 - **The method is not Rust-bound — the substrate interface**: what the machinery requires
   of a language is (1) an item grammar with faithful parse/render (tree-sitter
   everywhere; syn is the Rust binding), (2) a net model — types in signatures as sorts

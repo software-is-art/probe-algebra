@@ -1491,6 +1491,29 @@ impl ShapeCatalog {
                 premise: None,
             },
             ShapeInfo {
+                name: "composition",
+                schema: "f(g(x)) = h(x)",
+                gate: "an ordered pair of distinct unary endomorphisms on one sort plus \
+                       the endomorphism their composite collapses to (h may be f itself — \
+                       absorption — or g, or a third operator)",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 0), Slot::Unary(0, 0), Slot::Unary(0, 0)],
+                    distinct_sorts: &[],
+                    distinct_ops: &[(0, 1)],
+                    ordered_ops: &[],
+                },
+                template: "{op} after {other} collapses to {via}.",
+                lhs: App(0, &[App(1, &[X])]),
+                rhs: App(2, &[X]),
+                placeholders: &["f", "g", "h"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "via"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
                 name: "homomorphism",
                 schema: "h((x ⊕ y)) = (h(x) ⊗ h(y))",
                 gate: "unary h : s → t plus a homogeneous binary on s and one on t",

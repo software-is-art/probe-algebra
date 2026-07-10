@@ -182,6 +182,32 @@ mod probes {
         );
     }
 
+    /// THE SQUASH TABLE, discovered (the composition stanza's named consumer): which verb
+    /// sequences collapse to a single verb — journal compaction as law. Add-then-collect,
+    /// edit-then-collect, and collect-then-edit all collapse to collect; a future `squash`
+    /// consults these lock lines as data, the join-verb precedent. And the stanza closed a
+    /// sensitivity gap on arrival: the four ratified edit/collect confusion survivors —
+    /// invisible while both were merely projections with identical partners — die under
+    /// the composition laws, so the verb algebra's mutation lock reads ALL KILLED.
+    #[test]
+    fn the_squash_table_is_discovered() {
+        let spec = Spec::of::<VerbAlgebra>();
+        let equations: Vec<&str> = spec.laws.iter().map(|l| l.equation()).collect();
+        for squash in [
+            "collect_a(add_a(x)) = collect_a(x)",
+            "collect_a(edit_a(x)) = collect_a(x)",
+            "edit_a(collect_a(x)) = collect_a(x)",
+            "collect_b(add_b(x)) = collect_b(x)",
+            "collect_b(edit_b(x)) = collect_b(x)",
+            "edit_b(collect_b(x)) = collect_b(x)",
+        ] {
+            assert!(
+                equations.contains(&squash),
+                "`{squash}` should be a discovered squash rule; laws: {equations:#?}"
+            );
+        }
+    }
+
     /// REPLAY SAFETY IS A LAW: every verb is idempotent — the refusal semantics (a
     /// refused verb returns the state unchanged) make re-applying a journal segment
     /// harmless by algebra, not by luck. Discovery states it as projection laws.

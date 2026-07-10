@@ -24,10 +24,14 @@
       edit_a(empty) = empty
 - edit_a and edit_b may be applied in either order.
       edit_a(edit_b(x)) = edit_b(edit_a(x))
+- edit_a after collect_a collapses to collect_a.
+      edit_a(collect_a(x)) = collect_a(x)
 - edit_b is a projection — applying it twice is applying it once.
       edit_b(edit_b(x)) = edit_b(x)
 - edit_b leaves empty fixed.
       edit_b(empty) = empty
+- edit_b after collect_b collapses to collect_b.
+      edit_b(collect_b(x)) = collect_b(x)
 - collect_a is a projection — applying it twice is applying it once.
       collect_a(collect_a(x)) = collect_a(x)
 - collect_a leaves empty fixed.
@@ -40,6 +44,10 @@
       collect_a(collect_b(x)) = collect_b(collect_a(x))
 - collect_a and declare may be applied in either order.
       collect_a(declare(x)) = declare(collect_a(x))
+- collect_a after add_a collapses to collect_a.
+      collect_a(add_a(x)) = collect_a(x)
+- collect_a after edit_a collapses to collect_a.
+      collect_a(edit_a(x)) = collect_a(x)
 - collect_b is a projection — applying it twice is applying it once.
       collect_b(collect_b(x)) = collect_b(x)
 - collect_b leaves empty fixed.
@@ -50,6 +58,10 @@
       collect_b(edit_b(x)) = edit_b(collect_b(x))
 - collect_b and declare may be applied in either order.
       collect_b(declare(x)) = declare(collect_b(x))
+- collect_b after add_b collapses to collect_b.
+      collect_b(add_b(x)) = collect_b(x)
+- collect_b after edit_b collapses to collect_b.
+      collect_b(edit_b(x)) = collect_b(x)
 - declare is a projection — applying it twice is applying it once.
       declare(declare(x)) = declare(x)
 - declare and edit_a may be applied in either order.

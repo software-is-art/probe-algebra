@@ -60,6 +60,7 @@ const VOCABULARY: &[(&str, &str)] = &[
     ("fixed_point", "fixed point"),
     ("round_trip", "round-trip"),
     ("commuting_maps", "commuting maps"),
+    ("composes", "composition"),
     ("homomorphism", "homomorphism"),
     ("nontrivial", "action nontriviality"),
     ("not_constantly", "non-constancy"),

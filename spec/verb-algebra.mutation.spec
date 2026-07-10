@@ -1,4 +1,4 @@
-# algebra mutation: verb algebra — 64 operator-table mutants, 4 SURVIVED — regenerate via this repo's freeze path; ratify the diff.
+# algebra mutation: verb algebra — 64 operator-table mutants, all killed — regenerate via this repo's freeze path; ratify the diff.
 #
 # Every mutant is a perturbed operator table (a VALUE, not a build), judged by
 # re-running discovery: KILLED means the named-law set changed — the committed
@@ -25,7 +25,7 @@
 - killed    `edit_a` evaluates as `add_a`
 - killed    `edit_a` evaluates as `add_b`
 - killed    `edit_a` evaluates as `edit_b`
-- SURVIVED  `edit_a` evaluates as `collect_a`
+- killed    `edit_a` evaluates as `collect_a`
 - killed    `edit_a` evaluates as `collect_b`
 - killed    `edit_a` evaluates as `declare`
 - killed    `edit_b` evaluates as `empty`
@@ -33,12 +33,12 @@
 - killed    `edit_b` evaluates as `add_b`
 - killed    `edit_b` evaluates as `edit_a`
 - killed    `edit_b` evaluates as `collect_a`
-- SURVIVED  `edit_b` evaluates as `collect_b`
+- killed    `edit_b` evaluates as `collect_b`
 - killed    `edit_b` evaluates as `declare`
 - killed    `collect_a` evaluates as `empty`
 - killed    `collect_a` evaluates as `add_a`
 - killed    `collect_a` evaluates as `add_b`
-- SURVIVED  `collect_a` evaluates as `edit_a`
+- killed    `collect_a` evaluates as `edit_a`
 - killed    `collect_a` evaluates as `edit_b`
 - killed    `collect_a` evaluates as `collect_b`
 - killed    `collect_a` evaluates as `declare`
@@ -46,7 +46,7 @@
 - killed    `collect_b` evaluates as `add_a`
 - killed    `collect_b` evaluates as `add_b`
 - killed    `collect_b` evaluates as `edit_a`
-- SURVIVED  `collect_b` evaluates as `edit_b`
+- killed    `collect_b` evaluates as `edit_b`
 - killed    `collect_b` evaluates as `collect_a`
 - killed    `collect_b` evaluates as `declare`
 - killed    `declare` evaluates as `empty`
