@@ -1993,11 +1993,14 @@ the repo today, each entry a named candidate:
 - **Commit messages and PR bodies**: narration of a diff is a derivation — the journal
   plus the freeze-delta narration already hold the content; the commit itself is the
   signature. The agenda-from-journal brick subsumes this.
-- **The bless loop**: when a census drifts, the refusal names a command a human then
-  runs — but regeneration is pure derivation; only committing the diff is the signature.
-  The refusal could regenerate and present the diff instead of homework
-  ("refusals name their fixing verb", one step further: refusals RUN their fixing verb
-  when the fix is a derivation).
+- ~~**The bless loop**~~ (CLOSED the same day it was named — the standing question's
+  first kill: `Config::autofix_stale`, default on everywhere except CI. A drifted census
+  regenerates INTO THE WORKING TREE and the build fails exactly once — "the regenerated
+  text is now in your working tree; the diff is the ratification: commit it, or revert
+  it to refuse" — so the gate's authority is untouched while the homework disappears.
+  In CI the refusal only reports: a fresh checkout must never mutate itself. Both arms
+  drilled in `census_drifts_then_blesses_then_holds`; the bless variables remain for
+  explicit regeneration.)
 - **Imports in snippets**: `use` lines are name resolution, which is a derivation — a
   `bundle add` payload should not need to carry them; the verb can derive and splice
   them. Real toil today, felt while growing bundle-demo.
@@ -2014,6 +2017,29 @@ What stays hand-typed on principle, so the question is never over-applied: regis
 justifications, roadmap dispositions, declared expectations' CHOICE (which laws to
 promise), and every ratification — the signatures themselves. The question hunts
 derivations wearing a signature's clothes, never the reverse.
+
+And the standing question asked FORWARD — dissolving questions queued, unanswered on
+purpose (each wants its own conversation before it becomes a disposition):
+
+- **Do we need branches?** A branch is a speculative journal SEGMENT — merge is append,
+  rebase is replay, conflict is two segments claiming one item. Once the journal is the
+  source, the branch ceremony may be the log's view too.
+- **Is the issue tracker secretly the red-lock list?** A ticket that describes intended
+  behaviour IS a declared expectation not yet met — the target lock committed red was
+  always a ticket with a judge attached. TODO comments are the same fact at lower
+  altitude: each is either a derivable red gate or a disposition, and hand-tracked
+  prose is the worst home for both.
+- **Is a bug report secretly a fixture plus a missing law?** A reproduction is a dent
+  the spec should have caught — fire-drill's lineage says every incident becomes a
+  planted fixture; the dissolving form says it should arrive as one.
+- **Does CI need to re-execute what local gates already judged?** Re-execution exists
+  because the server does not trust the laptop — but a signed transcript of a local
+  gate run is an attestation, and the countersign might verify rather than re-derive.
+  (Trust roots are the hard honest part; differential-certify's provenance story is the
+  rail.)
+- **Is the editor anything but a bundle viewer?** Once files are views and changes are
+  verbs, an "editor" is a perception surface with a verb palette — the open-file
+  buffer, like the PR, survives only as a way of LOOKING.
 
 **Stage 2's first form landed with it: THE JOURNAL.** Every mutating verb appends one
 line to `bundle.journal` beside the nearest `Cargo.toml` — `<verb> <module> — <detail>`,

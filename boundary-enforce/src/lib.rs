@@ -133,6 +133,13 @@ pub struct Config {
     pub reasons_spec: Option<PathBuf>,
     /// The bless variable for [`Config::reasons_spec`]. Default: `BLESS_REASONS`.
     pub reasons_bless_env: String,
+    /// THE BLESS LOOP, DISSOLVED: when a census drifts, regenerate it INTO THE WORKING
+    /// TREE and fail the build once — the diff is the ratification (commit it) or the
+    /// refusal (revert it); the homework ("go run the bless command") disappears while
+    /// the gate's authority is untouched. Default: on everywhere except CI (`CI` env
+    /// set), because a fresh checkout must never mutate itself — there, the refusal
+    /// only reports. The bless variables remain for explicit regeneration.
+    pub autofix_stale: bool,
 }
 
 impl Config {
@@ -150,6 +157,7 @@ impl Config {
             tiers_bless_env: "BLESS_TIERS".to_string(),
             reasons_spec: None,
             reasons_bless_env: "BLESS_REASONS".to_string(),
+            autofix_stale: std::env::var_os("CI").is_none(),
         }
     }
 }
@@ -248,6 +256,7 @@ impl Enforcement {
             &config.bless_env,
             "the algebra-qualification census",
             &config.manifest_dir,
+            config.autofix_stale,
             &mut rerun,
             &mut violations,
         );
@@ -264,6 +273,7 @@ impl Enforcement {
             &config.tiers_bless_env,
             "the tier census",
             &config.manifest_dir,
+            config.autofix_stale,
             &mut rerun,
             &mut violations,
         );
@@ -284,6 +294,7 @@ impl Enforcement {
             &config.reasons_bless_env,
             "the qualify-reason census",
             &config.manifest_dir,
+            config.autofix_stale,
             &mut rerun,
             &mut violations,
         );
@@ -327,12 +338,14 @@ impl Enforcement {
 /// committed text — the ONE freeze/drift shape both censuses share, so the two cannot
 /// diverge in mechanics. `None` spec path skips entirely.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn freeze_or_gate(
     spec_path: &Option<PathBuf>,
     census: &str,
     bless_env: &str,
     label: &str,
     manifest: &Path,
+    autofix: bool,
     rerun: &mut Vec<PathBuf>,
     violations: &mut Vec<String>,
 ) {
@@ -349,11 +362,36 @@ fn freeze_or_gate(
         let committed = std::fs::read_to_string(spec_path).unwrap_or_default();
         if committed != census {
             let rel = spec_path.strip_prefix(manifest).unwrap_or(spec_path);
-            violations.push(format!(
-                "{} is stale — {label} drifted. Regenerate with `{bless_env}=1 cargo build` \
-                 and ratify the diff.",
-                rel.display(),
-            ));
+            // THE BLESS LOOP, DISSOLVED (the standing question's first catch:
+            // regeneration is pure derivation; only committing the diff is the
+            // signature). With `autofix` on — the default everywhere except CI — the
+            // refusal RUNS its fixing derivation: the regenerated census lands in the
+            // working tree and the build still fails ONCE, so the gate's authority is
+            // untouched (an unratified drift never builds green) while the homework
+            // ("go run the bless command") disappears. Commit the diff to ratify, or
+            // revert it to refuse. In CI there is no tree to ratify into, so the
+            // refusal only reports — a fresh checkout must never mutate itself.
+            if autofix {
+                if let Some(parent) = spec_path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .unwrap_or_else(|e| panic!("create {} ({e})", parent.display()));
+                }
+                std::fs::write(spec_path, census)
+                    .unwrap_or_else(|e| panic!("write {} ({e})", spec_path.display()));
+                violations.push(format!(
+                    "{} was stale — {label} drifted, and the regenerated text is now IN \
+                     YOUR WORKING TREE. The diff is the ratification: commit it, or \
+                     revert it to refuse the drift. (This build fails once so the \
+                     movement is never silent.)",
+                    rel.display(),
+                ));
+            } else {
+                violations.push(format!(
+                    "{} is stale — {label} drifted. Regenerate with `{bless_env}=1 cargo \
+                     build` and ratify the diff.",
+                    rel.display(),
+                ));
+            }
         }
     }
 }
