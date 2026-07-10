@@ -64,6 +64,14 @@ pub mod interp;
 pub mod kvstore;
 pub mod select;
 
+/// The certification data this crate CARRIES — every theory lock, its mutation companion,
+/// and the shape catalog, embedded byte for byte and keyed by lock stem, so a consumer
+/// pinned to a version holds exactly that version's certification (the thirteenth ask:
+/// "the version is the certification" as an API). Judged consumer-side via
+/// `discover::depend::Dependence::judge_embedded`; re-exported here so the payload is one
+/// name deep from the crate root.
+pub use discover::depend::Locks;
+
 /// `#[derive(Shaped)]` — generate a value object's probe surface (the fused universal
 /// probe's `inhabitant` + `perturbation_classes`) from its structure. The companion of the
 /// `crate::boundary::Shaped` trait, re-exported here so edges write `#[derive(Shaped)]`.

@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 691 sites.
+# 698 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -156,6 +156,8 @@
 - boundary_spec::discover::date::plus:deaf -> None
 - boundary_spec::discover::date::since:deaf -> None
 - boundary_spec::discover::date::zero:deaf -> None
+- boundary_spec::discover::depend::Dependence::judge_embedded:deaf -> Err(String::new())
+- boundary_spec::discover::depend::Dependence::judge_embedded:deaf -> Ok(vec![])
 - boundary_spec::discover::depend::Dependence::judge_register:0: || -> &&
 - boundary_spec::discover::depend::Dependence::judge_register:1: || -> &&
 - boundary_spec::discover::depend::Dependence::judge_register:2: == -> !=
@@ -169,6 +171,11 @@
 - boundary_spec::discover::depend::dependence_report::is_intact:deaf -> false
 - boundary_spec::discover::depend::dependence_report::is_intact:deaf -> true
 - boundary_spec::discover::depend::dependence_report::render:deaf -> String::new()
+- boundary_spec::discover::depend::judge_reliances:deaf -> Err(String::new())
+- boundary_spec::discover::depend::judge_reliances:deaf -> Ok(vec![])
+- boundary_spec::discover::depend::locks::text:0: == -> !=
+- boundary_spec::discover::depend::locks::text:1: == -> !=
+- boundary_spec::discover::depend::locks::text:deaf -> None
 - boundary_spec::discover::engine::DiscoveredLaw::ops:deaf -> vec![]
 - boundary_spec::discover::engine::Engine<T>::check:0: != -> ==
 - boundary_spec::discover::engine::Engine<T>::check:1: || -> &&

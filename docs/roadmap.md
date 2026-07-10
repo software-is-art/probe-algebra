@@ -1622,6 +1622,87 @@ on the dependency graph, not its own text), so an edit-time tier DELTA would nee
 not one file — deferred until that's worth the walk. Everything behavioural stays couriered by
 design, not omission.
 
+## The thirteenth ask: reliances go native — locks ship in the crate (points 1 + 3 BUILT)
+
+From the chattel-cli consumer instance, replacing the fixture lines it almost upstreamed.
+The tenth ask built the downstream register so open text stops feeding the rules — but it
+left the DATA in the wrong repo: upstream holding a mirror of consumer facts only the
+consumer can know is stale, plus a hand-off (or PR access) for every line and every
+deletion. The native mechanism already existed one level down in the same stack — the
+consumer's own CLI judges ITS clients' registers against the theory lock embedded in the
+binary they pin — so probe-algebra now does to itself what its consumer already did.
+
+**Point 1 — the locks ship** (`boundary_spec::Locks`, living in `discover::depend` where
+the judgment that consumes them lives): every behaviour lock, its algebra-mutation
+companion, and the shape catalog, `include_str!`-embedded byte for byte and keyed by lock
+stem. "The version is the certification" becomes an API — a consumer pinned to a tag holds
+exactly that tag's certification data, no filesystem archaeology, no release-notes
+parsing. The roster is DELIBERATE, not "everything": the mutation locks ride because the
+ratified survivors are the guarantee's fine print (the named degrees of freedom a swap
+could hide in), and `shapes.spec` rides as the law-language the equations are written in —
+while repo-meta locks (gates, tiers, qualify, probes, schemata, perimeter, substrate, the
+world lock, the infra exemplar, the seam graph and shape locks) and every hand-authored
+register stay home. A shipped lock is a COMMITMENT: embedding a repo-meta artifact would
+invite reliances on interior facts and make every interior reorganisation a potential
+downstream refusal. The roster is census-gated in both directions, with what ships
+DERIVED from the artifacts' own headers (`# discovered spec:` / `# algebra mutation:`,
+plus the catalog): a registry theory missing its embed line refuses, an unclassified spec
+artifact refuses, a stale home-line refuses, and the embedded bytes are pinned to the
+committed files (locally a tautology; in the packaged crate, proof `spec/` shipped
+coherently). One free property worth stating: the lock and the parser that reads it
+(`Spec::parse_lock`) travel in the same pinned artifact, so grammar skew between lock and
+reader is impossible by construction — the release-notes-parsing route could never
+promise that.
+
+**Point 3 — reliances live consumer-side** (`Dependence::judge_embedded`): a consumer
+commits `upstream-reliances.register` (the existing grammar, unchanged:
+`<theory> | <equation, exactly as the lock renders it>: <consumer> — <why>`) and judges
+it in its own suite against the pinned crate's embedded locks. The cross-repo form
+collapses to the self-judgment form because the lock travels with the pin: a pin bump
+re-runs the judgment against the new version's locks with zero ceremony, and a bump to a
+version that dropped a relied-on law refuses by equation, carrying the consumer's why,
+before a bare compile error explains nothing. Under the hood one shared core
+(`judge_reliances`) serves both register judges — one grammar, one refusal envelope, two
+lock resolvers (the spec directory for the owner, the embedded roster for the pin) — so
+the two forms cannot drift apart.
+
+**Deliberately not in this brick, each with its disposition:**
+
+- *Point 2 (the API surface as a lock)* — its own brick, next. The tenth ask put API
+  reliances in the compiled fixture because the compiler is the strongest available
+  judge; once judgment moves consumer-side the consumer compiles against the pin anyway,
+  so the surface lock's marginal value is the named refusal (why before the compile
+  error) and — the bigger prize — upstream's own public surface becoming a ratified,
+  review-routed lock, which `qualify.spec` (operator-shape, not pub-surface) does not do.
+  #48 just built the exact pattern it needs: a one-source emitter in `boundary-enforce`
+  serving both a frozen lock and a live consumer.
+- *Point 4 (the consumer census)* — recorded as a candidate, WITH the observation that
+  closes its disclosed gap: the census line is an ADDRESS (name + where the register
+  lives), and the world-gate pattern already knows what to do with an address — a weekly
+  `reliances (consumer drift)` gate pulling each censused consumer's register (one
+  anonymous read, the substrate's crates.io move) and judging it against the WORKING
+  TREE's locks gives upstream the release-time half: a breaking re-bless learned before
+  shipping, not at the consumer's bump. Floor semantics (an unreachable register is a
+  disclosed refusal, never silence); a world fact never feeds the countersign.
+- *The fixture shrink* — deferred until the consumer's register lands. The four compiled
+  surface reliances in `downstream-fixture/tests/reliances.rs` stay until their owner
+  re-declares them downstream; then the fixture shrinks to what it uniquely earns, the
+  synthetic consumer proving integration compiles.
+
+**Disclosures, all load-bearing:** renderer stability is now a CROSS-REPO contract —
+registers key on the equation byte-exact, so a pure render-convention change upstream
+reads as GONE in every consumer's suite, indistinguishable from a dropped law until the
+consumer reads the diff (part of why `shapes.spec` ships: the law-language is now
+certification surface). This protects at ADOPTION time, not release time — the candidate
+above is the remedy — and the incident ledger is clean: no upstream change has actually
+broken a consumer yet, so consumer register justifications should say they are foresight,
+not scar tissue (the ask's own instruction, kept). `Locks` is certification DATA, not
+re-derivation — holding the text is holding what discovery earned at release time, not
+the ability to re-run it. And the connection worth a line so it is not rediscovered:
+embedded locks are the data half of DIFFERENTIAL-CERTIFY — a published artifact carrying
+its own certification is exactly what lets release N−1 judge release N — so this brick
+lays the induction rail before that candidate's gate.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
