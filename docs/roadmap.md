@@ -1587,19 +1587,32 @@ mid-edit the code doesn't compile — which is why the freeze-delta courier exis
 deltas at the build and couriers them into the next window. But one lock is not behavioural:
 `spec/qualify.spec`, the surface census, is a STRUCTURAL property (a module qualifies when its
 functions are operator-shaped — bare named value types, no I/O), so its line is text-derivable
-from the file alone. `boundary_enforce::qualify_line` is that census's own per-file emitter,
-factored to ONE source (the operator-shape rule is stated once and served to both the frozen
-census and the hook — never restated), and the hook's fifth voice computes the line the census
-WOULD carry for the file's current text and renders the delta against the committed line with the
-same `spec_lock::LockDelta` the courier uses. So the agent learns "this edit adds/removes an
-operator — the qualify census will move, re-bless" AT the edit, where the intent is freshest,
-instead of at the red gate the build would otherwise be first to raise.
+from the file alone. `boundary_enforce::qualify_line` / `qualify_census_lines` are that census's
+OWN emitters, factored to ONE source (the operator-shape rule is stated once and served to both the
+frozen census and the hook — never restated), and the hook's fifth voice re-derives the whole live
+census from the tree, diffs it against the committed lock with the same `spec_lock::LockDelta` the
+courier uses, and shows the current drift. So the agent learns "this edit made the qualify census
+stale" AT the edit, where the intent is freshest, instead of at the red gate the build would
+otherwise be first to raise.
 
-Silent by construction, the sixth-sense discipline: scoped to `.rs` under `src/` (the census's
-own tree — a file it does not scan has no committed line, so a delta there would be a false
-alarm); a half-written file that does not parse is silence (`Err`, distinct from a parsed
-no-algebra file's `Ok(None)`, so never a spurious "stopped qualifying"); and no movement is
-silence.
+Two shape decisions, both made against how it reads to the agent consuming it:
+
+- **A drift LEDGER, not a per-file delta.** It shows the WHOLE current drift — every stale line
+  together — so accumulated movements sit in one block, and it goes empty the moment a re-bless
+  reconciles the tree. You never lose an outstanding line between the edit that caused it and the
+  bless that clears it.
+- **Un-scoped but DEDUPED.** The ledger is a repo fact, so it is surfaced on ANY edit, not narrowed
+  to a file class (which file you touched should not gate whether you see the drift). Breadth of
+  triggering would become breadth of repetition, so the voice persists the last-shown ledger and
+  speaks only when the render CHANGES: an accumulated line appears once, on whatever edit first
+  surfaces it, then stays quiet until the drift moves again. That is the un-scoped reach without the
+  banner-blindness a reprint-every-edit block would train.
+
+NO how-to-bless recipe rides the voice: the delta names `spec/qualify.spec`, whose own header
+carries `# … Regenerate with \`BLESS_QUALIFY=1 cargo build\``, so the command is self-documenting at
+the named lock and is stable orientation (also CLAUDE.md's one rule) — not news to reprint each
+firing. A half-written file contributes nothing to the live census, so a mid-edit save never
+invents a movement.
 
 The split is now explicit and on both sides: the STRUCTURAL half of the mirror (placement,
 qualification) lives at the edit as a live sense; the BEHAVIOURAL half lives at the build and is

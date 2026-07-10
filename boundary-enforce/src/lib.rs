@@ -684,6 +684,20 @@ pub fn qualify_line(source: &str, loc: &str) -> Result<Option<String>, String> {
     Ok(qualify_line_from_items(&file.items, loc))
 }
 
+/// The live qualify census BODY — every `QUALIFIES` line a source tree currently produces, sorted,
+/// without the header/count comments. This is exactly what [`render_census`] walks (same tree, same
+/// `tests.rs` skip, same per-file emitter), minus the prose, so the edit-time drift ledger can hold
+/// it against the committed `spec/qualify.spec` and show every currently-stale line at once —
+/// accumulating as files drift, empty the moment a re-bless reconciles them. `manifest` is the
+/// prefix stripped to form each line's path (so lines read `src/…` as the committed census does).
+pub fn qualify_census_lines(src: &Path, manifest: &Path) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut scanned = 0usize;
+    collect_qualifications(src, manifest, &mut scanned, &mut lines);
+    lines.sort();
+    lines
+}
+
 /// An operator read off a function: name, argument sorts, return sort.
 struct Op {
     name: String,
