@@ -1725,6 +1725,16 @@ operators off plain Rust with zero annotation, and cohesion + the spec's silence
 ("operators in no law") are already the disconnected-logic detectors — reports today,
 awaiting actuation.
 
+The precondition, named by the operator because it is easy to mistake for a side detail:
+this works ONLY because the discipline has no primitive obsession. Nets are SORTS, and
+sorts exist only where signatures speak the domain's vocabulary — the sixth sense already
+refuses to net on ubiquitous types (`String`, `i64`, `Vec`) because with open primitives
+everywhere, placement degenerates to soup (everything wires to everything) or silence
+(nothing nets at all). Value objects are not a style choice this candidate happens to sit
+beside; they are what gives the netlist its nets. Which re-reads the spike below: pushing
+the qualify census toward totality is not just measuring the bundle's territory, it is
+MANUFACTURING the signal auto-modularisation runs on.
+
 The real inversion, named plainly: FILE LAYOUT BECOMES A VIEW. Today the placer derives
 placement as a report and a lock, but the files are still hand-arranged and the lock only
 checks agreement. In the continuation form, the module tree is a GENERATED artifact under
