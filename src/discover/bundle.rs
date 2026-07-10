@@ -706,7 +706,6 @@ impl Bundle {
                 let n = item_name(item);
                 n.as_deref() == Some(name)
             })
-            .map(|(i, item)| (i, item))
             .expect("marked items exist");
         let start = byte_offset(module, target.1.span().start());
         let end = match file.items.get(target.0 + 1) {
