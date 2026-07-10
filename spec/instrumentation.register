@@ -27,5 +27,6 @@ src/select/boundary.rs: audit tooling — consumes cargo-mutants outcomes.json; 
 src/select/internal.rs: audit tooling — same as select/boundary.rs
 src/discover/mod.rs: theory declarations and spec tables — data mutated in-process, plus the theory!/system! macros
 src/discover/derived.rs: theory operators in inline algebra modules — mutated in-process on every test
+src/discover/verbs.rs: theory operators — the verb algebra's miniature carrier, mutated in-process on every test (spec/verb-algebra.mutation.spec reads ALL KILLED)
 src/discover/modularize.rs: sample corpus for the placer probes — the placer itself is instrumented
 src/discover/schemata.rs: the selector — instrumenting the mutant switch with mutants is self-reference

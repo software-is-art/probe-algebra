@@ -1,0 +1,4 @@
+add src/discover/squash.rs — struct SquashRules
+add src/discover/mod.rs — 
+add src/discover/squash.rs — 
+edit examples/bundle.rs — run

@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 784 sites.
+# 819 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -709,6 +709,41 @@
 - boundary_spec::discover::shape::ShapeReport::of:0: || -> &&
 - boundary_spec::discover::shape::ShapeReport::render:deaf -> String::new()
 - boundary_spec::discover::shape::find:0: != -> ==
+- boundary_spec::discover::squash::squash::collapse:0: == -> !=
+- boundary_spec::discover::squash::squash::collapse:1: && -> ||
+- boundary_spec::discover::squash::squash::collapse:deaf -> None
+- boundary_spec::discover::squash::squash::compact:0: ! -> (deleted)
+- boundary_spec::discover::squash::squash::compact:1: && -> ||
+- boundary_spec::discover::squash::squash::compact:2: != -> ==
+- boundary_spec::discover::squash::squash::compact:deaf -> Err(String::new())
+- boundary_spec::discover::squash::squash::compact:deaf -> Ok(String::new())
+- boundary_spec::discover::squash::squash::from_spec:0: == -> !=
+- boundary_spec::discover::squash::squash::from_spec:10: && -> ||
+- boundary_spec::discover::squash::squash::from_spec:11: != -> ==
+- boundary_spec::discover::squash::squash::from_spec:1: == -> !=
+- boundary_spec::discover::squash::squash::from_spec:2: && -> ||
+- boundary_spec::discover::squash::squash::from_spec:3: == -> !=
+- boundary_spec::discover::squash::squash::from_spec:4: == -> !=
+- boundary_spec::discover::squash::squash::from_spec:5: && -> ||
+- boundary_spec::discover::squash::squash::from_spec:6: ! -> (deleted)
+- boundary_spec::discover::squash::squash::from_spec:7: && -> ||
+- boundary_spec::discover::squash::squash::from_spec:8: == -> !=
+- boundary_spec::discover::squash::squash::from_spec:9: == -> !=
+- boundary_spec::discover::squash::squash::mobile:deaf -> false
+- boundary_spec::discover::squash::squash::mobile:deaf -> true
+- boundary_spec::discover::squash::squash::nest:0: == -> !=
+- boundary_spec::discover::squash::squash::nest:1: || -> &&
+- boundary_spec::discover::squash::squash::nest:2: ! -> (deleted)
+- boundary_spec::discover::squash::squash::nest:3: || -> &&
+- boundary_spec::discover::squash::squash::nest:4: ! -> (deleted)
+- boundary_spec::discover::squash::squash::nest:5: ! -> (deleted)
+- boundary_spec::discover::squash::squash::nest:6: && -> ||
+- boundary_spec::discover::squash::squash::nest:7: == -> !=
+- boundary_spec::discover::squash::squash::nest:8: || -> &&
+- boundary_spec::discover::squash::squash::nest:9: && -> ||
+- boundary_spec::discover::squash::squash::nest:deaf -> None
+- boundary_spec::discover::squash::squash::split_verb:0: == -> !=
+- boundary_spec::discover::squash::squash::unordered:0: <= -> >
 - boundary_spec::discover::substrate::LiveSubstrate::dents:0: == -> !=
 - boundary_spec::discover::substrate::LiveSubstrate::dents:1: && -> ||
 - boundary_spec::discover::substrate::LiveSubstrate::dents:2: || -> &&

@@ -57,6 +57,7 @@ fn run(args: &[String]) -> Result<String, String> {
          \x20      bundle place <module.rs>\n\
          \x20      bundle check <module.rs>\n\
          \x20      bundle collect <module.rs> [item-to-sweep]\n\
+         \x20      bundle squash <bundle.journal>\n\
          \x20      bundle constrains <module.rs> <operator>\n\
          \x20      bundle trace <theory> '<term>'\n\
          \x20      bundle lift <module.rs> <theory-name> [declaration ...]"
@@ -80,6 +81,8 @@ fn run(args: &[String]) -> Result<String, String> {
                                         Fn(f) => Some(format!("fn {}", f.sig.ident)),
                                         Struct(s) => Some(format!("struct {}", s.ident)),
                                         Enum(e) => Some(format!("enum {}", e.ident)),
+                                        Trait(t) => Some(format!("trait {}", t.ident)),
+                                        Mod(m) => Some(format!("mod {}", m.ident)),
                                         _ => None,
                                     }
                                 })
@@ -151,6 +154,38 @@ fn run(args: &[String]) -> Result<String, String> {
                         "collected `{name}` from {module_path} — the journal remembers it"
                     ))
                 }
+                ("squash", []) => {
+                    // the first slot names the JOURNAL, not a module: compaction to
+                    // law-normal form, licensed line by line by the verb algebra's
+                    // frozen laws — a collapse the lock does not state never happens.
+                    // The one verb that rewrites the record, warranted by the record's
+                    // own algebra; it journals nothing (its record IS the journal's
+                    // diff).
+                    if module.is_empty() {
+                        Err(format!(
+                            "bundle squash: no journal at {module_path} — nothing to compact"
+                        ))
+                    } else {
+                        use boundary_spec::discover::squash::SquashRules;
+                        let spec = boundary_spec::discover::Spec::of::<
+                            boundary_spec::discover::verbs::state::VerbAlgebra,
+                        >();
+                        let compacted = SquashRules::from_spec(&spec).compact(&module)?;
+                        if compacted == module {
+                            Ok(format!(
+                                "{module_path}: already law-normal — no licensed squash remains"
+                            ))
+                        } else {
+                            let (was, now) = (module.lines().count(), compacted.lines().count());
+                            std::fs::write(module_path, &compacted)
+                                .map_err(|e| format!("bundle squash: cannot write: {e}"))?;
+                            Ok(format!(
+                                "{module_path}: squashed {was} entries → {now} — every \
+                                 collapse licensed by the frozen verb algebra"
+                            ))
+                        }
+                    }
+                }
                 ("trace", [term]) => {
                     // perception: the first argument slot names a THEORY, not a module —
                     // trace runs over compiled theories (the build/text boundary: eval
@@ -165,7 +200,9 @@ fn run(args: &[String]) -> Result<String, String> {
                         "fabric" => Trace::of::<boundary_spec::discover::fabric::Fabric>(term)
                             .map(|t| t.render()),
                         other => Err(format!(
-                            "bundle trace: `{other}` is not in this binary's theory roster                              (verbs, router, fabric) — a consumer traces its own theories                              through discover::trace::Trace in its own suite"
+                            "bundle trace: `{other}` is not in this binary's theory roster \
+                             (verbs, router, fabric) — a consumer traces its own theories \
+                             through discover::trace::Trace in its own suite"
                         )),
                     }
                 }

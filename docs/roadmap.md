@@ -1967,7 +1967,14 @@ verb grew a filesystem read — the censuses watching the watcher), impl-interio
 placement (exercised as the
 fallback path the same day: building `edit` itself required an impl-interior change the
 verbs cannot express — the second rule's field-report arm, proven on day one), test
-authoring, and cross-file moves. Refusals should name their fixing verb.
+authoring (SHRUNK by the squash brick: a `#[cfg(test)] mod probes` is an ADDABLE item,
+proven when squash's whole probe suite went in through `add`; what stays open is growing
+an EXISTING probes module — an item-interior change), and cross-file moves (SHRUNK the
+same day: a module MOUNT is just `add` of a `pub mod` item on `mod.rs`, dissolved before
+it was ever named a gap). Newly named by the same brick: **the frozen arm** — the verbs'
+vehicle rebuilds behind the same gate as the tree it operates on, so a mid-transaction
+tree blocks the fixing verb; see the squash brick's field report. Refusals should name
+their fixing verb.
 
 **The disposition on removal — garbage collection, with the house amendment: MARK IS
 DERIVED, SWEEP IS RATIFIED.** The operator's question ("is there ever really a need to
@@ -2257,6 +2264,65 @@ exactly the way the incremental mutation gate needs `mutants-green`). Code on di
 likewise, keeps three jobs, all derived-artifact jobs: the build's input, the cache that
 keeps verbs fast, and the interop/legibility surface — materialized view #1 of the
 bundle, exactly as `ci.yml` is of the gate registry.
+
+### The squash verb — the lock executes (BUILT)
+
+The composition stanza froze the squash table; this brick makes it run. `bundle squash
+<bundle.journal>` compacts the change record to its LAW-NORMAL FORM, and the compactor's
+entire rule table is READ OFF the discovered laws (`SquashRules::from_spec`, parsing the
+engine's machine-grammar equations): same-item composition laws become the collapses
+(add-then-collect is one collect), projection laws become the replay-noise filter (a
+repeated identical entry is one entry), cross-item commuting-maps laws become MOBILITY
+(which verb pairs may slide past each other on different keys, so non-adjacent pairs can
+meet). Nothing is hand-authored: change the verb algebra, re-freeze, and the compactor's
+behaviour follows — the join-verb design ("the rules are data, never folklore") realised
+on the first verb to need it. Conservatism is silence, and the silences are load-bearing,
+each pinned: add-then-edit on one key composes to NO single verb, so both lines stay (the
+journal keeps the whole story); a verb the algebra does not model (`place`) is opaque and
+nothing slides past it; the one hard refusal is a line the journal grammar cannot read —
+the record is machine-written, so a strange line means a hand touched it. Squash journals
+nothing: it rewrites the record under the record's own warrant, and its trace is the
+journal's diff.
+
+The self-hosting note, one rung sharper than collect's: collect CONSULTED committed locks
+as evidence; squash EXECUTES the frozen spec of the verbs themselves as its engine. And
+the brick was built through the suit end to end: `squash.rs` was born by `add` on a
+missing file (module doc hand-typed after — prose is judgment), its probes went in by
+`add` too (a `#[cfg(test)] mod probes` is an addable item — the "test authoring" gap
+shrank without a new verb), the mount `pub mod squash;` went through `add` on `mod.rs`
+itself (the module-mount gap dissolved before it was ever named; the same transaction
+re-dealt two operator functions `mod.rs` had never had judged, ratified in this diff),
+and the CLI grew its own verb through its own `edit` — `fn run` replaced under the
+signature hold. Payload `use` items rode `add` as unnamed cargo, so the imports gap is
+narrower than feared; the arm's own imports live block-local inside the new match arm.
+
+**Field report — the frozen arm** (the one genuine rough edge, named for the ledger):
+mid-transaction, the tier census correctly derived the not-yet-mounted `squash.rs` as
+INTERIOR (not pub-reachable) and the inward rule refused the build — but `cargo run
+--example bundle` REBUILDS, so the vehicle of the very fix was blocked by the gate it
+was about to satisfy. The prebuilt example binary broke the deadlock. The missing piece:
+the verbs' vehicle must not share the build gate with the tree it operates on — a pinned
+suit binary (the shipped-hook precedent) or a verbs-exempt profile. Pleasing symmetry on
+the way out: the moment the mount landed, the tier census reclassified squash.rs
+INTERIOR → ALGEBRA on its own — the derivation watching the tree change under it.
+
+### The name, asked of the whole (disposition)
+
+The operator's question, after the mech-suit exchange: "what do we even call this thing
+now? It's grown way beyond my original feedback-loop domain model." Answered here so it
+is not re-litigated: KEEP THE NAME — not out of inertia, but because the repo grew INTO
+it. Genesis set the precedent of a name contracting to its true referent; this is the
+twin case, a name EXPANDING to its true referent. "Probe algebra" began as a metaphor
+over a feedback-loop domain model; today it is a description: the theories are algebras
+probed by batteries, the shape catalog is an algebra OF law shapes, the change history is
+literally an algebra (`spec/verb-algebra.spec`), and as of the squash brick the tooling
+EXECUTES frozen algebra as its rule table. The layers keep their working names — the
+METHOD is discovery (derive the fact, ratify the decision), the MEDIUM is the bundle
+(modules as databases, files as views), the MODALITY is the verbs (the CLI as the
+interface to the code), and the EXPERIENCE is the mech suit (the operator's coinage, kept
+because it says what it does: the agent supplies intent, the suit carries the load). The
+house naming discipline holds at the top: names say what things do, and this thing probes
+algebras and is increasingly made of them.
 
 ## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
 

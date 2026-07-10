@@ -338,7 +338,6 @@ impl Enforcement {
 /// committed text — the ONE freeze/drift shape both censuses share, so the two cannot
 /// diverge in mechanics. `None` spec path skips entirely.
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn freeze_or_gate(
     spec_path: &Option<PathBuf>,
     census: &str,
