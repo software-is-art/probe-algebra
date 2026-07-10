@@ -1924,6 +1924,41 @@ journal themselves; the agenda computes from the journal instead of re-deriving 
 from changed paths; `bundle-demo/MANIFEST.md` is the hand-made prototype of exactly this
 artifact, and deriving it is the next brick of the vision.
 
+### The aim, adopted: zero file patching — all CLI
+
+The operator's directive, now a working rule (CLAUDE.md carries the binding form): code
+changes go through the verbs wherever the verbs reach, and a change the verbs cannot
+express is a FIELD REPORT — the missing verb gets named here before the file gets
+patched. Dogfooding is the only way to find the rough edges; the primary user is the
+agent, and the gaps are the roadmap's fuel. Scope, stated once: this governs CODE —
+prose stays hand-typed (prose is judgment, the house rule already says so), and the
+freeze/bless paths already never hand-edit their artifacts.
+
+The named gaps at adoption, each a missing verb: **edit** (replace an item's body while
+everything that names it re-judges atomically — the largest gap; change is mutation, not
+only addition), **remove** (reliance-checked deletion — the embedded registers make it
+judgeable), **split** (rung 3 — executing a ratified cohesion split), **constrains** (the
+blast-radius read: which laws, freedoms, and reliances pin an operator), impl-interior
+placement, test authoring, and cross-file moves. Refusals should name their fixing verb.
+
+And the staged path from here to the operator's horizon — no files on disk or in git:
+
+1. **Verbs-only discipline** (now): every reachable change through the CLI; gaps named.
+2. **The transaction log**: verbs journal themselves; the agenda computes from the
+   journal; the PR body is derived.
+3. **The tree becomes a gated derived artifact**: the journal is committed, and a replay
+   gate holds tree == replay(journal) — the `ci.yml` move at tree scale; a hand-edited
+   file refuses the same way a hand-edited lock does.
+4. **The tree leaves git**: the repository is the journal, the locks, the registers, and
+   the shell; the tree materializes at build/publish time like any target artifact. This
+   needs the content-addressed item store (the bundle stops borrowing the file's bytes as
+   its representation) and judge-version anchoring in journal entries (replay under
+   tomorrow's judges may judge differently — the determinism pin, differential-certify's
+   rail). rustc and the ecosystem keep getting materialized trees; they just stop being
+   the source.
+
+### The log and the anchor
+
 And the question the log raises, asked by the operator and answered here so it is not
 re-litigated: if the log is the record of change, WHAT IS GIT FOR — do we even need it?
 The honest split: git stores STATES, the log stores INTENTS — a diff is a reconstruction

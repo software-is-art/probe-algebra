@@ -4,6 +4,16 @@ A Rust workspace (root crate `boundary-spec`) built around one idea: run the cod
 derive its spec, freeze the spec into committed files, and let CI fail on any drift.
 Almost every artifact here is generated from a declaration and compared byte for byte.
 
+## The second rule (adopted 2026-07-10): verbs before patches
+
+Change CODE through the bundle CLI wherever the verbs reach, never by writing text into
+the file: `cargo run --example bundle -- add|declare|place|check|lift ...` (each a judged
+transaction — a refusal writes nothing). A change the verbs cannot express is a FIELD
+REPORT: name the missing verb in docs/roadmap.md ("The aim, adopted: zero file patching")
+before falling back to a file edit. Prose (docs, registers' justifications) stays
+hand-typed — prose is judgment. The aim this serves: the CLI is the interface to the
+code; the gaps you hit are the roadmap's fuel.
+
 Orientation: `README.md` is the front door, `docs/tour.md` the guided walk,
 `docs/discovery.md` the discovery reference, `docs/compile-time.md` the compile-time
 edge grammar, `docs/roadmap.md` the build history and what's next, `docs/experience.md`
