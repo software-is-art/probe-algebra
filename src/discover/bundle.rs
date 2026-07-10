@@ -172,6 +172,98 @@ impl Bundle {
         out
     }
 
+    /// THE EDIT VERB — the largest gap named at the second rule's adoption, closed: replace
+    /// one named item's TEXT while its SIGNATURE holds. Change is mutation, not only
+    /// addition — but a signature move is an interface change wearing an edit's clothes, so
+    /// it is REFUSED here by name (retire the item and `add` its successor; a future
+    /// `resign` verb may earn the combined form). What an edit may change is the body, the
+    /// docs, and the attributes: the meaning and its prose — everything a caller cannot
+    /// observe through the signature. Everything that names the item re-judges downstream
+    /// exactly because the signature held: the laws re-run at the next judgment, the lift
+    /// drift-gate demands regeneration, the censuses re-derive.
+    ///
+    /// Refusals, named: an unparseable replacement, a replacement that is not exactly ONE
+    /// item, a name the module does not carry, a replacement whose name differs (an edit
+    /// is not a rename), and a FUNCTION whose signature moved (compared token-for-token).
+    /// Non-function items (types, consts) hold their name and kind instead — reshaping a
+    /// type is interface change, refused the same way.
+    pub fn edit(module: &str, item_name_text: &str, replacement: &str) -> Result<String, String> {
+        let new = syn::parse_file(replacement)
+            .map_err(|e| format!("bundle edit: replacement unparseable: {e}"))?;
+        let [new_item] = new.items.as_slice() else {
+            return Err(format!(
+                "bundle edit: the replacement must be exactly one item, got {} — one edit, \
+                 one judged transaction",
+                new.items.len()
+            ));
+        };
+        let Some(new_name) = item_name(new_item) else {
+            return Err(
+                "bundle edit: the replacement has no defining name — nothing to hold an \
+                 edit to"
+                    .to_string(),
+            );
+        };
+        if new_name != item_name_text {
+            return Err(format!(
+                "bundle edit: the replacement names `{new_name}`, not `{item_name_text}` — \
+                 an edit is not a rename"
+            ));
+        }
+
+        let file =
+            syn::parse_file(module).map_err(|e| format!("bundle edit: module unparseable: {e}"))?;
+        let target = file
+            .items
+            .iter()
+            .find(|item| {
+                let name = item_name(item);
+                name.as_deref() == Some(item_name_text)
+            })
+            .ok_or_else(|| {
+                format!(
+                    "bundle edit: no item named `{item_name_text}` in the module — `add` \
+                     grows, `edit` changes; nothing here to change"
+                )
+            })?;
+
+        // the signature hold: for functions, token-for-token equality of the signature; for
+        // everything else, the kind must match (a struct stays a struct) — reshaping is
+        // interface change either way, and interface change is not an edit.
+        match (target, new_item) {
+            (syn::Item::Fn(old), syn::Item::Fn(new)) => {
+                use quote::ToTokens;
+                let held = old.sig.to_token_stream().to_string();
+                let offered = new.sig.to_token_stream().to_string();
+                if held != offered {
+                    return Err(format!(
+                        "bundle edit: `{item_name_text}`'s signature moved (`{held}` -> \
+                         `{offered}`) — an interface change is not an edit; retire the item \
+                         and add its successor"
+                    ));
+                }
+            }
+            (old, new) if std::mem::discriminant(old) == std::mem::discriminant(new) => {}
+            _ => {
+                return Err(format!(
+                    "bundle edit: `{item_name_text}` changed item kind — an interface \
+                     change is not an edit"
+                ));
+            }
+        }
+
+        // the splice: the target's TEXT is replaced in place (its position and its gap are
+        // the module's furniture and stay), then one parse∘render keeps the canonical
+        // guarantee.
+        let start = byte_offset(module, target.span().start());
+        let end = byte_offset(module, target.span().end());
+        let mut out = String::with_capacity(module.len());
+        out.push_str(&module[..start]);
+        out.push_str(replacement.trim_end());
+        out.push_str(&module[end..]);
+        Ok(Bundle::parse(&out)?.render())
+    }
+
     /// THE CONTINUATION VERB, library form (rung 2): add a snippet to a module, purely
     /// additively, and return the module re-rendered in canonical placed order — the new
     /// operator lands WITH ITS COMPONENT (the placer's dealing, not an append), a new type
@@ -333,6 +425,18 @@ impl Bundle {
         out.push_str(&new_attr);
         out.push_str(&module[end..]);
         Ok(Bundle::parse(&out)?.render())
+    }
+
+    /// One journal line — stage 2 of the zero-file-patching aim: THE VERBS RECORD
+    /// THEMSELVES. The format is deliberately minimal and deterministic
+    /// (`<verb> <module> — <detail>`, no timestamps: order is the journal's only clock),
+    /// so the file is an append-only record a PR body can be derived from —
+    /// `bundle-demo/MANIFEST.md`'s hand-written story, machined. Disclosed limit, recorded
+    /// where the roadmap names stage 3: entries carry NAMES, not payloads, so the journal
+    /// is the agenda's source and the reviewer's record but not yet REPLAYABLE —
+    /// tree == replay(journal) needs the payload store.
+    pub fn journal_entry(verb: &str, module: &str, detail: &str) -> String {
+        format!("{verb} {module} — {detail}\n")
     }
 
     /// Is the module already in canonical placed order? (Parse-only judgment: true exactly
@@ -720,6 +824,84 @@ mod tests {
         assert!(err.contains("the grammar is"), "{err}");
         let err = Bundle::declare(module, "commutative()").unwrap_err();
         assert!(err.contains("names no operators"), "{err}");
+    }
+
+    /// THE EDIT VERB, drilled: a body edit lands with the signature held — position, gap,
+    /// and every other item's bytes untouched — while a signature move, a rename, a kind
+    /// change, a multi-item replacement, and an unknown name each refuse BY NAME. Change
+    /// is mutation; interface change is not an edit.
+    #[test]
+    fn edit_replaces_the_body_and_holds_the_signature() {
+        let module = "\
+pub struct Count;
+
+/// peak.
+pub fn peak(a: Count, b: Count) -> Count {
+    a
+}
+
+/// gather.
+pub fn gather(a: Count) -> Count {
+    a
+}
+";
+        // the meaning changes; the docs may change; the signature holds.
+        let edited = Bundle::edit(
+            module,
+            "peak",
+            "/// peak — now honestly the max.\npub fn peak(a: Count, b: Count) -> Count {\n    b\n}\n",
+        )
+        .expect("a body edit lands");
+        assert!(edited.contains("now honestly the max"));
+        assert!(edited.contains("    b\n}"), "{edited}");
+        assert!(
+            edited.contains("/// gather.\npub fn gather(a: Count) -> Count {\n    a\n}"),
+            "the neighbour survives byte-identical: {edited}"
+        );
+        // the result stays canonical.
+        assert!(Bundle::parse(&edited).expect("parses").is_canonical());
+
+        // the refusals, each named:
+        let err = Bundle::edit(
+            module,
+            "peak",
+            "pub fn peak(a: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("signature moved"), "{err}");
+        let err = Bundle::edit(
+            module,
+            "peak",
+            "pub fn summit(a: Count, b: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("not a rename"), "{err}");
+        let err = Bundle::edit(
+            module,
+            "Count",
+            "pub fn Count(a: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("changed item kind"), "{err}");
+        let err = Bundle::edit(
+            module,
+            "ghost",
+            "pub fn ghost(a: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("no item named `ghost`"), "{err}");
+        let err = Bundle::edit(module, "peak", "pub struct A;\npub struct B;\n").unwrap_err();
+        assert!(err.contains("exactly one item"), "{err}");
+    }
+
+    /// The journal line is deterministic and minimal — order is its only clock — so the
+    /// record the verbs append is diffable, derivable-from, and never smuggles state.
+    #[test]
+    fn the_journal_line_is_deterministic() {
+        assert_eq!(
+            Bundle::journal_entry("add", "src/tally.rs", "fn merge"),
+            "add src/tally.rs — fn merge\n"
+        );
     }
 
     /// A module with NO operators (or no items at all) is its own render — the dealing has

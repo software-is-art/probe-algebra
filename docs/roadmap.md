@@ -1934,12 +1934,30 @@ agent, and the gaps are the roadmap's fuel. Scope, stated once: this governs COD
 prose stays hand-typed (prose is judgment, the house rule already says so), and the
 freeze/bless paths already never hand-edit their artifacts.
 
-The named gaps at adoption, each a missing verb: **edit** (replace an item's body while
-everything that names it re-judges atomically — the largest gap; change is mutation, not
-only addition), **remove** (reliance-checked deletion — the embedded registers make it
-judgeable), **split** (rung 3 — executing a ratified cohesion split), **constrains** (the
-blast-radius read: which laws, freedoms, and reliances pin an operator), impl-interior
-placement, test authoring, and cross-file moves. Refusals should name their fixing verb.
+The named gaps at adoption, each a missing verb: ~~**edit**~~ (CLOSED the same day — the
+rule's first working session hit it immediately, as predicted: `Bundle::edit` replaces
+one item's text while its SIGNATURE holds, compared token-for-token; a signature move, a
+rename, or a kind change is an interface change wearing an edit's clothes, refused by
+name with both signatures shown. What an edit may change is the meaning and its prose —
+everything a caller cannot observe through the signature — and everything that names the
+item re-judges downstream precisely because the signature held. Dogfooded live on
+`bundle-demo`'s `bump`, where the planted signature-move refusal fired naming
+`fn bump (t : Tally)` against the offered two-argument form), **remove**
+(reliance-checked deletion — the embedded registers make it judgeable), **split** (rung
+3 — executing a ratified cohesion split), **constrains** (the blast-radius read: which
+laws, freedoms, and reliances pin an operator), impl-interior placement (exercised as the
+fallback path the same day: building `edit` itself required an impl-interior change the
+verbs cannot express — the second rule's field-report arm, proven on day one), test
+authoring, and cross-file moves. Refusals should name their fixing verb.
+
+**Stage 2's first form landed with it: THE JOURNAL.** Every mutating verb appends one
+line to `bundle.journal` beside the nearest `Cargo.toml` — `<verb> <module> — <detail>`,
+no timestamps, order the only clock — so the change record is derived, never narrated
+(`bundle-demo/bundle.journal` opened with the dogfooded edit as its first entry, the
+machined successor to MANIFEST.md's hand-written story). The write lands first and a
+journal failure is reported, never swallowed. Disclosed: entries carry names, not
+payloads — the agenda's source and the reviewer's record, not yet replayable;
+tree == replay(journal) is stage 3's business, with the payload store.
 
 And the staged path from here to the operator's horizon — no files on disk or in git:
 

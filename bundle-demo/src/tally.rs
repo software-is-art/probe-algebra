@@ -23,7 +23,7 @@ pub fn floor() -> Tally {
     Tally::T0
 }
 
-/// One saturating step upward.
+/// One saturating step upward — the ceiling holds.
 pub fn bump(t: Tally) -> Tally {
     match t {
         Tally::T0 => Tally::T1,
