@@ -2105,6 +2105,35 @@ And the staged path from here to the operator's horizon — no files on disk or 
    rail). rustc and the ecosystem keep getting materialized trees; they just stop being
    the source.
 
+### Candidate: the verb algebra — the reflog as the sixteenth theory
+
+Promoted from the branch/merge dissolving question because it is buildable NOW and it is
+the method's deepest dogfood: the change-history as a registry theory, its laws the
+fork/join rules, discovered rather than designed. The design sketch, so the build session
+starts warm:
+
+- **The carrier is a small bundle-state value** — a `Shaped` miniature of a module (a
+  bounded set of items with names, kinds, and component tags; the stream-carrier lesson:
+  deliberate histories, not combinatorial soup). The VERBS are the operators: `add(item)`,
+  `edit(name)`, `declare(expectation)`, `collect(name)` — each a total function on the
+  carrier (refusals map to the unchanged state or a tagged refusal value; partiality IS in
+  the vocabulary).
+- **What discovery should find, if the design above is honest**: disjoint `add`s commute;
+  `edit`s of distinct names commute; same-name `edit`s do NOT (the non-commutativity is
+  the CONFLICT, pinned the way the router's non-commutativity is pinned — a load-bearing
+  refusal, not a failure); `add` then `collect` of the same name annihilates; `declare`
+  commutes with everything not naming its ops. Every law that comes back green is a
+  fork/join rule with a can-fail proof; every refuted law is a conflict class, NAMED.
+- **The freeze**: `spec/verbs.spec` — the merge semantics of the entire system as a
+  committed, mutation-tested, drift-gated lock. A version-control system whose merge
+  rules carry the same evidence discipline as the code they merge. When the join verb
+  ships, it consults this lock the way `check` consults the placer — the rules are data,
+  never folklore.
+- **The honest frame, inherited**: the miniature carrier proves the algebra's SHAPE; the
+  real journal's items are richer, so the lock is evidence about the design, not a proof
+  about the implementation — the seam between miniature and real join is a transport
+  seam like any other, judged when the join verb exists.
+
 ### The log and the anchor
 
 And the question the log raises, asked by the operator and answered here so it is not

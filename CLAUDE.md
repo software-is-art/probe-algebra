@@ -14,6 +14,17 @@ before falling back to a file edit. Prose (docs, registers' justifications) stay
 hand-typed — prose is judgment. The aim this serves: the CLI is the interface to the
 code; the gaps you hit are the roadmap's fuel.
 
+## The instrument (adopted 2026-07-10): a grep is a reading
+
+When you reach for grep, or open a file to READ its interior, notice it: you are
+consulting the fallback encyclopedia because the question you hold is not yet a lock
+class or a perception verb (`cargo run --example bundle -- constrains <module> <op>` is
+the first of those verbs — try it before the grep). The reach itself is the instrument:
+"what was I trying to confirm that nothing ratifies?" names the next brick. Record the
+reading in docs/roadmap.md (the editor disposition carries the census). Interior reads
+go archaic the same way interior writes did — the answer set grows until the fallback
+goes quiet.
+
 ## The standing question
 
 Ask it of everything you find yourself doing by hand: **"what else are we doing by hand
