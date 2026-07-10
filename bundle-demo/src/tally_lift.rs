@@ -1,3 +1,4 @@
+#[allow(clippy::clone_on_copy)]
 impl ::boundary_spec::discover::lift::Liftable for Tally {
     fn theory_name() -> &'static str { "tally" }
     fn ops() -> ::std::vec::Vec<::boundary_spec::discover::lift::LiftedOp<Self>> {

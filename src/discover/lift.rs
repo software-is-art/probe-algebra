@@ -307,7 +307,11 @@ fn render_single(
     ops: &[(String, Vec<usize>, usize)],
     declared: &[(String, Vec<String>)],
 ) -> String {
-    let mut out = format!("impl ::boundary_spec::discover::lift::Liftable for {carrier} {{\n");
+    // the eval closures clone grid values without knowing the carrier's Copy-ness —
+    // the generated impl carries the allow so a Copy carrier lints clean.
+    let mut out = format!(
+        "#[allow(clippy::clone_on_copy)]\nimpl ::boundary_spec::discover::lift::Liftable for {carrier} {{\n"
+    );
     out.push_str(&format!(
         "    fn theory_name() -> &'static str {{ {theory_name:?} }}\n"
     ));
