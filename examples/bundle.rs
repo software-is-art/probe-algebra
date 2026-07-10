@@ -55,6 +55,7 @@ fn run(args: &[String]) -> Result<String, String> {
          \x20      bundle declare <module.rs> \"<shape(op, ...)>\"\n\
          \x20      bundle place <module.rs>\n\
          \x20      bundle check <module.rs>\n\
+         \x20      bundle collect <module.rs> [item-to-sweep]\n\
          \x20      bundle constrains <module.rs> <operator>\n\
          \x20      bundle lift <module.rs> <theory-name> [declaration ...]"
             .to_string()
@@ -116,6 +117,37 @@ fn run(args: &[String]) -> Result<String, String> {
                             "{module_path}: NOT canonical — `bundle place` would move it"
                         ))
                     }
+                }
+                ("collect", []) => {
+                    // the MARK census: read-only, journals nothing — a derived fact list.
+                    let root = nearest_crate_root(module_path);
+                    let register = root.join("downstream/reliances.register");
+                    let register = register.exists().then_some(register);
+                    let marked =
+                        Bundle::collectable(&module, &root.join("spec"), register.as_deref())?;
+                    if marked.is_empty() {
+                        Ok(format!(
+                            "{module_path}: nothing collectable — every item is reached by a root"
+                        ))
+                    } else {
+                        Ok(marked
+                            .iter()
+                            .map(|(name, evidence)| format!("collectable: {name} — {evidence}"))
+                            .collect::<Vec<_>>()
+                            .join("\n"))
+                    }
+                }
+                ("collect", [name]) => {
+                    // the SWEEP: one judged transaction, journaled; refuses the unmarked.
+                    let root = nearest_crate_root(module_path);
+                    let register = root.join("downstream/reliances.register");
+                    let register = register.exists().then_some(register);
+                    let swept =
+                        Bundle::collect(&module, name, &root.join("spec"), register.as_deref())?;
+                    commit(module_path, &swept, "collect", name)?;
+                    Ok(format!(
+                        "collected `{name}` from {module_path} — the journal remembers it"
+                    ))
                 }
                 ("constrains", [name]) => {
                     // perception: read-only, journals nothing. The committed record is the

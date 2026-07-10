@@ -1945,7 +1945,14 @@ item re-judges downstream precisely because the signature held. Dogfooded live o
 `fn bump (t : Tally)` against the offered two-argument form), **remove**
 (~~**remove**~~ DISSOLVED by the operator's question — see the collection disposition
 below: garbage collection replaces deletion, with mark derived and sweep ratified),
-**collect** (the mark census + the sweep verb), **split** (rung
+~~**collect**~~ (CLOSED — and it is the first verb that implemented its own FROZEN
+SPEC: `spec/verb-algebra.spec` had already discovered collect's laws before the verb
+existed. `Bundle::collectable` is the MARK — every named private item reached by no
+root, the roots each an existing sense (the `pub` boundary, reference by any other
+item, a committed law, a declared expectation, a reliance) — and `Bundle::collect` is
+the SWEEP, one judged journaled transaction that refuses anything the mark did not
+derive, showing the mark set in the refusal. Module-scope, disclosed; the crate-wide
+collector needs the tree walk at item grain), **split** (rung
 3 — executing a ratified cohesion split), ~~**constrains**~~ (CLOSED next — the
 perception verb, and the one the primary user said it would reach for most: everything
 that pins a named operator on one page, derived instead of grepped — its placement
@@ -2133,6 +2140,29 @@ Built the session after it was sketched, and the sketch held almost exactly. Wha
   BOTH layout engines gained `commuting_maps(reorder, theme)` on their scorecards — the
   growth dynamic (hostile domain → stanza → every theory benefits), demonstrated on
   contact.
+
+Two follow-ons from the operator's read of the build:
+
+- **Restraint, calibrated**: the house rule is not "make do" — it is EVERY STANZA NAMES
+  ITS CONSUMER (commuting maps named the verbs; inflation/deflation named fabric). The
+  COMPOSITION stanza (`f(g(x)) = h(x)` — three unary slots) now has its consumer named:
+  JOURNAL COMPACTION — squash as algebra. Which verb sequences reduce to a single verb is
+  exactly what a `squash` operation must know, and the engine can discover those
+  identities the way it found the join rules. Queued, legitimate, waiting on the squash
+  brick to pull it in.
+- **The method is not Rust-bound — the substrate interface**: what the machinery requires
+  of a language is (1) an item grammar with faithful parse/render (tree-sitter
+  everywhere; syn is the Rust binding), (2) a net model — types in signatures as sorts
+  (any typed language; the no-primitive-obsession precondition is the real constraint,
+  not the language), (3) an EVAL BRIDGE for behavioural discovery — already proven
+  cross-language: the theory-bridge consumes Lean's exported operator tables today, so
+  any language that can dump finite tables gets spec locks, mutation verdicts, and
+  distance with zero new engine machinery — and (4) the language's own compiler as one
+  gate among many (rustc's actual role). Rust is the HOST and the first SUBSTRATE;
+  layout-probe (geometry), spec-lock's adopters (checklist data), and the verb algebra
+  itself (items and names, no syntax) are the existing proofs that the method outruns
+  its host. Honest bounds: dynamic languages weaken the nets, and the compiled-mutant
+  layer is per-substrate work.
 
 The original sketch follows, kept for the record:
 

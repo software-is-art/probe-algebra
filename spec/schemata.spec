@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 754 sites.
+# 768 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -106,6 +106,18 @@
 - boundary_spec::discover::bridge::eval:deaf -> None
 - boundary_spec::discover::bundle::bundle::add:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::add:deaf -> Ok(String::new())
+- boundary_spec::discover::bundle::bundle::collect:0: == -> !=
+- boundary_spec::discover::bundle::bundle::collect:1: ! -> (deleted)
+- boundary_spec::discover::bundle::bundle::collect:2: == -> !=
+- boundary_spec::discover::bundle::bundle::collect:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::collect:deaf -> Ok(String::new())
+- boundary_spec::discover::bundle::bundle::collectable:0: ! -> (deleted)
+- boundary_spec::discover::bundle::bundle::collectable:1: != -> ==
+- boundary_spec::discover::bundle::bundle::collectable:2: && -> ||
+- boundary_spec::discover::bundle::bundle::collectable:3: || -> &&
+- boundary_spec::discover::bundle::bundle::collectable:4: || -> &&
+- boundary_spec::discover::bundle::bundle::collectable:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::collectable:deaf -> Ok(vec![])
 - boundary_spec::discover::bundle::bundle::constrains:0: == -> !=
 - boundary_spec::discover::bundle::bundle::constrains:1: || -> &&
 - boundary_spec::discover::bundle::bundle::constrains:2: ! -> (deleted)
@@ -142,6 +154,8 @@
 - boundary_spec::discover::bundle::is_cfg_test:0: && -> ||
 - boundary_spec::discover::bundle::is_cfg_test:deaf -> false
 - boundary_spec::discover::bundle::is_cfg_test:deaf -> true
+- boundary_spec::discover::bundle::is_public:deaf -> false
+- boundary_spec::discover::bundle::is_public:deaf -> true
 - boundary_spec::discover::bundle::item_name:deaf -> None
 - boundary_spec::discover::bundle::mentions:0: == -> !=
 - boundary_spec::discover::bundle::mentions:1: || -> &&

@@ -567,6 +567,136 @@ impl Bundle {
         Ok(out)
     }
 
+    /// THE MARK PHASE of garbage collection (the removal disposition: mark is derived,
+    /// sweep is ratified): every named top-level item REACHED BY NO ROOT, with the
+    /// evidence rendered per item. The roots, each an existing sense: `pub` visibility
+    /// (the module boundary — consumers this walk cannot see, so public is pinned by
+    /// definition), reference by any other item's text, a committed law naming it, a
+    /// declared expectation naming it, and a downstream reliance naming it. An item
+    /// every root is silent about is COLLECTABLE — a derived fact, not a deletion.
+    ///
+    /// Scope, disclosed: module-level. A crate-wide collector needs the tree walk (the
+    /// tier derivation's reachability at item grain) — this rung proves the mark/sweep
+    /// split on the substrate the verbs already govern.
+    ///
+    /// Capability: Effectful — reads the committed locks and the optional register.
+    pub fn collectable(
+        module: &str,
+        spec_dir: &Path,
+        reliances: Option<&Path>,
+    ) -> Result<Vec<(String, String)>, String> {
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle collect: module unparseable: {e}"))?;
+
+        // the committed record, read once: every law equation and reliance key.
+        let mut law_text = String::new();
+        if let Ok(dir) = std::fs::read_dir(spec_dir) {
+            for entry in dir.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !name.ends_with(".mutation.spec") {
+                    if let Ok(text) = std::fs::read_to_string(entry.path()) {
+                        if text.starts_with("# discovered spec:") {
+                            law_text.push_str(&text);
+                        }
+                    }
+                }
+            }
+        }
+        let mut reliance_text = String::new();
+        if let Some(path) = reliances {
+            let register = spec_lock::Register {
+                name: "downstream reliances".to_string(),
+                path: path.to_path_buf(),
+            };
+            for (key, _) in register.entries()? {
+                reliance_text.push_str(&key);
+                reliance_text.push('\n');
+            }
+        }
+        let expectations = expects_entries(module).join("\n");
+
+        let mut marked = Vec::new();
+        for (i, item) in file.items.iter().enumerate() {
+            let Some(name) = item_name(item) else {
+                continue;
+            };
+            if is_public(item) {
+                continue; // the module boundary is a root: consumers are out of sight.
+            }
+            let referenced = file.items.iter().enumerate().any(|(j, other)| {
+                j != i && {
+                    let start = byte_offset(module, other.span().start());
+                    let end = byte_offset(module, other.span().end());
+                    mentions(&module[start..end], &name)
+                }
+            });
+            if referenced {
+                continue;
+            }
+            if mentions(&law_text, &name)
+                || mentions(&expectations, &name)
+                || mentions(&reliance_text, &name)
+            {
+                continue;
+            }
+            marked.push((
+                name,
+                "private, referenced by no item, named in no committed law, no declared \
+                 expectation, no reliance"
+                    .to_string(),
+            ));
+        }
+        Ok(marked)
+    }
+
+    /// THE SWEEP — one judged transaction removing exactly ONE marked item: the verb
+    /// refuses anything [`Bundle::collectable`] did not derive (the sweep only takes what
+    /// the mark proved — automatic in the sense that matters, ratified by the diff the
+    /// caller commits). The item's text goes and its position's gap goes with it; every
+    /// other byte survives, and the result is the canonical render. Nothing is ever
+    /// destroyed one level up: the journal remembers what the tree forgets.
+    pub fn collect(
+        module: &str,
+        name: &str,
+        spec_dir: &Path,
+        reliances: Option<&Path>,
+    ) -> Result<String, String> {
+        let marked = Bundle::collectable(module, spec_dir, reliances)?;
+        if !marked.iter().any(|(m, _)| m == name) {
+            return Err(format!(
+                "bundle collect: `{name}` is not collectable — a root reaches it (or no \
+                 such item exists); the sweep only takes what the mark derives. \
+                 Marked now: [{}]",
+                marked
+                    .iter()
+                    .map(|(m, _)| m.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle collect: module unparseable: {e}"))?;
+        let target = file
+            .items
+            .iter()
+            .enumerate()
+            .find(|(_, item)| {
+                let n = item_name(item);
+                n.as_deref() == Some(name)
+            })
+            .map(|(i, item)| (i, item))
+            .expect("marked items exist");
+        let start = byte_offset(module, target.1.span().start());
+        let end = match file.items.get(target.0 + 1) {
+            Some(next) => byte_offset(module, next.span().start()),
+            None => module.len(),
+        };
+        let mut out = String::with_capacity(module.len());
+        out.push_str(&module[..start]);
+        out.push_str(&module[end..]);
+        Ok(Bundle::parse(&out)?.render())
+    }
+
     /// One journal line — stage 2 of the zero-file-patching aim: THE VERBS RECORD
     /// THEMSELVES. The format is deliberately minimal and deterministic
     /// (`<verb> <module> — <detail>`, no timestamps: order is the journal's only clock),
@@ -693,6 +823,24 @@ pub(crate) fn mentions(text: &str, name: &str) -> bool {
         from = end;
     }
     false
+}
+
+/// Is a top-level item `pub` — the module boundary, a GC root (consumers are out of this
+/// walk's sight, so public is pinned by definition)?
+#[crate::mutate]
+fn is_public(item: &syn::Item) -> bool {
+    let vis = match item {
+        syn::Item::Fn(f) => &f.vis,
+        syn::Item::Struct(s) => &s.vis,
+        syn::Item::Enum(e) => &e.vis,
+        syn::Item::Union(u) => &u.vis,
+        syn::Item::Type(t) => &t.vis,
+        syn::Item::Mod(m) => &m.vis,
+        syn::Item::Const(c) => &c.vis,
+        syn::Item::Static(s) => &s.vis,
+        _ => return true, // impls, uses, macros: no visibility to judge — never marked.
+    };
+    matches!(vis, syn::Visibility::Public(_))
 }
 
 /// Does an attribute list carry `#[cfg(test)]`?
@@ -1093,6 +1241,70 @@ pub fn gather(a: Count) -> Count {
         assert!(!mentions("submerged", "merge"));
         assert!(!mentions("merges", "merge"));
         assert!(mentions("`merge` evaluates as `floor`", "merge"));
+    }
+
+    /// GARBAGE COLLECTION, drilled — mark derived, sweep ratified, on a fixture with one
+    /// of everything: a pub item (rooted by the boundary), a private helper another item
+    /// references (rooted by reference), a private fn a law names (rooted by the
+    /// committed record), and one genuinely disconnected private fn — exactly ONE mark.
+    /// The sweep takes the marked item and refuses everything else BY ROOT; the result
+    /// is canonical and every surviving byte is untouched.
+    #[test]
+    fn collect_marks_the_unreached_and_sweeps_only_the_marked() {
+        let dir = std::env::temp_dir().join(format!("bundle-collect-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("spec")).unwrap();
+        std::fs::write(
+            dir.join("spec/tally.spec"),
+            "# discovered spec: tally — a behaviour lock; regenerate and ratify.\n\n\
+             - lawful is a projection — applying it twice is applying it once.\n      \
+             lawful(lawful(x)) = lawful(x)\n",
+        )
+        .unwrap();
+        let module = "\
+pub struct Count;
+
+/// public — the boundary roots it.
+pub fn peak(a: Count, b: Count) -> Count {
+    helper(a, b)
+}
+
+/// referenced by peak — rooted.
+fn helper(a: Count, b: Count) -> Count {
+    let _ = b;
+    a
+}
+
+/// named by a committed law — rooted.
+fn lawful(a: Count) -> Count {
+    a
+}
+
+/// reached by nothing — the one honest mark.
+fn orphan(a: Count) -> Count {
+    a
+}
+";
+        let marked = Bundle::collectable(module, &dir.join("spec"), None).expect("marks");
+        assert_eq!(marked.len(), 1, "exactly one collectable: {marked:?}");
+        assert_eq!(marked[0].0, "orphan");
+        assert!(marked[0].1.contains("referenced by no item"));
+
+        // the sweep takes the mark — and only the mark.
+        let swept = Bundle::collect(module, "orphan", &dir.join("spec"), None).expect("sweeps");
+        assert!(!swept.contains("orphan"), "{swept}");
+        for survivor in ["pub fn peak", "fn helper", "fn lawful"] {
+            assert!(swept.contains(survivor), "`{survivor}` survives: {swept}");
+        }
+        assert!(Bundle::parse(&swept).expect("parses").is_canonical());
+
+        // refusals name the root: a pub item, a referenced item, a law-named item, and a
+        // ghost all refuse — the sweep only takes what the mark derives.
+        for pinned in ["peak", "helper", "lawful", "ghost"] {
+            let err = Bundle::collect(module, pinned, &dir.join("spec"), None).unwrap_err();
+            assert!(err.contains("not collectable"), "{err}");
+            assert!(err.contains("orphan"), "the mark set is shown: {err}");
+        }
     }
 
     /// The journal line is deterministic and minimal — order is its only clock — so the
