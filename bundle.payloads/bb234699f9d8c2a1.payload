@@ -1,0 +1,652 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+    use std::path::Path;
+
+    /// RUNG 1's PIN, on a real module: `modularize.rs` — the committed file whose whole
+    /// subject is proposing modularity — parses into a bundle and renders back BYTE FOR
+    /// BYTE. This is the faithfulness proof the roadmap demands before any generation:
+    /// the representation loses nothing (docs, trivia, the attributed inline module, the
+    /// cfg(test) suite all survive verbatim), and the committed module is ALREADY in
+    /// canonical placed order — checked, not assumed.
+    #[test]
+    fn the_committed_module_round_trips_byte_for_byte() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/discover/modularize.rs");
+        let source = std::fs::read_to_string(path).expect("committed module");
+        let bundle = Bundle::parse(&source).expect("parses");
+        assert!(
+            bundle.is_canonical(),
+            "the committed module is canonically placed"
+        );
+        assert_eq!(bundle.render(), source, "the round-trip is byte-for-byte");
+    }
+
+    /// A SCRAMBLED module — operators of two components interleaved — renders back
+    /// component-grouped: peak and gather (both on Count) reunite ahead of both (on Flag),
+    /// each carrying its own doc comment, every non-operator item (the types, the constant
+    /// between the functions) holding its position and bytes. The reorder is the render's
+    /// only opinion, and this is the drill proving it ACTS — a renderer that echoed its
+    /// input would fail here, so the byte-for-byte pin above cannot be passed vacuously.
+    #[test]
+    fn a_scrambled_module_renders_back_canonically() {
+        let scrambled = "\
+//! a scrambled bag.
+
+pub struct Count;
+pub struct Flag;
+
+/// peak.
+pub fn peak(a: Count, b: Count) -> Count {
+    a
+}
+
+const SEAM: usize = 1;
+
+/// both.
+pub fn both(a: Flag, b: Flag) -> Flag {
+    b
+}
+
+/// gather.
+pub fn gather(a: Count) -> Count {
+    a
+}
+";
+        let canonical = "\
+//! a scrambled bag.
+
+pub struct Count;
+pub struct Flag;
+
+/// peak.
+pub fn peak(a: Count, b: Count) -> Count {
+    a
+}
+
+const SEAM: usize = 1;
+
+/// gather.
+pub fn gather(a: Count) -> Count {
+    a
+}
+
+/// both.
+pub fn both(a: Flag, b: Flag) -> Flag {
+    b
+}
+";
+        let bundle = Bundle::parse(scrambled).expect("parses");
+        assert!(!bundle.is_canonical(), "the scramble is detected");
+        let rendered = bundle.render();
+        assert_eq!(
+            rendered, canonical,
+            "components regroup, everything else holds"
+        );
+        // idempotence: the canonical render is a fixed point of parse∘render.
+        let again = Bundle::parse(&rendered).expect("the render parses");
+        assert!(again.is_canonical());
+        assert_eq!(again.render(), rendered);
+    }
+
+    /// The refusal paths are NAMED: a half-written module refuses to parse (no bundle is
+    /// guessed from broken text), and a module whose operator name is not unique refuses
+    /// the dealing rather than picking a segment.
+    #[test]
+    fn refusals_are_named_never_guessed() {
+        let err = Bundle::parse("pub fn broken( -> {").unwrap_err();
+        assert!(err.contains("unparseable"), "{err}");
+
+        let ambiguous = "\
+pub struct Count;
+pub fn peak(a: Count) -> Count {
+    a
+}
+pub mod inner {
+    use super::Count;
+    pub fn peak(a: Count) -> Count {
+        a
+    }
+}
+";
+        let err = Bundle::parse(ambiguous).unwrap_err();
+        assert!(err.contains("not unique"), "{err}");
+        assert!(err.contains("peak"), "{err}");
+    }
+
+    /// THE CONTINUATION VERB, drilled: an added operator lands WITH ITS COMPONENT — not at
+    /// the end — every existing item's bytes survive verbatim, a following addition that
+    /// touches a second sort BRIDGES (monotone: nothing else moves), a non-operator
+    /// addition lands before the trailing test module, and the result is a fixed point of
+    /// parse∘render.
+    #[test]
+    fn add_places_the_snippet_with_its_component() {
+        let module = "\
+//! a working module.
+
+pub struct Count;
+pub struct Flag;
+
+/// peak.
+pub fn peak(a: Count, b: Count) -> Count {
+    a
+}
+
+/// both.
+pub fn both(a: Flag, b: Flag) -> Flag {
+    b
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn holds() {}
+}
+";
+        // a Count operator: it must land in the Count component (with peak), not at the end.
+        let grown = Bundle::add(
+            module,
+            "/// gather.\npub fn gather(a: Count) -> Count {\n    a\n}\n",
+        )
+        .expect("adds");
+        let peak_at = grown.find("pub fn peak").expect("peak survives");
+        let gather_at = grown.find("pub fn gather").expect("gather landed");
+        let both_at = grown.find("pub fn both").expect("both survives");
+        assert!(
+            peak_at < gather_at && gather_at < both_at,
+            "gather joins the Count component ahead of the Flag one:\n{grown}"
+        );
+        // additive: every original item's text survives byte-identical, tests still last.
+        for piece in [
+            "//! a working module.",
+            "/// peak.\npub fn peak(a: Count, b: Count) -> Count {\n    a\n}",
+            "/// both.\npub fn both(a: Flag, b: Flag) -> Flag {\n    b\n}",
+            "#[cfg(test)]\nmod tests {",
+        ] {
+            assert!(grown.contains(piece), "`{piece}` survives:\n{grown}");
+        }
+        assert!(
+            grown.find("mod tests").unwrap() > gather_at,
+            "tests stay last"
+        );
+        // the result is canonical — a fixed point of parse∘render.
+        let reparsed = Bundle::parse(&grown).expect("the grown module parses");
+        assert!(reparsed.is_canonical());
+        assert_eq!(reparsed.render(), grown);
+
+        // a helper type (no operator) lands before the tests, after the working items.
+        let with_type = Bundle::add(&grown, "pub struct Spin;\n").expect("adds a type");
+        assert!(
+            with_type.find("pub struct Spin").unwrap() < with_type.find("mod tests").unwrap(),
+            "{with_type}"
+        );
+    }
+
+    /// The verb's refusals: a snippet that does not parse, a snippet that declares
+    /// nothing, and a NAME COLLISION with an existing item — the type-library voice's
+    /// whisper made a hard stop, named.
+    #[test]
+    fn add_refuses_collisions_and_noise() {
+        let module = "pub struct Count;\npub fn peak(a: Count) -> Count {\n    a\n}\n";
+        let err = Bundle::add(module, "pub fn broken( -> {").unwrap_err();
+        assert!(err.contains("unparseable"), "{err}");
+        let err = Bundle::add(module, "// only a comment\n").unwrap_err();
+        assert!(err.contains("declares nothing"), "{err}");
+        let err = Bundle::add(module, "pub fn peak(a: Count) -> Count {\n    a\n}\n").unwrap_err();
+        assert!(err.contains("`peak` already exists"), "{err}");
+        let err = Bundle::add(module, "pub struct Count;\n").unwrap_err();
+        assert!(err.contains("`Count` already exists"), "{err}");
+        // an impl extends an existing name — precisely NOT a collision.
+        let grown = Bundle::add(
+            module,
+            "impl Count {\n    pub fn zero(self) -> Count {\n        self\n    }\n}\n",
+        )
+        .expect("an impl extends, never collides");
+        assert!(grown.contains("pub fn zero"));
+    }
+
+    /// THE DECLARATION ENTRY, drilled on the REAL module: declaring an expectation into the
+    /// committed `modularize.rs` (whose `soup` carries `#[crate::algebra]` with no
+    /// `expects`) moves ONLY the attribute — every other byte survives — and the result
+    /// parses, stays canonical, and carries the declaration. The SHOULD half joins the
+    /// bundle without disturbing the IS half.
+    #[test]
+    fn declare_moves_only_the_attribute_on_a_real_module() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/discover/modularize.rs");
+        let source = std::fs::read_to_string(path).expect("committed module");
+        let declared = Bundle::declare(&source, "commutative(peak)").expect("declares");
+        assert!(
+            declared.contains("expects(commutative(peak))"),
+            "the declaration landed"
+        );
+        // only the attribute differs: removing the one changed line from each side
+        // leaves identical text.
+        let differing: Vec<(&str, &str)> = source
+            .lines()
+            .zip(declared.lines())
+            .filter(|(a, b)| a != b)
+            .collect();
+        assert_eq!(differing.len(), 1, "exactly one line moved");
+        assert!(differing[0]
+            .0
+            .contains("#[crate::algebra(Soup, \"flat soup\")]"));
+        assert!(differing[0]
+            .1
+            .contains("#[crate::algebra(Soup, \"flat soup\", expects(commutative(peak)))]"));
+        // a second declaration APPENDS inside the existing expects; repeating one refuses.
+        let twice = Bundle::declare(&declared, "associative(peak)").expect("appends");
+        assert!(
+            twice.contains("expects(commutative(peak), associative(peak))"),
+            "{twice}"
+        );
+        let err = Bundle::declare(&twice, "commutative(peak)").unwrap_err();
+        assert!(err.contains("already declared"), "{err}");
+    }
+
+    /// The declaration gate teaches, never guesses: an unratified shape word is refused
+    /// LISTING the vocabulary; a module with no `#[algebra]` names the fix; malformed
+    /// declarations name their grammar.
+    #[test]
+    fn declare_refuses_by_teaching() {
+        let module = "#[crate::algebra(M, \"m\")]\npub mod m {\n    pub struct A;\n    pub fn f(a: A) -> A {\n        a\n    }\n}\n";
+        let err = Bundle::declare(module, "sparkly(f)").unwrap_err();
+        assert!(err.contains("not in the ratified catalog"), "{err}");
+        assert!(err.contains("Declarable shapes:"), "{err}");
+        assert!(err.contains("commutative"), "the refusal teaches: {err}");
+
+        let err = Bundle::declare("pub struct A;\n", "commutative(f)").unwrap_err();
+        assert!(err.contains("no `#[algebra]` module"), "{err}");
+
+        let err = Bundle::declare(module, "commutative").unwrap_err();
+        assert!(err.contains("the grammar is"), "{err}");
+        let err = Bundle::declare(module, "commutative()").unwrap_err();
+        assert!(err.contains("names no operators"), "{err}");
+    }
+
+    /// THE EDIT VERB, drilled: a body edit lands with the signature held — position, gap,
+    /// and every other item's bytes untouched — while a signature move, a rename, a kind
+    /// change, a multi-item replacement, and an unknown name each refuse BY NAME. Change
+    /// is mutation; interface change is not an edit.
+    #[test]
+    fn edit_replaces_the_body_and_holds_the_signature() {
+        let module = "\
+pub struct Count;
+
+/// peak.
+pub fn peak(a: Count, b: Count) -> Count {
+    a
+}
+
+/// gather.
+pub fn gather(a: Count) -> Count {
+    a
+}
+";
+        // the meaning changes; the docs may change; the signature holds.
+        let edited = Bundle::edit(
+            module,
+            "peak",
+            "/// peak — now honestly the max.\npub fn peak(a: Count, b: Count) -> Count {\n    b\n}\n",
+        )
+        .expect("a body edit lands");
+        assert!(edited.contains("now honestly the max"));
+        assert!(edited.contains("    b\n}"), "{edited}");
+        assert!(
+            edited.contains("/// gather.\npub fn gather(a: Count) -> Count {\n    a\n}"),
+            "the neighbour survives byte-identical: {edited}"
+        );
+        // the result stays canonical.
+        assert!(Bundle::parse(&edited).expect("parses").is_canonical());
+
+        // the refusals, each named:
+        let err = Bundle::edit(
+            module,
+            "peak",
+            "pub fn peak(a: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("signature moved"), "{err}");
+        let err = Bundle::edit(
+            module,
+            "peak",
+            "pub fn summit(a: Count, b: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("not a rename"), "{err}");
+        let err = Bundle::edit(
+            module,
+            "Count",
+            "pub fn Count(a: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("changed item kind"), "{err}");
+        let err = Bundle::edit(
+            module,
+            "ghost",
+            "pub fn ghost(a: Count) -> Count {\n    a\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("no item named `ghost`"), "{err}");
+        let err = Bundle::edit(module, "peak", "pub struct A;\npub struct B;\n").unwrap_err();
+        assert!(err.contains("exactly one item"), "{err}");
+    }
+
+    /// THE PERCEPTION VERB, drilled on the REAL bundle-born member: `constrains merge`
+    /// reads the committed record and reports the component, the laws (the declared four
+    /// plus the discovered homomorphism), the honest empties, and the freedoms — the blast
+    /// radius derived, not grepped. An operator the module does not declare refuses.
+    #[test]
+    fn constrains_reads_the_committed_record() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("bundle-demo");
+        let module = std::fs::read_to_string(root.join("src/tally.rs")).expect("demo module");
+        let report =
+            Bundle::constrains(&module, "merge", &root.join("spec"), None).expect("reports");
+        assert!(report.contains("component: { merge, floor, bump } over nets { Tally }"));
+        assert!(
+            report.contains("(x merge y) = (y merge x)"),
+            "the contract laws appear: {report}"
+        );
+        assert!(
+            report.contains("bump((x merge y)) = (bump(x) merge bump(y))"),
+            "the discovered surprise appears too: {report}"
+        );
+        assert!(
+            report.contains("none declared — semver's old blind spot"),
+            "empty reliances render honestly: {report}"
+        );
+
+        // an operator that does not exist refuses — perception does not guess.
+        let err = Bundle::constrains(&module, "ghost", &root.join("spec"), None).unwrap_err();
+        assert!(err.contains("no operator `ghost`"), "{err}");
+    }
+
+    /// The word-boundary matcher: `merge` does not match `submerged` or `merges`, and
+    /// matches at line edges and inside equations.
+    #[test]
+    fn mentions_is_ident_bounded() {
+        assert!(mentions("(x merge y) = (y merge x)", "merge"));
+        assert!(mentions("merge", "merge"));
+        assert!(!mentions("submerged", "merge"));
+        assert!(!mentions("merges", "merge"));
+        assert!(mentions("`merge` evaluates as `floor`", "merge"));
+    }
+
+    /// THE HOST'S ITEM KINDS, reachable (the self-hosting disposition's rung-2 gap,
+    /// closed): an impl edits under the METHOD-SIGNATURE-SET hold — bodies and docs free,
+    /// surface held — a moved set refuses by count, two blocks sharing an address refuse
+    /// as ambiguous, and a trait edits under the same hold. Drilled on fixtures AND on
+    /// real host code: `modularize.rs`'s own `impl ProposedModule`, edited through the
+    /// verb, every byte outside the block untouched.
+    #[test]
+    fn edit_reaches_impls_and_traits_holding_their_surface() {
+        let module = "\
+pub struct Count;
+
+impl Count {
+    /// up.
+    pub fn up(self) -> Count {
+        self
+    }
+}
+";
+        // a body/doc edit under the held surface lands.
+        let edited = Bundle::edit(
+            module,
+            "impl Count",
+            "impl Count {\n    /// up — now with intent.\n    pub fn up(self) -> Count {\n        Count\n    }\n}\n",
+        )
+        .expect("an impl body edit lands");
+        assert!(edited.contains("now with intent"));
+        // a moved method set refuses: an added method is interface change.
+        let err = Bundle::edit(
+            module,
+            "impl Count",
+            "impl Count {\n    pub fn up(self) -> Count {\n        self\n    }\n    pub fn down(self) -> Count {\n        self\n    }\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("method-signature set moved"), "{err}");
+        // two blocks sharing one address refuse as ambiguous, never guessed between.
+        let doubled = format!("{module}\nimpl Count {{}}\n");
+        let err = Bundle::edit(&doubled, "impl Count", "impl Count {}\n").unwrap_err();
+        assert!(err.contains("ambiguous"), "{err}");
+        // a trait edits under the same hold (docs free, surface held)...
+        let with_trait = "pub struct A;\n\npub trait Speak {\n    fn speak(&self) -> A;\n}\n";
+        let edited = Bundle::edit(
+            with_trait,
+            "Speak",
+            "/// the voice.\npub trait Speak {\n    fn speak(&self) -> A;\n}\n",
+        )
+        .expect("a trait doc edit lands");
+        assert!(edited.contains("the voice"));
+        // ...and a moved trait surface refuses.
+        let err = Bundle::edit(
+            with_trait,
+            "Speak",
+            "pub trait Speak {\n    fn speak(&self) -> A;\n    fn shout(&self) -> A;\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("method-signature set moved"), "{err}");
+
+        // REAL HOST CODE: modularize.rs's own `impl ProposedModule`, edited through the
+        // verb — the doc moves, the signature set holds, and every byte outside the
+        // block survives. Rung 2 of self-hosting, smoked on the tree that hosts it.
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/discover/modularize.rs");
+        let host = std::fs::read_to_string(path).expect("host module");
+        let block_start = host
+            .find("#[crate::mutate]\nimpl ProposedModule {")
+            .expect("the block");
+        let block_end = block_start + host[block_start..].find("\n}\n").expect("its end") + 3;
+        let replacement = host[block_start..block_end].replace(
+            "is not a module, it is a misfit",
+            "is not a module, it is a MISFIT",
+        );
+        let edited = Bundle::edit(&host, "impl ProposedModule", &replacement)
+            .expect("the host impl edits through the verb");
+        assert!(edited.contains("it is a MISFIT"));
+        assert_eq!(
+            edited.replace("it is a MISFIT", "it is a misfit"),
+            host,
+            "every byte outside the edit survives"
+        );
+    }
+
+    /// GARBAGE COLLECTION, drilled — mark derived, sweep ratified, on a fixture with one
+    /// of everything: a pub item (rooted by the boundary), a private helper another item
+    /// references (rooted by reference), a private fn a law names (rooted by the
+    /// committed record), and one genuinely disconnected private fn — exactly ONE mark.
+    /// The sweep takes the marked item and refuses everything else BY ROOT; the result
+    /// is canonical and every surviving byte is untouched.
+    #[test]
+    fn collect_marks_the_unreached_and_sweeps_only_the_marked() {
+        let dir = std::env::temp_dir().join(format!("bundle-collect-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("spec")).unwrap();
+        std::fs::write(
+            dir.join("spec/tally.spec"),
+            "# discovered spec: tally — a behaviour lock; regenerate and ratify.\n\n\
+             - lawful is a projection — applying it twice is applying it once.\n      \
+             lawful(lawful(x)) = lawful(x)\n",
+        )
+        .unwrap();
+        let module = "\
+pub struct Count;
+
+/// public — the boundary roots it.
+pub fn peak(a: Count, b: Count) -> Count {
+    helper(a, b)
+}
+
+/// referenced by peak — rooted.
+fn helper(a: Count, b: Count) -> Count {
+    let _ = b;
+    a
+}
+
+/// named by a committed law — rooted.
+fn lawful(a: Count) -> Count {
+    a
+}
+
+/// reached by nothing — the one honest mark.
+fn orphan(a: Count) -> Count {
+    a
+}
+";
+        let marked = Bundle::collectable(module, &dir.join("spec"), None).expect("marks");
+        assert_eq!(marked.len(), 1, "exactly one collectable: {marked:?}");
+        assert_eq!(marked[0].0, "orphan");
+        assert!(marked[0].1.contains("referenced by no item"));
+
+        // the sweep takes the mark — and only the mark.
+        let swept = Bundle::collect(module, "orphan", &dir.join("spec"), None).expect("sweeps");
+        assert!(!swept.contains("orphan"), "{swept}");
+        for survivor in ["pub fn peak", "fn helper", "fn lawful"] {
+            assert!(swept.contains(survivor), "`{survivor}` survives: {swept}");
+        }
+        assert!(Bundle::parse(&swept).expect("parses").is_canonical());
+
+        // refusals name the root: a pub item, a referenced item, a law-named item, and a
+        // ghost all refuse — the sweep only takes what the mark derives.
+        for pinned in ["peak", "helper", "lawful", "ghost"] {
+            let err = Bundle::collect(module, pinned, &dir.join("spec"), None).unwrap_err();
+            assert!(err.contains("not collectable"), "{err}");
+            assert!(err.contains("orphan"), "the mark set is shown: {err}");
+        }
+    }
+
+    /// The journal line is deterministic and minimal — order is its only clock — so the
+    /// record the verbs append is diffable, derivable-from, and never smuggles state.
+    #[test]
+    fn the_journal_line_is_deterministic() {
+        assert_eq!(
+            Bundle::journal_entry("add", "src/tally.rs", "fn merge"),
+            "add src/tally.rs — fn merge\n"
+        );
+    }
+
+    /// A module with NO operators (or no items at all) is its own render — the dealing has
+    /// nothing to say, and fidelity still holds to the byte.
+    #[test]
+    fn a_module_without_operators_is_its_own_render() {
+        let plain = "//! just types.\n\npub struct A;\n\npub struct B;\n";
+        let bundle = Bundle::parse(plain).expect("parses");
+        assert!(bundle.is_canonical());
+        assert_eq!(bundle.render(), plain);
+        assert_eq!(Bundle::parse("").expect("empty parses").render(), "");
+    }
+
+    /// SENSITIVITY BACKSTOPS from the full sweep's findings — the splice helpers
+    /// hold their exact bytes (a contains() assertion lets a padding or
+    /// cfg-detection flip hide; byte equality does not).
+    #[test]
+    fn the_splice_helpers_hold_their_exact_bytes() {
+        // exactly ONE blank line between tail and block — with and without a
+        // trailing newline on the module (the padding sites diverge on the bare case).
+        let grown = Bundle::add("pub fn a() {}\n", "pub fn b() {}\n").expect("adds");
+        assert_eq!(grown, "pub fn a() {}\n\npub fn b() {}\n");
+        let grown = Bundle::add("pub fn a() {}", "pub fn b() {}\n").expect("adds");
+        assert_eq!(grown, "pub fn a() {}\n\npub fn b() {}\n");
+
+        // a cfg attribute that is NOT test never becomes the splice point (the
+        // detector must read the whole attribute, not either half)...
+        let gated = "pub fn a() {}\n\n#[cfg(feature = \"x\")]\nmod gated {}\n";
+        let grown = Bundle::add(gated, "pub fn b() {}\n").expect("adds");
+        assert_eq!(
+            grown,
+            "pub fn a() {}\n\n#[cfg(feature = \"x\")]\nmod gated {}\n\npub fn b() {}\n"
+        );
+        // ...while a REAL test module stays last.
+        let tested = "pub fn a() {}\n\n#[cfg(test)]\nmod probes {}\n";
+        let grown = Bundle::add(tested, "pub fn b() {}\n").expect("adds");
+        assert_eq!(
+            grown,
+            "pub fn a() {}\n\npub fn b() {}\n\n#[cfg(test)]\nmod probes {}\n"
+        );
+    }
+
+    /// A lone `pub` item is never collectable — the module boundary is a root by
+    /// definition, so the mark must SEE visibility (deaf, it would mark everything).
+    #[test]
+    fn a_pub_item_is_never_collectable() {
+        let marked = Bundle::collectable("pub fn lone() {}\n", Path::new("no-such-spec"), None)
+            .expect("marks");
+        assert!(marked.is_empty(), "{marked:?}");
+    }
+
+    /// The op's own component is the one reported — and ONLY it. A single-op
+    /// component is the sensitive fixture: with the same-name check inverted, every
+    /// OTHER component would print instead, invisible to any multi-op module.
+    #[test]
+    fn constrains_reports_exactly_the_named_component() {
+        let module = "pub struct A;\npub struct B;\n\npub fn alpha(a: A) -> A {\n    a\n}\n\npub fn beta(b: B) -> B {\n    b\n}\n";
+        let report =
+            Bundle::constrains(module, "alpha", Path::new("no-such-spec"), None).expect("reports");
+        assert!(
+            report.contains("component: { alpha } over nets { A }"),
+            "{report}"
+        );
+        assert!(!report.contains("beta"), "only alpha's component: {report}");
+    }
+
+    /// The freedoms filter is a CONJUNCTION: `merge` (all its mutants killed)
+    /// reports the honest empty even though the demo lock carries other operators'
+    /// SURVIVED lines and killed lines naming `merge` — either half alone would
+    /// invent freedoms.
+    #[test]
+    fn freedoms_require_both_survival_and_the_name() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("bundle-demo");
+        let module = std::fs::read_to_string(root.join("src/tally.rs")).expect("demo module");
+        let report =
+            Bundle::constrains(&module, "merge", &root.join("spec"), None).expect("reports");
+        assert!(
+            report.contains("none — every judged mutant of this operator dies"),
+            "{report}"
+        );
+    }
+
+    /// PERCEPTION AT THE TEXT GRAIN: show returns the item's verbatim segment — the
+    /// exact bytes `edit` holds — so editing an item with its own shown text is a
+    /// byte-exact no-op; the refusal TEACHES the addressable roster; ambiguity refuses;
+    /// and the inventory publishes the held signature, so an edit payload can be
+    /// authored from the contract without ever opening the file.
+    #[test]
+    fn show_returns_the_exact_segment_edit_holds() {
+        let module = "pub struct T;\n\n/// Doc.\npub fn one(t: T) -> T {\n    t\n}\n";
+        let shown = Bundle::show(module, "one").expect("shows");
+        assert_eq!(shown, "/// Doc.\npub fn one(t: T) -> T {\n    t\n}");
+        assert_eq!(
+            Bundle::edit(module, "one", &shown).expect("edits"),
+            module,
+            "show → edit round-trips as a no-op"
+        );
+
+        let refusal = Bundle::show(module, "ghost").unwrap_err();
+        assert!(refusal.contains("addressable here: T, one"), "{refusal}");
+
+        let toc = Bundle::inventory(module).expect("inventories");
+        assert!(toc.contains("- struct T [pub]"), "{toc}");
+        assert!(
+            toc.contains("- fn one [pub, operator] — fn one (t : T) -> T"),
+            "the held signature is published: {toc}"
+        );
+        assert!(toc.contains("canonically placed"), "{toc}");
+    }
+
+    /// show speaks every address `edit` speaks — impls by their address form, test
+    /// mods by name — and the inventory reports held method-set sizes for impls.
+    #[test]
+    fn show_speaks_the_full_address_grammar() {
+        let module = "pub struct T;\n\nimpl T {\n    pub fn go(&self) {}\n}\n\n\
+                      #[cfg(test)]\nmod probes {}\n";
+        assert_eq!(
+            Bundle::show(module, "impl T").expect("shows"),
+            "impl T {\n    pub fn go(&self) {}\n}"
+        );
+        assert_eq!(
+            Bundle::show(module, "probes").expect("shows"),
+            "#[cfg(test)]\nmod probes {}"
+        );
+        let toc = Bundle::inventory(module).expect("inventories");
+        assert!(toc.contains("- impl T — 1 method signatures held"), "{toc}");
+        assert!(toc.contains("- mod probes [tests]"), "{toc}");
+    }
+}

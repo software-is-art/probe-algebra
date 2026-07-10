@@ -1978,17 +1978,50 @@ verbs' vehicle rebuilt behind the same gate as the tree it operates on, so a
 mid-transaction tree blocked the fixing verb; `bundle pin` dissolves it, see the pinned
 suit brick). Refusals should name their fixing verb.
 
-Newly named from the first sustained night INSIDE the suit — **the show verb** (the
-editor-reach census's first datum, gathered by dogfooding instead of survey): every
-`edit` payload is a whole-item replacement, so before each one the agent extracts the
-item's CURRENT text — and the only tool for that tonight was the fallback encyclopedia
-(sed ranges, awk brace-matching, a python extraction script for the impl and test-mod
-edits — interior reads, every one). The reading, named: "what does item X say right
-now?" is a PERCEPTION question the verbs cannot yet answer. `bundle show <module.rs>
-<item>` — the item's verbatim text on stdout, `constrains`' sibling at the text grain —
-would close the loop where a whole edit cycle (show → revise → edit) never opens a file.
-It is also the replay differential's natural helper: show reads the same segmentation
-replay reconstructs.
+~~Newly named from the first sustained night INSIDE the suit — **the show verb**~~
+(named in the morning, CLOSED by the afternoon — the editor-reach census's first datum,
+gathered by dogfooding instead of survey: every `edit` payload is a whole-item
+replacement, so every edit began with an interior read — sed ranges, awk brace-matching,
+a python extraction script. The reading, named: "what does item X say right now?" is a
+PERCEPTION question, and now the verbs answer it. `bundle show <module.rs> <item>`
+returns the item's VERBATIM SEGMENT, cut by the same spans `edit` holds and `replay`
+reconstructs — pinned by the round-trip probe: editing an item with its own shown text
+is a byte-exact no-op, so `show m.rs x > payload; revise; edit` is an edit cycle that
+never opens a file. `bundle show <module.rs>` with no item is the INVENTORY — the
+module's table of contents with each item's kind, visibility, operator status, and, for
+functions, THE EXACT SIGNATURE THE EDIT HOLD WILL COMPARE, token for token. That last
+column is the published-interface brick riding along: an edit payload can now be
+authored FROM THE CONTRACT (inventory gives the signature, `constrains` gives the laws,
+`trace` gives the conduct) — for a certified operator, the residual reasons to read a
+body are exactly the properties the lock language cannot yet say. Refusals teach: an
+unknown address lists the addressable roster, which also DISCLOSES the grain honestly —
+items inside inline algebra mods address as the mod, inner addressing is a future rung.
+Built through the suit except the two Bundle methods themselves — interface GROWTH,
+which `edit` refuses by design; the impl-interior fallback arm, exercised as intended.)
+
+Two deferrals from the same conversation, recorded so they are not re-litigated:
+
+- **The incremental turn (DBSP), deferred**: the rhyme is real — the journal is a delta
+  stream, replay is integration, squash is delta consolidation, collect is retraction,
+  and delta-render's d/i commutations plus the homomorphism shape are the linearity
+  condition incrementalization turns on. The disposition when it is time: adopt the
+  ALGEBRA, not the engine — incrementalization as a LICENSED optimization (only views
+  whose maintenance the lock certifies linear go incremental; the batch path stays as
+  the standing second source, `incremental(view, δ) == batch(integrate(journal))` as a
+  drift gate), and the verb algebra already knows where the group structure fails (the
+  refused conflicts), so Z-set treatment applies to VIEWS over the item set, never to
+  the raw verb stream. The trigger to revisit: stage 4 making view-derivation the hot
+  loop. Not before — today's measured bottleneck is test execution, which this does not
+  touch.
+- **The totality claim, named without building**: discovery already EXECUTES every
+  operator over every grid tuple on every test run — a panic would fail the suite — so
+  "every operator is total on its declared grid" is already load-bearing; it has simply
+  never been stated as a lock line. When the spec header format next moves for its own
+  reasons, the totality line rides along free. The wider property vocabularies
+  (scaling laws for time, allocation counts, sandbox-carrier effect theories — the
+  store's "stash is a projection" probe is the prototype: an idempotence law about real
+  I/O judged in a scoped world) are the named path for shrinking the read-the-body
+  residue; each is a derive-plus-ratify brick waiting for its consumer.
 
 **The disposition on removal — garbage collection, with the house amendment: MARK IS
 DERIVED, SWEEP IS RATIFIED.** The operator's question ("is there ever really a need to

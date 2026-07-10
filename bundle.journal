@@ -13,3 +13,5 @@ edit src/discover/mutation.rs — tests
 edit src/discover/protocol.rs — probes
 edit src/discover/store.rs — probes
 edit src/discover/bundle.rs — impl Bundle @5c53b61b20a3a65d
+edit examples/bundle.rs — run @ffb9fd577408b1a7
+edit src/discover/bundle.rs — probes @bb234699f9d8c2a1

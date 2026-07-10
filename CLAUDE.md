@@ -8,7 +8,7 @@ Almost every artifact here is generated from a declaration and compared byte for
 
 Change CODE through the bundle CLI wherever the verbs reach, never by writing text into
 the file: `cargo run --example bundle -- <verb> ...` with verbs
-add|edit|declare|place|check|collect|squash|replay|constrains|trace|lift|pin (each a
+add|edit|declare|place|check|show|collect|squash|replay|constrains|trace|lift|pin (each a
 judged transaction — a refusal writes nothing). Prefer the pinned binary `.suit/bundle`
 when it exists (`bundle pin` installs it) — it does not rebuild behind the gate of the
 tree it is changing. A change the verbs cannot express is a FIELD

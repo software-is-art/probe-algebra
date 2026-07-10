@@ -589,6 +589,119 @@ impl Bundle {
         Ok(out)
     }
 
+    /// PERCEPTION AT THE TEXT GRAIN: the item's VERBATIM SEGMENT, cut by the same spans
+    /// `edit` holds and `replay` reconstructs — so a show → revise → edit cycle never
+    /// opens a file, and editing an item with its own shown text is a byte-exact no-op.
+    /// Read-only; journals nothing. Addresses are `edit`'s addresses (`merge`,
+    /// `impl Type`, `impl Trait for Type`, `probes`); refusals teach — an address
+    /// nothing carries lists what the module does declare, and a shared address refuses
+    /// as ambiguous rather than guessing.
+    pub fn show(module: &str, item_name_text: &str) -> Result<String, String> {
+        let file =
+            syn::parse_file(module).map_err(|e| format!("bundle show: module unparseable: {e}"))?;
+        let mut targets = file
+            .items
+            .iter()
+            .filter(|item| item_address(item).as_deref() == Some(item_name_text));
+        let target = targets.next().ok_or_else(|| {
+            let roster: Vec<String> = file.items.iter().filter_map(item_address).collect();
+            format!(
+                "bundle show: no item at `{item_name_text}` — addressable here: {}",
+                roster.join(", ")
+            )
+        })?;
+        let shadowed = targets.count();
+        if shadowed > 0 {
+            return Err(format!(
+                "bundle show: {} items share the address `{item_name_text}` — ambiguous, \
+                 refused rather than guessed between",
+                shadowed + 1
+            ));
+        }
+        let start = byte_offset(module, target.span().start());
+        let end = byte_offset(module, target.span().end());
+        Ok(module[start..end].to_string())
+    }
+
+    /// The module's TABLE OF CONTENTS — orientation without an interior read: every
+    /// addressable item with its kind, visibility, operator status, and (for functions)
+    /// the exact signature `edit` will hold, token for token — the published interface,
+    /// so an edit payload can be authored FROM THE CONTRACT. Impls and traits report
+    /// the size of their held method-signature set. Read-only; journals nothing.
+    pub fn inventory(module: &str) -> Result<String, String> {
+        use quote::ToTokens;
+        let bundle = Bundle::parse(module)?;
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle inventory: module unparseable: {e}"))?;
+        let mut out = format!(
+            "{} items, {} operators, {}:\n",
+            file.items.iter().filter_map(item_address).count(),
+            bundle.canonical.len(),
+            if bundle.is_canonical() {
+                "canonically placed"
+            } else {
+                "NOT canonical — `bundle place` would move it"
+            }
+        );
+        for item in &file.items {
+            let Some(address) = item_address(item) else {
+                continue;
+            };
+            let mut tags: Vec<String> = Vec::new();
+            if is_public(item) && !matches!(item, syn::Item::Impl(_)) {
+                tags.push("pub".to_string());
+            }
+            let held = match item {
+                syn::Item::Fn(f) => {
+                    if bundle
+                        .canonical
+                        .iter()
+                        .any(|op| *op == f.sig.ident.to_string())
+                    {
+                        tags.push("operator".to_string());
+                    }
+                    format!(" — {}", f.sig.to_token_stream())
+                }
+                syn::Item::Impl(_) | syn::Item::Trait(_) => {
+                    format!(
+                        " — {} method signatures held",
+                        method_signatures(item).len()
+                    )
+                }
+                syn::Item::Mod(m) if is_cfg_test(&m.attrs) => {
+                    tags.push("tests".to_string());
+                    String::new()
+                }
+                _ => String::new(),
+            };
+            let kind = match item {
+                syn::Item::Fn(_) => "fn",
+                syn::Item::Struct(_) => "struct",
+                syn::Item::Enum(_) => "enum",
+                syn::Item::Union(_) => "union",
+                syn::Item::Type(_) => "type",
+                syn::Item::Mod(_) => "mod",
+                syn::Item::Const(_) => "const",
+                syn::Item::Static(_) => "static",
+                syn::Item::Trait(_) => "trait",
+                syn::Item::Impl(_) => "impl",
+                _ => "item",
+            };
+            let name = if matches!(item, syn::Item::Impl(_)) {
+                address
+            } else {
+                format!("{kind} {address}")
+            };
+            let tags = if tags.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", tags.join(", "))
+            };
+            out.push_str(&format!("- {name}{tags}{held}\n"));
+        }
+        Ok(out)
+    }
+
     /// THE MARK PHASE of garbage collection (the removal disposition: mark is derived,
     /// sweep is ratified): every named top-level item REACHED BY NO ROOT, with the
     /// evidence rendered per item. The roots, each an existing sense: `pub` visibility
@@ -1554,5 +1667,52 @@ fn orphan(a: Count) -> Count {
             report.contains("none — every judged mutant of this operator dies"),
             "{report}"
         );
+    }
+
+    /// PERCEPTION AT THE TEXT GRAIN: show returns the item's verbatim segment — the
+    /// exact bytes `edit` holds — so editing an item with its own shown text is a
+    /// byte-exact no-op; the refusal TEACHES the addressable roster; ambiguity refuses;
+    /// and the inventory publishes the held signature, so an edit payload can be
+    /// authored from the contract without ever opening the file.
+    #[test]
+    fn show_returns_the_exact_segment_edit_holds() {
+        let module = "pub struct T;\n\n/// Doc.\npub fn one(t: T) -> T {\n    t\n}\n";
+        let shown = Bundle::show(module, "one").expect("shows");
+        assert_eq!(shown, "/// Doc.\npub fn one(t: T) -> T {\n    t\n}");
+        assert_eq!(
+            Bundle::edit(module, "one", &shown).expect("edits"),
+            module,
+            "show → edit round-trips as a no-op"
+        );
+
+        let refusal = Bundle::show(module, "ghost").unwrap_err();
+        assert!(refusal.contains("addressable here: T, one"), "{refusal}");
+
+        let toc = Bundle::inventory(module).expect("inventories");
+        assert!(toc.contains("- struct T [pub]"), "{toc}");
+        assert!(
+            toc.contains("- fn one [pub, operator] — fn one (t : T) -> T"),
+            "the held signature is published: {toc}"
+        );
+        assert!(toc.contains("canonically placed"), "{toc}");
+    }
+
+    /// show speaks every address `edit` speaks — impls by their address form, test
+    /// mods by name — and the inventory reports held method-set sizes for impls.
+    #[test]
+    fn show_speaks_the_full_address_grammar() {
+        let module = "pub struct T;\n\nimpl T {\n    pub fn go(&self) {}\n}\n\n\
+                      #[cfg(test)]\nmod probes {}\n";
+        assert_eq!(
+            Bundle::show(module, "impl T").expect("shows"),
+            "impl T {\n    pub fn go(&self) {}\n}"
+        );
+        assert_eq!(
+            Bundle::show(module, "probes").expect("shows"),
+            "#[cfg(test)]\nmod probes {}"
+        );
+        let toc = Bundle::inventory(module).expect("inventories");
+        assert!(toc.contains("- impl T — 1 method signatures held"), "{toc}");
+        assert!(toc.contains("- mod probes [tests]"), "{toc}");
     }
 }
