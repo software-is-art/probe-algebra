@@ -1978,6 +1978,18 @@ verbs' vehicle rebuilt behind the same gate as the tree it operates on, so a
 mid-transaction tree blocked the fixing verb; `bundle pin` dissolves it, see the pinned
 suit brick). Refusals should name their fixing verb.
 
+Newly named from the first sustained night INSIDE the suit — **the show verb** (the
+editor-reach census's first datum, gathered by dogfooding instead of survey): every
+`edit` payload is a whole-item replacement, so before each one the agent extracts the
+item's CURRENT text — and the only tool for that tonight was the fallback encyclopedia
+(sed ranges, awk brace-matching, a python extraction script for the impl and test-mod
+edits — interior reads, every one). The reading, named: "what does item X say right
+now?" is a PERCEPTION question the verbs cannot yet answer. `bundle show <module.rs>
+<item>` — the item's verbatim text on stdout, `constrains`' sibling at the text grain —
+would close the loop where a whole edit cycle (show → revise → edit) never opens a file.
+It is also the replay differential's natural helper: show reads the same segmentation
+replay reconstructs.
+
 **The disposition on removal — garbage collection, with the house amendment: MARK IS
 DERIVED, SWEEP IS RATIFIED.** The operator's question ("is there ever really a need to
 remove something? we know how everything hangs together — the unused disconnects and we
