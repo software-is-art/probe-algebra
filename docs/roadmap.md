@@ -1944,8 +1944,18 @@ item re-judges downstream precisely because the signature held. Dogfooded live o
 `bundle-demo`'s `bump`, where the planted signature-move refusal fired naming
 `fn bump (t : Tally)` against the offered two-argument form), **remove**
 (reliance-checked deletion — the embedded registers make it judgeable), **split** (rung
-3 — executing a ratified cohesion split), **constrains** (the blast-radius read: which
-laws, freedoms, and reliances pin an operator), impl-interior placement (exercised as the
+3 — executing a ratified cohesion split), ~~**constrains**~~ (CLOSED next — the
+perception verb, and the one the primary user said it would reach for most: everything
+that pins a named operator on one page, derived instead of grepped — its placement
+component, the committed laws naming it, the declared expectations, the ratified freedoms
+at it, and the downstream reliances, with empty sections rendered honestly as findings
+("none — every judged mutant of this operator dies"). Read-only: perception writes
+nothing and journals nothing; an operator the module does not declare refuses. First
+live run on the bundle-born member returned the four declared laws PLUS the discovered
+homomorphism — the report already knows more than the author declared. Pleasing
+side-effect: the reason census re-classified `bundle.rs` as effectful the moment the
+verb grew a filesystem read — the censuses watching the watcher), impl-interior
+placement (exercised as the
 fallback path the same day: building `edit` itself required an impl-interior change the
 verbs cannot express — the second rule's field-report arm, proven on day one), test
 authoring, and cross-file moves. Refusals should name their fixing verb.

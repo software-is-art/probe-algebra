@@ -55,6 +55,7 @@ fn run(args: &[String]) -> Result<String, String> {
          \x20      bundle declare <module.rs> \"<shape(op, ...)>\"\n\
          \x20      bundle place <module.rs>\n\
          \x20      bundle check <module.rs>\n\
+         \x20      bundle constrains <module.rs> <operator>\n\
          \x20      bundle lift <module.rs> <theory-name> [declaration ...]"
             .to_string()
     };
@@ -115,6 +116,15 @@ fn run(args: &[String]) -> Result<String, String> {
                             "{module_path}: NOT canonical — `bundle place` would move it"
                         ))
                     }
+                }
+                ("constrains", [name]) => {
+                    // perception: read-only, journals nothing. The committed record is the
+                    // nearest crate's spec directory and its downstream reliance register.
+                    let root = nearest_crate_root(module_path);
+                    let register = root.join("downstream/reliances.register");
+                    let register = register.exists().then_some(register);
+                    Bundle::constrains(&module, name, &root.join("spec"), register.as_deref())
+                        .map(|report| report.trim_end().to_string())
                 }
                 ("lift", [theory_name, declarations @ ..]) => {
                     let declarations: Vec<&str> = declarations.iter().map(String::as_str).collect();

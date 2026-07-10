@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 734 sites.
+# 753 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -106,6 +106,14 @@
 - boundary_spec::discover::bridge::eval:deaf -> None
 - boundary_spec::discover::bundle::bundle::add:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::add:deaf -> Ok(String::new())
+- boundary_spec::discover::bundle::bundle::constrains:0: == -> !=
+- boundary_spec::discover::bundle::bundle::constrains:1: || -> &&
+- boundary_spec::discover::bundle::bundle::constrains:2: ! -> (deleted)
+- boundary_spec::discover::bundle::bundle::constrains:3: == -> !=
+- boundary_spec::discover::bundle::bundle::constrains:4: || -> &&
+- boundary_spec::discover::bundle::bundle::constrains:5: && -> ||
+- boundary_spec::discover::bundle::bundle::constrains:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::constrains:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::declare:0: == -> !=
 - boundary_spec::discover::bundle::bundle::declare:1: == -> !=
 - boundary_spec::discover::bundle::bundle::declare:2: == -> !=
@@ -135,6 +143,17 @@
 - boundary_spec::discover::bundle::is_cfg_test:deaf -> false
 - boundary_spec::discover::bundle::is_cfg_test:deaf -> true
 - boundary_spec::discover::bundle::item_name:deaf -> None
+- boundary_spec::discover::bundle::mentions:0: == -> !=
+- boundary_spec::discover::bundle::mentions:1: || -> &&
+- boundary_spec::discover::bundle::mentions:2: == -> !=
+- boundary_spec::discover::bundle::mentions:3: ! -> (deleted)
+- boundary_spec::discover::bundle::mentions:4: || -> &&
+- boundary_spec::discover::bundle::mentions:5: == -> !=
+- boundary_spec::discover::bundle::mentions:6: ! -> (deleted)
+- boundary_spec::discover::bundle::mentions:7: || -> &&
+- boundary_spec::discover::bundle::mentions:8: && -> ||
+- boundary_spec::discover::bundle::mentions:deaf -> false
+- boundary_spec::discover::bundle::mentions:deaf -> true
 - boundary_spec::discover::bundle::pad_to_blank_line:0: ! -> (deleted)
 - boundary_spec::discover::bundle::pad_to_blank_line:1: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:0: ! -> (deleted)

@@ -13,7 +13,7 @@ src/discover/architect.rs: REFUSES — borrowed types, effectful bodies, paramet
 src/discover/arithmetic.rs: REFUSES — borrowed types, parameterised types, primitive signatures
 src/discover/bite.rs: REFUSES — borrowed types, effectful bodies, parameterised types, unshaped types, zero-argument constants
 src/discover/bridge.rs: REFUSES — borrowed types, parameterised types, primitive signatures, zero-argument constants
-src/discover/bundle.rs: REFUSES — borrowed types, parameterised types, primitive signatures, unit returns
+src/discover/bundle.rs: REFUSES — borrowed types, effectful bodies, parameterised types, primitive signatures, unit returns
 src/discover/coherence.rs: REFUSES — borrowed types, parameterised types, primitive signatures, zero-argument constants
 src/discover/cohesion.rs: REFUSES — borrowed types, primitive signatures, unit returns, zero-argument constants
 src/discover/composition.rs: REFUSES — borrowed types, parameterised types, primitive signatures, zero-argument constants

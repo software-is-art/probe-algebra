@@ -24,10 +24,12 @@
 //! parse, never guessed.
 
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use super::genesis::byte_offset;
 use super::shape::Placement;
 use super::watch::Ticker;
+use super::Spec;
 use syn::spanned::Spanned;
 
 /// One parsed module as a bundle: the preamble (module docs — everything before the first
@@ -427,6 +429,144 @@ impl Bundle {
         Ok(Bundle::parse(&out)?.render())
     }
 
+    /// THE PERCEPTION VERB — everything that PINS a named operator, read from the
+    /// committed record and rendered as one deterministic report: the blast radius an
+    /// agent wants BEFORE touching anything, derived instead of grepped. Four senses, one
+    /// page: the operator's placement COMPONENT (who it is wired to), the committed LAWS
+    /// naming it (the contract — an edit that breaks one refuses at the next judgment),
+    /// its ratified FREEDOMS (the mutation-lock survivors at it — where a change is
+    /// invisible to the spec, the guarantee's own fine print), and the downstream
+    /// RELIANCES naming it (who breaks, and the why they declared). Read-only: perception
+    /// writes nothing and journals nothing.
+    ///
+    /// Empty sections render honestly ("none — …"): silence is a finding, not a blank.
+    /// An operator the module does not declare is a refusal — perception does not guess.
+    /// Disclosed: declared expectations are read from `#[algebra]` attributes in the
+    /// module text; a lifted module's declarations live in its lift artifact and reach
+    /// this report through their frozen laws instead.
+    ///
+    /// Capability: Effectful — reads the committed locks in `spec_dir` and the optional
+    /// reliance register.
+    pub fn constrains(
+        module: &str,
+        name: &str,
+        spec_dir: &Path,
+        reliances: Option<&Path>,
+    ) -> Result<String, String> {
+        let sigs = Ticker::parse_rust_sigs(module)?;
+        let declared_here = sigs
+            .iter()
+            .any(|(op, _, _)| *op == name || op.ends_with(&format!("::{name}")));
+        if !declared_here {
+            return Err(format!(
+                "bundle constrains: the module declares no operator `{name}` — \
+                 perception does not guess"
+            ));
+        }
+
+        let mut out = format!("constrains `{name}`:\n");
+
+        // the COMPONENT: who the operator is wired to, from the one placer.
+        let placement = Placement::over("bundle", sigs);
+        for component in &placement.components {
+            if component
+                .ops
+                .iter()
+                .any(|op| *op == name || op.ends_with(&format!("::{name}")))
+            {
+                out.push_str(&format!(
+                    "  component: {{ {} }} over nets {{ {} }}\n",
+                    component.ops.join(", "),
+                    component.nets.join(", ")
+                ));
+            }
+        }
+
+        // the LAWS: every committed behaviour lock in spec_dir whose equation or prose
+        // names the operator.
+        let mut laws: Vec<String> = Vec::new();
+        let mut freedoms: Vec<String> = Vec::new();
+        if let Ok(dir) = std::fs::read_dir(spec_dir) {
+            let mut files: Vec<_> = dir
+                .flatten()
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect();
+            files.sort();
+            for file in files {
+                let Ok(text) = std::fs::read_to_string(spec_dir.join(&file)) else {
+                    continue;
+                };
+                if file.ends_with(".mutation.spec") {
+                    let stem = file.trim_end_matches(".mutation.spec");
+                    for line in text.lines() {
+                        if line.contains("SURVIVED") && line.contains(&format!("`{name}`")) {
+                            freedoms.push(format!(
+                                "    - {stem}: {}\n",
+                                line.trim_start_matches(['-', ' '])
+                            ));
+                        }
+                    }
+                } else if text.starts_with("# discovered spec:") {
+                    let stem = file.trim_end_matches(".spec");
+                    for (prose, equation) in Spec::parse_lock(&text) {
+                        if mentions(&equation, name) {
+                            laws.push(format!("    - {stem}: {equation}  ({prose})\n"));
+                        }
+                    }
+                }
+            }
+        }
+        out.push_str("  laws naming it (the contract):\n");
+        if laws.is_empty() {
+            out.push_str("    none — the committed spec is silent about this operator\n");
+        } else {
+            laws.iter().for_each(|l| out.push_str(l));
+        }
+
+        // the DECLARED expectations: the SHOULD half, read from `#[algebra]` attributes.
+        let declared: Vec<String> = expects_entries(module)
+            .into_iter()
+            .filter(|entry| mentions(entry, name))
+            .collect();
+        out.push_str("  declared expectations naming it:\n");
+        if declared.is_empty() {
+            out.push_str("    none — conduct only; no declared contract names it here\n");
+        } else {
+            for entry in declared {
+                out.push_str(&format!("    - {entry}\n"));
+            }
+        }
+
+        // the FREEDOMS: the ratified survivors at this operator — the fine print.
+        out.push_str("  freedoms at it (ratified degrees of freedom):\n");
+        if freedoms.is_empty() {
+            out.push_str("    none — every judged mutant of this operator dies\n");
+        } else {
+            freedoms.iter().for_each(|f| out.push_str(f));
+        }
+
+        // the RELIANCES: who declared they stand on a law naming it.
+        out.push_str("  downstream reliances naming it:\n");
+        let mut relied = Vec::new();
+        if let Some(path) = reliances {
+            let register = spec_lock::Register {
+                name: "downstream reliances".to_string(),
+                path: path.to_path_buf(),
+            };
+            for (key, justification) in register.entries()? {
+                if mentions(&key, name) {
+                    relied.push(format!("    - {key} ({justification})\n"));
+                }
+            }
+        }
+        if relied.is_empty() {
+            out.push_str("    none declared — semver's old blind spot, now an honest empty\n");
+        } else {
+            relied.iter().for_each(|r| out.push_str(r));
+        }
+        Ok(out)
+    }
+
     /// One journal line — stage 2 of the zero-file-patching aim: THE VERBS RECORD
     /// THEMSELVES. The format is deliberately minimal and deterministic
     /// (`<verb> <module> — <detail>`, no timestamps: order is the journal's only clock),
@@ -532,6 +672,27 @@ fn expects_entries(attr_text: &str) -> Vec<String> {
         entries.push(current.trim().to_string());
     }
     entries
+}
+
+/// Does `text` mention `name` as a whole word (ident-boundary on both sides)? The report
+/// matcher — `merge` must not match `submerged`, and an operator named inside an equation,
+/// a declaration, or a reliance key counts wherever it stands.
+#[crate::mutate]
+pub(crate) fn mentions(text: &str, name: &str) -> bool {
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_';
+    let bytes = text.as_bytes();
+    let mut from = 0;
+    while let Some(at) = text[from..].find(name) {
+        let start = from + at;
+        let end = start + name.len();
+        let before_ok = start == 0 || !is_ident(text[..start].chars().next_back().unwrap());
+        let after_ok = end == bytes.len() || !is_ident(text[end..].chars().next().unwrap());
+        if before_ok && after_ok {
+            return true;
+        }
+        from = end;
+    }
+    false
 }
 
 /// Does an attribute list carry `#[cfg(test)]`?
@@ -892,6 +1053,46 @@ pub fn gather(a: Count) -> Count {
         assert!(err.contains("no item named `ghost`"), "{err}");
         let err = Bundle::edit(module, "peak", "pub struct A;\npub struct B;\n").unwrap_err();
         assert!(err.contains("exactly one item"), "{err}");
+    }
+
+    /// THE PERCEPTION VERB, drilled on the REAL bundle-born member: `constrains merge`
+    /// reads the committed record and reports the component, the laws (the declared four
+    /// plus the discovered homomorphism), the honest empties, and the freedoms — the blast
+    /// radius derived, not grepped. An operator the module does not declare refuses.
+    #[test]
+    fn constrains_reads_the_committed_record() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("bundle-demo");
+        let module = std::fs::read_to_string(root.join("src/tally.rs")).expect("demo module");
+        let report =
+            Bundle::constrains(&module, "merge", &root.join("spec"), None).expect("reports");
+        assert!(report.contains("component: { merge, floor, bump } over nets { Tally }"));
+        assert!(
+            report.contains("(x merge y) = (y merge x)"),
+            "the contract laws appear: {report}"
+        );
+        assert!(
+            report.contains("bump((x merge y)) = (bump(x) merge bump(y))"),
+            "the discovered surprise appears too: {report}"
+        );
+        assert!(
+            report.contains("none declared — semver's old blind spot"),
+            "empty reliances render honestly: {report}"
+        );
+
+        // an operator that does not exist refuses — perception does not guess.
+        let err = Bundle::constrains(&module, "ghost", &root.join("spec"), None).unwrap_err();
+        assert!(err.contains("no operator `ghost`"), "{err}");
+    }
+
+    /// The word-boundary matcher: `merge` does not match `submerged` or `merges`, and
+    /// matches at line edges and inside equations.
+    #[test]
+    fn mentions_is_ident_bounded() {
+        assert!(mentions("(x merge y) = (y merge x)", "merge"));
+        assert!(mentions("merge", "merge"));
+        assert!(!mentions("submerged", "merge"));
+        assert!(!mentions("merges", "merge"));
+        assert!(mentions("`merge` evaluates as `floor`", "merge"));
     }
 
     /// The journal line is deterministic and minimal — order is its only clock — so the
