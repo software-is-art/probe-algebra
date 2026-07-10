@@ -1812,14 +1812,35 @@ the three work classes — (a) value-object debt, (b) missing VOCABULARY (effect
 builder plumbing — the effects-as-theories direction, given a concrete worklist),
 (c) principled refusals that become register lines — stays a ratification, as it must.
 First numbers, and the headline was visible the moment the lock minted: 56 files, 3
-qualify, 53 refuse — and the single biggest named class is IMPL-ATTACHED SURFACE ONLY
+qualify, 53 refuse — and the single biggest named class was IMPL-ATTACHED SURFACE ONLY
 (15 files): the no-rats-nest rule pushes every public callable onto a typestate, and the
-census reads free functions, so the discipline's own crown rule manufactures its largest
-blind spot. That tension — associated functions as operators — is now the spike's first
-real question, with fifteen addresses. (Fittingly, `discover::bundle` itself landed in
-that class on arrival.) The borrowed/parameterised classes dominate the remainder: the
-engine's own plumbing speaks `&`, `Vec`, and `Result`, which is where the vocabulary work
-begins. The target restated honestly, the instrumentation-census shape exactly: totality
+census read free functions, so the discipline's own crown rule manufactured its largest
+blind spot. (Fittingly, `discover::bundle` itself landed in that class on arrival.)
+
+**Brick 2, built the same day — ASSOCIATED FUNCTIONS ARE OPERATORS.** The one rule, one
+change: a method is judged exactly like a free function with `self`/`&self`/`Self`
+resolved to the impl target (calling convention and spelling, not shape); `&mut self` is
+mutation, refused; a generic impl target is not a sort; methods key `Type::method` — the
+sixth sense's identity convention, keeping two typestates' `new`s distinct. Two honesty
+refinements rode along, both caught by reading the first re-bless before ratifying it:
+`Self` must never leak into the census as a sort, and a TYPE PARAMETER is a variable, not
+a value type — the walk now refuses `fn id<T>(x: T) -> T` and kin, closing a quirk that
+predated the spike. The movement: root census 3 → 16 of 56 (the real algebras were
+sitting behind receivers all along — `kvstore/store.rs` alone carries 18 method operators
+over 10 sorts, `interp/boundary.rs` nine over seven), and the demo members' actual domain
+modules (credit meter, billing, gauge, mixer) all census as the algebras genesis always
+knew they were. The impl-attached class is DISSOLVED from the reason vocabulary — not
+renamed: the walk sees impls now, so those files report their real signature classes
+(a `mutating receivers` class joined for `&mut self`). 40 files still refuse, and the
+remainder is now honestly what it looked like it would be: borrowed/parameterised
+plumbing — the engine speaks `&`, `Vec`, and `Result` — which is where the vocabulary
+work begins.
+
+A milestone landed alongside, found by the same day's full schemata sweep: the last FOUR
+ratified schemata survivors now die (the widened suite reaches their guards), so
+`spec/schemata.register` is EMPTY — zero ratified survivors across all 706 compiled
+mutants. The stale-line drill moved to a fixture register so it outlives the live
+register's population. The target restated honestly, the instrumentation-census shape exactly: totality
 is "every file qualifies OR carries a ratified reason" — the census owns totality from day
 one; what grows is the qualifying fraction. And the tie back to the candidate above is
 direct: only operator-shaped code can live in a bundle, so every file this spike converts

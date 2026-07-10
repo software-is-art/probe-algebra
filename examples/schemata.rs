@@ -335,8 +335,8 @@ mod probes {
             );
         }
         // the committed register and the ratified survivors are one set: exactly the
-        // ratified keys hold, an empty sweep flags them stale, and an unratified
-        // survivor drifts, named.
+        // ratified keys hold (today that set is EMPTY — every compiled mutant dies), and
+        // an unratified survivor drifts, named.
         let ratified: Vec<String> = Schemata::register()
             .entries()
             .expect("register parses")
@@ -346,7 +346,6 @@ mod probes {
         assert!(Schemata::register()
             .check(ratified.iter().map(String::as_str))
             .is_ok());
-        assert!(Schemata::register().check([]).is_err(), "stale lines flag");
         let err = Schemata::register()
             .check(
                 ratified
@@ -356,5 +355,22 @@ mod probes {
             )
             .unwrap_err();
         assert!(err.contains("classify:1"), "{err}");
+        // the STALE-LINE flag, drilled on a fixture so the drill outlives the live
+        // register's population (which reached zero when the last four ratified
+        // survivors died): a ratified line whose mutant no longer survives is a lie
+        // the check must name.
+        let dir = std::env::temp_dir().join(format!("schemata-register-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("fixture dir");
+        let path = dir.join("stale.register");
+        std::fs::write(
+            &path,
+            "`ghost::site:0: == -> !=`: a mutant that no longer survives\n",
+        )
+        .expect("fixture register");
+        let fixture = spec_lock::Register {
+            name: "schemata survivors".to_string(),
+            path,
+        };
+        assert!(fixture.check([]).is_err(), "stale lines flag");
     }
 }

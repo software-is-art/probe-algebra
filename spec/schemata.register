@@ -3,7 +3,3 @@
 # the runner's sweep subcommand (an unratified survivor drifts; a ratified line whose mutant
 # dies goes stale by hand-review). Keys contain colons, so they are backtick-quoted.
 
-`boundary_spec::discover::mutation::never:deaf -> None`: equivalent by contract — `never` IS the always-None partiality mutant; its deafness form is itself
-`boundary_spec::discover::mutation::proj1:deaf -> None`: duplicate degree of freedom — deaf proj1 coincides with the `never` mutant the harness already plants
-`boundary_spec::discover::mutation::same_conduct:deaf -> false`: conservative direction — "every mutant is distinct" can only cause extra kills, never a miss
-`boundary_spec::discover::protocol::edit:deaf -> None`: the edit-counter freedom already ratified in spec/doc flow.mutation.spec, seen through the schemata lens
