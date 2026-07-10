@@ -1572,6 +1572,56 @@ compiled second source to cross-check against (`step_theory`); the plain-Rust fr
 text. A build-time cross-check (parsed placement vs a compiled reachability view) is the honest
 next tightening, deferred until the text model is seen misleading.
 
+## The edit-time lock delta: the qualify census re-derived at the edit (BUILT)
+
+Why the spec-lock workflow lets review be coarse: every behavioural change surfaces as a lock
+delta, so reviewing the diff of the locks reviews the behaviour — and, because each probe carries
+a can-fail proof (a green probe that cannot fail is a lie), the mirror is complete over what it
+locks. Agents don't err on purpose; they err where nothing reflects the mistake back. So the
+lever is reflection LATENCY: push each mirror as close to the edit as it will go. The coupling
+ticker moved the STRUCTURAL reflection (placement) to the edit; this moves the first LOCK-DELTA
+reflection there too.
+
+The behavioural locks can't come along — distance, discovered laws, cohesion need `eval`, and
+mid-edit the code doesn't compile — which is why the freeze-delta courier exists: it derives those
+deltas at the build and couriers them into the next window. But one lock is not behavioural:
+`spec/qualify.spec`, the surface census, is a STRUCTURAL property (a module qualifies when its
+functions are operator-shaped — bare named value types, no I/O), so its line is text-derivable
+from the file alone. `boundary_enforce::qualify_line` / `qualify_census_lines` are that census's
+OWN emitters, factored to ONE source (the operator-shape rule is stated once and served to both the
+frozen census and the hook — never restated), and the hook's fifth voice re-derives the whole live
+census from the tree, diffs it against the committed lock with the same `spec_lock::LockDelta` the
+courier uses, and shows the current drift. So the agent learns "this edit made the qualify census
+stale" AT the edit, where the intent is freshest, instead of at the red gate the build would
+otherwise be first to raise.
+
+Two shape decisions, both made against how it reads to the agent consuming it:
+
+- **A drift LEDGER, not a per-file delta.** It shows the WHOLE current drift — every stale line
+  together — so accumulated movements sit in one block, and it goes empty the moment a re-bless
+  reconciles the tree. You never lose an outstanding line between the edit that caused it and the
+  bless that clears it.
+- **Un-scoped but DEDUPED.** The ledger is a repo fact, so it is surfaced on ANY edit, not narrowed
+  to a file class (which file you touched should not gate whether you see the drift). Breadth of
+  triggering would become breadth of repetition, so the voice persists the last-shown ledger and
+  speaks only when the render CHANGES: an accumulated line appears once, on whatever edit first
+  surfaces it, then stays quiet until the drift moves again. That is the un-scoped reach without the
+  banner-blindness a reprint-every-edit block would train.
+
+NO how-to-bless recipe rides the voice: the delta names `spec/qualify.spec`, whose own header
+carries `# … Regenerate with \`BLESS_QUALIFY=1 cargo build\``, so the command is self-documenting at
+the named lock and is stable orientation (also CLAUDE.md's one rule) — not news to reprint each
+firing. A half-written file contributes nothing to the live census, so a mid-edit save never
+invents a movement.
+
+The split is now explicit and on both sides: the STRUCTURAL half of the mirror (placement,
+qualification) lives at the edit as a live sense; the BEHAVIOURAL half lives at the build and is
+couriered forward. Follow-up worth naming: qualify is the ONLY committed lock a single text edit
+can honestly re-derive today. `tiers.spec` is text-derivable but CROSS-file (a file's tier depends
+on the dependency graph, not its own text), so an edit-time tier DELTA would need the whole tree,
+not one file — deferred until that's worth the walk. Everything behavioural stays couriered by
+design, not omission.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

@@ -7,18 +7,27 @@
 //! * the SHAPE TICKER (`discover::watch::Ticker`) — a coupling move on ANY Rust edit: a theory
 //!   nets on its sorts, a plain module on its own declared types, and the ticker speaks only
 //!   when the edit bridges two clusters or opens a new one — a sixth sense, not a firehose;
+//! * the QUALIFY voice (`spec/qualify.spec`) — the edit-time LOCK DELTA as a DRIFT LEDGER: the whole
+//!   current drift of the surface census, re-derived from the tree via
+//!   `boundary_enforce::qualify_census_lines` and diffed against the committed lock. Surfaced on ANY
+//!   edit (un-scoped) but DEDUPED against the last-shown ledger, so it speaks only when the drift
+//!   moves — the behavioural mirror at the edit, for the one lock a text edit can re-derive (no
+//!   how-to-bless recipe: the named lock's own header carries it);
 //! * the TIER voice (`spec/tiers.spec`) — on first edit of a file, its derived tier and the
 //!   rules it carries (the reader-service the deleted `//! Tier:` markers gave);
 //! * the FREEZE-DELTA courier (`freeze_delta_voice`) — the recommendation movement the last
 //!   build derived via `spec_lock::Lock::delta` (a placement re-settling, a seam candidate
 //!   appearing), inserted once into the window and then cleared.
 //!
-//! The first three voices the hook DERIVES from a single text edit. The fourth it does not
+//! The first four voices the hook DERIVES from a single text edit. The fifth it does not
 //! compute at all: distance, cohesion, and placement need the compiled theory (running `eval`),
 //! which a text edit cannot afford — so the movement of those recommendations is derived where
 //! it is cheap, at the build that emits the locks (`spec_lock::Lock::delta` holds both sides at
-//! that instant), and the hook only COURIERS the result into the next context window. Nothing is
-//! watched or reconstructed: the emitter narrates its own delta, the hook carries it. (The
+//! that instant), and the hook only COURIERS the result into the next context window. The qualify
+//! voice is the boundary case that DOES fit a text edit: qualification is a structural property
+//! (operator-shaped functions), so its lock delta is computed live here, while the behavioural
+//! locks stay couriered. Nothing is watched or reconstructed: the emitter narrates its own delta,
+//! the hook carries it (or, for qualify, derives it). (The
 //! freedom/survivor census stays at session start, read from the committed mutation locks.) All
 //! the voices are mutation-tested and register-driven, and before this crate every
 //! consumer wrapped them in the same four pieces of unjudged glue: a bash wrapper, inline
@@ -86,8 +95,8 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
         .to_string();
     let source = std::fs::read_to_string(&path).unwrap_or_default();
 
-    // FOUR voices, each priced in silence — the whole edit-time envelope, so the shipped
-    // binary fully replaces the bash wrapper it descends from (the fourth, the freeze-delta
+    // FIVE voices, each priced in silence — the whole edit-time envelope, so the shipped
+    // binary fully replaces the bash wrapper it descends from (the last, the freeze-delta
     // courier, the hook carries rather than computes):
     let mut blocks: Vec<String> = Vec::new();
 
@@ -109,6 +118,14 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
     // net-disjoint component) on ANY Rust file, stateful across invocations (see [`shape_voice`]).
     if let Some(shape) = shape_voice(project_dir, &rel, &source) {
         blocks.push(shape);
+    }
+
+    // the QUALIFY voice — the edit-time lock delta as a DRIFT LEDGER: the whole current drift of
+    // `spec/qualify.spec`, re-derived from the tree on disk, surfaced on ANY edit (not scoped to
+    // certain files) but DEDUPED so it speaks only when the drift actually moves — see
+    // [`qualify_voice`]. Narrated BEFORE the build that would otherwise be first to notice.
+    if let Some(qualify) = qualify_voice(project_dir) {
+        blocks.push(qualify);
     }
 
     // the TIER voice — on FIRST edit of a file, its derived tier and the rules that tier
@@ -178,6 +195,71 @@ fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
     std::fs::create_dir_all(&state_dir).ok()?;
     std::fs::write(&state, Ticker::store_signatures(&sigs)).ok()?;
     line
+}
+
+/// The QUALIFY voice — the edit-time LOCK DELTA as a DRIFT LEDGER, un-scoped and deduped. The
+/// qualify census (`spec/qualify.spec`) is text-derivable — a module qualifies by the SHAPE of its
+/// functions (operator-shaped, no I/O), no `eval` — so the whole live census is re-derived from the
+/// tree on disk and diffed against the committed lock, and the delta IS the drift the next
+/// `BLESS_QUALIFY=1` build would ratify. It shows the FULL current drift, every stale line together,
+/// accumulating as files move and empty the moment a re-bless reconciles the tree. The behavioural
+/// half of the mirror — distance, discovered laws — still needs the compiled theory and stays at the
+/// build (the freeze-delta courier carries it); qualification is the one lock a text edit re-derives.
+///
+/// Two design choices, both deliberate:
+/// * UN-SCOPED — the ledger is a property of the whole tree, surfaced on ANY edit, not narrowed to
+///   `src/*.rs` or any file class. Qualify drift is a repo fact; which file you happened to touch
+///   should not gate whether you see it.
+/// * DEDUPED, not naggy — because the standing drift renders identically on every edit until it
+///   moves, the voice persists the last-shown ledger under `target/probe-hook` and speaks ONLY when
+///   the render differs: an accumulated line appears once, on whatever edit first surfaces it, then
+///   stays quiet until the drift moves again; a re-bless empties it and the next real drift
+///   re-announces. So breadth of triggering does not become breadth of repetition.
+///
+/// A file that does not parse contributes nothing to the live census (`qualify_census_lines` skips
+/// it), so a half-written save never invents a movement. NO recipe: the delta names
+/// `spec/qualify.spec`, whose own header carries the regenerate command
+/// (`# … Regenerate with \`BLESS_QUALIFY=1 cargo build\``) — how-to-bless is self-documenting at the
+/// named lock and stable orientation (also CLAUDE.md's one rule), not news to reprint each firing.
+/// The movement renders through `spec_lock::LockDelta`, the renderer the freeze-delta courier uses.
+///
+/// A repo with no census pays nothing: the missing lock returns before any tree scan.
+///
+/// Capability: Effectful — reads `spec/qualify.spec`, rescans the `src/` tree, and reads/writes the
+/// dedup state under `project_dir`.
+fn qualify_voice(project_dir: &Path) -> Option<String> {
+    // a repo without the census returns here, before any scan — the feature exists only where the
+    // lock does, which is not the same as scoping which EDITS may surface it.
+    let committed_text = std::fs::read_to_string(project_dir.join("spec/qualify.spec")).ok()?;
+    let committed: String = committed_text
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    // the LIVE census body, rescanned from the tree on disk (the edit is already written) — the
+    // WHOLE current drift, so every stale line sits together.
+    let live =
+        boundary_enforce::qualify_census_lines(&project_dir.join("src"), project_dir).join("\n");
+
+    let state = project_dir.join("target/probe-hook/qualify-ledger");
+    let delta = spec_lock::LockDelta::between(&committed, &live);
+    if delta.is_empty() {
+        // clean (nothing stale, or a re-bless just reconciled it): forget any shown ledger so the
+        // NEXT real drift re-announces, and say nothing — an empty ledger is not worth a block.
+        if std::fs::read_to_string(&state).is_ok_and(|s| !s.is_empty()) {
+            let _ = std::fs::write(&state, "");
+        }
+        return None;
+    }
+    // DEDUP: the standing drift renders the same until it moves, so speak only when it differs from
+    // what was last shown — breadth of triggering must not become breadth of repetition.
+    let rendered = delta.render("qualify census (spec/qualify.spec)");
+    if std::fs::read_to_string(&state).is_ok_and(|s| s == rendered) {
+        return None;
+    }
+    std::fs::create_dir_all(project_dir.join("target/probe-hook")).ok()?;
+    std::fs::write(&state, &rendered).ok()?;
+    Some(rendered)
 }
 
 /// The TIER voice — one line on the FIRST edit of a file: its DERIVED tier and what that
@@ -503,6 +585,81 @@ mod drills {
             respond(&event(&bare.join("src/x.rs")), &bare).expect("tier still names itself");
         assert!(voice.contains("tier: src/x.rs is ALGEBRA"), "{voice}");
         assert!(voice.contains("regenerate spec/tiers.spec"), "{voice}");
+    }
+
+    /// THE QUALIFY VOICE, drilled — the edit-time LOCK DELTA as an UN-SCOPED, DEDUPED drift ledger.
+    /// A fresh tree is silence; a reshaping edit shows the census movement once with NO how-to-bless
+    /// recipe; the SAME drift on a later edit is silence (deduped, not naggy); a grown ledger
+    /// surfaces on ANY edit — including a non-`.rs` file — because it is un-scoped; and re-blessing
+    /// empties it, so the next real drift re-announces.
+    #[test]
+    fn the_qualify_voice_is_an_unscoped_deduped_drift_ledger() {
+        let root = tree(
+            "qualify",
+            &[
+                (
+                    "spec/qualify.spec",
+                    "# census\nsrc/a.rs: QUALIFIES — operators [f] over sorts {A}\n",
+                ),
+                (
+                    "src/a.rs",
+                    "pub struct A;\npub fn f(x: A) -> A { todo!() }\n",
+                ),
+            ],
+        );
+        let eva = event(&root.join("src/a.rs"));
+        // fresh: the live census reproduces the committed lock — silence.
+        assert_eq!(respond(&eva, &root), None);
+
+        // reshape a.rs (a second operator): the ledger moved (empty -> one line) → it speaks once.
+        std::fs::write(
+            root.join("src/a.rs"),
+            "pub struct A;\npub fn f(x: A) -> A { todo!() }\npub fn g(x: A) -> A { todo!() }\n",
+        )
+        .unwrap();
+        let v = respond(&eva, &root).expect("the census drift shows on change");
+        assert!(v.contains("qualify census (spec/qualify.spec)"), "{v}");
+        assert!(
+            v.contains("+ src/a.rs: QUALIFIES — operators [f, g] over sorts {A}"),
+            "{v}"
+        );
+        assert!(
+            !v.contains("BLESS_QUALIFY") && !v.to_lowercase().contains("re-bless"),
+            "the how-to-bless recipe is gone: {v}"
+        );
+        // DEDUP: the same drift on the next edit is silence — breadth of triggering is not breadth
+        // of repetition.
+        assert_eq!(respond(&eva, &root), None);
+
+        // a SECOND file starts qualifying: the GROWN ledger surfaces on a NON-`.rs` edit — proof it
+        // is un-scoped (which file you touch does not gate seeing the drift), and both lines sit.
+        std::fs::write(
+            root.join("src/b.rs"),
+            "pub struct B;\npub fn h(x: B) -> B { todo!() }\n",
+        )
+        .unwrap();
+        let doc = root.join("README.md");
+        std::fs::write(&doc, "notes\n").unwrap();
+        let v = respond(&event(&doc), &root).expect("a non-.rs edit surfaces the CHANGED ledger");
+        assert!(
+            v.contains("+ src/a.rs: QUALIFIES — operators [f, g] over sorts {A}"),
+            "{v}"
+        );
+        assert!(
+            v.contains("+ src/b.rs: QUALIFIES — operators [h] over sorts {B}"),
+            "{v}"
+        );
+        // and the same grown drift on the next edit is silence again (deduped).
+        assert_eq!(respond(&event(&doc), &root), None);
+
+        // re-bless (the committed lock catches up to the tree): the ledger empties — silence.
+        std::fs::write(
+            root.join("spec/qualify.spec"),
+            "# census\nsrc/a.rs: QUALIFIES — operators [f, g] over sorts {A}\n\
+             src/b.rs: QUALIFIES — operators [h] over sorts {B}\n",
+        )
+        .unwrap();
+        assert_eq!(respond(&eva, &root), None);
     }
 
     /// THE FOURTH VOICE, drilled — the courier carries a movement `delta()` derived at freeze
