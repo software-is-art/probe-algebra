@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 715 sites.
+# 727 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -106,6 +106,12 @@
 - boundary_spec::discover::bridge::eval:deaf -> None
 - boundary_spec::discover::bundle::bundle::add:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::add:deaf -> Ok(String::new())
+- boundary_spec::discover::bundle::bundle::declare:0: == -> !=
+- boundary_spec::discover::bundle::bundle::declare:1: == -> !=
+- boundary_spec::discover::bundle::bundle::declare:2: == -> !=
+- boundary_spec::discover::bundle::bundle::declare:3: && -> ||
+- boundary_spec::discover::bundle::bundle::declare:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::declare:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::is_canonical:0: == -> !=
 - boundary_spec::discover::bundle::bundle::is_canonical:deaf -> false
 - boundary_spec::discover::bundle::bundle::is_canonical:deaf -> true
@@ -114,12 +120,18 @@
 - boundary_spec::discover::bundle::bundle::parse:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::render:0: == -> !=
 - boundary_spec::discover::bundle::bundle::render:deaf -> String::new()
+- boundary_spec::discover::bundle::expects_entries:0: == -> !=
+- boundary_spec::discover::bundle::expects_entries:1: == -> !=
+- boundary_spec::discover::bundle::expects_entries:2: ! -> (deleted)
+- boundary_spec::discover::bundle::expects_entries:deaf -> vec![]
 - boundary_spec::discover::bundle::is_cfg_test:0: && -> ||
 - boundary_spec::discover::bundle::is_cfg_test:deaf -> false
 - boundary_spec::discover::bundle::is_cfg_test:deaf -> true
 - boundary_spec::discover::bundle::item_name:deaf -> None
 - boundary_spec::discover::bundle::pad_to_blank_line:0: ! -> (deleted)
 - boundary_spec::discover::bundle::pad_to_blank_line:1: ! -> (deleted)
+- boundary_spec::discover::bundle::parse_declaration:0: ! -> (deleted)
+- boundary_spec::discover::bundle::parse_declaration:deaf -> Err(String::new())
 - boundary_spec::discover::coherence::CoherenceReport::between:deaf -> Err(String::new())
 - boundary_spec::discover::coherence::coherence_violations:deaf -> Err(String::new())
 - boundary_spec::discover::coherence::coherence_violations:deaf -> Ok(vec![])

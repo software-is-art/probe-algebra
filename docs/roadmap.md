@@ -1842,6 +1842,19 @@ genesis along the method's own IS/SHOULD line:
 One sentence for the record: the bundle continues, genesis births, and the declaration is
 vocabulary, not a tool.
 
+**The declaration entry's first form is BUILT** (`Bundle::declare`, landed the same day as
+the disposition): an expectation declares additively into a module's `#[algebra(...)]`
+attribute — the `expects` grammar exactly as the macro takes it — and the module comes back
+canonically rendered, differing in that one attribute and nothing else (drilled on the
+committed `modularize.rs`: exactly one line moves). Parser-as-gate throughout: a shape word
+outside the ratified catalog is refused TEACHING the vocabulary (the same validator the
+engine panics with, in `Expectation::canonical`'s non-panicking form), a duplicate
+declaration is refused, a module with no `#[algebra]` names the fix, and two `#[algebra]`
+modules refuse as ambiguous. Disclosed next: the ZERO-ANNOTATION declaration channel
+(expectations on a `Lifted` module — auto-lift's world currently has no way to say SHOULD),
+and the red-lock story end to end on a bundle-born crate, which is the retirement
+criterion above.
+
 ## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
 
 The companion measurement, asked for by the operator in the same conversation, aimed at

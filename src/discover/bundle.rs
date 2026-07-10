@@ -228,6 +228,113 @@ impl Bundle {
         Ok(Bundle::parse(&spliced)?.render())
     }
 
+    /// THE DECLARATION ENTRY, first form (the disposition's end state, rung 1): declare an
+    /// expectation into a module's `#[algebra(...)]` attribute, additively — the SHOULD half
+    /// joining the bundle the operators live in. `declaration` is the `expects` grammar
+    /// exactly as the macro takes it (`commutative(peak)`, `identity(grant, zero)`); the
+    /// result is the module re-rendered canonically, differing only in that attribute.
+    ///
+    /// Parser-as-gate, all refusals named: a shape word outside the ratified catalog is
+    /// refused TEACHING the vocabulary (`Expectation::canonical` — the same validator the
+    /// engine panics with, in its non-panicking form); a duplicate of an already-declared
+    /// expectation is refused; a module with no `#[algebra]` item is refused naming the fix
+    /// (the zero-annotation declaration channel — expectations on a `Lifted` module — is a
+    /// disclosed further rung); two `#[algebra]` items are refused as ambiguous rather than
+    /// guessed between.
+    pub fn declare(module: &str, declaration: &str) -> Result<String, String> {
+        let (key, _args) = parse_declaration(declaration)?;
+        let canonical_key = super::expect::Expectation::canonical(&key).ok_or_else(|| {
+            format!(
+                "bundle declare: `{key}` is not in the ratified catalog \
+                 (spec/shapes.spec). Declarable shapes: {}",
+                super::expect::Expectation::vocabulary_keys().join(", ")
+            )
+        })?;
+
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle declare: module unparseable: {e}"))?;
+        let mut algebra_attrs: Vec<&syn::Attribute> = Vec::new();
+        for item in &file.items {
+            let attrs: &[syn::Attribute] = match item {
+                syn::Item::Mod(m) => &m.attrs,
+                _ => continue,
+            };
+            algebra_attrs.extend(attrs.iter().filter(|a| {
+                a.path()
+                    .segments
+                    .last()
+                    .is_some_and(|s| s.ident == "algebra")
+            }));
+        }
+        let attr = match algebra_attrs.as_slice() {
+            [] => {
+                return Err(
+                    "bundle declare: no `#[algebra]` module to declare into — attach \
+                     `#[algebra(Marker, \"name\")]` to the module (the zero-annotation \
+                     declaration channel is a further rung)"
+                        .to_string(),
+                )
+            }
+            [one] => *one,
+            many => {
+                return Err(format!(
+                    "bundle declare: {} `#[algebra]` modules in one file — ambiguous, \
+                     refused rather than guessed between",
+                    many.len()
+                ))
+            }
+        };
+
+        let start = byte_offset(module, attr.span().start());
+        let end = byte_offset(module, attr.span().end());
+        let attr_text = &module[start..end];
+        let entry = declaration.trim();
+
+        // a duplicate of an already-declared expectation is refused, compared through the
+        // canonical shape name so `idempotent(x)` and its catalog name cannot both land.
+        for existing in expects_entries(attr_text) {
+            let Ok((existing_key, existing_args)) = parse_declaration(&existing) else {
+                continue;
+            };
+            let (_, new_args) = parse_declaration(entry)?;
+            if super::expect::Expectation::canonical(&existing_key) == Some(canonical_key)
+                && existing_args == new_args
+            {
+                return Err(format!(
+                    "bundle declare: `{entry}` is already declared — a declaration is \
+                     additive, never repeated"
+                ));
+            }
+        }
+
+        // the edit: append inside an existing `expects(...)` (the grammar keeps it last,
+        // so the attribute ends `))]`), or open one (the attribute ends `)]`). Anything
+        // else is refused, never guessed at.
+        let new_attr = if let Some(head) = attr_text.strip_suffix("))]") {
+            if attr_text.contains("expects(") {
+                format!("{head}, {entry}))]")
+            } else {
+                return Err(format!(
+                    "bundle declare: unrecognized `#[algebra]` shape `{attr_text}` — \
+                     declare by hand"
+                ));
+            }
+        } else if let Some(head) = attr_text.strip_suffix(")]") {
+            format!("{head}, expects({entry}))]")
+        } else {
+            return Err(format!(
+                "bundle declare: unrecognized `#[algebra]` shape `{attr_text}` — declare \
+                 by hand"
+            ));
+        };
+
+        let mut out = String::with_capacity(module.len() + new_attr.len());
+        out.push_str(&module[..start]);
+        out.push_str(&new_attr);
+        out.push_str(&module[end..]);
+        Ok(Bundle::parse(&out)?.render())
+    }
+
     /// Is the module already in canonical placed order? (Parse-only judgment: true exactly
     /// when `render` would reproduce the input.)
     pub fn is_canonical(&self) -> bool {
@@ -261,6 +368,66 @@ fn item_name(item: &syn::Item) -> Option<String> {
         syn::Item::Static(s) => Some(s.ident.to_string()),
         _ => None,
     }
+}
+
+/// A declaration's shallow parse: `key(arg, arg)` → the shape key and its trimmed args.
+/// The DEEP validation stays where it lives — the catalog for the vocabulary
+/// ([`super::expect::Expectation::canonical`]), the macro for the full grammar at compile
+/// time; this parse only needs enough structure to validate and compare.
+#[crate::mutate]
+fn parse_declaration(text: &str) -> Result<(String, Vec<String>), String> {
+    let text = text.trim();
+    let (key, rest) = text.split_once('(').ok_or_else(|| {
+        format!("bundle declare: `{text}` is not a declaration — the grammar is `shape(op, ...)`")
+    })?;
+    let args = rest.strip_suffix(')').ok_or_else(|| {
+        format!("bundle declare: `{text}` is missing its closing paren — nothing to judge")
+    })?;
+    let args: Vec<String> = args
+        .split(',')
+        .map(|a| a.trim().to_string())
+        .filter(|a| !a.is_empty())
+        .collect();
+    if args.is_empty() {
+        return Err(format!(
+            "bundle declare: `{text}` names no operators — a declaration binds a shape to ops"
+        ));
+    }
+    Ok((key.trim().to_string(), args))
+}
+
+/// The entries of an attribute's `expects(...)` group, split at top-level commas (an
+/// entry's own parens respected). Empty when the attribute carries no `expects`.
+#[crate::mutate]
+fn expects_entries(attr_text: &str) -> Vec<String> {
+    let Some(after) = attr_text.split_once("expects(").map(|(_, rest)| rest) else {
+        return Vec::new();
+    };
+    let mut entries = Vec::new();
+    let mut depth = 0usize;
+    let mut current = String::new();
+    for c in after.chars() {
+        match c {
+            '(' => {
+                depth += 1;
+                current.push(c);
+            }
+            ')' if depth == 0 => break, // expects' own close
+            ')' => {
+                depth -= 1;
+                current.push(c);
+            }
+            ',' if depth == 0 => {
+                entries.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(c),
+        }
+    }
+    if !current.trim().is_empty() {
+        entries.push(current.trim().to_string());
+    }
+    entries
 }
 
 /// Does an attribute list carry `#[cfg(test)]`?
@@ -495,6 +662,64 @@ mod tests {
         )
         .expect("an impl extends, never collides");
         assert!(grown.contains("pub fn zero"));
+    }
+
+    /// THE DECLARATION ENTRY, drilled on the REAL module: declaring an expectation into the
+    /// committed `modularize.rs` (whose `soup` carries `#[crate::algebra]` with no
+    /// `expects`) moves ONLY the attribute — every other byte survives — and the result
+    /// parses, stays canonical, and carries the declaration. The SHOULD half joins the
+    /// bundle without disturbing the IS half.
+    #[test]
+    fn declare_moves_only_the_attribute_on_a_real_module() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/discover/modularize.rs");
+        let source = std::fs::read_to_string(path).expect("committed module");
+        let declared = Bundle::declare(&source, "commutative(peak)").expect("declares");
+        assert!(
+            declared.contains("expects(commutative(peak))"),
+            "the declaration landed"
+        );
+        // only the attribute differs: removing the one changed line from each side
+        // leaves identical text.
+        let differing: Vec<(&str, &str)> = source
+            .lines()
+            .zip(declared.lines())
+            .filter(|(a, b)| a != b)
+            .collect();
+        assert_eq!(differing.len(), 1, "exactly one line moved");
+        assert!(differing[0]
+            .0
+            .contains("#[crate::algebra(Soup, \"flat soup\")]"));
+        assert!(differing[0]
+            .1
+            .contains("#[crate::algebra(Soup, \"flat soup\", expects(commutative(peak)))]"));
+        // a second declaration APPENDS inside the existing expects; repeating one refuses.
+        let twice = Bundle::declare(&declared, "associative(peak)").expect("appends");
+        assert!(
+            twice.contains("expects(commutative(peak), associative(peak))"),
+            "{twice}"
+        );
+        let err = Bundle::declare(&twice, "commutative(peak)").unwrap_err();
+        assert!(err.contains("already declared"), "{err}");
+    }
+
+    /// The declaration gate teaches, never guesses: an unratified shape word is refused
+    /// LISTING the vocabulary; a module with no `#[algebra]` names the fix; malformed
+    /// declarations name their grammar.
+    #[test]
+    fn declare_refuses_by_teaching() {
+        let module = "#[crate::algebra(M, \"m\")]\npub mod m {\n    pub struct A;\n    pub fn f(a: A) -> A {\n        a\n    }\n}\n";
+        let err = Bundle::declare(module, "sparkly(f)").unwrap_err();
+        assert!(err.contains("not in the ratified catalog"), "{err}");
+        assert!(err.contains("Declarable shapes:"), "{err}");
+        assert!(err.contains("commutative"), "the refusal teaches: {err}");
+
+        let err = Bundle::declare("pub struct A;\n", "commutative(f)").unwrap_err();
+        assert!(err.contains("no `#[algebra]` module"), "{err}");
+
+        let err = Bundle::declare(module, "commutative").unwrap_err();
+        assert!(err.contains("the grammar is"), "{err}");
+        let err = Bundle::declare(module, "commutative()").unwrap_err();
+        assert!(err.contains("names no operators"), "{err}");
     }
 
     /// A module with NO operators (or no items at all) is its own render — the dealing has
