@@ -2051,8 +2051,14 @@ purpose (each wants its own conversation before it becomes a disposition):
   currently ratifying?): a person reaches for the editor exactly where the question
   they are holding IS NOT YET A LOCK CLASS — the interior is the fallback
   encyclopedia, consulted when derived answers run out. The enumeration: "how does
-  this behave on THIS input" is a missing perception verb (`trace`/`eval` — the
-  engine already holds both halves); "is this fast / allocation-free" is a missing
+  this behave on THIS input" ~~is a missing perception verb~~ (CLOSED —
+  `discover::trace`: a ground term over a theory's operators, evaluated bottom-up with
+  every reduction narrated through the theory's own observation; refusals teach the
+  vocabulary, arity mismatches show both counts, and a partial operator's refusal is a
+  fact shown rather than an error buried. `bundle trace verbs 'add_a(edit_a(empty))'`
+  makes the verb algebra's conflict WATCHABLE — the two orderings traced side by side,
+  the divergence visible without opening any file. Variables stay out deliberately:
+  quantification is the laws' business, discovery's half of the split); "is this fast / allocation-free" is a missing
   property vocabulary (toleranced BENCHMARK locks — the three-valued judgment's
   shape, pointed at time); "is this safe" is the capability audit and fabric's
   reachability brought down one altitude; "what is here that I can use" is the
@@ -2163,6 +2169,23 @@ Two follow-ons from the operator's read of the build:
   itself (items and names, no syntax) are the existing proofs that the method outruns
   its host. Honest bounds: dynamic languages weaken the nets, and the compiled-mutant
   layer is per-substrate work.
+
+- **The payload language** (the operator's follow-on: "are you writing traits directly
+  with edit?"): the audit says NO — no trait has ever gone through the verbs, the
+  bundle-born member is fully certified with zero traits/generics/nested modules, and
+  the verb grammar treats traits as opaque cargo nothing has missed. The taxonomy
+  underneath: language features split into MEANING features (the body's business) and
+  COMPOSITION features (modules, visibility, traits, interfaces) — compensations for
+  hand-composition, and the apparatus has absorbed them one by one: modules → placement,
+  visibility → tiers, traits → declared expectations + the catalog (A TRAIT IS A NAMED
+  LAW-SET THE COMPILER CANNOT CHECK; the engine's version carries a can-fail proof),
+  semver → locks. What survives of traits is dispatch (a genuine meaning-level need) and
+  the HOST's own generics — the host stays Rust. And the body need not be: the theory
+  bridge already judges Lean's exported tables, so for enumerable carriers the edit
+  payload could be the value TABLE itself — language-free meaning — and for unbounded
+  carriers any language with an eval bridge qualifies, per module. The payload language
+  has a spec already: THE OPERATOR-SHAPE RULE — which re-reads the 55/55 spike as the
+  migration of the codebase INTO the payload language, not a compliance project.
 
 The original sketch follows, kept for the record:
 

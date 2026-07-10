@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 768 sites.
+# 780 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -735,6 +735,18 @@
 - boundary_spec::discover::system::SystemReport::lock_in:0: == -> !=
 - boundary_spec::discover::system::SystemReport::render:0: ! -> (deleted)
 - boundary_spec::discover::system::SystemReport::render:deaf -> String::new()
+- boundary_spec::discover::trace::check_arity:0: != -> ==
+- boundary_spec::discover::trace::check_arity:deaf -> Err(String::new())
+- boundary_spec::discover::trace::eval_ground:deaf -> Err(String::new())
+- boundary_spec::discover::trace::parse_ground:0: == -> !=
+- boundary_spec::discover::trace::parse_ground:1: || -> &&
+- boundary_spec::discover::trace::parse_ground:2: ! -> (deleted)
+- boundary_spec::discover::trace::parse_ground:3: == -> !=
+- boundary_spec::discover::trace::parse_ground:4: ! -> (deleted)
+- boundary_spec::discover::trace::parse_ground:deaf -> Err(String::new())
+- boundary_spec::discover::trace::trace::of:0: ! -> (deleted)
+- boundary_spec::discover::trace::trace::of:deaf -> Err(String::new())
+- boundary_spec::discover::trace::trace::render:deaf -> String::new()
 - boundary_spec::discover::watch::diff:0: ! -> (deleted)
 - boundary_spec::discover::watch::diff:1: ! -> (deleted)
 - boundary_spec::discover::watch::diff:2: < -> >=

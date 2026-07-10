@@ -33,6 +33,7 @@ use std::process::ExitCode;
 
 use boundary_spec::discover::bundle::Bundle;
 use boundary_spec::discover::lift::AutoLift;
+use boundary_spec::discover::trace::Trace;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -57,6 +58,7 @@ fn run(args: &[String]) -> Result<String, String> {
          \x20      bundle check <module.rs>\n\
          \x20      bundle collect <module.rs> [item-to-sweep]\n\
          \x20      bundle constrains <module.rs> <operator>\n\
+         \x20      bundle trace <theory> '<term>'\n\
          \x20      bundle lift <module.rs> <theory-name> [declaration ...]"
             .to_string()
     };
@@ -148,6 +150,24 @@ fn run(args: &[String]) -> Result<String, String> {
                     Ok(format!(
                         "collected `{name}` from {module_path} — the journal remembers it"
                     ))
+                }
+                ("trace", [term]) => {
+                    // perception: the first argument slot names a THEORY, not a module —
+                    // trace runs over compiled theories (the build/text boundary: eval
+                    // needs the build). The roster is the theories this example links.
+                    match module_path.as_str() {
+                        "verbs" | "verb algebra" => {
+                            Trace::of::<boundary_spec::discover::verbs::state::VerbAlgebra>(term)
+                                .map(|t| t.render())
+                        }
+                        "router" => Trace::of::<boundary_spec::discover::router::Router>(term)
+                            .map(|t| t.render()),
+                        "fabric" => Trace::of::<boundary_spec::discover::fabric::Fabric>(term)
+                            .map(|t| t.render()),
+                        other => Err(format!(
+                            "bundle trace: `{other}` is not in this binary's theory roster                              (verbs, router, fabric) — a consumer traces its own theories                              through discover::trace::Trace in its own suite"
+                        )),
+                    }
                 }
                 ("constrains", [name]) => {
                     // perception: read-only, journals nothing. The committed record is the
