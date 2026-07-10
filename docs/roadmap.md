@@ -1703,6 +1703,98 @@ embedded locks are the data half of DIFFERENTIAL-CERTIFY — a published artifac
 its own certification is exactly what lets release N−1 judge release N — so this brick
 lays the induction rail before that candidate's gate.
 
+## Candidate: the bundle is the source — genesis as a continuation process
+
+Named in conversation with the operator, whose reframe is the headline: genesis is not a
+starter template, it is a CONTINUATION process. The diagnosis behind it, in the operator's
+own accounting of the agent coding experience: finding context is maybe 10% of the battle
+(grep and subagents do fine); the other 90% is fighting entropy — a series of disconnected,
+task-specific edits IS tech debt, and pulling the accumulated shape back into a context
+window to crunch down is exactly what agents are worst at. The wished-for experience: the
+agent writes a SNIPPET OF LOGIC, purely additively, and the apparatus assembles the
+modularity — with the inverse sweep collecting disconnected logic back up.
+
+The pieces mostly exist, and one property makes the whole idea safe rather than wishful.
+Placement is MONOTONE by union-find's own algebra (candidate 14): a new operator joins a
+component or bridges two — it can never re-split or reshuffle what it does not touch. That
+is precisely the guarantee an additive author needs: a snippet cannot silently reorganise
+the rest of the program, so entropy from ADDITION is structurally bounded. Around that
+core: the placer derives the partition from signature text, the sixth sense narrates
+bridges at the edit, genesis renders whole trees from declarations, auto-lift reads
+operators off plain Rust with zero annotation, and cohesion + the spec's silence line
+("operators in no law") are already the disconnected-logic detectors — reports today,
+awaiting actuation.
+
+The real inversion, named plainly: FILE LAYOUT BECOMES A VIEW. Today the placer derives
+placement as a report and a lock, but the files are still hand-arranged and the lock only
+checks agreement. In the continuation form, the module tree is a GENERATED artifact under
+the one rule — never hand-edit, regenerate, ratify the diff — rendered from a BUNDLE
+(operators + meanings + expectations) the way `ci.yml` is rendered from the gate registry.
+Code as a database, files as its placed render: the same authority inversion as every
+brick here, pointed at the last hand-maintained artifact class, source layout itself.
+
+Prior art, honestly cited: Unison built the codebase-as-database experience at the
+FUNCTION level — content-addressed definitions, names as metadata, edits as append. The
+step beyond is AUTO-MODULARISATION: in Unison the namespace is still the human's to
+arrange; here the modularity is derived (net connectivity), continuous (re-placed on every
+change), and ratified (the shape lock). Placement is the tool's output, not the author's
+input.
+
+The rung ladder, round-trip before generation as always:
+
+0. **The type-library surfacing voice** — before any re-rendering exists, a hook voice
+   that surfaces which sorts and operators already live in the component an edit is
+   netting into (`Placement::signatures_of` + the existing voice delivery): the
+   anti-duplication sense, attacking the context 10% while the assembly 90% gets built.
+1. **Round-trip** — represent ONE existing module of this repo as a bundle and make the
+   render reproduce the committed tree byte for byte, locked. No generation until the
+   representation is proven faithful.
+2. **`genesis add`** — the continuation verb: a snippet parses to operators (auto-lift's
+   scan), nets into the placed partition, the tree re-renders, the locks freeze, the
+   delta narrates through the existing courier. The agent's whole interface is "write
+   the logic"; placement, imports, and file identity are derived.
+3. **The inverse sweep, actuated** — cohesion's latent splits, the silence line, and the
+   placer's seam candidates feed re-render SUGGESTIONS. Cohesion stays a suggestion by
+   design: the machine executes placement, the human keeps ratifying splits — taste
+   enters at the freeze, where it always has.
+
+Disclosures, all load-bearing. The algebra does not reach everything: this repo's own
+qualify census is 3 of 55 files, so the bundle governs the operator-shaped fraction and
+must NAME what it skips (the census move) — the spike below is the measurement of exactly
+that territory. Meanings travel opaquely: a snippet is a signature plus a body; placement
+is signature-derived and the body just rides along, which is why the behaviour locks are
+not decoration on this candidate but the only reason auto-assembly is trustworthy at all.
+And review churn must prove out in practice: if files are views, a re-render moves code,
+and the promise that hierarchical ratification plus the review router keep those diffs
+readable (placement-only reflow = machinery-verified, one agenda line) is the thing rung 1
+and 2 must demonstrate, not assume.
+
+## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
+
+The companion measurement, asked for by the operator in the same conversation, aimed at
+the part of the codebase we have been politely walking around: the qualify census says 3
+of 55 files carry an algebra, and the other 52 are the plumbing every vision above quietly
+excludes. The reason to push anyway, in the operator's framing: 90% of what is hard to get
+right in a program is its DOMAIN — and operator-shaping a file is not a formality, it
+FORCES the domain modelling (value objects in, primitives out, effects to the edge). Read
+that way the qualify census is not a compliance number, it is a domain-modelling progress
+bar for the repo's own interior.
+
+Rung 1 is a REASON census, not a refactor: extend the qualify walk to say WHY each
+non-qualifying file refuses (primitive-typed signatures, I/O in the body, generic/trait
+machinery, macro plumbing…), frozen like any census. The reasons partition the 52 into the
+three classes the work needs: (a) genuinely operator-shapeable with domain work — the
+value-object debt, now enumerated with addresses; (b) files needing VOCABULARY the
+discipline does not have yet (effectful edges, builder plumbing — the effects-as-theories
+research direction, given a concrete worklist); (c) principled refusals (build scripts,
+proc-macro shims) that become reasoned register lines. The target restated honestly, the
+instrumentation-census shape exactly: 55 of 55 is "every file qualifies OR carries a
+ratified reason" — totality belongs to the census from day one; what grows is the
+qualifying fraction. And the tie back to the candidate above is direct: only
+operator-shaped code can live in a bundle, so every file this spike converts is territory
+the continuation process can govern — the two experiments are one programme measured from
+opposite ends.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
