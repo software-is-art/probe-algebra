@@ -38,5 +38,6 @@ fn main() {
     config.kernel_allowlist = kernel;
     config.qualify_spec = Some(manifest.join("spec/qualify.spec"));
     config.tiers_spec = Some(manifest.join("spec/tiers.spec"));
+    config.reasons_spec = Some(manifest.join("spec/qualify-reasons.spec"));
     Enforcement::enforce_or_panic(&config);
 }

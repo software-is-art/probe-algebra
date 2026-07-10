@@ -126,6 +126,13 @@ pub struct Config {
     pub tiers_spec: Option<PathBuf>,
     /// The bless variable for [`Config::tiers_spec`]. Default: `BLESS_TIERS`.
     pub tiers_bless_env: String,
+    /// Where the REASON census is frozen and drift-gated — WHY each non-qualifying file
+    /// refuses the algebra census (the qualify census's complement, derived by the same
+    /// walk). `None` skips the freeze/drift pass (the census is still computed and
+    /// returned).
+    pub reasons_spec: Option<PathBuf>,
+    /// The bless variable for [`Config::reasons_spec`]. Default: `BLESS_REASONS`.
+    pub reasons_bless_env: String,
 }
 
 impl Config {
@@ -141,6 +148,8 @@ impl Config {
             bless_env: "BLESS_QUALIFY".to_string(),
             tiers_spec: None,
             tiers_bless_env: "BLESS_TIERS".to_string(),
+            reasons_spec: None,
+            reasons_bless_env: "BLESS_REASONS".to_string(),
         }
     }
 }
@@ -156,6 +165,9 @@ pub struct Enforcement {
     /// The rendered tier lock (what [`Config::tiers_spec`] freezes): the derived partition,
     /// one line per file with the evidence that placed it.
     pub tiers_census: String,
+    /// The rendered REASON census (what [`Config::reasons_spec`] freezes): one line per
+    /// non-qualifying file with the mechanical blocker classes its functions exhibit.
+    pub reasons_census: String,
     /// The files and directories whose change must re-trigger enforcement, in emission order.
     pub rerun_paths: Vec<PathBuf>,
 }
@@ -256,12 +268,33 @@ impl Enforcement {
             &mut violations,
         );
 
+        // REASON CENSUS: the qualify census's COMPLEMENT — for every file that does NOT
+        // qualify, the mechanical blocker classes its functions exhibit (no functions,
+        // impl-attached surface, primitive signatures, effects…). Same walk, same rule,
+        // second render: the census is evidence, the reading of it (value-object debt vs
+        // missing vocabulary vs principled refusal) stays a ratification.
+        let reasons_census = render_reasons(
+            &config.src_root,
+            &config.manifest_dir,
+            &config.reasons_bless_env,
+        );
+        freeze_or_gate(
+            &config.reasons_spec,
+            &reasons_census,
+            &config.reasons_bless_env,
+            "the qualify-reason census",
+            &config.manifest_dir,
+            &mut rerun,
+            &mut violations,
+        );
+
         violations.sort();
         violations.dedup();
         Enforcement {
             violations,
             qualify_census,
             tiers_census,
+            reasons_census,
             rerun_paths: rerun,
         }
     }
@@ -696,6 +729,175 @@ pub fn qualify_census_lines(src: &Path, manifest: &Path) -> Vec<String> {
     collect_qualifications(src, manifest, &mut scanned, &mut lines);
     lines.sort();
     lines
+}
+
+// ===== the REASON census: why each non-qualifying module refuses =====
+
+/// Render the qualify-REASON census: one line per file whose functions form no algebra,
+/// carrying the mechanical blocker classes they exhibit — the qualify census's complement,
+/// derived by the same walk (same `tests.rs` skip, same operator-shape rule, stated once).
+/// The classes are EVIDENCE, deliberately mechanical; reading them into value-object debt,
+/// missing vocabulary, or a principled refusal is a ratification, not a derivation.
+fn render_reasons(src: &Path, manifest: &Path, bless_env: &str) -> String {
+    let mut scanned = 0usize;
+    let mut lines: Vec<String> = Vec::new();
+    collect_reasons(src, manifest, &mut scanned, &mut lines);
+    lines.sort();
+    let mut report = format!(
+        "# qualify reasons — WHY each module refuses the algebra census: the mechanical blockers,\n\
+         # per file, derived by the same walk as the qualify census (one rule, two renders). Classes:\n\
+         # no functions | impl-attached surface only | unit returns | primitive signatures |\n\
+         # borrowed types | parameterised types | unshaped types | zero-argument constants |\n\
+         # effectful bodies. The classes are evidence; reading them into value-object debt, missing\n\
+         # vocabulary, or a principled refusal is the ratification's job. Regenerate with\n\
+         # `{bless_env}=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files scanned, {} qualify, {} refuse.\n\n",
+        scanned,
+        scanned - lines.len(),
+        lines.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+    report
+}
+
+/// Walk `dir` and push a `REFUSES` line for every parsed file whose functions form no
+/// algebra — the same walk (and skips) as [`collect_qualifications`].
+fn collect_reasons(dir: &Path, manifest: &Path, scanned: &mut usize, out: &mut Vec<String>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_reasons(&path, manifest, scanned, out);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        if path.file_name().and_then(|n| n.to_str()) == Some("tests.rs") {
+            continue;
+        }
+        let Ok(file) = parse(&path) else { continue };
+        *scanned += 1;
+        let classes = refusal_classes_from_items(&file.items);
+        if classes.is_empty() {
+            continue;
+        }
+        let loc = path
+            .strip_prefix(manifest)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        out.push(format!("{loc}: REFUSES — {}", classes.join(", ")));
+    }
+}
+
+/// The blocker classes one file's items exhibit — EMPTY exactly when the file qualifies
+/// (some function is operator-shaped, the same predicate [`qualify_line_from_items`]
+/// answers), so the two censuses partition the scanned files by construction. For a
+/// refusing file: no free functions at all is its own class (with impl-attached surface
+/// distinguished, because the census reads free functions and the no-rats-nest rule pushes
+/// public surface INTO impls — the tension the reason census exists to expose); otherwise
+/// the classes aggregate every blocker across the free functions, sorted.
+fn refusal_classes_from_items(items: &[Item]) -> Vec<&'static str> {
+    let imports = std_effect_imports(items);
+    let mut ops: Vec<Op> = Vec::new();
+    qualify_items(items, &imports, &mut ops);
+    if !ops.is_empty() {
+        return Vec::new();
+    }
+    let mut free_fns: Vec<&ItemFn> = Vec::new();
+    let mut methods = 0usize;
+    collect_fns(items, &mut free_fns, &mut methods);
+    if free_fns.is_empty() {
+        return if methods > 0 {
+            vec!["impl-attached surface only"]
+        } else {
+            vec!["no functions"]
+        };
+    }
+    let mut classes: std::collections::BTreeSet<&'static str> = std::collections::BTreeSet::new();
+    for f in free_fns {
+        match &f.sig.output {
+            ReturnType::Default => {
+                classes.insert("unit returns");
+            }
+            ReturnType::Type(_, ty) => {
+                if let Some(class) = type_class(ty) {
+                    classes.insert(class);
+                }
+            }
+        }
+        if f.sig.inputs.is_empty() {
+            classes.insert("zero-argument constants");
+        }
+        for arg in &f.sig.inputs {
+            if let FnArg::Typed(pt) = arg {
+                if let Some(class) = type_class(&pt.ty) {
+                    classes.insert(class);
+                }
+            }
+        }
+        let mut eff = EffectFinder {
+            found: None,
+            imports: &imports,
+        };
+        eff.visit_item_fn(f);
+        if eff.found.is_some() {
+            classes.insert("effectful bodies");
+        }
+    }
+    classes.into_iter().collect()
+}
+
+/// Free functions and impl-method counts, descending into non-test inline modules — the
+/// same traversal shape as [`qualify_items`], widened to see what that walk ignores.
+fn collect_fns<'a>(items: &'a [Item], free: &mut Vec<&'a ItemFn>, methods: &mut usize) {
+    for it in items {
+        match it {
+            Item::Fn(f) if !is_cfg_test(&f.attrs) => free.push(f),
+            Item::Impl(i) if !is_cfg_test(&i.attrs) => {
+                *methods += i
+                    .items
+                    .iter()
+                    .filter(|ii| matches!(ii, syn::ImplItem::Fn(_)))
+                    .count();
+            }
+            Item::Mod(m) if !is_cfg_test(&m.attrs) => {
+                if let Some((_, inner)) = &m.content {
+                    collect_fns(inner, free, methods);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Why a type is not a bare named value type — `None` when it IS one (the same admission
+/// [`named_value_type`] makes, so the classifier and the rule cannot disagree about a type).
+fn type_class(ty: &Type) -> Option<&'static str> {
+    if named_value_type(ty).is_some() {
+        return None;
+    }
+    match ty {
+        Type::Path(tp) => match tp.path.segments.last() {
+            Some(seg) if !matches!(seg.arguments, syn::PathArguments::None) => {
+                Some("parameterised types")
+            }
+            Some(_) => Some("primitive signatures"),
+            None => Some("unshaped types"),
+        },
+        Type::Reference(_) => Some("borrowed types"),
+        Type::Tuple(t) if t.elems.is_empty() => Some("unit returns"),
+        _ => Some("unshaped types"),
+    }
 }
 
 /// An operator read off a function: name, argument sorts, return sort.
@@ -1582,5 +1784,86 @@ mod qualify_line_tests {
     #[test]
     fn an_unparseable_file_is_err_not_none() {
         assert!(qualify_line("pub fn broken( -> {", "src/m.rs").is_err());
+    }
+}
+
+#[cfg(test)]
+mod reason_census_tests {
+    use super::refusal_classes_from_items;
+
+    fn classes(src: &str) -> Vec<&'static str> {
+        refusal_classes_from_items(&syn::parse_file(src).expect("parses").items)
+    }
+
+    /// A QUALIFYING file has NO refusal classes — the two censuses partition the scanned
+    /// files by construction (this is the same predicate the qualify emitter answers).
+    #[test]
+    fn a_qualifying_file_has_no_classes() {
+        assert!(classes("pub struct A;\npub fn f(x: A) -> A { todo!() }\n").is_empty());
+    }
+
+    /// The two file-level classes: no functions at all (types, data, glue), and
+    /// impl-attached surface only — distinguished because the no-rats-nest rule pushes
+    /// public surface INTO impls, which the qualify walk cannot see; that tension is the
+    /// finding this census exists to expose.
+    #[test]
+    fn file_level_classes_distinguish_glue_from_impl_surface() {
+        assert_eq!(classes("pub struct A;\n"), vec!["no functions"]);
+        assert_eq!(
+            classes("pub struct A;\nimpl A { pub fn f(&self) -> A { A } }\n"),
+            vec!["impl-attached surface only"]
+        );
+    }
+
+    /// The signature classes, one probe each: primitives, borrows, parameterised types,
+    /// unit returns, zero-argument constants, unshaped types — aggregated and sorted
+    /// across a file's free functions.
+    #[test]
+    fn signature_classes_name_each_blocker() {
+        assert_eq!(
+            classes("pub fn n(x: u32) -> u32 { x }\n"),
+            vec!["primitive signatures"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: &A) -> A { todo!() }\n"),
+            vec!["borrowed types"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: Option<A>) -> A { todo!() }\n"),
+            vec!["parameterised types"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: A) { let _ = x; }\n"),
+            vec!["unit returns"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f() -> A { A }\n"),
+            vec!["zero-argument constants"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: (A, A)) -> A { x.0 }\n"),
+            vec!["unshaped types"]
+        );
+        // aggregation is a sorted union across functions:
+        assert_eq!(
+            classes(
+                "pub struct A;\npub fn f(x: u32) -> u32 { x }\npub fn g(x: &A) -> A { todo!() }\n"
+            ),
+            vec!["borrowed types", "primitive signatures"]
+        );
+    }
+
+    /// An effectful body blocks an otherwise operator-shaped function, and the class
+    /// names it — the I/O half of the operator-shape rule, same evidence the qualify
+    /// walk reads.
+    #[test]
+    fn an_effectful_body_is_its_own_class() {
+        assert_eq!(
+            classes(
+                "use std::fs;\npub struct A;\n\
+                 pub fn f(x: A) -> A { let _ = fs::read(\"p\"); x }\n"
+            ),
+            vec!["effectful bodies"]
+        );
     }
 }

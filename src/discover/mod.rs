@@ -22,6 +22,7 @@ pub mod architect;
 pub mod arithmetic;
 pub mod bite;
 pub mod bridge;
+pub mod bundle;
 pub mod coherence;
 pub mod cohesion;
 pub mod composition;

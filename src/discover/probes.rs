@@ -145,6 +145,7 @@ const STRUCTURAL: &[(&str, Mechanism)] = &[
     // spec/probes.register (rung 2) until it earns an individual drill.
     ("surface", Mechanism::DriftGate),
     ("tiers", Mechanism::DriftGate),
+    ("reasons", Mechanism::DriftGate),
 ];
 
 /// The unified probe census — every probe lock with the mechanism that proves it sensitive.
@@ -294,6 +295,7 @@ mod probes_tests {
         // structural byte-locks and world judges, keyed to the roster.
         let structural = match file {
             "qualify.spec" => Some("surface"),
+            "qualify-reasons.spec" => Some("reasons"),
             "tiers.spec" => Some("tiers"),
             "shapes.spec" => Some("catalog"),
             "gates.spec" => Some("pipeline"),

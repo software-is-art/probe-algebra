@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 698 sites.
+# 706 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -104,6 +104,14 @@
 - boundary_spec::discover::bridge::Triage::of:0: ! -> (deleted)
 - boundary_spec::discover::bridge::Triage::render:deaf -> String::new()
 - boundary_spec::discover::bridge::eval:deaf -> None
+- boundary_spec::discover::bundle::bundle::is_canonical:0: == -> !=
+- boundary_spec::discover::bundle::bundle::is_canonical:deaf -> false
+- boundary_spec::discover::bundle::bundle::is_canonical:deaf -> true
+- boundary_spec::discover::bundle::bundle::parse:0: == -> !=
+- boundary_spec::discover::bundle::bundle::parse:1: > -> <=
+- boundary_spec::discover::bundle::bundle::parse:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::render:0: == -> !=
+- boundary_spec::discover::bundle::bundle::render:deaf -> String::new()
 - boundary_spec::discover::coherence::CoherenceReport::between:deaf -> Err(String::new())
 - boundary_spec::discover::coherence::coherence_violations:deaf -> Err(String::new())
 - boundary_spec::discover::coherence::coherence_violations:deaf -> Ok(vec![])
@@ -370,6 +378,8 @@
 - boundary_spec::discover::genesis::banner:deaf -> String::new()
 - boundary_spec::discover::genesis::bless_env:deaf -> String::new()
 - boundary_spec::discover::genesis::bless_tiers_env:deaf -> String::new()
+- boundary_spec::discover::genesis::byte_offset:0: == -> !=
+- boundary_spec::discover::genesis::byte_offset:1: == -> !=
 - boundary_spec::discover::genesis::camel:0: ! -> (deleted)
 - boundary_spec::discover::genesis::camel:deaf -> String::new()
 - boundary_spec::discover::genesis::crate_ident:deaf -> String::new()
@@ -450,8 +460,6 @@
 - boundary_spec::discover::genesis::parse_value:1: && -> ||
 - boundary_spec::discover::genesis::shape_info:0: == -> !=
 - boundary_spec::discover::genesis::shape_rank:0: == -> !=
-- boundary_spec::discover::genesis::slice_by_line_column:0: == -> !=
-- boundary_spec::discover::genesis::slice_by_line_column:1: == -> !=
 - boundary_spec::discover::genesis::type_text:deaf -> String::new()
 - boundary_spec::discover::genesis::validate:0: ! -> (deleted)
 - boundary_spec::discover::genesis::validate:10: ! -> (deleted)

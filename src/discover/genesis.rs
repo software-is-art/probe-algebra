@@ -609,26 +609,31 @@ fn slice_by_line_column(
     start: proc_macro2::LineColumn,
     end: proc_macro2::LineColumn,
 ) -> &str {
-    let offset = |pos: proc_macro2::LineColumn| {
-        let mut remaining_lines = pos.line - 1;
-        let mut byte = 0;
-        for (i, c) in source.char_indices() {
-            if remaining_lines == 0 {
-                let line_start = byte;
-                return source[line_start..]
-                    .char_indices()
-                    .nth(pos.column)
-                    .map(|(o, _)| line_start + o)
-                    .unwrap_or(source.len());
-            }
-            if c == '\n' {
-                remaining_lines -= 1;
-                byte = i + 1;
-            }
+    &source[byte_offset(source, start)..byte_offset(source, end)]
+}
+
+/// The byte offset of a proc-macro2 line/column position in `source` (lines 1-based, columns
+/// UTF-8-character offsets within the line) — the span→text bridge, stated once: genesis's
+/// declaration splice and the bundle's item segmentation (`discover::bundle`) both cut with it.
+#[crate::mutate]
+pub(crate) fn byte_offset(source: &str, pos: proc_macro2::LineColumn) -> usize {
+    let mut remaining_lines = pos.line - 1;
+    let mut byte = 0;
+    for (i, c) in source.char_indices() {
+        if remaining_lines == 0 {
+            let line_start = byte;
+            return source[line_start..]
+                .char_indices()
+                .nth(pos.column)
+                .map(|(o, _)| line_start + o)
+                .unwrap_or(source.len());
         }
-        source.len()
-    };
-    &source[offset(start)..offset(end)]
+        if c == '\n' {
+            remaining_lines -= 1;
+            byte = i + 1;
+        }
+    }
+    source.len()
 }
 
 // ===== validation (the declaration must be coherent before anything is emitted) =============

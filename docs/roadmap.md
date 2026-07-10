@@ -1756,9 +1756,21 @@ The rung ladder, round-trip before generation as always:
    that surfaces which sorts and operators already live in the component an edit is
    netting into (`Placement::signatures_of` + the existing voice delivery): the
    anti-duplication sense, attacking the context 10% while the assembly 90% gets built.
-1. **Round-trip** — represent ONE existing module of this repo as a bundle and make the
-   render reproduce the committed tree byte for byte, locked. No generation until the
-   representation is proven faithful.
+1. **Round-trip — BUILT** (`discover::bundle`). A module parses into a bundle (each
+   top-level item a verbatim segment; operators identified by the sixth sense's net model,
+   grouped by the one placer) and renders back in canonical placed order. The pin is real:
+   `modularize.rs` — the committed file whose whole subject is proposing modularity —
+   round-trips BYTE FOR BYTE (docs, the attributed inline module, the cfg(test) suite all
+   verbatim), and was already canonically placed — checked, not assumed. The
+   non-vacuousness drill scrambles two components and demands the regroup; refusals are
+   named (unparseable text, a non-unique operator name — the dealing is never guessed).
+   One design lesson earned on first contact and worth keeping: SEPARATOR TRIVIA BELONGS
+   TO THE POSITION, NOT THE ITEM — doc comments are attributes inside an item's span and
+   travel with it, but the blank lines between items are the module's furniture, so a
+   reorder dresses the dealt items in the original positions' spacing (the first draft
+   moved gaps with items and produced jammed output; the drill caught it). Disclosed
+   rung-1 limits: only top-level operator fns are re-dealt (impl blocks and inline modules
+   ride whole), and identity is the function name.
 2. **`genesis add`** — the continuation verb: a snippet parses to operators (auto-lift's
    scan), nets into the placed partition, the tree re-renders, the locks freeze, the
    delta narrates through the existing courier. The agent's whole interface is "write
@@ -1790,20 +1802,29 @@ FORCES the domain modelling (value objects in, primitives out, effects to the ed
 that way the qualify census is not a compliance number, it is a domain-modelling progress
 bar for the repo's own interior.
 
-Rung 1 is a REASON census, not a refactor: extend the qualify walk to say WHY each
-non-qualifying file refuses (primitive-typed signatures, I/O in the body, generic/trait
-machinery, macro plumbing…), frozen like any census. The reasons partition the 52 into the
-three classes the work needs: (a) genuinely operator-shapeable with domain work — the
-value-object debt, now enumerated with addresses; (b) files needing VOCABULARY the
-discipline does not have yet (effectful edges, builder plumbing — the effects-as-theories
-research direction, given a concrete worklist); (c) principled refusals (build scripts,
-proc-macro shims) that become reasoned register lines. The target restated honestly, the
-instrumentation-census shape exactly: 55 of 55 is "every file qualifies OR carries a
-ratified reason" — totality belongs to the census from day one; what grows is the
-qualifying fraction. And the tie back to the candidate above is direct: only
-operator-shaped code can live in a bundle, so every file this spike converts is territory
-the continuation process can govern — the two experiments are one programme measured from
-opposite ends.
+Rung 1 is a REASON census, not a refactor — BUILT (`spec/qualify-reasons.spec`, derived by
+`boundary-enforce` in the same walk as the qualify census — one rule, two renders — frozen
+under `BLESS_REASONS`, drift-gated on every build, covered in the probe census as a
+ratified drift-gate probe). The classes are deliberately mechanical (no functions,
+impl-attached surface only, primitive signatures, borrowed types, parameterised types,
+unshaped types, unit returns, zero-argument constants, effectful bodies); reading them into
+the three work classes — (a) value-object debt, (b) missing VOCABULARY (effectful edges,
+builder plumbing — the effects-as-theories direction, given a concrete worklist),
+(c) principled refusals that become register lines — stays a ratification, as it must.
+First numbers, and the headline was visible the moment the lock minted: 56 files, 3
+qualify, 53 refuse — and the single biggest named class is IMPL-ATTACHED SURFACE ONLY
+(15 files): the no-rats-nest rule pushes every public callable onto a typestate, and the
+census reads free functions, so the discipline's own crown rule manufactures its largest
+blind spot. That tension — associated functions as operators — is now the spike's first
+real question, with fifteen addresses. (Fittingly, `discover::bundle` itself landed in
+that class on arrival.) The borrowed/parameterised classes dominate the remainder: the
+engine's own plumbing speaks `&`, `Vec`, and `Result`, which is where the vocabulary work
+begins. The target restated honestly, the instrumentation-census shape exactly: totality
+is "every file qualifies OR carries a ratified reason" — the census owns totality from day
+one; what grows is the qualifying fraction. And the tie back to the candidate above is
+direct: only operator-shaped code can live in a bundle, so every file this spike converts
+is territory the continuation process can govern — the two experiments are one programme
+measured from opposite ends.
 
 ## Standing follow-ups
 

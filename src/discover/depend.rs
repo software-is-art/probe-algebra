@@ -654,6 +654,10 @@ mod probes {
             ),
             ("perimeter.spec", "repo-meta: this repo's settings floor"),
             ("probes.spec", "repo-meta: this repo's probe roster"),
+            (
+                "qualify-reasons.spec",
+                "repo-meta: this repo's domain-modelling worklist (the qualify census's complement)",
+            ),
             ("qualify.spec", "repo-meta: this repo's surface census"),
             (
                 "schemata.spec",
