@@ -599,10 +599,10 @@ impl Bundle {
     pub fn show(module: &str, item_name_text: &str) -> Result<String, String> {
         let file =
             syn::parse_file(module).map_err(|e| format!("bundle show: module unparseable: {e}"))?;
-        let mut targets = file
-            .items
-            .iter()
-            .filter(|item| item_address(item).as_deref() == Some(item_name_text));
+        let mut targets = file.items.iter().filter(|item| {
+            let address = item_address(item);
+            address.as_deref() == Some(item_name_text)
+        });
         let target = targets.next().ok_or_else(|| {
             let roster: Vec<String> = file.items.iter().filter_map(item_address).collect();
             format!(

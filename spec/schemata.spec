@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 832 sites.
+# 841 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -140,6 +140,11 @@
 - boundary_spec::discover::bundle::bundle::edit:5: == -> !=
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Ok(String::new())
+- boundary_spec::discover::bundle::bundle::inventory:0: ! -> (deleted)
+- boundary_spec::discover::bundle::bundle::inventory:1: && -> ||
+- boundary_spec::discover::bundle::bundle::inventory:2: == -> !=
+- boundary_spec::discover::bundle::bundle::inventory:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::inventory:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::is_canonical:0: == -> !=
 - boundary_spec::discover::bundle::bundle::is_canonical:deaf -> false
 - boundary_spec::discover::bundle::bundle::is_canonical:deaf -> true
@@ -149,6 +154,10 @@
 - boundary_spec::discover::bundle::bundle::parse:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::render:0: == -> !=
 - boundary_spec::discover::bundle::bundle::render:deaf -> String::new()
+- boundary_spec::discover::bundle::bundle::show:0: == -> !=
+- boundary_spec::discover::bundle::bundle::show:1: > -> <=
+- boundary_spec::discover::bundle::bundle::show:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::show:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::expects_entries:0: == -> !=
 - boundary_spec::discover::bundle::expects_entries:1: == -> !=
 - boundary_spec::discover::bundle::expects_entries:2: ! -> (deleted)
