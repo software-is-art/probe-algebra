@@ -1943,7 +1943,9 @@ everything a caller cannot observe through the signature — and everything that
 item re-judges downstream precisely because the signature held. Dogfooded live on
 `bundle-demo`'s `bump`, where the planted signature-move refusal fired naming
 `fn bump (t : Tally)` against the offered two-argument form), **remove**
-(reliance-checked deletion — the embedded registers make it judgeable), **split** (rung
+(~~**remove**~~ DISSOLVED by the operator's question — see the collection disposition
+below: garbage collection replaces deletion, with mark derived and sweep ratified),
+**collect** (the mark census + the sweep verb), **split** (rung
 3 — executing a ratified cohesion split), ~~**constrains**~~ (CLOSED next — the
 perception verb, and the one the primary user said it would reach for most: everything
 that pins a named operator on one page, derived instead of grepped — its placement
@@ -1959,6 +1961,30 @@ placement (exercised as the
 fallback path the same day: building `edit` itself required an impl-interior change the
 verbs cannot express — the second rule's field-report arm, proven on day one), test
 authoring, and cross-file moves. Refusals should name their fixing verb.
+
+**The disposition on removal — garbage collection, with the house amendment: MARK IS
+DERIVED, SWEEP IS RATIFIED.** The operator's question ("is there ever really a need to
+remove something? we know how everything hangs together — the unused disconnects and we
+eventually discard it automatically") dissolves the `remove` verb, with one correction
+the method itself demands. Plain auto-discard would be self-attestation: a runtime GC's
+unreachable object is PROVABLY worthless, but an unreferenced item of code can be
+seasonal, staged, or vocabulary awaiting its consumer — liveness has an intentional
+component the reference graph cannot see, the kernel-register lesson again (intent is
+never inferred from conduct). So: the MARK phase is fully derivable and mostly already
+built — an item is COLLECTABLE when no root reaches it, and every root is an existing
+sense (pub-reachability from the tier derivation, the laws' silence line, declared
+expectations, downstream reliances, placement isolation); `collect` is `constrains`
+inverted — find everything that nothing pins — rendered as a derived census with
+evidence per item. The SWEEP is one judged, journaled verb removing exactly the marked
+set: automatic in the sense that matters (zero analysis, one command, machine-authored
+diff), ratified in the sense that keeps it honest (the diff is the signature). The
+journal gives "eventually" its clock — disconnection age in journal order, generations
+in certified releases — so the proposal can escalate on schedule without ever seizing
+authority. And in stage 4 the fear of deletion dissolves entirely: the log never
+forgets, so collect is UN-MATERIALIZE, never un-exist — precisely why GC is safe in
+runtimes. What remains of "remove" is only the BREAKING case, deleting something still
+pinned — and that is not collection, it is interface change, which already has its
+ceremony: the reliance machinery refusing by name until the consumers migrate.
 
 **Stage 2's first form landed with it: THE JOURNAL.** Every mutating verb appends one
 line to `bundle.journal` beside the nearest `Cargo.toml` — `<verb> <module> — <detail>`,
