@@ -328,4 +328,65 @@ mod probes {
         let refusal = rules().compact("add src/m.rs\n").unwrap_err();
         assert!(refusal.contains("line 1"), "{refusal}");
     }
+
+    /// The equation parser's guards, pinned on SYNTHETIC law text (the sweep found
+    /// these branches reachable only by equations the live algebra never writes):
+    /// a cross-item or mixed-item composition is NO collapse, an item-blind
+    /// composition is NO collapse, a square with mismatched maps is NO mobility,
+    /// an underscored variable still parses, and junk shapes carry no rule at all.
+    #[test]
+    fn the_equation_parser_admits_only_what_it_should() {
+        let spec_of = |equations: &[&str]| crate::discover::Spec {
+            theory: "synthetic",
+            laws: equations
+                .iter()
+                .map(|e| crate::discover::Law {
+                    prose: String::new(),
+                    equation: (*e).to_string(),
+                })
+                .collect(),
+            consequences: 0,
+            uncovered_ops: vec![],
+            undecided: vec![],
+            tolerance: None,
+        };
+
+        for not_a_collapse in [
+            "collect_a(add_b(x)) = collect_a(x)",
+            "collect_a(add_a(x)) = collect_b(x)",
+            "collect_a(add_b(x)) = collect_b(x)",
+            "declare(edit(x)) = declare(x)",
+        ] {
+            let r = SquashRules::from_spec(&spec_of(&[not_a_collapse]));
+            assert!(
+                r.collapses.is_empty(),
+                "`{not_a_collapse}` must license nothing: {:?}",
+                r.collapses
+            );
+        }
+
+        let r = SquashRules::from_spec(&spec_of(&["add_a(edit_b(x)) = edit_b(collect_a(x))"]));
+        assert!(
+            r.commutes.is_empty(),
+            "a square with mismatched maps is not mobility: {:?}",
+            r.commutes
+        );
+
+        // an underscored VARIABLE parses — the core validation accepts '_' too.
+        let r = SquashRules::from_spec(&spec_of(&["add_a(add_a(x_1)) = add_a(x_1)"]));
+        assert!(r.projections.contains("add"), "{:?}", r.projections);
+
+        for junk in [
+            "(x + y) = (y + x)",
+            "add_a(x, y) = add_a(x)",
+            "add_a() = add_a()",
+            "x = x",
+        ] {
+            let r = SquashRules::from_spec(&spec_of(&[junk]));
+            assert!(
+                r.collapses.is_empty() && r.projections.is_empty() && r.commutes.is_empty(),
+                "`{junk}` must carry no rule"
+            );
+        }
+    }
 }

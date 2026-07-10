@@ -1715,4 +1715,17 @@ fn orphan(a: Count) -> Count {
         assert!(toc.contains("- impl T — 1 method signatures held"), "{toc}");
         assert!(toc.contains("- mod probes [tests]"), "{toc}");
     }
+
+    /// The FINAL `expects` entry must not fall off the parse (the sweep's catch: the
+    /// existing duplicate probe re-declares the FIRST entry, which the comma path
+    /// pushes — only the trailing entry exercises the after-loop push, and with it
+    /// dropped a duplicate of the LAST expectation would land instead of refusing).
+    #[test]
+    fn a_duplicate_of_the_final_expectation_refuses() {
+        let module = "#[crate::algebra(M, \"m\")]\npub mod m {\n    pub struct A;\n    pub fn f(a: A) -> A {\n        a\n    }\n}\n";
+        let once = Bundle::declare(module, "idempotent(f)").expect("declares");
+        let twice = Bundle::declare(&once, "involution(f)").expect("appends");
+        let refusal = Bundle::declare(&twice, "involution(f)").unwrap_err();
+        assert!(refusal.contains("already declared"), "{refusal}");
+    }
 }

@@ -836,4 +836,23 @@ mod probes {
         // and a file with no ops block parses to an empty, settled placement.
         assert!(parse_ops("fn main() {}").unwrap().is_empty());
     }
+
+    /// The vocabulary front stays audible: a module's own types and its signatures'
+    /// idents both arrive (probe-hook's library voice reads this through `.ok()?`,
+    /// which would silently swallow a deaf refusal — so the conduct pins here,
+    /// lib-side).
+    #[test]
+    fn type_vocabulary_hears_own_types_and_signatures() {
+        let vocabulary = Ticker::type_vocabulary(
+            "pub struct Tally;\npub fn merge(a: Tally, b: Other) -> Tally {\n    a\n}\n",
+        )
+        .expect("parses");
+        for name in ["Tally", "Other"] {
+            assert!(vocabulary.contains(name), "{vocabulary:?}");
+        }
+        assert!(
+            Ticker::type_vocabulary("not rust").is_err(),
+            "an unparseable module refuses by name"
+        );
+    }
 }

@@ -304,4 +304,24 @@ mod probes {
             .render();
         assert!(report.contains("effect/judgment split"), "{report}");
     }
+
+    /// The address guard is a CONJUNCTION: a trailing `@` token that is not exactly
+    /// 16 hex digits is DETAIL, not an address — either half alone would send a
+    /// stray token to the store and turn an honest pre-store verdict into a
+    /// missing-blob error.
+    #[test]
+    fn a_stray_at_token_is_not_an_address() {
+        let root = scratch("stray");
+        let store = PayloadStore::beside(&root);
+        for stray in [
+            "add src/m.rs — fn x @abcdef12345\n",
+            "add src/m.rs — fn x @zzzzzzzzzzzzzzzz\n",
+        ] {
+            let report = Replay::differential(stray, &store).unwrap().render();
+            assert!(
+                report.contains("predates the payload store"),
+                "wrong-length or non-hex stays detail: {report}"
+            );
+        }
+    }
 }
