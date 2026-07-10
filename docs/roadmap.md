@@ -1986,6 +1986,35 @@ runtimes. What remains of "remove" is only the BREAKING case, deleting something
 pinned — and that is not collection, it is interface change, which already has its
 ceremony: the reliance machinery refusing by name until the consumers migrate.
 
+**The standing question, adopted into CLAUDE.md** — "what else are we doing by hand that
+is secretly a derivation plus a signature?" — with the inventory it yields when asked of
+the repo today, each entry a named candidate:
+
+- **Commit messages and PR bodies**: narration of a diff is a derivation — the journal
+  plus the freeze-delta narration already hold the content; the commit itself is the
+  signature. The agenda-from-journal brick subsumes this.
+- **The bless loop**: when a census drifts, the refusal names a command a human then
+  runs — but regeneration is pure derivation; only committing the diff is the signature.
+  The refusal could regenerate and present the diff instead of homework
+  ("refusals name their fixing verb", one step further: refusals RUN their fixing verb
+  when the fix is a derivation).
+- **Imports in snippets**: `use` lines are name resolution, which is a derivation — a
+  `bundle add` payload should not need to carry them; the verb can derive and splice
+  them. Real toil today, felt while growing bundle-demo.
+- **CLAUDE.md's regenerate table**: artifact → command is registry DATA restated as
+  prose — derivable from the gate/freeze declarations and drift-gated like everything
+  else, so the table can never lie about a command again.
+- **The crate shell** (Cargo.toml, the mod line): mostly derivation (genesis's residue,
+  the shell mint); the hand-typed part shrinks to the dependency DECISIONS.
+- **Test scaffolds**: the probes are already derived; what stays hand-typed is the
+  irreducible base the method has always named — meanings, negative fixtures, and the
+  grammar itself.
+
+What stays hand-typed on principle, so the question is never over-applied: register
+justifications, roadmap dispositions, declared expectations' CHOICE (which laws to
+promise), and every ratification — the signatures themselves. The question hunts
+derivations wearing a signature's clothes, never the reverse.
+
 **Stage 2's first form landed with it: THE JOURNAL.** Every mutating verb appends one
 line to `bundle.journal` beside the nearest `Cargo.toml` — `<verb> <module> — <detail>`,
 no timestamps, order the only clock — so the change record is derived, never narrated

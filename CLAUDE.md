@@ -14,6 +14,14 @@ before falling back to a file edit. Prose (docs, registers' justifications) stay
 hand-typed — prose is judgment. The aim this serves: the CLI is the interface to the
 code; the gaps you hit are the roadmap's fuel.
 
+## The standing question
+
+Ask it of everything you find yourself doing by hand: **"what else are we doing by hand
+that is secretly a derivation plus a signature?"** It is the method's one move (derive
+the fact, ratify the decision) pointed at its own tooling, and it has already dissolved
+genesis's emitter, git's change-medium, and the `remove` verb. When you catch one,
+record it in docs/roadmap.md's hand-work inventory — naming it is the brick's first half.
+
 Orientation: `README.md` is the front door, `docs/tour.md` the guided walk,
 `docs/discovery.md` the discovery reference, `docs/compile-time.md` the compile-time
 edge grammar, `docs/roadmap.md` the build history and what's next, `docs/experience.md`
