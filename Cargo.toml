@@ -19,6 +19,7 @@ members = [
     ".",
     "boundary-spec-macros",
     "boundary-enforce",
+    "bundle-demo",
     "delta-render",
     "layout-probe",
     "downstream-fixture",

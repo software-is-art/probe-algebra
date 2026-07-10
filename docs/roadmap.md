@@ -1850,10 +1850,35 @@ committed `modularize.rs`: exactly one line moves). Parser-as-gate throughout: a
 outside the ratified catalog is refused TEACHING the vocabulary (the same validator the
 engine panics with, in `Expectation::canonical`'s non-panicking form), a duplicate
 declaration is refused, a module with no `#[algebra]` names the fix, and two `#[algebra]`
-modules refuse as ambiguous. Disclosed next: the ZERO-ANNOTATION declaration channel
-(expectations on a `Lifted` module — auto-lift's world currently has no way to say SHOULD),
-and the red-lock story end to end on a bundle-born crate, which is the retirement
-criterion above.
+modules refuse as ambiguous.
+
+**Both disclosed rungs closed the next day.** The ZERO-ANNOTATION channel:
+`Liftable::expectations()` (default empty — a plain lift starts with no contract, every
+declaration an explicit act), `Lifted<C>` forwarding it as `Expected`, and
+`AutoLift::scan_module` growing a declarations parameter that vocabulary-gates at scan
+time and BAKES the contract into the generated impl — so
+`Distance::of::<Lifted<C>>()` is a red/green gate for an author who wrote only types and
+Rust. Both arms drilled: the bool carrier's declared laws judge MET, and an overshooting
+declaration (idempotence claimed of an involution) reads UNMET BY NAME — the red target
+lock, in the lifted world.
+
+**And the peak got its name, from the operator: THE CLI IS THE INTERFACE TO THE CODE.**
+Agents should not write text into open files — and the irony is that agents already drive
+everything else through a CLI, including reading and writing the files themselves; the
+bundle just makes the CLI speak in judged transactions instead of bytes. First form:
+`examples/bundle.rs` — `add`, `declare`, `place`, `check`, `lift` — each verb wrapping the
+library form, refusals writing nothing, successes leaving the module canonically placed.
+The proof is `bundle-demo/`, THE BUNDLE-BORN MEMBER: its `src` grown entirely through the
+verbs (every command in its MANIFEST.md — birth as the degenerate case of continuation, an
+`add` onto the empty file), its contract declared through `lift`'s declarations, judged
+MET on every test run, its lift committed as a derived artifact held byte-for-byte to the
+scan, its module held to the round-trip pin, its locks frozen and sensitivity-swept. And
+discovery kept its oldest promise on day one: the four declared laws came back with a
+SURPRISE nobody declared — `bump` is a merge-homomorphism — the flagship's
+declared-plus-discovered story, reproduced by the continuation process. Retirement
+status, honestly: the MODULE level of the criterion is met (grown, declared, judged,
+locked, CLI-only); the SYSTEM level (seams, transports, the two-lifecycle red commit)
+remains, so the genesis emitter stands for now.
 
 ## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
 

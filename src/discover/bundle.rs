@@ -375,7 +375,7 @@ fn item_name(item: &syn::Item) -> Option<String> {
 /// ([`super::expect::Expectation::canonical`]), the macro for the full grammar at compile
 /// time; this parse only needs enough structure to validate and compare.
 #[crate::mutate]
-fn parse_declaration(text: &str) -> Result<(String, Vec<String>), String> {
+pub(crate) fn parse_declaration(text: &str) -> Result<(String, Vec<String>), String> {
     let text = text.trim();
     let (key, rest) = text.split_once('(').ok_or_else(|| {
         format!("bundle declare: `{text}` is not a declaration — the grammar is `shape(op, ...)`")
