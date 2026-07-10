@@ -1924,6 +1924,23 @@ journal themselves; the agenda computes from the journal instead of re-deriving 
 from changed paths; `bundle-demo/MANIFEST.md` is the hand-made prototype of exactly this
 artifact, and deriving it is the next brick of the vision.
 
+And the question the log raises, asked by the operator and answered here so it is not
+re-litigated: if the log is the record of change, WHAT IS GIT FOR — do we even need it?
+The honest split: git stores STATES, the log stores INTENTS — a diff is a reconstruction
+of what happened, the log IS what happened (patch-first systems — darcs, Pijul — are the
+prior art; Unison again at the term level). So the log becomes the source of CHANGE, and
+git shrinks — the genesis move again, a name contracting to its true referent — into the
+ANCHOR: the content-addressed snapshot store, the countersigned certified line, the
+distribution surface every other tool speaks. The two cross-check by the second-source
+pattern the repo already trusts everywhere: the journal, replayed, must produce the tree
+git holds — agreement is a judged fact, divergence a defect detector (and replay is why
+the log alone is not enough: a verb replayed under tomorrow's judges may judge
+differently, while a snapshot is version-independent — the log needs git's anchor
+exactly the way the incremental mutation gate needs `mutants-green`). Code on disk,
+likewise, keeps three jobs, all derived-artifact jobs: the build's input, the cache that
+keeps verbs fast, and the interop/legibility surface — materialized view #1 of the
+bundle, exactly as `ci.yml` is of the gate registry.
+
 ## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
 
 The companion measurement, asked for by the operator in the same conversation, aimed at
