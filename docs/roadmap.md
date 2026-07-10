@@ -1778,10 +1778,17 @@ The rung ladder, round-trip before generation as always:
    moved gaps with items and produced jammed output; the drill caught it). Disclosed
    rung-1 limits: only top-level operator fns are re-dealt (impl blocks and inline modules
    ride whole), and identity is the function name.
-2. **`genesis add`** — the continuation verb: a snippet parses to operators (auto-lift's
-   scan), nets into the placed partition, the tree re-renders, the locks freeze, the
-   delta narrates through the existing courier. The agent's whole interface is "write
-   the logic"; placement, imports, and file identity are derived.
+2. **The continuation verb — LIBRARY FORM BUILT** (`Bundle::add`; the name `genesis add`
+   died with the disposition below — the verb is the bundle's). A snippet plus a module
+   in, the module re-rendered in canonical placed order out: the added operator lands
+   WITH ITS COMPONENT (the placer's dealing, not an append), a helper type lands before
+   the trailing `#[cfg(test)]` module (tests stay last), every existing item's bytes
+   survive verbatim (addition is monotone — drilled), and the result is a fixed point of
+   parse∘render. Refusals named: unparseable snippet, empty snippet, and a NAME COLLISION
+   with an existing item — the type-library voice's whisper made a hard stop (an `impl`
+   extends a name, which is precisely not a collision). No I/O in the verb; the caller
+   writes the file. The binary wrapper is deliberately deferred until real usage names
+   its shape — the library call is what an agent's tooling actually invokes.
 3. **The inverse sweep, actuated** — cohesion's latent splits, the silence line, and the
    placer's seam candidates feed re-render SUGGESTIONS. Cohesion stays a suggestion by
    design: the machine executes placement, the human keeps ratifying splits — taste
@@ -1797,6 +1804,43 @@ And review churn must prove out in practice: if files are views, a re-render mov
 and the promise that hierarchical ratification plus the review router keep those diffs
 readable (placement-only reflow = machinery-verified, one agenda line) is the thing rung 1
 and 2 must demonstrate, not assume.
+
+### The disposition on genesis: the bundle continues, genesis births, and the declaration is vocabulary
+
+Settled in conversation with the operator before rung 2's design, because rung 2 must be
+designed against it. The question — "do we need genesis once we have this?" — splits
+genesis along the method's own IS/SHOULD line:
+
+- **Genesis-the-scaffolder dissolves into the bundle.** Scaffolding is rendering a bundle
+  with meaning-holes; migration mode (the fifth field report's largest ask, still open on
+  the v2 list) is `Bundle::parse` — adopting an existing module IS what rung 1 does. The
+  bundle does not just replace the emitter, it delivers the v2 items that were queued for
+  it: patch-not-scaffold, adopt-existing-functions-as-meanings, no holes where
+  implementations live.
+- **Genesis-the-declaration-language survives, as the bundle's INTENTIONAL half.**
+  Everything the bundle/auto-lift path produces is DISCOVERED — what the code is. The
+  declaration grammar (`expects { }`, seams, protocol blocks, validity) is what the code
+  SHOULD be, and no derivation produces it: without declared expectations there is no red
+  target lock, no distance, no unmet law driving work; without declared seams there is no
+  obligation, only candidates. The end state: A DECLARATION IS A BUNDLE ENTRY — an
+  expectation, a seam, a protocol line lives in the same bundle as the operators, written
+  additively like everything else, rendering to the distance gates and target locks the
+  emitter produces today. The same motion the repo already made one level down when
+  genesis's parse-side `Expect` enum dissolved into `discover::expect::Expectation`.
+- **Retirement is by the house rule** (the per-diff mutation gate's rule: retire when the
+  census closes the territory): genesis's emitter retires when a bundle-born crate
+  reproduces the flagship story end to end — expectations declared red, meanings filled,
+  green at both levels, locks fresh from birth — with the demos re-founded on the bundle
+  as proof. Until then it stands; two CI-tested members lean on it.
+- **Naming resolves itself with zero renames.** The continuation tool already has its
+  name (the bundle); the declaration grammar must NOT get a name of its own, because it
+  must not get a separate existence (one vocabulary — the tenth ask's lesson); and
+  "genesis" becomes precisely true by SHRINKING: when the emitter dissolves, what remains
+  under the name is the one genuinely genesis-shaped act — minting the crate shell, once,
+  at origin. The name stays put and the referent contracts to fit it.
+
+One sentence for the record: the bundle continues, genesis births, and the declaration is
+vocabulary, not a tool.
 
 ## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
 

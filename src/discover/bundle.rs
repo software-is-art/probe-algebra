@@ -172,6 +172,62 @@ impl Bundle {
         out
     }
 
+    /// THE CONTINUATION VERB, library form (rung 2): add a snippet to a module, purely
+    /// additively, and return the module re-rendered in canonical placed order — the new
+    /// operator lands WITH ITS COMPONENT (the placer's dealing, not an append), a new type
+    /// or helper lands before the trailing `#[cfg(test)]` module (tests stay last), and
+    /// every existing item's bytes survive verbatim (addition is monotone by union-find's
+    /// own algebra — the snippet can join or bridge components, never reshuffle what it
+    /// does not touch). The caller writes the result to the file; the verb has no I/O.
+    ///
+    /// Refusals are named, never guessed: an unparseable snippet, an empty snippet, and a
+    /// NAME COLLISION with an existing top-level item — the anti-duplication guarantee at
+    /// the mechanical level, the type-library voice's whisper made a hard stop.
+    pub fn add(module: &str, snippet: &str) -> Result<String, String> {
+        let new = syn::parse_file(snippet)
+            .map_err(|e| format!("bundle add: snippet unparseable: {e}"))?;
+        if new.items.is_empty() {
+            return Err("bundle add: the snippet declares nothing".to_string());
+        }
+        let existing =
+            syn::parse_file(module).map_err(|e| format!("bundle add: module unparseable: {e}"))?;
+        let taken: BTreeSet<String> = existing.items.iter().filter_map(item_name).collect();
+        for name in new.items.iter().filter_map(item_name) {
+            if taken.contains(&name) {
+                return Err(format!(
+                    "bundle add: `{name}` already exists in the module — addition is \
+                     additive; edit the existing item or pick a name"
+                ));
+            }
+        }
+
+        // splice the snippet before the trailing `#[cfg(test)]` module when there is one
+        // (tests stay last), else at the end — then one parse∘render places it.
+        let block = format!("{}\n", snippet.trim_end());
+        let test_start = existing.items.iter().find_map(|item| match item {
+            syn::Item::Mod(m) if is_cfg_test(&m.attrs) => {
+                Some(byte_offset(module, item.span().start()))
+            }
+            _ => None,
+        });
+        let mut spliced = String::new();
+        match test_start {
+            Some(at) => {
+                spliced.push_str(&module[..at]);
+                pad_to_blank_line(&mut spliced);
+                spliced.push_str(&block);
+                spliced.push('\n');
+                spliced.push_str(&module[at..]);
+            }
+            None => {
+                spliced.push_str(module);
+                pad_to_blank_line(&mut spliced);
+                spliced.push_str(&block);
+            }
+        }
+        Ok(Bundle::parse(&spliced)?.render())
+    }
+
     /// Is the module already in canonical placed order? (Parse-only judgment: true exactly
     /// when `render` would reproduce the input.)
     pub fn is_canonical(&self) -> bool {
@@ -186,6 +242,52 @@ impl Bundle {
                 .iter()
                 .map(String::as_str)
                 .collect::<Vec<_>>()
+    }
+}
+
+/// A top-level item's name, for the collision refusal — functions, types, modules,
+/// constants; items without a single defining ident (impls, uses) contribute none (an
+/// impl extends an existing name, which is precisely not a collision).
+#[crate::mutate]
+fn item_name(item: &syn::Item) -> Option<String> {
+    match item {
+        syn::Item::Fn(f) => Some(f.sig.ident.to_string()),
+        syn::Item::Struct(s) => Some(s.ident.to_string()),
+        syn::Item::Enum(e) => Some(e.ident.to_string()),
+        syn::Item::Union(u) => Some(u.ident.to_string()),
+        syn::Item::Type(t) => Some(t.ident.to_string()),
+        syn::Item::Mod(m) => Some(m.ident.to_string()),
+        syn::Item::Const(c) => Some(c.ident.to_string()),
+        syn::Item::Static(s) => Some(s.ident.to_string()),
+        _ => None,
+    }
+}
+
+/// Does an attribute list carry `#[cfg(test)]`?
+#[crate::mutate]
+fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|a| {
+        a.path().is_ident("cfg")
+            && a.parse_args::<syn::Path>()
+                .is_ok_and(|p| p.is_ident("test"))
+    })
+}
+
+/// Ensure `out` ends with a blank line (exactly one empty line before what comes next) —
+/// the separator convention the splice writes between existing text and the added block.
+#[crate::mutate]
+fn pad_to_blank_line(out: &mut String) {
+    while out.ends_with("\n\n\n") {
+        out.pop();
+    }
+    if out.is_empty() {
+        return;
+    }
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    if !out.ends_with("\n\n") {
+        out.push('\n');
     }
 }
 
@@ -302,6 +404,97 @@ pub mod inner {
         let err = Bundle::parse(ambiguous).unwrap_err();
         assert!(err.contains("not unique"), "{err}");
         assert!(err.contains("peak"), "{err}");
+    }
+
+    /// THE CONTINUATION VERB, drilled: an added operator lands WITH ITS COMPONENT — not at
+    /// the end — every existing item's bytes survive verbatim, a following addition that
+    /// touches a second sort BRIDGES (monotone: nothing else moves), a non-operator
+    /// addition lands before the trailing test module, and the result is a fixed point of
+    /// parse∘render.
+    #[test]
+    fn add_places_the_snippet_with_its_component() {
+        let module = "\
+//! a working module.
+
+pub struct Count;
+pub struct Flag;
+
+/// peak.
+pub fn peak(a: Count, b: Count) -> Count {
+    a
+}
+
+/// both.
+pub fn both(a: Flag, b: Flag) -> Flag {
+    b
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn holds() {}
+}
+";
+        // a Count operator: it must land in the Count component (with peak), not at the end.
+        let grown = Bundle::add(
+            module,
+            "/// gather.\npub fn gather(a: Count) -> Count {\n    a\n}\n",
+        )
+        .expect("adds");
+        let peak_at = grown.find("pub fn peak").expect("peak survives");
+        let gather_at = grown.find("pub fn gather").expect("gather landed");
+        let both_at = grown.find("pub fn both").expect("both survives");
+        assert!(
+            peak_at < gather_at && gather_at < both_at,
+            "gather joins the Count component ahead of the Flag one:\n{grown}"
+        );
+        // additive: every original item's text survives byte-identical, tests still last.
+        for piece in [
+            "//! a working module.",
+            "/// peak.\npub fn peak(a: Count, b: Count) -> Count {\n    a\n}",
+            "/// both.\npub fn both(a: Flag, b: Flag) -> Flag {\n    b\n}",
+            "#[cfg(test)]\nmod tests {",
+        ] {
+            assert!(grown.contains(piece), "`{piece}` survives:\n{grown}");
+        }
+        assert!(
+            grown.find("mod tests").unwrap() > gather_at,
+            "tests stay last"
+        );
+        // the result is canonical — a fixed point of parse∘render.
+        let reparsed = Bundle::parse(&grown).expect("the grown module parses");
+        assert!(reparsed.is_canonical());
+        assert_eq!(reparsed.render(), grown);
+
+        // a helper type (no operator) lands before the tests, after the working items.
+        let with_type = Bundle::add(&grown, "pub struct Spin;\n").expect("adds a type");
+        assert!(
+            with_type.find("pub struct Spin").unwrap() < with_type.find("mod tests").unwrap(),
+            "{with_type}"
+        );
+    }
+
+    /// The verb's refusals: a snippet that does not parse, a snippet that declares
+    /// nothing, and a NAME COLLISION with an existing item — the type-library voice's
+    /// whisper made a hard stop, named.
+    #[test]
+    fn add_refuses_collisions_and_noise() {
+        let module = "pub struct Count;\npub fn peak(a: Count) -> Count {\n    a\n}\n";
+        let err = Bundle::add(module, "pub fn broken( -> {").unwrap_err();
+        assert!(err.contains("unparseable"), "{err}");
+        let err = Bundle::add(module, "// only a comment\n").unwrap_err();
+        assert!(err.contains("declares nothing"), "{err}");
+        let err = Bundle::add(module, "pub fn peak(a: Count) -> Count {\n    a\n}\n").unwrap_err();
+        assert!(err.contains("`peak` already exists"), "{err}");
+        let err = Bundle::add(module, "pub struct Count;\n").unwrap_err();
+        assert!(err.contains("`Count` already exists"), "{err}");
+        // an impl extends an existing name — precisely NOT a collision.
+        let grown = Bundle::add(
+            module,
+            "impl Count {\n    pub fn zero(self) -> Count {\n        self\n    }\n}\n",
+        )
+        .expect("an impl extends, never collides");
+        assert!(grown.contains("pub fn zero"));
     }
 
     /// A module with NO operators (or no items at all) is its own render — the dealing has
