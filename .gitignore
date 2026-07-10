@@ -22,3 +22,6 @@ target
 
 # Claude Code session-local settings
 .claude/settings.local.json
+
+# The pinned suit binary (bundle pin) — a local artifact with provenance, never committed
+.suit/

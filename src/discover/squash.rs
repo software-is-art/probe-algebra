@@ -86,7 +86,25 @@ impl SquashRules {
     /// not model (`place`) is opaque — nothing slides past it. The one hard refusal is
     /// a line the journal grammar cannot read: the record is machine-written, so a
     /// strange line means a hand touched it.
+    ///
+    /// Payload addresses (a trailing ` @<16 hex>`, the store's suffix) are NOT part of
+    /// the key — two edits of one item are the same conversation even though their
+    /// payloads differ — and when a pair collapses, the line whose verb the lock names
+    /// survives, later over earlier. So edit-then-edit keeps the LATER payload: the
+    /// miniature's projection law licenses the shape, the last-write transport matches
+    /// what the real bundle does, and the replay differential is the judge that keeps
+    /// that transport honest (`replay(squash(j)) == replay(j)`).
     pub fn compact(&self, journal: &str) -> Result<String, String> {
+        fn stripped(key: &str) -> &str {
+            match key.rsplit_once(" @") {
+                Some((head, addr))
+                    if addr.len() == 16 && addr.chars().all(|c| c.is_ascii_hexdigit()) =>
+                {
+                    head
+                }
+                _ => key,
+            }
+        }
         let mut entries = Vec::new();
         for (n, line) in journal.lines().enumerate() {
             let parsed = line
@@ -109,7 +127,7 @@ impl SquashRules {
             changed = false;
             'scan: for i in 0..entries.len() {
                 for j in i + 1..entries.len() {
-                    if entries[j].1 != entries[i].1 {
+                    if stripped(&entries[j].1) != stripped(&entries[i].1) {
                         continue;
                     }
                     let slides = entries[i + 1..j]
@@ -117,7 +135,11 @@ impl SquashRules {
                         .all(|e| self.mobile(&e.0, &entries[j].0));
                     if slides {
                         if let Some(one) = self.collapse(&entries[i].0, &entries[j].0) {
-                            entries[i].0 = one;
+                            if entries[j].0 == one {
+                                entries[i] = entries[j].clone();
+                            } else {
+                                entries[i].0 = one;
+                            }
                             entries.remove(j);
                             changed = true;
                             break 'scan;
@@ -271,6 +293,31 @@ mod probes {
         assert_eq!(
             rules().compact(journal).unwrap(),
             "edit src/m.rs — fn bump\n"
+        );
+    }
+
+    /// Payload addresses are NOT part of the key: an add and a collect of one item
+    /// still meet and collapse when the add carries a store address — the collapse
+    /// keeps the line whose verb the lock names.
+    #[test]
+    fn payload_addresses_ride_the_collapse() {
+        let journal = "add src/m.rs — fn x @00112233aabbccdd\ncollect src/m.rs — fn x\n";
+        assert_eq!(
+            rules().compact(journal).unwrap(),
+            "collect src/m.rs — fn x\n"
+        );
+    }
+
+    /// Two edits of one item collapse to the LATER — the projection law licenses the
+    /// shape, last-write matches what the real bundle does, and the replay
+    /// differential judges the transport (replay(squash(j)) == replay(j)).
+    #[test]
+    fn the_later_payload_wins_the_projection() {
+        let journal =
+            "edit src/m.rs — bump @00112233aabbccdd\nedit src/m.rs — bump @ffeeddccbbaa0011\n";
+        assert_eq!(
+            rules().compact(journal).unwrap(),
+            "edit src/m.rs — bump @ffeeddccbbaa0011\n"
         );
     }
 

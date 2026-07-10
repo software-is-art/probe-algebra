@@ -1966,15 +1966,17 @@ side-effect: the reason census re-classified `bundle.rs` as effectful the moment
 verb grew a filesystem read — the censuses watching the watcher), impl-interior
 placement (exercised as the
 fallback path the same day: building `edit` itself required an impl-interior change the
-verbs cannot express — the second rule's field-report arm, proven on day one), test
-authoring (SHRUNK by the squash brick: a `#[cfg(test)] mod probes` is an ADDABLE item,
-proven when squash's whole probe suite went in through `add`; what stays open is growing
-an EXISTING probes module — an item-interior change), and cross-file moves (SHRUNK the
+verbs cannot express — the second rule's field-report arm, proven on day one),
+~~test authoring~~ (CLOSED across two bricks: a `#[cfg(test)] mod probes` is an ADDABLE
+item, proven when squash's probe suite went in through `add` — and growing an EXISTING
+probes module turned out to already be `edit`'s business: non-Fn/Impl/Trait items edit
+under a name + kind hold, exactly right for a test mod, discovered while killing the
+sweep's findings), and cross-file moves (SHRUNK the
 same day: a module MOUNT is just `add` of a `pub mod` item on `mod.rs`, dissolved before
-it was ever named a gap). Newly named by the same brick: **the frozen arm** — the verbs'
-vehicle rebuilds behind the same gate as the tree it operates on, so a mid-transaction
-tree blocks the fixing verb; see the squash brick's field report. Refusals should name
-their fixing verb.
+it was ever named a gap). ~~**The frozen arm**~~ (named and CLOSED the same night — the
+verbs' vehicle rebuilt behind the same gate as the tree it operates on, so a
+mid-transaction tree blocked the fixing verb; `bundle pin` dissolves it, see the pinned
+suit brick). Refusals should name their fixing verb.
 
 **The disposition on removal — garbage collection, with the house amendment: MARK IS
 DERIVED, SWEEP IS RATIFIED.** The operator's question ("is there ever really a need to
@@ -2305,6 +2307,50 @@ the verbs' vehicle must not share the build gate with the tree it operates on �
 suit binary (the shipped-hook precedent) or a verbs-exempt profile. Pleasing symmetry on
 the way out: the moment the mount landed, the tier census reclassified squash.rs
 INTERIOR → ALGEBRA on its own — the derivation watching the tree change under it.
+
+### The pinned suit (BUILT — the frozen arm, closed the same night it was named)
+
+`bundle pin` installs the RUNNING binary at `.suit/bundle` with a provenance line beside
+it (version, source path, toolchain), so the verbs stop rebuilding behind the gate of the
+tree they operate on. Both incidents that named the gap are dissolved: a mid-transaction
+tree can no longer block the verb that would heal it, and a verification poked mid-sweep
+no longer taxes the sweep's shared build cache. `.suit/` is ignored — the binary is a
+local artifact; the provenance says where it came from. The deeper reason it had to exist
+before stage 3: a replayer that must build from the tree it is reconstructing cannot be a
+second source for that tree.
+
+### Stage 3: the payload store and the replay differential (BUILT)
+
+The journal stops being names-only and starts being a SOURCE. `discover::store` adds the
+content-addressed payload store (`bundle.payloads/` beside the journal, FNV-1a 64
+fingerprints, one blob per distinct payload — stash is a projection, so re-recording
+never bloats; a collision REFUSES rather than overwrites); `add`/`edit` stash their
+payloads and the journal entry carries ` @<address>`. `bundle replay <journal>` is the
+differential: reconstruct each journaled file by re-applying its entries' EFFECTS
+(payloads from the store, never re-judging — a verb replayed under tomorrow's judges may
+judge differently, and the ratification already happened; `collect` therefore refuses
+replay by NAMING the effect/judgment split, the disclosed gap), then judge against the
+tree. `tree == replay(journal)` is now measured file by file instead of promised — the
+log-and-anchor disposition's second-source cross-check, live. First real run: every
+existing entry predates the store, so the bar reads an honest ZERO of nine journaled
+files — the metric exists precisely so real work moves it. Squash learned the addresses
+the same hour: a trailing ` @<16 hex>` is NOT part of the compaction key, and when a pair
+collapses the line whose verb the lock names survives (later over earlier — so
+edit-then-edit keeps the LATER payload; the projection law licenses the shape, and
+`replay(squash(j)) == replay(j)` is the differential drill that will judge the transport).
+
+Alongside, the first completed FULL sweep since the verb suite landed returned 12
+findings — debt from the collect/constrains/trace bricks whose sweeps container-restarts
+had killed. Eleven died to new probes (exact-byte splice assertions where contains() let
+padding and cfg-detection flips hide; a single-op-component fixture for the constrains
+matcher; the freedoms filter's conjunction pinned on the demo lock's natural killed-vs-
+SURVIVED split; direct conduct probes for the mutant makers and the doc-flow `edit`);
+ONE was ratified — `mutation::never:deaf -> None`, equivalence by definition (`never` IS
+the constant-None evaluator), the register's first and only line. And the probe work
+surfaced a discovery: TEST MODS ARE ALREADY EDITABLE THROUGH THE VERB — `edit` holds
+non-Fn/Impl/Trait items by name + kind, which for a `#[cfg(test)] mod` is exactly right
+(bodies free, kind held), so growing an existing probes module needed no new vocabulary.
+The test-authoring gap closed by reading the code the verbs already had.
 
 ### The name, asked of the whole (disposition)
 

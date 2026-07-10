@@ -2,7 +2,7 @@
 # operator-shaped (every argument and the return a bare named value type, no primitives, no
 # I/O). Boundary-hood is a COMPUTED property here, not the `boundary.rs` file convention — a
 # module qualifies wherever it lives. Regenerate with `BLESS_QUALIFY=1 cargo build`.
-# 59 files scanned, 17 qualify.
+# 60 files scanned, 17 qualify.
 
 src/boundary.rs: QUALIFIES — operators [Capability::combine, Capability::join, Provenance::combine] over sorts {Capability, Provenance}
 src/capability.rs: QUALIFIES — operators [Audit::declared, Audit::observed, cap_of] over sorts {Audit, Capability, Source}

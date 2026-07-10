@@ -586,6 +586,8 @@ fn sample_programs() -> Vec<Expr> {
 
 pub mod squash;
 
+pub mod store;
+
 #[cfg(test)]
 mod tests {
     use super::*;

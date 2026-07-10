@@ -1487,4 +1487,73 @@ fn orphan(a: Count) -> Count {
         assert_eq!(bundle.render(), plain);
         assert_eq!(Bundle::parse("").expect("empty parses").render(), "");
     }
+
+    /// SENSITIVITY BACKSTOPS from the full sweep's findings — the splice helpers
+    /// hold their exact bytes (a contains() assertion lets a padding or
+    /// cfg-detection flip hide; byte equality does not).
+    #[test]
+    fn the_splice_helpers_hold_their_exact_bytes() {
+        // exactly ONE blank line between tail and block — with and without a
+        // trailing newline on the module (the padding sites diverge on the bare case).
+        let grown = Bundle::add("pub fn a() {}\n", "pub fn b() {}\n").expect("adds");
+        assert_eq!(grown, "pub fn a() {}\n\npub fn b() {}\n");
+        let grown = Bundle::add("pub fn a() {}", "pub fn b() {}\n").expect("adds");
+        assert_eq!(grown, "pub fn a() {}\n\npub fn b() {}\n");
+
+        // a cfg attribute that is NOT test never becomes the splice point (the
+        // detector must read the whole attribute, not either half)...
+        let gated = "pub fn a() {}\n\n#[cfg(feature = \"x\")]\nmod gated {}\n";
+        let grown = Bundle::add(gated, "pub fn b() {}\n").expect("adds");
+        assert_eq!(
+            grown,
+            "pub fn a() {}\n\n#[cfg(feature = \"x\")]\nmod gated {}\n\npub fn b() {}\n"
+        );
+        // ...while a REAL test module stays last.
+        let tested = "pub fn a() {}\n\n#[cfg(test)]\nmod probes {}\n";
+        let grown = Bundle::add(tested, "pub fn b() {}\n").expect("adds");
+        assert_eq!(
+            grown,
+            "pub fn a() {}\n\npub fn b() {}\n\n#[cfg(test)]\nmod probes {}\n"
+        );
+    }
+
+    /// A lone `pub` item is never collectable — the module boundary is a root by
+    /// definition, so the mark must SEE visibility (deaf, it would mark everything).
+    #[test]
+    fn a_pub_item_is_never_collectable() {
+        let marked = Bundle::collectable("pub fn lone() {}\n", Path::new("no-such-spec"), None)
+            .expect("marks");
+        assert!(marked.is_empty(), "{marked:?}");
+    }
+
+    /// The op's own component is the one reported — and ONLY it. A single-op
+    /// component is the sensitive fixture: with the same-name check inverted, every
+    /// OTHER component would print instead, invisible to any multi-op module.
+    #[test]
+    fn constrains_reports_exactly_the_named_component() {
+        let module = "pub struct A;\npub struct B;\n\npub fn alpha(a: A) -> A {\n    a\n}\n\npub fn beta(b: B) -> B {\n    b\n}\n";
+        let report =
+            Bundle::constrains(module, "alpha", Path::new("no-such-spec"), None).expect("reports");
+        assert!(
+            report.contains("component: { alpha } over nets { A }"),
+            "{report}"
+        );
+        assert!(!report.contains("beta"), "only alpha's component: {report}");
+    }
+
+    /// The freedoms filter is a CONJUNCTION: `merge` (all its mutants killed)
+    /// reports the honest empty even though the demo lock carries other operators'
+    /// SURVIVED lines and killed lines naming `merge` — either half alone would
+    /// invent freedoms.
+    #[test]
+    fn freedoms_require_both_survival_and_the_name() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("bundle-demo");
+        let module = std::fs::read_to_string(root.join("src/tally.rs")).expect("demo module");
+        let report =
+            Bundle::constrains(&module, "merge", &root.join("spec"), None).expect("reports");
+        assert!(
+            report.contains("none — every judged mutant of this operator dies"),
+            "{report}"
+        );
+    }
 }

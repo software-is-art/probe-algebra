@@ -3,3 +3,4 @@
 # the runner's sweep subcommand (an unratified survivor drifts; a ratified line whose mutant
 # dies goes stale by hand-review). Keys contain colons, so they are backtick-quoted.
 
+`boundary_spec::discover::mutation::never:deaf -> None`: equivalence by definition — `never` IS the constant-None evaluator (the partiality battery's generator), so its deafness form is byte-for-byte its body; there is nothing for a probe to tell apart, and the degree of freedom cannot be deleted without deleting the partiality battery itself.

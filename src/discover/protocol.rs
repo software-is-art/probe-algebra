@@ -205,4 +205,16 @@ mod probes {
             "doc flow: 1 of 1 declared laws hold; no surprises"
         );
     }
+
+    /// `edit` bumps the revision and is TOTAL — defined everywhere (deaf to None it
+    /// would silently empty Review and Published of every revision the closure
+    /// reaches, and the sweep proved nothing pinned that).
+    #[test]
+    fn edit_is_total_and_bumps_the_revision() {
+        let touched = edit(&Doc::of("body", 0)).expect("edit is total");
+        assert_eq!(touched.rev, 1);
+        assert_eq!(touched.body, "body");
+        let capped = edit(&Doc::of("body", u8::MAX)).expect("still total at the rim");
+        assert_eq!(capped.rev, u8::MAX, "saturating, not wrapping");
+    }
 }

@@ -58,12 +58,40 @@ fn run(args: &[String]) -> Result<String, String> {
          \x20      bundle check <module.rs>\n\
          \x20      bundle collect <module.rs> [item-to-sweep]\n\
          \x20      bundle squash <bundle.journal>\n\
+         \x20      bundle replay <bundle.journal>\n\
          \x20      bundle constrains <module.rs> <operator>\n\
          \x20      bundle trace <theory> '<term>'\n\
-         \x20      bundle lift <module.rs> <theory-name> [declaration ...]"
+         \x20      bundle lift <module.rs> <theory-name> [declaration ...]\n\
+         \x20      bundle pin"
             .to_string()
     };
     match args {
+        [verb] if verb == "pin" => {
+            // THE PINNED SUIT (the frozen-arm field report's fix): install THIS
+            // RUNNING BINARY at .suit/bundle, so the verbs stop rebuilding behind the
+            // gate of the tree they operate on — a mid-transaction tree can no longer
+            // block the verb that would heal it. Provenance rides beside the binary.
+            let me = std::env::current_exe()
+                .map_err(|e| format!("bundle pin: cannot find the running binary ({e})"))?;
+            std::fs::create_dir_all(".suit")
+                .map_err(|e| format!("bundle pin: cannot create .suit ({e})"))?;
+            std::fs::copy(&me, ".suit/bundle")
+                .map_err(|e| format!("bundle pin: cannot install ({e})"))?;
+            std::fs::write(
+                ".suit/provenance",
+                format!(
+                    "bundle {} — pinned from {} (toolchain {})\n",
+                    env!("CARGO_PKG_VERSION"),
+                    me.display(),
+                    boundary_spec::discover::gates::TOOLCHAIN,
+                ),
+            )
+            .map_err(|e| format!("bundle pin: provenance unwritten ({e})"))?;
+            Ok(
+                "pinned: .suit/bundle — the suit no longer rebuilds behind the tree's gate"
+                    .to_string(),
+            )
+        }
         [verb, module_path, rest @ ..] => {
             let module = std::fs::read_to_string(module_path).unwrap_or_default();
             match (verb.as_str(), rest) {
@@ -89,13 +117,27 @@ fn run(args: &[String]) -> Result<String, String> {
                                 .collect()
                         })
                         .unwrap_or_default();
-                    commit(module_path, &grown, "add", &named.join(", "))?;
+                    // stage 3: the payload rides the record — stash first, so a store
+                    // refusal writes nothing at all.
+                    use boundary_spec::discover::store::PayloadStore;
+                    let store = PayloadStore::beside(&nearest_crate_root(module_path));
+                    let address = store.stash(&snippet)?;
+                    let detail = format!("{} @{address}", named.join(", "));
+                    commit(module_path, &grown, "add", &detail)?;
                     Ok(format!("added into {module_path} — canonically placed"))
                 }
                 ("edit", [item_name, replacement_source]) => {
                     let replacement = read_payload("edit", replacement_source)?;
                     let edited = Bundle::edit(&module, item_name, &replacement)?;
-                    commit(module_path, &edited, "edit", item_name)?;
+                    use boundary_spec::discover::store::PayloadStore;
+                    let store = PayloadStore::beside(&nearest_crate_root(module_path));
+                    let address = store.stash(&replacement)?;
+                    commit(
+                        module_path,
+                        &edited,
+                        "edit",
+                        &format!("{item_name} @{address}"),
+                    )?;
                     Ok(format!(
                         "edited `{item_name}` in {module_path} — signature held"
                     ))
@@ -184,6 +226,23 @@ fn run(args: &[String]) -> Result<String, String> {
                                  collapse licensed by the frozen verb algebra"
                             ))
                         }
+                    }
+                }
+                ("replay", []) => {
+                    // perception: the REPLAY DIFFERENTIAL — reconstruct each journaled
+                    // file from the record plus the payload store and judge it against
+                    // the tree. Read-only; journals nothing. Divergence is a FINDING,
+                    // not a failure: the report is stage 3's progress bar
+                    // (tree == replay(journal), measured file by file).
+                    if module.is_empty() {
+                        Err(format!(
+                            "bundle replay: no journal at {module_path} — nothing to replay"
+                        ))
+                    } else {
+                        use boundary_spec::discover::store::{PayloadStore, Replay};
+                        let store = PayloadStore::beside(&nearest_crate_root(module_path));
+                        Replay::differential(&module, &store)
+                            .map(|replay| replay.render().trim_end().to_string())
                     }
                 }
                 ("trace", [term]) => {
