@@ -2364,6 +2364,31 @@ local artifact; the provenance says where it came from. The deeper reason it had
 before stage 3: a replayer that must build from the tree it is reconstructing cannot be a
 second source for that tree.
 
+### Where the sweep's hour went (accounted, and the candidate it names)
+
+The operator asked where the local sweep's time goes and whether we understand what it
+is for. The accounting, from the pipeline's own code: the sweep is ONE build, one
+recorded baseline (the coverage map: which tests touch which site), then per site a
+fail-fast run of ONLY the covering tests — **when nextest is installed**. On the agent's
+box it was not, so the disclosed fallback ran the ENTIRE lib suite per site: ~830 sites ×
+(cargo startup + a ~6s suite) across 4 workers oversubscribing 4 cores — the observed
+60–90 minutes was the fallback tax plus contention, not the design. CI installs nextest
+and runs the same sweep inside the every-change check job on real runners; local
+certification was never load-bearing. Fixed at the environment grain (nextest installed;
+the pinned-suit lesson again — the vehicle's provisioning is part of the tool).
+
+What it is FOR, restated so the cost has a purpose attached: tests judge the code; the
+sweep judges the TESTS — every compiled flip must be detectable by the lib suite or it
+is an unpinned degree of freedom, and this is the mutation gate that let the per-diff
+source gates retire. But per CHANGE the full sweep re-judges hundreds of sites whose
+code and covering tests both stand still — pure recomputation, and the first genuinely
+justified consumer of the deferred incremental turn. **Candidate: the changed-scope
+sweep** — sites are keyed by function path and the census is committed, so a diff since
+`mutants-green` (or since HEAD) names exactly the sites whose guard code changed plus
+the sites whose covering tests changed; sweep that subset in the inner loop and leave
+the full re-certification to CI and the weekly shards, which already exist for exactly
+this division of labour.
+
 ### Stage 3: the payload store and the replay differential (BUILT)
 
 The journal stops being names-only and starts being a SOURCE. `discover::store` adds the
