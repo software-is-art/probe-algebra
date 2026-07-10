@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 780 sites.
+# 784 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -134,8 +134,10 @@
 - boundary_spec::discover::bundle::bundle::declare:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::edit:0: != -> ==
 - boundary_spec::discover::bundle::bundle::edit:1: == -> !=
-- boundary_spec::discover::bundle::bundle::edit:2: != -> ==
-- boundary_spec::discover::bundle::bundle::edit:3: == -> !=
+- boundary_spec::discover::bundle::bundle::edit:2: > -> <=
+- boundary_spec::discover::bundle::bundle::edit:3: != -> ==
+- boundary_spec::discover::bundle::bundle::edit:4: != -> ==
+- boundary_spec::discover::bundle::bundle::edit:5: == -> !=
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::is_canonical:0: == -> !=
@@ -156,6 +158,7 @@
 - boundary_spec::discover::bundle::is_cfg_test:deaf -> true
 - boundary_spec::discover::bundle::is_public:deaf -> false
 - boundary_spec::discover::bundle::is_public:deaf -> true
+- boundary_spec::discover::bundle::item_address:deaf -> None
 - boundary_spec::discover::bundle::item_name:deaf -> None
 - boundary_spec::discover::bundle::mentions:0: == -> !=
 - boundary_spec::discover::bundle::mentions:1: || -> &&
@@ -168,6 +171,7 @@
 - boundary_spec::discover::bundle::mentions:8: && -> ||
 - boundary_spec::discover::bundle::mentions:deaf -> false
 - boundary_spec::discover::bundle::mentions:deaf -> true
+- boundary_spec::discover::bundle::method_signatures:deaf -> vec![]
 - boundary_spec::discover::bundle::pad_to_blank_line:0: ! -> (deleted)
 - boundary_spec::discover::bundle::pad_to_blank_line:1: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:0: ! -> (deleted)

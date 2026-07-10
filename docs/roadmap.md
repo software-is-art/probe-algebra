@@ -2187,6 +2187,25 @@ Two follow-ons from the operator's read of the build:
   has a spec already: THE OPERATOR-SHAPE RULE — which re-reads the 55/55 spike as the
   migration of the codebase INTO the payload language, not a compliance project.
 
+- **Self-hosting** (the operator's question: could probe-algebra be implemented entirely
+  with the verbs?) — three rungs, and the first is already behind us. (1)
+  SELF-DESCRIBING, done quietly: the locks freeze the freezer, the probes census the
+  probes, schemata mutates the mutation machinery, and the verb algebra is the theory of
+  the toolchain's own change process. (2) SELF-CONSTRUCTING — every change to this tree
+  through the verbs. The audit named ONE gap: the host is mostly impls and traits, which
+  the verb grammar treated as cargo — CLOSED the same day: `item_address` gives impls
+  their edit address (`impl Type`, `impl Trait for Type`; two blocks sharing one refuse
+  as ambiguous), traits join `item_name`, and `edit`'s interface-hold scales up one
+  grain — an impl or trait edits under the METHOD-SIGNATURE-SET hold, bodies and docs
+  free, surface held, a moved set refused by count. Smoked on real host code:
+  `modularize.rs`'s own `impl ProposedModule`, edited through the verb, every byte
+  outside the block untouched. What remains of rung 2 is practice, not vocabulary: the
+  second rule's coverage growing as the gaps ledger empties. (3) SELF-TRUSTING — the
+  verbs building the verbs inherits the compiler-compiling-itself question, and the rail
+  is already laid: differential-certify (release N−1 judges N), base case disclosed.
+  Self-describing, self-constructing, self-trusting — each rung keeps the honest frame
+  of the one below it.
+
 The original sketch follows, kept for the record:
 
 - **The carrier is a small bundle-state value** — a `Shaped` miniature of a module (a

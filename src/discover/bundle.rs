@@ -185,10 +185,13 @@ impl Bundle {
     /// drift-gate demands regeneration, the censuses re-derive.
     ///
     /// Refusals, named: an unparseable replacement, a replacement that is not exactly ONE
-    /// item, a name the module does not carry, a replacement whose name differs (an edit
-    /// is not a rename), and a FUNCTION whose signature moved (compared token-for-token).
-    /// Non-function items (types, consts) hold their name and kind instead — reshaping a
-    /// type is interface change, refused the same way.
+    /// item, an address the module does not carry, a replacement whose address differs
+    /// (an edit is not a rename), an AMBIGUOUS address (two impl blocks may legally share
+    /// one — refused by count, never guessed between), a FUNCTION whose signature moved
+    /// (token-for-token), and an IMPL or TRAIT whose METHOD-SIGNATURE SET moved — the
+    /// interface-hold at whole-item grain, which is what lets `edit` reach the host's own
+    /// item kinds (the self-hosting disposition's rung-2 gap, closed). Non-function items
+    /// (types, consts) hold their name and kind.
     pub fn edit(module: &str, item_name_text: &str, replacement: &str) -> Result<String, String> {
         let new = syn::parse_file(replacement)
             .map_err(|e| format!("bundle edit: replacement unparseable: {e}"))?;
@@ -199,7 +202,7 @@ impl Bundle {
                 new.items.len()
             ));
         };
-        let Some(new_name) = item_name(new_item) else {
+        let Some(new_name) = item_address(new_item) else {
             return Err(
                 "bundle edit: the replacement has no defining name — nothing to hold an \
                  edit to"
@@ -215,19 +218,24 @@ impl Bundle {
 
         let file =
             syn::parse_file(module).map_err(|e| format!("bundle edit: module unparseable: {e}"))?;
-        let target = file
-            .items
-            .iter()
-            .find(|item| {
-                let name = item_name(item);
-                name.as_deref() == Some(item_name_text)
-            })
-            .ok_or_else(|| {
-                format!(
-                    "bundle edit: no item named `{item_name_text}` in the module — `add` \
-                     grows, `edit` changes; nothing here to change"
-                )
-            })?;
+        let mut targets = file.items.iter().filter(|item| {
+            let address = item_address(item);
+            address.as_deref() == Some(item_name_text)
+        });
+        let target = targets.next().ok_or_else(|| {
+            format!(
+                "bundle edit: no item named `{item_name_text}` in the module — `add` \
+                 grows, `edit` changes; nothing here to change"
+            )
+        })?;
+        let shadowed = targets.count();
+        if shadowed > 0 {
+            return Err(format!(
+                "bundle edit: {} items share the address `{item_name_text}` — ambiguous, \
+                 refused rather than guessed between",
+                shadowed + 1
+            ));
+        }
 
         // the signature hold: for functions, token-for-token equality of the signature; for
         // everything else, the kind must match (a struct stays a struct) — reshaping is
@@ -242,6 +250,20 @@ impl Bundle {
                         "bundle edit: `{item_name_text}`'s signature moved (`{held}` -> \
                          `{offered}`) — an interface change is not an edit; retire the item \
                          and add its successor"
+                    ));
+                }
+            }
+            (old @ syn::Item::Impl(_), new @ syn::Item::Impl(_))
+            | (old @ syn::Item::Trait(_), new @ syn::Item::Trait(_)) => {
+                let held = method_signatures(old);
+                let offered = method_signatures(new);
+                if held != offered {
+                    return Err(format!(
+                        "bundle edit: `{item_name_text}`'s method-signature set moved \
+                         ({} held, {} offered) — an interface change is not an edit; \
+                         bodies and docs are free, the surface holds",
+                        held.len(),
+                        offered.len()
                     ));
                 }
             }
@@ -740,8 +762,67 @@ fn item_name(item: &syn::Item) -> Option<String> {
         syn::Item::Mod(m) => Some(m.ident.to_string()),
         syn::Item::Const(c) => Some(c.ident.to_string()),
         syn::Item::Static(s) => Some(s.ident.to_string()),
+        syn::Item::Trait(t) => Some(t.ident.to_string()),
         _ => None,
     }
+}
+
+/// A top-level item's EDIT ADDRESS — [`item_name`] widened with the host's item kinds
+/// (the self-hosting disposition's rung-2 gap): an inherent impl addresses as
+/// `impl <Type>`, a trait impl as `impl <Trait> for <Type>`, so the majority of host
+/// code stops being cargo the edit verb cannot reach. Impls stay OUT of [`item_name`]
+/// deliberately: two `impl Fabric` blocks are legal Rust, so extending a name is not an
+/// `add` collision — but two blocks sharing one address make an edit AMBIGUOUS, refused
+/// by count rather than guessed between.
+#[crate::mutate]
+fn item_address(item: &syn::Item) -> Option<String> {
+    use quote::ToTokens;
+    if let Some(name) = item_name(item) {
+        return Some(name);
+    }
+    match item {
+        syn::Item::Impl(im) => {
+            let target = im.self_ty.to_token_stream().to_string().replace(' ', "");
+            Some(match &im.trait_ {
+                Some((_, path, _)) => format!(
+                    "impl {} for {}",
+                    path.to_token_stream().to_string().replace(' ', ""),
+                    target
+                ),
+                None => format!("impl {target}"),
+            })
+        }
+        _ => None,
+    }
+}
+
+/// The METHOD-SIGNATURE SET of an impl or trait — its interface at whole-item grain,
+/// sorted for set comparison. "An interface change is not an edit" scales up: an impl's
+/// bodies and docs are free to move under `edit`; the set of method signatures holds.
+#[crate::mutate]
+fn method_signatures(item: &syn::Item) -> Vec<String> {
+    use quote::ToTokens;
+    let mut sigs: Vec<String> = match item {
+        syn::Item::Impl(im) => im
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                syn::ImplItem::Fn(m) => Some(m.sig.to_token_stream().to_string()),
+                _ => None,
+            })
+            .collect(),
+        syn::Item::Trait(t) => t
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                syn::TraitItem::Fn(m) => Some(m.sig.to_token_stream().to_string()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    sigs.sort();
+    sigs
 }
 
 /// A declaration's shallow parse: `key(arg, arg)` → the shape key and its trimmed args.
@@ -1241,6 +1322,85 @@ pub fn gather(a: Count) -> Count {
         assert!(!mentions("submerged", "merge"));
         assert!(!mentions("merges", "merge"));
         assert!(mentions("`merge` evaluates as `floor`", "merge"));
+    }
+
+    /// THE HOST'S ITEM KINDS, reachable (the self-hosting disposition's rung-2 gap,
+    /// closed): an impl edits under the METHOD-SIGNATURE-SET hold — bodies and docs free,
+    /// surface held — a moved set refuses by count, two blocks sharing an address refuse
+    /// as ambiguous, and a trait edits under the same hold. Drilled on fixtures AND on
+    /// real host code: `modularize.rs`'s own `impl ProposedModule`, edited through the
+    /// verb, every byte outside the block untouched.
+    #[test]
+    fn edit_reaches_impls_and_traits_holding_their_surface() {
+        let module = "\
+pub struct Count;
+
+impl Count {
+    /// up.
+    pub fn up(self) -> Count {
+        self
+    }
+}
+";
+        // a body/doc edit under the held surface lands.
+        let edited = Bundle::edit(
+            module,
+            "impl Count",
+            "impl Count {\n    /// up — now with intent.\n    pub fn up(self) -> Count {\n        Count\n    }\n}\n",
+        )
+        .expect("an impl body edit lands");
+        assert!(edited.contains("now with intent"));
+        // a moved method set refuses: an added method is interface change.
+        let err = Bundle::edit(
+            module,
+            "impl Count",
+            "impl Count {\n    pub fn up(self) -> Count {\n        self\n    }\n    pub fn down(self) -> Count {\n        self\n    }\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("method-signature set moved"), "{err}");
+        // two blocks sharing one address refuse as ambiguous, never guessed between.
+        let doubled = format!("{module}\nimpl Count {{}}\n");
+        let err = Bundle::edit(&doubled, "impl Count", "impl Count {}\n").unwrap_err();
+        assert!(err.contains("ambiguous"), "{err}");
+        // a trait edits under the same hold (docs free, surface held)...
+        let with_trait = "pub struct A;\n\npub trait Speak {\n    fn speak(&self) -> A;\n}\n";
+        let edited = Bundle::edit(
+            with_trait,
+            "Speak",
+            "/// the voice.\npub trait Speak {\n    fn speak(&self) -> A;\n}\n",
+        )
+        .expect("a trait doc edit lands");
+        assert!(edited.contains("the voice"));
+        // ...and a moved trait surface refuses.
+        let err = Bundle::edit(
+            with_trait,
+            "Speak",
+            "pub trait Speak {\n    fn speak(&self) -> A;\n    fn shout(&self) -> A;\n}\n",
+        )
+        .unwrap_err();
+        assert!(err.contains("method-signature set moved"), "{err}");
+
+        // REAL HOST CODE: modularize.rs's own `impl ProposedModule`, edited through the
+        // verb — the doc moves, the signature set holds, and every byte outside the
+        // block survives. Rung 2 of self-hosting, smoked on the tree that hosts it.
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/discover/modularize.rs");
+        let host = std::fs::read_to_string(path).expect("host module");
+        let block_start = host
+            .find("#[crate::mutate]\nimpl ProposedModule {")
+            .expect("the block");
+        let block_end = block_start + host[block_start..].find("\n}\n").expect("its end") + 3;
+        let replacement = host[block_start..block_end].replace(
+            "is not a module, it is a misfit",
+            "is not a module, it is a MISFIT",
+        );
+        let edited = Bundle::edit(&host, "impl ProposedModule", &replacement)
+            .expect("the host impl edits through the verb");
+        assert!(edited.contains("it is a MISFIT"));
+        assert_eq!(
+            edited.replace("it is a MISFIT", "it is a misfit"),
+            host,
+            "every byte outside the edit survives"
+        );
     }
 
     /// GARBAGE COLLECTION, drilled — mark derived, sweep ratified, on a fixture with one
