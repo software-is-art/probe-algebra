@@ -1752,10 +1752,17 @@ input.
 
 The rung ladder, round-trip before generation as always:
 
-0. **The type-library surfacing voice** — before any re-rendering exists, a hook voice
-   that surfaces which sorts and operators already live in the component an edit is
-   netting into (`Placement::signatures_of` + the existing voice delivery): the
-   anti-duplication sense, attacking the context 10% while the assembly 90% gets built.
+0. **The type-library surfacing voice — BUILT** (`probe-hook`'s sixth voice,
+   `library_voice`, landed the day after the census learned to see impls — the two bricks
+   compose: 16 modules' operator families are now the library). On any Rust edit, the
+   types the edited file touches (`Ticker::type_vocabulary` — every type ident its
+   signatures mention, own or imported) intersect against the committed
+   `spec/qualify.spec`, and files elsewhere whose sorts overlap are named with their
+   operator families — the existing vocabulary in the window before a twin gets written.
+   The census intersection IS the noise filter (ubiquitous types never appear as census
+   sorts), the edited file's own line never speaks, and the render dedupes per file,
+   re-announcing only when the overlap changes. The anti-duplication sense, attacking the
+   context 10% while the assembly 90% gets built.
 1. **Round-trip — BUILT** (`discover::bundle`). A module parses into a bundle (each
    top-level item a verbatim segment; operators identified by the sixth sense's net model,
    grouped by the one placer) and renders back in canonical placed order. The pin is real:

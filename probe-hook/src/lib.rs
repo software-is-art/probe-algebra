@@ -13,13 +13,17 @@
 //!   edit (un-scoped) but DEDUPED against the last-shown ledger, so it speaks only when the drift
 //!   moves — the behavioural mirror at the edit, for the one lock a text edit can re-derive (no
 //!   how-to-bless recipe: the named lock's own header carries it);
+//! * the TYPE-LIBRARY voice (`library_voice`) — the anti-duplication sense (rung 0 of the
+//!   bundle candidate): when the edited file touches sorts that already carry operators in
+//!   OTHER files' census lines, the existing families are named — per-file, deduped, the
+//!   census intersection doubling as the noise filter;
 //! * the TIER voice (`spec/tiers.spec`) — on first edit of a file, its derived tier and the
 //!   rules it carries (the reader-service the deleted `//! Tier:` markers gave);
 //! * the FREEZE-DELTA courier (`freeze_delta_voice`) — the recommendation movement the last
 //!   build derived via `spec_lock::Lock::delta` (a placement re-settling, a seam candidate
 //!   appearing), inserted once into the window and then cleared.
 //!
-//! The first four voices the hook DERIVES from a single text edit. The fifth it does not
+//! The first five voices the hook DERIVES from a single text edit. The sixth it does not
 //! compute at all: distance, cohesion, and placement need the compiled theory (running `eval`),
 //! which a text edit cannot afford — so the movement of those recommendations is derived where
 //! it is cheap, at the build that emits the locks (`spec_lock::Lock::delta` holds both sides at
@@ -95,7 +99,7 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
         .to_string();
     let source = std::fs::read_to_string(&path).unwrap_or_default();
 
-    // FIVE voices, each priced in silence — the whole edit-time envelope, so the shipped
+    // SIX voices, each priced in silence — the whole edit-time envelope, so the shipped
     // binary fully replaces the bash wrapper it descends from (the last, the freeze-delta
     // courier, the hook carries rather than computes):
     let mut blocks: Vec<String> = Vec::new();
@@ -118,6 +122,14 @@ pub fn respond(hook_json: &str, project_dir: &Path) -> Option<String> {
     // net-disjoint component) on ANY Rust file, stateful across invocations (see [`shape_voice`]).
     if let Some(shape) = shape_voice(project_dir, &rel, &source) {
         blocks.push(shape);
+    }
+
+    // the TYPE-LIBRARY voice — the anti-duplication sense: when the edited file touches
+    // sorts that already carry operators ELSEWHERE in the committed qualify census, name
+    // those files and their operator families before a twin gets written (see
+    // [`library_voice`]).
+    if let Some(library) = library_voice(project_dir, &rel, &source) {
+        blocks.push(library);
     }
 
     // the QUALIFY voice — the edit-time lock delta as a DRIFT LEDGER: the whole current drift of
@@ -227,6 +239,81 @@ fn shape_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
 ///
 /// Capability: Effectful — reads `spec/qualify.spec`, rescans the `src/` tree, and reads/writes the
 /// dedup state under `project_dir`.
+/// The TYPE-LIBRARY voice — the anti-duplication sense (rung 0 of the bundle candidate,
+/// docs/roadmap.md): when the edited file touches SORTS that already carry operators in
+/// OTHER files, whisper which files and which operator families, so the existing vocabulary
+/// is in the window before a twin gets written. The library is the committed
+/// `spec/qualify.spec` — derived, ratified, cheap to read (the tier voice's move) — and the
+/// edited file's side is `Ticker::type_vocabulary` (every type ident its signatures
+/// mention, plus its own declared types). The census intersection IS the noise filter:
+/// ubiquitous types (`String`, `Vec`, `Result`) never appear as census sorts, so nothing
+/// wires to everything.
+///
+/// Priced in silence, the standing rules: only Rust edits; the edited file's own census
+/// line never speaks (its operators are not news to itself); no intersection is silence;
+/// and the render is DEDUPED per file (`target/probe-hook/<slug>.library` holds the last
+/// shown text), so the library speaks on first contact and again only when the overlap
+/// CHANGES — a grown family, a new sharing file, a dropped sort.
+///
+/// Capability: Effectful — reads `spec/qualify.spec` and the per-file dedup state.
+fn library_voice(project_dir: &Path, rel: &str, source: &str) -> Option<String> {
+    if !rel.ends_with(".rs") {
+        return None;
+    }
+    let census = std::fs::read_to_string(project_dir.join("spec/qualify.spec")).ok()?;
+    let vocabulary = Ticker::type_vocabulary(source).ok()?;
+
+    let mut lines: Vec<String> = Vec::new();
+    for line in census.lines() {
+        // the committed format: `<path>: QUALIFIES — operators [..] over sorts {..}`;
+        // header comments and blank lines simply do not match.
+        let Some((path, rest)) = line.split_once(": QUALIFIES — operators [") else {
+            continue;
+        };
+        let Some((operators, sorts)) = rest.split_once("] over sorts {") else {
+            continue;
+        };
+        let Some(sorts) = sorts.strip_suffix('}') else {
+            continue;
+        };
+        if path == rel {
+            continue;
+        }
+        let shared: Vec<&str> = sorts
+            .split(", ")
+            .filter(|s| vocabulary.contains(*s))
+            .collect();
+        if shared.is_empty() {
+            continue;
+        }
+        lines.push(format!(
+            "  {path}: shares {{{}}} — operators [{operators}]",
+            shared.join(", ")
+        ));
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    let rendered = format!(
+        "type library — sorts this file touches already carry operators elsewhere:\n{}",
+        lines.join("\n")
+    );
+
+    let slug: String = rel
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let state = project_dir
+        .join("target/probe-hook")
+        .join(format!("{slug}.library"));
+    if std::fs::read_to_string(&state).is_ok_and(|s| s == rendered) {
+        return None;
+    }
+    std::fs::create_dir_all(project_dir.join("target/probe-hook")).ok()?;
+    std::fs::write(&state, &rendered).ok()?;
+    Some(rendered)
+}
+
 fn qualify_voice(project_dir: &Path) -> Option<String> {
     // a repo without the census returns here, before any scan — the feature exists only where the
     // lock does, which is not the same as scoping which EDITS may surface it.
@@ -585,6 +672,76 @@ mod drills {
             respond(&event(&bare.join("src/x.rs")), &bare).expect("tier still names itself");
         assert!(voice.contains("tier: src/x.rs is ALGEBRA"), "{voice}");
         assert!(voice.contains("regenerate spec/tiers.spec"), "{voice}");
+    }
+
+    /// THE TYPE-LIBRARY VOICE, drilled — the anti-duplication sense. An edit touching a sort
+    /// that already carries operators ELSEWHERE names the file and its family, once; the same
+    /// overlap again is silence (deduped per file); a GROWN overlap re-announces; a file whose
+    /// types intersect nothing is silence; and the edited file's own census line never speaks.
+    #[test]
+    fn the_library_voice_names_existing_operator_families_once() {
+        // the tree is CONSISTENT with its committed census (the qualify ledger stays
+        // silent), so every block below is the library voice's alone. The edited file
+        // does not qualify (borrowed arg) — but its signature MENTIONS Credits, an
+        // imported domain type: exactly the twin-about-to-be-written moment.
+        let meter = "pub struct Credits;\npub struct Order;\n\
+             impl Credits {\n\
+                 pub fn grant(self, o: Order) -> Credits { let _ = o; self }\n\
+                 pub fn spend(self, c: Credits) -> Credits { c }\n\
+             }\n";
+        let gauge =
+            "pub struct Level;\nimpl Level { pub fn fuse(self, l: Level) -> Level { l } }\n";
+        let root = tree(
+            "library",
+            &[
+                (
+                    "spec/qualify.spec",
+                    "# census\n\
+                     src/gauge.rs: QUALIFIES — operators [Level::fuse] over sorts {Level}\n\
+                     src/meter.rs: QUALIFIES — operators [Credits::grant, Credits::spend] over sorts {Credits, Order}\n",
+                ),
+                ("src/meter.rs", meter),
+                ("src/gauge.rs", gauge),
+                (
+                    "src/new_work.rs",
+                    "use crate::meter::Credits;\npub fn top_up(c: &Credits) -> Credits { c.spend(Credits) }\n",
+                ),
+                ("src/stranger.rs", "pub struct Unrelated;\n"),
+            ],
+        );
+        let ev = event(&root.join("src/new_work.rs"));
+        let voice = respond(&ev, &root).expect("the overlap speaks");
+        assert!(
+            voice.contains("type library — sorts this file touches already carry operators"),
+            "{voice}"
+        );
+        assert!(
+            voice.contains(
+                "src/meter.rs: shares {Credits} — operators [Credits::grant, Credits::spend]"
+            ),
+            "{voice}"
+        );
+        assert!(!voice.contains("gauge"), "no Level overlap: {voice}");
+        // deduped: the same overlap on the next edit is silence.
+        assert_eq!(respond(&ev, &root), None);
+        // a GROWN overlap re-announces: the edit now touches Order too.
+        std::fs::write(
+            root.join("src/new_work.rs"),
+            "use crate::meter::{Credits, Order};\n\
+             pub fn top_up(c: &Credits) -> Credits { c.spend(Credits) }\n\
+             pub fn settle(o: &Order) -> Order { let _ = o; Order }\n",
+        )
+        .unwrap();
+        let voice = respond(&ev, &root).expect("the grown overlap re-announces");
+        assert!(voice.contains("shares {Credits, Order}"), "{voice}");
+        // a file intersecting nothing is silence; the census file's OWN line never
+        // speaks (its operators are not news to itself).
+        assert_eq!(respond(&event(&root.join("src/stranger.rs")), &root), None);
+        assert_eq!(
+            respond(&event(&root.join("src/meter.rs")), &root),
+            None,
+            "a file's own operators are not news to itself"
+        );
     }
 
     /// THE QUALIFY VOICE, drilled — the edit-time LOCK DELTA as an UN-SCOPED, DEDUPED drift ledger.
