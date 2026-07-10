@@ -17,3 +17,4 @@ edit examples/bundle.rs — run @ffb9fd577408b1a7
 edit src/discover/bundle.rs — probes @bb234699f9d8c2a1
 edit src/discover/bundle.rs — impl Bundle @177aa3370f5b03a7
 edit src/discover/lift.rs — render_single @38b7b446daa57e30
+edit examples/bundle.rs — main @09f4d54a15b6a941

@@ -36,14 +36,17 @@ use boundary_spec::discover::lift::AutoLift;
 use boundary_spec::discover::trace::Trace;
 
 fn main() -> ExitCode {
+    // a closed pipe (`bundle show m.rs | head`) is the reader's satisfaction, not a
+    // failure — perception output tolerates it instead of panicking mid-print.
+    use std::io::Write;
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
         Ok(message) => {
-            println!("{message}");
+            let _ = writeln!(std::io::stdout(), "{message}");
             ExitCode::SUCCESS
         }
         Err(refusal) => {
-            eprintln!("{refusal}");
+            let _ = writeln!(std::io::stderr(), "{refusal}");
             ExitCode::FAILURE
         }
     }
