@@ -23,3 +23,7 @@ edit src/discover/squash.rs — probes @52c0bfcf39a664a8
 edit src/discover/store.rs — probes @0e6c745f1a90c967
 edit src/discover/watch.rs — probes @bc845bdc3b235eb8
 edit src/discover/squash.rs — probes @3cde842f3e98b364
+add src/discover/verdict.rs — struct VerdictStore @4938fd73abd715c1
+add src/discover/verdict.rs — mod probes @ba6e116b73f37f4a
+add src/discover/mod.rs — mod verdict @d60f22f1fcd38724
+edit examples/bundle.rs — run @9b25e82f6c3e605d

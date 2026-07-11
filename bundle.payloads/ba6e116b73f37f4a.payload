@@ -1,0 +1,81 @@
+#[cfg(test)]
+mod probes {
+    use super::VerdictStore;
+    use crate::discover::gates::{Cadence, GateRegistry};
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("probe-verdict-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("scratch dir");
+        dir
+    }
+
+    /// THE CLASS, CLOSED: green is a fact about a tree hash. An unjudged tree owes
+    /// (fails closed), a recorded verdict holds, ONE MOVED BYTE re-opens the debt —
+    /// the stale green that burned the session twice is unrepresentable — and the
+    /// store's own entries sit OUTSIDE the scope they judge, so recording a verdict
+    /// does not move the tree it describes.
+    #[test]
+    fn a_moved_tree_owes_again() {
+        let root = scratch("moved");
+        std::fs::write(root.join("a.rs"), "pub fn a() {}\n").unwrap();
+        let store = VerdictStore::beside(&root);
+        let key = VerdictStore::tree_hash(&root).unwrap();
+        assert!(!store.held("fmt", &key), "unjudged fails closed");
+        store.record("fmt", &key).unwrap();
+        assert!(store.held("fmt", &key), "a recorded verdict holds");
+
+        std::fs::write(root.join("a.rs"), "pub fn a() { }\n").unwrap();
+        let moved = VerdictStore::tree_hash(&root).unwrap();
+        assert_ne!(key, moved, "one byte moves the key");
+        assert!(!store.held("fmt", &moved), "a moved tree has no green");
+        assert_eq!(
+            VerdictStore::tree_hash(&root).unwrap(),
+            moved,
+            "verdicts sit outside their own scope"
+        );
+    }
+
+    /// The key is CONTENT, not location or time: two checkouts with identical relative
+    /// trees share a key — the portability the sampled countersign will stand on.
+    #[test]
+    fn the_key_is_content_not_place() {
+        let here = scratch("content-here");
+        let there = scratch("content-there");
+        for root in [&here, &there] {
+            std::fs::create_dir_all(root.join("src")).unwrap();
+            std::fs::write(root.join("src/lib.rs"), "pub struct T;\n").unwrap();
+        }
+        assert_eq!(
+            VerdictStore::tree_hash(&here).unwrap(),
+            VerdictStore::tree_hash(&there).unwrap()
+        );
+        // a path is part of the content: the same bytes under another name is
+        // another tree.
+        std::fs::rename(there.join("src/lib.rs"), there.join("src/lob.rs")).unwrap();
+        assert_ne!(
+            VerdictStore::tree_hash(&here).unwrap(),
+            VerdictStore::tree_hash(&there).unwrap()
+        );
+    }
+
+    /// The owed roster IS the registry's every-change set — derived, never restated:
+    /// an empty store owes every one of them, and only them.
+    #[test]
+    fn the_owed_roster_is_the_registry() {
+        let root = scratch("roster");
+        let store = VerdictStore::beside(&root);
+        let owed = store.owed("0000000000000000");
+        let declared = GateRegistry::declared()
+            .iter()
+            .filter(|g| matches!(g.cadence, Cadence::EveryChange))
+            .count();
+        assert_eq!(owed.len(), declared, "every-change gates, exactly");
+        assert!(!owed.is_empty(), "the roster is never empty");
+        assert!(
+            owed.iter().all(|(_, held)| !held),
+            "an empty store owes everything"
+        );
+    }
+}

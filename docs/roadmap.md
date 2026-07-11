@@ -2389,6 +2389,25 @@ the sites whose covering tests changed; sweep that subset in the inner loop and 
 the full re-certification to CI and the weekly shards, which already exist for exactly
 this division of labour.
 
+**The gates become locks (BUILT — the operator's "make that class of failure
+impossible", same day):** the warm-green class named precisely is a VERDICT HELD WITHOUT
+ITS INPUT KEY — and every judgment in the repo was already staleness-proof except the
+gates themselves, which lived as terminal output and working memory (the bag-of-booleans
+pattern at the CI grain). `discover::verdict` closes it by construction: a verdict is
+keyed by the content fingerprint of everything the gates judge (relative paths + bytes,
+sorted walk, `.git`/`target`/`.suit` disclosed as the skip set), a missing entry FAILS
+CLOSED as unjudged, only green is ever recorded (red demands a tree change, and a
+changed tree is a new key), and the store's entries sit outside their own scope so
+recording cannot stale itself. `bundle gates` runs the owed every-change gates FROM THE
+REGISTRY DECLARATION (the same one ci.yml renders from — "green locally" and "green in
+CI" stay one claim), records verdicts only if the tree the gates judged is the tree that
+exists afterwards (autofix moves the key; the run says so and asks to be re-run), and
+`bundle owes` is the ceremony-sequencing toil dissolved: the to-do list a change owes is
+DERIVED — the gates without verdicts at the current hash — not remembered. Pinned by the
+probes: one moved byte re-opens the debt; identical relative trees share a key (the
+portability the countersign below will stand on); the roster is the registry's
+every-change set, never restated.
+
 **Candidate behind it (the operator's follow-on): the verdict store with a sampled
 countersign.** "Can a local sweep attest so CI skips?" — the waste diagnosis is right
 (same tree, same pinned toolchain, a deterministic judgment recomputed), but a straight

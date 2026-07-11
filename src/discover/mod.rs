@@ -588,6 +588,8 @@ pub mod squash;
 
 pub mod store;
 
+pub mod verdict;
+
 #[cfg(test)]
 mod tests {
     use super::*;

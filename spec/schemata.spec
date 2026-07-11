@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 841 sites.
+# 849 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -808,6 +808,14 @@
 - boundary_spec::discover::trace::trace::of:0: ! -> (deleted)
 - boundary_spec::discover::trace::trace::of:deaf -> Err(String::new())
 - boundary_spec::discover::trace::trace::render:deaf -> String::new()
+- boundary_spec::discover::verdict::verdict::entry:deaf -> String::new()
+- boundary_spec::discover::verdict::verdict::held:deaf -> false
+- boundary_spec::discover::verdict::verdict::held:deaf -> true
+- boundary_spec::discover::verdict::verdict::owed:deaf -> vec![]
+- boundary_spec::discover::verdict::verdict::record:deaf -> Err(String::new())
+- boundary_spec::discover::verdict::verdict::tree_hash:deaf -> Err(String::new())
+- boundary_spec::discover::verdict::verdict::tree_hash:deaf -> Ok(String::new())
+- boundary_spec::discover::verdict::verdict::walk:deaf -> Err(String::new())
 - boundary_spec::discover::watch::diff:0: ! -> (deleted)
 - boundary_spec::discover::watch::diff:1: ! -> (deleted)
 - boundary_spec::discover::watch::diff:2: < -> >=
