@@ -2575,6 +2575,18 @@ measured from opposite ends.
 - **Morphism downstream**: the fixture exercises Construction/Branch/Guarded;
   the fourth edge shape is honestly unexercised downstream.
 - **MSRV**: unpinned; verify and add `rust-version` after first publish.
+- **Candidate: the ceremony layer is the suit's next frontier** (the operating notes
+  from the first merged epic). Inside the tree the agent works suited — verbs, verdicts,
+  attestations; at the GitHub layer (PR bodies, merges, releases, CI-watching) it is
+  back to buttons and logs, the fallback encyclopedia of the CEREMONY. The evidence:
+  PR bodies hand-narrated three times when the journal holds their content (the
+  agenda-from-journal candidate, now with a consumer), the release semantics still in
+  shell (its two failures were both shell-class), and watch-state dying with every
+  container restart while the pinned binary sails through. Also worth naming from the
+  same notes: OPERATED failures arrive pre-narrated — the perimeter refused a merge
+  method by quoting its own lock; the diagnosis step keeps collapsing into reading —
+  and the unkeyed-verdict failure class appeared at a fourth altitude (semver) once the
+  first three gave it a name.
 - **Candidate: the version bump becomes a derived demand** (named by the release the
   big merge broke twice). The mint's second failure was the honest one: the release
   loop is idempotent by version, `boundary-enforce` grew its API without a bump, so
