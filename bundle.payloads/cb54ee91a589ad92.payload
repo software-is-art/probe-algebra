@@ -1,0 +1,12 @@
+/// One judged site in a sweep transcript: its census name, the verdict the sweep
+/// reached, and the covering tests it was judged BY — carried so a countersign can
+/// re-run exactly the judgment being audited. The lie direction that matters is a
+/// false `killed` (a hidden degree of freedom), and it cannot be fabricated from
+/// non-covering tests: tests that never reach the flipped guard pass under the mutant,
+/// the sampled re-judgment observes a survivor, and the disagreement fires.
+#[derive(Debug)]
+pub struct SiteVerdict {
+    pub site: String,
+    pub verdict: String,
+    pub tests: Vec<String>,
+}

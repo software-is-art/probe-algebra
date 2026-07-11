@@ -2408,6 +2408,27 @@ probes: one moved byte re-opens the debt; identical relative trees share a key (
 portability the countersign below will stand on); the roster is the registry's
 every-change set, never restated.
 
+**The sampled countersign (BUILT — the candidate below, finished the next day):** the
+sweep now writes a COMMITTED attestation (`attest/sweep.transcript`: tree hash,
+toolchain, baseline, and every site's verdict with the covering tests it was judged by),
+and the mutation gate's one declared command became `schemata verify` — locally and in
+CI, the same claim: a committed attestation matching the checked-out tree and toolchain
+is AUDITED by re-judging a random sample of its sites (seed drawn from entropy after the
+transcript is fixed, so a false `killed` cannot be placed where the audit won't look —
+and it cannot be fabricated from non-covering tests either: tests that never reach the
+flipped guard pass under the mutant and the disagreement fires); a missing, foreign, or
+disagreeing attestation falls back to the full sweep, which re-attests. The register
+still judges the claimed survivor set before any sampling (an unratified survivor is a
+red gate, not a disagreement), the census must name exactly the attested population, and
+`attest/` is EXCLUDED from the tree hash — the attestation describes the tree, so it
+cannot be part of the tree it describes. Timeout portability stays the disclosed edge:
+a slow-box detection can read as a fast-box survivor, a FALSE disagreement that costs a
+redundant sweep and never a false green. Field report from the first run: the
+whole-tree scope makes PROSE edits invalidate the mutation verdict — a docs-only change
+re-owes a nine-minute sweep it cannot affect. The named refinement: PER-GATE SCOPES
+(fmt reads .rs; the sweep reads src and tests; none of the four reads docs/) — the
+verdict key becomes a claim about what each gate actually consumes.
+
 **Candidate behind it (the operator's follow-on): the verdict store with a sampled
 countersign.** "Can a local sweep attest so CI skips?" — the waste diagnosis is right
 (same tree, same pinned toolchain, a deterministic judgment recomputed), but a straight

@@ -9,8 +9,9 @@
 //!
 //! Disclosed edges: the fingerprint is FNV-64 (a fingerprint, not a commitment — these
 //! verdicts are the suit's local memory; the committed, countersigned form is the
-//! sampled-countersign candidate), and the skip set (.git, target, .suit) is a scope
-//! claim: what no gate reads cannot stale a verdict.
+//! sampled-countersign candidate), and the skip set (.git, target, .suit, attest) is a
+//! scope claim: what no gate reads cannot stale a verdict, and the attestation cannot
+//! be part of the tree it describes.
 
 use std::path::{Path, PathBuf};
 
@@ -39,8 +40,9 @@ impl VerdictStore {
 
     /// The SCOPE KEY: a fingerprint of every file the gates judge — relative paths and
     /// bytes in sorted walk order, skipping only what no gate reads (`.git`, `target`,
-    /// the suit's own artifacts). Relative paths make the key a claim about CONTENT,
-    /// portable across checkouts — the future countersign compares these.
+    /// the suit's own artifacts) plus `attest/` (the transcript DESCRIBES the tree, so
+    /// it cannot be part of the tree it describes). Relative paths make the key a claim
+    /// about CONTENT, portable across checkouts — the countersign compares these.
     ///
     /// Capability: Effectful — reads the tree it fingerprints.
     pub fn tree_hash(crate_root: &Path) -> Result<String, String> {
@@ -112,7 +114,7 @@ impl VerdictStore {
             let path = entry.path();
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if matches!(name.as_ref(), ".git" | "target" | ".suit") {
+            if matches!(name.as_ref(), ".git" | "target" | ".suit" | "attest") {
                 continue;
             }
             if path.is_dir() {

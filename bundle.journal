@@ -27,3 +27,14 @@ add src/discover/verdict.rs — struct VerdictStore @4938fd73abd715c1
 add src/discover/verdict.rs — mod probes @ba6e116b73f37f4a
 add src/discover/mod.rs — mod verdict @d60f22f1fcd38724
 edit examples/bundle.rs — run @9b25e82f6c3e605d
+add src/discover/attest.rs — struct SiteVerdict, struct Transcript @3d5410c389fcad8f
+add src/discover/attest.rs — mod probes @0d1a55b527d80d3e
+add src/discover/mod.rs — mod attest @436e66293ac41200
+edit src/discover/verdict.rs — impl VerdictStore @203fa27dbd0b6ae7
+edit examples/schemata.rs — main @4084980c8222e7d5
+edit examples/schemata.rs — sweep @d91c7a9ac670eb4a
+add examples/schemata.rs — fn verify, fn countersign @887aa3033fb0e1b6
+edit src/discover/gates.rs — impl GateRegistry @f7b614c66c075055
+edit src/discover/gates.rs — impl GateRegistry @c69eb51034ea997f
+edit src/discover/attest.rs — SiteVerdict @cb54ee91a589ad92
+edit src/discover/attest.rs — Transcript @3a1cdf0ecbebb6ba

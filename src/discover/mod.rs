@@ -590,6 +590,8 @@ pub mod store;
 
 pub mod verdict;
 
+pub mod attest;
+
 #[cfg(test)]
 mod tests {
     use super::*;

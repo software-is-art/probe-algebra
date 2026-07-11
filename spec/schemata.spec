@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 849 sites.
+# 856 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -71,6 +71,13 @@
 - boundary_spec::discover::arithmetic::one:deaf -> None
 - boundary_spec::discover::arithmetic::run:deaf -> None
 - boundary_spec::discover::arithmetic::zero:deaf -> None
+- boundary_spec::discover::attest::attest::parse:0: || -> &&
+- boundary_spec::discover::attest::attest::parse:1: ! -> (deleted)
+- boundary_spec::discover::attest::attest::parse:deaf -> Err(String::new())
+- boundary_spec::discover::attest::attest::render:deaf -> String::new()
+- boundary_spec::discover::attest::attest::sample:0: == -> !=
+- boundary_spec::discover::attest::attest::sample:1: < -> >=
+- boundary_spec::discover::attest::attest::sample:deaf -> vec![]
 - boundary_spec::discover::bite::BiteVerdicts::gate:deaf -> Err(String::new())
 - boundary_spec::discover::bite::BiteVerdicts::gate:deaf -> Ok(String::new())
 - boundary_spec::discover::bite::Corpus::bites:0: ! -> (deleted)

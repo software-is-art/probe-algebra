@@ -1,0 +1,170 @@
+/// The mutation gate's ONE command: countersign a matching committed attestation by
+/// sampled re-judgment, or sweep from scratch (writing a fresh attestation) when the
+/// transcript is missing, foreign, or disagreeing. Locally, right after a sweep, this
+/// is a fast audit of your own record; on a cold checkout it is the sampled
+/// countersign — derivation local, signature cold, cost O(sample) — and any mismatch
+/// falls back to the full sweep, so a false disagreement only ever costs time.
+fn verify() {
+    let root = std::path::Path::new(".");
+    let key = match boundary_spec::discover::verdict::VerdictStore::tree_hash(root) {
+        Ok(key) => key,
+        Err(refusal) => {
+            eprintln!("{refusal}");
+            std::process::exit(1);
+        }
+    };
+    let committed =
+        std::fs::read_to_string(boundary_spec::discover::attest::Transcript::location(root))
+            .ok()
+            .and_then(|text| boundary_spec::discover::attest::Transcript::parse(&text).ok());
+    match committed {
+        Some(transcript)
+            if transcript.tree == key
+                && transcript.toolchain == boundary_spec::discover::gates::TOOLCHAIN =>
+        {
+            if countersign(&transcript) {
+                return;
+            }
+            eprintln!(
+                "countersign: the attestation cannot stand — sweeping from scratch"
+            );
+            sweep();
+        }
+        Some(transcript) => {
+            println!(
+                "attestation names tree {}, this is tree {key} — sweeping anew",
+                transcript.tree
+            );
+            sweep();
+        }
+        None => {
+            println!("no readable attestation at attest/sweep.transcript — sweeping");
+            sweep();
+        }
+    }
+}
+
+/// The sampled audit: census and attestation must name the same site population, the
+/// register judges the CLAIMED survivor set (an unratified survivor is a red gate, not
+/// a disagreement), and then a random sample of sites is re-judged by exactly the
+/// covering tests the transcript names. The seed comes from entropy AFTER the
+/// transcript is fixed — which sites get audited cannot be known when the claim is
+/// written, so a false `killed` cannot be placed where the audit won't look.
+fn countersign(transcript: &boundary_spec::discover::attest::Transcript) -> bool {
+    use std::hash::{BuildHasher, Hasher};
+    let census = match Schemata::census() {
+        Ok(sites) => sites,
+        Err(collision) => {
+            eprintln!("{collision}");
+            std::process::exit(1);
+        }
+    };
+    let attested: BTreeSet<&str> = transcript.sites.iter().map(|s| s.site.as_str()).collect();
+    if census.len() != attested.len() || !census.iter().all(|site| attested.contains(site)) {
+        eprintln!(
+            "countersign: the census ({} sites) and the attestation ({}) name different \
+             populations",
+            census.len(),
+            attested.len()
+        );
+        return false;
+    }
+    let survivors: Vec<&str> = transcript
+        .sites
+        .iter()
+        .filter(|s| s.verdict == "SURVIVED")
+        .map(|s| s.site.as_str())
+        .collect();
+    if let Err(drift) = Schemata::register().check(survivors.iter().copied()) {
+        eprintln!("{drift}");
+        std::process::exit(1);
+    }
+    let have_nextest = Command::new("cargo")
+        .args(["nextest", "--version"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !have_nextest {
+        println!("countersign needs nextest for per-site re-judgment — sweeping instead");
+        return false;
+    }
+    // one build serves every sampled verdict — the sweep's own economy.
+    let built = Command::new("cargo")
+        .args([
+            "test",
+            "-q",
+            "-p",
+            "boundary-spec",
+            "--lib",
+            "--features",
+            "schemata",
+            "--no-run",
+        ])
+        .status()
+        .expect("cargo runs");
+    if !built.success() {
+        std::process::exit(1);
+    }
+    let seed = std::collections::hash_map::RandomState::new()
+        .build_hasher()
+        .finish();
+    let sample = transcript.sample(transcript.sites.len().div_ceil(64).max(8), seed);
+    let limit = derive_limit(Duration::from_secs(transcript.baseline_secs));
+    println!(
+        "countersigning {} of {} sites (seed {seed:016x}; timeout {}s from the attested \
+         baseline)",
+        sample.len(),
+        transcript.sites.len(),
+        limit.as_secs()
+    );
+    for entry in &sample {
+        let observed_survives = if entry.tests.is_empty() {
+            // no covering test was claimed: survival IS the claim's content, and a
+            // claimed kill with no tests to kill by is a lie on its face.
+            true
+        } else {
+            let expr = entry
+                .tests
+                .iter()
+                .map(|t| format!("test(={t})"))
+                .collect::<Vec<_>>()
+                .join(" or ");
+            let mut cmd = Command::new("cargo");
+            cmd.args([
+                "nextest",
+                "run",
+                "-p",
+                "boundary-spec",
+                "--lib",
+                "--features",
+                "schemata",
+                "--fail-fast",
+                "--test-threads",
+                "2",
+                "-E",
+                &expr,
+            ])
+            .env("PROBE_MUTANT", entry.site.as_str());
+            survives(cmd, limit)
+        };
+        let claimed_survives = entry.verdict == "SURVIVED";
+        if observed_survives != claimed_survives {
+            eprintln!(
+                "countersign: `{}` — attested {} but observed {}",
+                entry.site,
+                entry.verdict,
+                if observed_survives { "SURVIVED" } else { "killed" }
+            );
+            return false;
+        }
+        println!("agrees   {} ({})", entry.site, entry.verdict);
+    }
+    println!(
+        "countersigned: {} sampled sites agree — the attestation stands for tree {}",
+        sample.len(),
+        transcript.tree
+    );
+    true
+}
