@@ -2389,6 +2389,23 @@ the sites whose covering tests changed; sweep that subset in the inner loop and 
 the full re-certification to CI and the weekly shards, which already exist for exactly
 this division of labour.
 
+**Candidate behind it (the operator's follow-on): the verdict store with a sampled
+countersign.** "Can a local sweep attest so CI skips?" — the waste diagnosis is right
+(same tree, same pinned toolchain, a deterministic judgment recomputed), but a straight
+skip fails the trust analysis, with same-day evidence: local green lied twice this
+session (warm-cache clippy passes that failed cold), and `mutants-green` works precisely
+because the countersign comes from the one party the working session cannot mint
+signatures for. The version that survives: the local sweep commits its TRANSCRIPT — tree
+hash, toolchain, per-site verdicts, content-addressed like the payload store (a judgment
+store) — and CI re-judges a RANDOM SAMPLE of sites against it: agreement countersigns
+the whole, one divergence triggers the full sweep, the weekly shards stay the
+from-scratch backstop. Derivation local, countersign sampled — CI stays the signer at
+O(sample) cost. Preconditions, disclosed: normalized timeout semantics (a timeout is a
+detection, and timeouts are machine-relative — verdicts must be portable before they are
+shareable) and the attestation claiming its ENVIRONMENT (toolchain already locked;
+cold-build discipline becomes part of the claim). Sequenced after the changed-scope
+sweep, which gets most of the win with none of the new trust surface.
+
 ### Stage 3: the payload store and the replay differential (BUILT)
 
 The journal stops being names-only and starts being a SOURCE. `discover::store` adds the
