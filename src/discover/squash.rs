@@ -381,6 +381,12 @@ mod probes {
             "add_a(x, y) = add_a(x)",
             "add_a() = add_a()",
             "x = x",
+            // two-deep forms whose guards must fire to stay silent: a symbol head,
+            // an empty core, an unparseable core — each would otherwise arrive at
+            // the projection arm and mint a rule from garbage.
+            "+(+(x)) = +(x)",
+            "add_a(add_a()) = add_a()",
+            "add_a(add_a(x, y)) = add_a(x, y)",
         ] {
             let r = SquashRules::from_spec(&spec_of(&[junk]));
             assert!(

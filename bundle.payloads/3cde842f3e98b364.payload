@@ -1,0 +1,184 @@
+#[cfg(test)]
+mod probes {
+    use super::SquashRules;
+    use crate::discover::verbs::state::VerbAlgebra;
+    use crate::discover::Spec;
+
+    fn rules() -> SquashRules {
+        SquashRules::from_spec(&Spec::of::<VerbAlgebra>())
+    }
+
+    /// THE HEADLINE: the rule table is READ OFF the frozen algebra, never authored —
+    /// the composition stanza's squash table, the projection laws, and the cross-item
+    /// commutations arrive as equations and come out as rules. The collect precedent
+    /// completed: a verb implemented BY the frozen spec of the verbs themselves.
+    #[test]
+    fn the_rule_table_is_derived_not_authored() {
+        let r = rules();
+        for (first, then, one) in [
+            ("add", "collect", "collect"),
+            ("edit", "collect", "collect"),
+            ("collect", "edit", "collect"),
+        ] {
+            assert_eq!(
+                r.collapses.get(&(first.to_string(), then.to_string())),
+                Some(&one.to_string()),
+                "`{first}` then `{then}` should collapse to `{one}`"
+            );
+        }
+        for verb in ["add", "edit", "collect", "declare"] {
+            assert!(r.projections.contains(verb), "`{verb}` replays safely");
+        }
+        assert!(r.mobile("edit", "collect"), "cross-key edit/collect slides");
+        assert!(
+            r.mobile("add", "declare"),
+            "declare is item-blind — it slides"
+        );
+        assert!(
+            !r.mobile("place", "collect"),
+            "`place` is outside the algebra — opaque"
+        );
+    }
+
+    /// The working case: an add and a collect on the same key meet across an unrelated
+    /// edit (the lock licenses the slide) and collapse to the one collect the frozen
+    /// table names.
+    #[test]
+    fn the_journal_compacts_to_law_normal_form() {
+        let journal = "add src/m.rs — fn x\nedit src/m.rs — fn y\ncollect src/m.rs — fn x\n";
+        assert_eq!(
+            rules().compact(journal).unwrap(),
+            "collect src/m.rs — fn x\nedit src/m.rs — fn y\n"
+        );
+    }
+
+    /// Silence is load-bearing: add-then-edit on one key composes to NO single verb (no
+    /// verb makes a twice-touched item from an absent one), so the table is silent and
+    /// the journal keeps the whole story — squash never invents a collapse.
+    #[test]
+    fn a_pair_the_lock_is_silent_on_keeps_both_lines() {
+        let journal = "add src/m.rs — fn x\nedit src/m.rs — fn x\n";
+        assert_eq!(rules().compact(journal).unwrap(), journal);
+    }
+
+    /// A verb the algebra does not model is OPAQUE: nothing slides past `place`, so the
+    /// same-key pair around it stays apart — mobility only where the lock speaks.
+    #[test]
+    fn an_unmodelled_verb_is_opaque() {
+        let journal = "add src/m.rs — fn x\n\
+                       place src/m.rs — re-placed canonically\n\
+                       collect src/m.rs — fn x\n";
+        assert_eq!(rules().compact(journal).unwrap(), journal);
+    }
+
+    /// Replay noise: the projection laws make a repeated identical entry one entry —
+    /// the same laws that make journal replay safe make its record deduplicate.
+    #[test]
+    fn replay_noise_is_one_entry() {
+        let journal = "edit src/m.rs — fn bump\nedit src/m.rs — fn bump\n";
+        assert_eq!(
+            rules().compact(journal).unwrap(),
+            "edit src/m.rs — fn bump\n"
+        );
+    }
+
+    /// Payload addresses are NOT part of the key: an add and a collect of one item
+    /// still meet and collapse when the add carries a store address — the collapse
+    /// keeps the line whose verb the lock names.
+    #[test]
+    fn payload_addresses_ride_the_collapse() {
+        let journal = "add src/m.rs — fn x @00112233aabbccdd\ncollect src/m.rs — fn x\n";
+        assert_eq!(
+            rules().compact(journal).unwrap(),
+            "collect src/m.rs — fn x\n"
+        );
+    }
+
+    /// Two edits of one item collapse to the LATER — the projection law licenses the
+    /// shape, last-write matches what the real bundle does, and the replay
+    /// differential judges the transport (replay(squash(j)) == replay(j)).
+    #[test]
+    fn the_later_payload_wins_the_projection() {
+        let journal =
+            "edit src/m.rs — bump @00112233aabbccdd\nedit src/m.rs — bump @ffeeddccbbaa0011\n";
+        assert_eq!(
+            rules().compact(journal).unwrap(),
+            "edit src/m.rs — bump @ffeeddccbbaa0011\n"
+        );
+    }
+
+    /// The one hard refusal: the journal is machine-written, so a line the grammar
+    /// cannot read means a hand touched the record — named by line, nothing written.
+    #[test]
+    fn a_hand_touched_line_refuses() {
+        let refusal = rules().compact("add src/m.rs\n").unwrap_err();
+        assert!(refusal.contains("line 1"), "{refusal}");
+    }
+
+    /// The equation parser's guards, pinned on SYNTHETIC law text (the sweep found
+    /// these branches reachable only by equations the live algebra never writes):
+    /// a cross-item or mixed-item composition is NO collapse, an item-blind
+    /// composition is NO collapse, a square with mismatched maps is NO mobility,
+    /// an underscored variable still parses, and junk shapes carry no rule at all.
+    #[test]
+    fn the_equation_parser_admits_only_what_it_should() {
+        let spec_of = |equations: &[&str]| crate::discover::Spec {
+            theory: "synthetic",
+            laws: equations
+                .iter()
+                .map(|e| crate::discover::Law {
+                    prose: String::new(),
+                    equation: (*e).to_string(),
+                })
+                .collect(),
+            consequences: 0,
+            uncovered_ops: vec![],
+            undecided: vec![],
+            tolerance: None,
+        };
+
+        for not_a_collapse in [
+            "collect_a(add_b(x)) = collect_a(x)",
+            "collect_a(add_a(x)) = collect_b(x)",
+            "collect_a(add_b(x)) = collect_b(x)",
+            "declare(edit(x)) = declare(x)",
+        ] {
+            let r = SquashRules::from_spec(&spec_of(&[not_a_collapse]));
+            assert!(
+                r.collapses.is_empty(),
+                "`{not_a_collapse}` must license nothing: {:?}",
+                r.collapses
+            );
+        }
+
+        let r = SquashRules::from_spec(&spec_of(&["add_a(edit_b(x)) = edit_b(collect_a(x))"]));
+        assert!(
+            r.commutes.is_empty(),
+            "a square with mismatched maps is not mobility: {:?}",
+            r.commutes
+        );
+
+        // an underscored VARIABLE parses — the core validation accepts '_' too.
+        let r = SquashRules::from_spec(&spec_of(&["add_a(add_a(x_1)) = add_a(x_1)"]));
+        assert!(r.projections.contains("add"), "{:?}", r.projections);
+
+        for junk in [
+            "(x + y) = (y + x)",
+            "add_a(x, y) = add_a(x)",
+            "add_a() = add_a()",
+            "x = x",
+            // two-deep forms whose guards must fire to stay silent: a symbol head,
+            // an empty core, an unparseable core — each would otherwise arrive at
+            // the projection arm and mint a rule from garbage.
+            "+(+(x)) = +(x)",
+            "add_a(add_a()) = add_a()",
+            "add_a(add_a(x, y)) = add_a(x, y)",
+        ] {
+            let r = SquashRules::from_spec(&spec_of(&[junk]));
+            assert!(
+                r.collapses.is_empty() && r.projections.is_empty() && r.commutes.is_empty(),
+                "`{junk}` must carry no rule"
+            );
+        }
+    }
+}

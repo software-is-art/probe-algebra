@@ -22,3 +22,4 @@ edit src/discover/bundle.rs — probes @3c1a7f172a744803
 edit src/discover/squash.rs — probes @52c0bfcf39a664a8
 edit src/discover/store.rs — probes @0e6c745f1a90c967
 edit src/discover/watch.rs — probes @bc845bdc3b235eb8
+edit src/discover/squash.rs — probes @3cde842f3e98b364
