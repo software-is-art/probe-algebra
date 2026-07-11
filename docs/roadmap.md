@@ -2575,3 +2575,16 @@ measured from opposite ends.
 - **Morphism downstream**: the fixture exercises Construction/Branch/Guarded;
   the fourth edge shape is honestly unexercised downstream.
 - **MSRV**: unpinned; verify and add `rust-version` after first publish.
+- **Candidate: the version bump becomes a derived demand** (named by the release the
+  big merge broke twice). The mint's second failure was the honest one: the release
+  loop is idempotent by version, `boundary-enforce` grew its API without a bump, so
+  the stale 0.1.0 was "already published — skipping" and the root crate's tarball
+  verify resolved the OLD one from the live index. The version integer is the last
+  hand-asserted compatibility claim in the system — and the machinery to derive the
+  demand already exists: each member's qualify census is committed, so "the public
+  surface moved since the published version" is a computable fact. The gate shape: a
+  publishable crate whose census diff against its published version is non-empty must
+  carry a manifest version the index does not know — semver honesty as a lock, not a
+  memory. (The SIGPIPE that broke the first mint is fixed in release.sh itself; the
+  deeper item — the release ceremony as typed Rust, the last shell carrying
+  semantics — stands.)

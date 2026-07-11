@@ -15,7 +15,7 @@ boundary-spec = { path = "..", version = "0.2.0" }
 spec-lock = { path = "../spec-lock", version = "0.1.0" }
 # The qualify census's own per-file emitter (`qualify_line`) — the edit-time voice computes
 # the exact line the frozen census would carry, one vocabulary with the build, never restated.
-boundary-enforce = { path = "../boundary-enforce", version = "0.1.0" }
+boundary-enforce = { path = "../boundary-enforce", version = "0.2.0" }
 # The hook protocol is JSON on stdin; a real parser, because file paths can carry
 # escaped quotes and a grep-shaped extraction is exactly the glue this crate retires.
 serde_json = "1"

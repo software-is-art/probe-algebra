@@ -88,7 +88,7 @@ spec-lock = { path = "spec-lock", version = "0.1.0" }
 # honesty, probe completeness, qualify census) — extracted so any crate's build.rs can attach the
 # same discipline. This repo's build.rs is now a thin shim over it; the KERNEL allowlist stays in
 # the shim, where admitting a member remains a reviewed diff in THIS tree.
-boundary-enforce = { path = "boundary-enforce", version = "0.1.0" }
+boundary-enforce = { path = "boundary-enforce", version = "0.2.0" }
 
 # delta-render's drift gates re-run discovery (and the whole algebra-mutation verdict)
 # inside every `cargo test`, and Engine<T> monomorphizes INTO that crate — so it alone
