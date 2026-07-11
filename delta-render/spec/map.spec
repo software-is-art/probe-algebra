@@ -18,6 +18,8 @@
       map(map(x)) = map(x)
 - map leaves zero fixed.
       map(zero) = zero
+- map and neg may be applied in either order.
+      map(neg(x)) = neg(map(x))
 - map turns plus into plus.
       map((x plus y)) = (map(x) plus map(y))
 

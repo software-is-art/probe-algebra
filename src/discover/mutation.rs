@@ -814,4 +814,20 @@ mod tests {
             );
         }
     }
+
+    /// The mutant MAKERS hold their own conduct (the full sweep's findings): the
+    /// right projection is not the partiality mutant, and same-conduct judges an
+    /// evaluator as agreeing with itself — a battery whose makers drift builds
+    /// mutants whose descriptions lie.
+    #[test]
+    fn the_mutant_makers_hold_their_conduct() {
+        assert!(
+            matches!(proj1::<Mute>(&[MV(1), MV(2)]), Some(MV(2))),
+            "proj1 projects the RIGHT argument; deaf it would be `never`"
+        );
+        assert!(never::<Mute>(&[MV(1)]).is_none());
+        let tuples = vec![vec![MV(1)], vec![MV(2)]];
+        assert!(same_conduct::<Mute>(one_op, one_op, &tuples));
+        assert!(!same_conduct::<Mute>(one_op, two_op, &tuples));
+    }
 }

@@ -666,12 +666,16 @@ impl GateRegistry {
                 verifies: "no compiled expression-flip mutant survives the lib suite: \
                            every `#[mutate]` site (spec/schemata.spec — the judges, the \
                            router's classifier, the reliance judge) ships in ONE build \
-                           behind the PROBE_MUTANT selector, and the sweep runs the \
-                           suite once per site — a green run with a flip active is a \
-                           survivor, ratified by key in spec/schemata.register or \
-                           killed with a probe. The rebuild-per-mutant price is gone, \
-                           so the whole population rides EVERY change (~a minute on a \
-                           warm cache), not a weekly clock",
+                           behind the PROBE_MUTANT selector — a green run with a flip \
+                           active is a survivor, ratified by key in \
+                           spec/schemata.register or killed with a probe. `verify` is \
+                           the sampled countersign: a committed attestation \
+                           (attest/sweep.transcript) matching this tree and toolchain \
+                           is audited by re-judging a random sample of its sites — \
+                           derivation local, signature cold — and a missing, foreign, \
+                           or disagreeing attestation falls back to the full sweep, \
+                           which re-attests. The weekly shards stay the from-scratch \
+                           backstop",
                 command: &[
                     "cargo",
                     "run",
@@ -680,7 +684,7 @@ impl GateRegistry {
                     "--example",
                     "schemata",
                     "--",
-                    "sweep",
+                    "verify",
                 ],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,

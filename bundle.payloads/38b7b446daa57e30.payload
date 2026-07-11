@@ -1,0 +1,55 @@
+/// Render the single-carrier `impl Liftable` — the ops table over one carrier.
+fn render_single(
+    theory_name: &str,
+    carrier: &str,
+    ops: &[(String, Vec<usize>, usize)],
+    declared: &[(String, Vec<String>)],
+) -> String {
+    // the eval closures clone grid values without knowing the carrier's Copy-ness —
+    // the generated impl carries the allow so a Copy carrier lints clean.
+    let mut out = format!(
+        "#[allow(clippy::clone_on_copy)]\nimpl ::boundary_spec::discover::lift::Liftable for {carrier} {{\n"
+    );
+    out.push_str(&format!(
+        "    fn theory_name() -> &'static str {{ {theory_name:?} }}\n"
+    ));
+    out.push_str(
+        "    fn ops() -> ::std::vec::Vec<::boundary_spec::discover::lift::LiftedOp<Self>> {\n        ::std::vec![\n",
+    );
+    for (name, inputs, _output) in ops {
+        let arity = inputs.len();
+        let fixity = fixity_for(arity);
+        let binder = if arity == 0 { "_" } else { "a" };
+        let args = (0..arity)
+            .map(|i| format!("a[{i}].clone()"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "            ::boundary_spec::discover::lift::LiftedOp {{ name: {name:?}, symbol: {name:?}, \
+             fixity: ::boundary_spec::discover::engine::Fixity::{fixity}, arity: {arity}, \
+             eval: |{binder}| ::std::option::Option::Some({name}({args})) }},\n"
+        ));
+    }
+    out.push_str("        ]\n    }\n");
+    // the SHOULD channel, baked in: the declarations ride the generated impl (canonical
+    // shape names — validated at scan time, so `Expectation::of`'s panic path is dead
+    // code by construction).
+    if !declared.is_empty() {
+        out.push_str(
+            "    fn expectations() -> ::std::vec::Vec<::boundary_spec::discover::expect::Expectation> {\n        ::std::vec![\n",
+        );
+        for (shape, args) in declared {
+            let ops = args
+                .iter()
+                .map(|a| format!("{a:?}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.push_str(&format!(
+                "            ::boundary_spec::discover::expect::Expectation::of({shape:?}, ::std::vec![{ops}]),\n"
+            ));
+        }
+        out.push_str("        ]\n    }\n");
+    }
+    out.push_str("}\n");
+    out
+}

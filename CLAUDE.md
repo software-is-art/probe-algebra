@@ -4,6 +4,41 @@ A Rust workspace (root crate `boundary-spec`) built around one idea: run the cod
 derive its spec, freeze the spec into committed files, and let CI fail on any drift.
 Almost every artifact here is generated from a declaration and compared byte for byte.
 
+## The second rule (adopted 2026-07-10): verbs before patches
+
+Change CODE through the bundle CLI wherever the verbs reach, never by writing text into
+the file: `cargo run --example bundle -- <verb> ...` with verbs
+add|edit|declare|place|check|show|collect|squash|replay|constrains|trace|lift|pin (each a
+judged transaction — a refusal writes nothing), plus gates|owes (green as a fact about a
+tree hash: `bundle owes` derives what the current tree still owes, `bundle gates` runs
+the owed every-change gates and records content-keyed verdicts — never trust a
+remembered green). Prefer the pinned binary `.suit/bundle`
+when it exists (`bundle pin` installs it) — it does not rebuild behind the gate of the
+tree it is changing. A change the verbs cannot express is a FIELD
+REPORT: name the missing verb in docs/roadmap.md ("The aim, adopted: zero file patching")
+before falling back to a file edit. Prose (docs, registers' justifications) stays
+hand-typed — prose is judgment. The aim this serves: the CLI is the interface to the
+code; the gaps you hit are the roadmap's fuel.
+
+## The instrument (adopted 2026-07-10): a grep is a reading
+
+When you reach for grep, or open a file to READ its interior, notice it: you are
+consulting the fallback encyclopedia because the question you hold is not yet a lock
+class or a perception verb (`cargo run --example bundle -- constrains <module> <op>` is
+the first of those verbs — try it before the grep). The reach itself is the instrument:
+"what was I trying to confirm that nothing ratifies?" names the next brick. Record the
+reading in docs/roadmap.md (the editor disposition carries the census). Interior reads
+go archaic the same way interior writes did — the answer set grows until the fallback
+goes quiet.
+
+## The standing question
+
+Ask it of everything you find yourself doing by hand: **"what else are we doing by hand
+that is secretly a derivation plus a signature?"** It is the method's one move (derive
+the fact, ratify the decision) pointed at its own tooling, and it has already dissolved
+genesis's emitter, git's change-medium, and the `remove` verb. When you catch one,
+record it in docs/roadmap.md's hand-work inventory — naming it is the brick's first half.
+
 Orientation: `README.md` is the front door, `docs/tour.md` the guided walk,
 `docs/discovery.md` the discovery reference, `docs/compile-time.md` the compile-time
 edge grammar, `docs/roadmap.md` the build history and what's next, `docs/experience.md`

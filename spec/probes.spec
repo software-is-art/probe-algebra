@@ -13,12 +13,14 @@
 - router: oracle-swap
 - store protocol: oracle-swap
 - ttl store: oracle-swap
+- verb algebra: oracle-swap
 
 ## structural probes (shape)
 - catalog: fire-drill
 - infra: live-dent
 - perimeter: live-dent
 - pipeline: fire-drill
+- reasons: drift-gate
 - schemata: fire-drill
 - seams: fire-drill
 - shape: fire-drill

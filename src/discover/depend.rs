@@ -34,6 +34,15 @@
 //!     law some consumer declared, the baseline no longer holds it and the judgment
 //!     refuses by equation, naming the reliance, before the ratification diff lands:
 //!     self-judgment makes declared reliances un-droppable.
+//!
+//! The thirteenth ask collapsed the two forms for the pinned consumer: the crate CARRIES
+//! its certification data ([`Locks`] — every theory lock, its mutation companion, and the
+//! shape catalog, `include_str!`-embedded), so a consumer's committed
+//! `upstream-reliances.register` is judged in its own suite against the locks of the exact
+//! version it is pinned to ([`Dependence::judge_embedded`]) — declaration lives with its
+//! owner, judgment re-runs on every pin bump, nothing crosses repos. A bump to a version
+//! that dropped a relied-on law refuses BY NAME, carrying the consumer's why, before a
+//! bare compile error explains nothing.
 
 use std::path::Path;
 
@@ -138,23 +147,13 @@ impl Dependence {
         register: &spec_lock::Register,
         spec_dir: &Path,
     ) -> Result<Vec<(String, String)>, String> {
-        let mut held = Vec::new();
-        for (key, justification) in register.entries()? {
-            let Some((theory, equation)) = key.split_once(" | ") else {
-                return Err(format!(
-                    "downstream reliance `{key}` refused: the key grammar is \
-                     `<theory> | <equation>` — without the ` | ` there is nothing \
-                     to judge"
-                ));
-            };
-            let (theory, equation) = (theory.trim(), equation.trim());
+        judge_reliances(register, |theory| {
             // the theory names a lock FILE, so it must stay inside the spec directory:
             // a name carrying path syntax is refused, never resolved — the register is
             // reviewed data, but the judge does not lean on that.
             if theory.contains('/') || theory.contains('\\') || theory.contains("..") {
                 return Err(format!(
-                    "downstream reliance `{key}` refused: `{theory}` is not a theory \
-                     name — path syntax cannot name a lock"
+                    "`{theory}` is not a theory name — path syntax cannot name a lock"
                 ));
             }
             let slug: String = theory
@@ -162,18 +161,171 @@ impl Dependence {
                 .map(|c| if c == ' ' { '-' } else { c })
                 .collect();
             let lock_path = spec_dir.join(format!("{slug}.spec"));
-            let text = std::fs::read_to_string(&lock_path).map_err(|e| {
+            std::fs::read_to_string(&lock_path)
+                .map_err(|e| format!("no committed lock for `{theory}` ({e})"))
+        })
+    }
+
+    /// Judge a CONSUMER-SIDE reliance register against the locks this crate carries
+    /// ([`Locks`]) — the thirteenth ask's collapse: the cross-repo form becomes the
+    /// self-judgment form because the lock travels with the pin. A consumer commits
+    /// `upstream-reliances.register` (the same `<theory> | <equation>: <consumer> — <why>`
+    /// grammar) and calls this in its own suite; a pin bump re-runs the judgment against
+    /// the new version's embedded locks with zero ceremony, and a bump that dropped a
+    /// relied-on law refuses by equation and why — before a bare compile error explains
+    /// nothing. Returns the held reliances as `(key, justification)` for rendering.
+    ///
+    /// Capability: Effectful — reads the register (the locks themselves are compiled in).
+    pub fn judge_embedded(register: &spec_lock::Register) -> Result<Vec<(String, String)>, String> {
+        judge_reliances(register, |theory| {
+            Locks::text(theory).map(str::to_string).ok_or_else(|| {
                 format!(
-                    "downstream reliance on `{equation}` refused: no committed lock \
-                     for `{theory}` ({e}) — declared by {justification}"
+                    "this version embeds no lock named `{theory}` — the certification \
+                     data a pin carries is its theory locks, their mutation companions, \
+                     and the shape catalog"
                 )
-            })?;
-            let deps = vec![Dependence::on(theory, equation)];
-            Dependence::judge(theory, &deps, &text, &text)
-                .map_err(|inner| format!("{inner} — declared by {justification}"))?;
-            held.push((key, justification));
-        }
-        Ok(held)
+            })
+        })
+    }
+}
+
+/// The shared judgment core behind [`Dependence::judge_register`] (locks resolved from a
+/// spec directory) and [`Dependence::judge_embedded`] (locks resolved from [`Locks`]) —
+/// one grammar, one refusal envelope, two resolvers. `lock_text` answers a theory name
+/// with its lock text or the refusal detail; every refusal carries the consumer's
+/// declared why, so the message names who is broken and what they said they stand on.
+#[crate::mutate]
+fn judge_reliances(
+    register: &spec_lock::Register,
+    lock_text: impl Fn(&str) -> Result<String, String>,
+) -> Result<Vec<(String, String)>, String> {
+    let mut held = Vec::new();
+    for (key, justification) in register.entries()? {
+        let Some((theory, equation)) = key.split_once(" | ") else {
+            return Err(format!(
+                "downstream reliance `{key}` refused: the key grammar is \
+                 `<theory> | <equation>` — without the ` | ` there is nothing \
+                 to judge"
+            ));
+        };
+        let (theory, equation) = (theory.trim(), equation.trim());
+        let text = lock_text(theory).map_err(|detail| {
+            format!(
+                "downstream reliance on `{equation}` refused: {detail} — declared by \
+                 {justification}"
+            )
+        })?;
+        let deps = vec![Dependence::on(theory, equation)];
+        Dependence::judge(theory, &deps, &text, &text)
+            .map_err(|inner| format!("{inner} — declared by {justification}"))?;
+        held.push((key, justification));
+    }
+    Ok(held)
+}
+
+/// The certification data this crate CARRIES: every committed theory lock, its
+/// algebra-mutation companion, and the shape catalog, `include_str!`-embedded byte for
+/// byte at compile time and keyed by lock stem. "The version is the certification" as an
+/// API — a consumer pinned to a release holds exactly that release's locks, no filesystem
+/// archaeology, no release-notes parsing; and because [`Spec::parse_lock`] ships in the
+/// same artifact, the lock and the parser that reads it can never skew.
+///
+/// The roster is DELIBERATE, and census-gated in both directions (see this module's
+/// probes): the behaviour locks and their mutation companions ship — the laws are the
+/// contract, the ratified survivors are its fine print (the named degrees of freedom a
+/// swap could hide in) — and `shapes.spec` rides along as the law-language the equations
+/// are written in. Repo-meta locks (gates, tiers, perimeter, substrate, schemata, the
+/// censuses) and every hand-authored register stay home: they are this repository's
+/// structure and decisions, not the certification a pin carries, and embedding one would
+/// invite reliances on interior facts. Consumers judge reliances against this data via
+/// [`Dependence::judge_embedded`].
+///
+/// Honest frame: this is certification DATA, not re-derivation — holding a lock's text is
+/// holding what discovery earned at release time, not the ability to re-run it (that
+/// takes the engine and the theory, which the crate also ships, but separately).
+pub struct Locks;
+
+/// The embedded roster, sorted by key. Keys are lock-file stems: a theory's lock under
+/// its slug (`date-calculus`), its mutation companion under `<slug>.mutation`, the
+/// catalog under `shapes`.
+static EMBEDDED: &[(&str, &str)] = &[
+    ("bridged-bool", include_str!("../../spec/bridged-bool.spec")),
+    (
+        "bridged-bool.mutation",
+        include_str!("../../spec/bridged-bool.mutation.spec"),
+    ),
+    (
+        "date-calculus",
+        include_str!("../../spec/date-calculus.spec"),
+    ),
+    (
+        "date-calculus.mutation",
+        include_str!("../../spec/date-calculus.mutation.spec"),
+    ),
+    ("doc-flow", include_str!("../../spec/doc-flow.spec")),
+    (
+        "doc-flow.mutation",
+        include_str!("../../spec/doc-flow.mutation.spec"),
+    ),
+    ("fabric", include_str!("../../spec/fabric.spec")),
+    (
+        "fabric.mutation",
+        include_str!("../../spec/fabric.mutation.spec"),
+    ),
+    (
+        "interpreter-arithmetic",
+        include_str!("../../spec/interpreter-arithmetic.spec"),
+    ),
+    (
+        "interpreter-arithmetic.mutation",
+        include_str!("../../spec/interpreter-arithmetic.mutation.spec"),
+    ),
+    ("router", include_str!("../../spec/router.spec")),
+    (
+        "router.mutation",
+        include_str!("../../spec/router.mutation.spec"),
+    ),
+    ("shapes", include_str!("../../spec/shapes.spec")),
+    (
+        "store-protocol",
+        include_str!("../../spec/store-protocol.spec"),
+    ),
+    (
+        "store-protocol.mutation",
+        include_str!("../../spec/store-protocol.mutation.spec"),
+    ),
+    ("ttl-store", include_str!("../../spec/ttl-store.spec")),
+    (
+        "ttl-store.mutation",
+        include_str!("../../spec/ttl-store.mutation.spec"),
+    ),
+    ("verb-algebra", include_str!("../../spec/verb-algebra.spec")),
+    (
+        "verb-algebra.mutation",
+        include_str!("../../spec/verb-algebra.mutation.spec"),
+    ),
+];
+
+#[crate::mutate("locks")]
+impl Locks {
+    /// Every embedded lock, `(key, text)`, sorted by key — the whole certification
+    /// payload, for callers that enumerate rather than look up.
+    pub fn all() -> &'static [(&'static str, &'static str)] {
+        EMBEDDED
+    }
+
+    /// The embedded lock text for `name` — a lock stem (`router`, `ttl-store.mutation`)
+    /// or a theory's display name (`date calculus`; spaces slug to hyphens, the same
+    /// convention the lock filenames use). `None` is an honest miss, never a fallback.
+    pub fn text(name: &str) -> Option<&'static str> {
+        let slug: String = name
+            .chars()
+            .map(|c| if c == ' ' { '-' } else { c })
+            .collect();
+        EMBEDDED
+            .iter()
+            .find(|(key, _)| *key == slug)
+            .map(|(_, text)| *text)
     }
 }
 
@@ -440,6 +592,214 @@ mod probes {
             Dependence::judge_register(&absent, &root.join("spec")).expect("empty"),
             vec![]
         );
+    }
+
+    /// THE ROSTER, complete for the registry: every theory the spec registry declares
+    /// ships its lock and its mutation companion, the mounted bridge ships both of its
+    /// own, and the shape catalog — the law-language every embedded equation is written
+    /// in — rides along. A theory added to the registry without its `include_str!` lines
+    /// fails HERE, so the crate cannot publish a version whose certification data is
+    /// missing a theory.
+    #[test]
+    fn the_embedded_locks_cover_the_registry() {
+        for spec in crate::discover::all_specs() {
+            assert!(
+                Locks::text(spec.theory).is_some(),
+                "`{}` is in the registry but its lock is not embedded — add its \
+                 include_str! line to EMBEDDED",
+                spec.theory
+            );
+            assert!(
+                Locks::text(&format!("{}.mutation", spec.theory)).is_some(),
+                "`{}` ships without its mutation companion — the degrees of freedom \
+                 are the guarantee's fine print and travel with it",
+                spec.theory
+            );
+        }
+        // the bridged theory is mounted, not registry-declared — its locks ship too:
+        assert!(Locks::text("bridged-bool").is_some());
+        assert!(Locks::text("bridged-bool.mutation").is_some());
+        assert!(Locks::text("shapes").is_some());
+    }
+
+    /// THE SHIP/HOME CENSUS over the committed spec directory, judged both ways. What
+    /// ships is DERIVED from the artifacts themselves (a behaviour lock's or mutation
+    /// lock's own header, plus the catalog); registers stay home as a CLASS
+    /// (hand-authored decisions are not certification data); everything else must carry
+    /// a reasoned HOME line below — an unclassified artifact refuses, and a HOME line
+    /// whose artifact is gone is stale, a lie to delete. So the embedded roster and the
+    /// spec directory can only move together, ratified.
+    #[test]
+    fn every_spec_artifact_ships_or_stays_home_by_decision() {
+        const HOME: &[(&str, &str)] = &[
+            (
+                "boundary-spec.shape.spec",
+                "this repo's own derived shape — a consumer freezes its own via ShapeReport::lock_in",
+            ),
+            (
+                "boundary-spec.system.spec",
+                "this repo's own seam graph — structure, not certification data",
+            ),
+            (
+                "bridged-bool.export",
+                "the prover's input emission — data the bridge consumes, not a lock it certifies",
+            ),
+            (
+                "bridged-bool.obligations.spec",
+                "the proof-obligation triage — the prover loop's worklist, not a consumer contract",
+            ),
+            (
+                "exemplar.infra.spec",
+                "the first infra consumer's shape, names washed — an exemplar, not this crate's conduct",
+            ),
+            ("gates.spec", "repo-meta: this repo's pipeline declaration"),
+            (
+                "perimeter.ruleset.json",
+                "repo-meta: the platform render of the perimeter floor",
+            ),
+            ("perimeter.spec", "repo-meta: this repo's settings floor"),
+            ("probes.spec", "repo-meta: this repo's probe roster"),
+            (
+                "qualify-reasons.spec",
+                "repo-meta: this repo's domain-modelling worklist (the qualify census's complement)",
+            ),
+            ("qualify.spec", "repo-meta: this repo's surface census"),
+            (
+                "schemata.spec",
+                "repo-meta: this repo's compiled-mutant census",
+            ),
+            (
+                "store-model.world.spec",
+                "this repo's ratified beliefs about ITS demonstration dependency",
+            ),
+            ("substrate.spec", "repo-meta: this repo's git meaning"),
+            ("tiers.spec", "repo-meta: this repo's tier partition"),
+        ];
+        let spec_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("spec");
+        let mut ships: Vec<String> = Vec::new();
+        for entry in std::fs::read_dir(&spec_dir).expect("spec directory") {
+            let name = entry
+                .expect("dir entry")
+                .file_name()
+                .into_string()
+                .expect("utf-8 file name");
+            if name.ends_with(".register") {
+                continue; // registers stay home as a class: decisions, never data.
+            }
+            let text = std::fs::read_to_string(spec_dir.join(&name)).expect("spec artifact");
+            let first = text.lines().next().unwrap_or_default();
+            if name == "shapes.spec"
+                || first.starts_with("# discovered spec:")
+                || first.starts_with("# algebra mutation:")
+            {
+                let stem = name
+                    .strip_suffix(".mutation.spec")
+                    .map(|s| format!("{s}.mutation"))
+                    .unwrap_or_else(|| {
+                        name.strip_suffix(".spec")
+                            .expect("a .spec file")
+                            .to_string()
+                    });
+                ships.push(stem);
+            } else {
+                assert!(
+                    HOME.iter().any(|(home, _)| *home == name),
+                    "`spec/{name}` is neither certification data (embed it in Locks) nor \
+                     a reasoned HOME line — classify it"
+                );
+            }
+        }
+        for (home, _) in HOME {
+            assert!(
+                spec_dir.join(home).exists(),
+                "stale HOME line `{home}` — the artifact is gone; a stale exception is a lie"
+            );
+        }
+        ships.sort();
+        let embedded: Vec<&str> = Locks::all().iter().map(|(key, _)| *key).collect();
+        assert_eq!(
+            embedded, ships,
+            "the embedded roster and the committed certification artifacts must move together"
+        );
+    }
+
+    /// The embedded texts ARE the committed bytes. Locally this is `include_str!`
+    /// tautology; in the PACKAGED crate it proves `spec/` shipped coherently — the
+    /// files a consumer's tooling might read agree with the constants their pin
+    /// carries.
+    #[test]
+    fn the_embedded_locks_are_the_committed_bytes() {
+        let spec_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("spec");
+        for (key, text) in Locks::all() {
+            let file = key
+                .strip_suffix(".mutation")
+                .map(|s| format!("{s}.mutation.spec"))
+                .unwrap_or_else(|| format!("{key}.spec"));
+            let committed = std::fs::read_to_string(spec_dir.join(&file)).expect("committed lock");
+            assert_eq!(*text, committed, "`{key}` diverges from `spec/{file}`");
+        }
+    }
+
+    /// Lookup speaks the theory vocabulary: a display name with spaces resolves to the
+    /// same lock as its slug, and a miss is `None` — never a fallback.
+    #[test]
+    fn lock_lookup_speaks_the_theory_vocabulary() {
+        assert_eq!(Locks::text("date calculus"), Locks::text("date-calculus"));
+        assert!(Locks::text("date calculus")
+            .expect("embedded")
+            .starts_with("# discovered spec: date calculus"));
+        assert!(Locks::text("interpreter arithmetic.mutation").is_some());
+        assert_eq!(Locks::text("ghost theory"), None);
+    }
+
+    /// THE COLLAPSE, live: a consumer-side register judged against the locks the pin
+    /// carries — a held reliance passes with its why; a law this version does not hold
+    /// refuses naming equation and consumer; a theory the roster does not carry refuses
+    /// naming what a pin does carry. No spec directory anywhere: the certification data
+    /// is the crate's own.
+    #[test]
+    fn the_embedded_judgment_collapses_the_cross_repo_form() {
+        let root = std::env::temp_dir().join(format!("depend-embedded-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let register = |name: &str, text: &str| {
+            let path = root.join(name);
+            std::fs::write(&path, text).unwrap();
+            spec_lock::Register {
+                name: "upstream reliances".to_string(),
+                path,
+            }
+        };
+
+        // a real law, read from the embedded lock itself — the consumer's authoring flow:
+        let (_, equation) = Spec::parse_lock(Locks::text("router").expect("embedded"))
+            .into_iter()
+            .next()
+            .expect("the router lock holds laws");
+        let good = register(
+            "good.register",
+            &format!("router | {equation}: a pinned consumer — its retry loop stands on this\n"),
+        );
+        let held = Dependence::judge_embedded(&good).expect("the pinned version holds it");
+        assert_eq!(held.len(), 1);
+        assert!(held[0].1.contains("retry loop"));
+
+        // a law this version does not hold refuses, naming equation and consumer:
+        let dropped = register(
+            "dropped.register",
+            "router | (a ⊗ b) = (b ⊗ a): a pinned consumer — assumed a law that never froze\n",
+        );
+        let err = Dependence::judge_embedded(&dropped).unwrap_err();
+        assert!(err.contains("(a ⊗ b) = (b ⊗ a)"), "{err}");
+        assert!(err.contains("a pinned consumer"), "{err}");
+
+        // a theory outside the roster refuses naming what a pin does carry:
+        let unknown = register(
+            "unknown.register",
+            "ghost theory | (x ⊕ y) = (y ⊕ x): someone — relies on a lock no pin carries\n",
+        );
+        let err = Dependence::judge_embedded(&unknown).unwrap_err();
+        assert!(err.contains("embeds no lock"), "{err}");
     }
 
     /// The judgment reads REAL frozen locks: every law in this repo's committed router

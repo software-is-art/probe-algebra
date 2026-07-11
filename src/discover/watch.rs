@@ -56,6 +56,60 @@ impl Ticker {
     pub fn parse_rust_sigs(source: &str) -> Result<Vec<NetSignature>, String> {
         rust_sigs(source)
     }
+
+    /// Every type NAME a module touches — its own declared types plus every type ident its
+    /// function signatures mention (through references, generics, and tuples; free
+    /// functions, impl methods, and inline modules alike). Deliberately UNFILTERED, unlike
+    /// the net model: the type-library voice intersects this against the qualify census's
+    /// sorts, and census sorts are domain value types by construction, so the census IS the
+    /// noise filter — `String` and `Vec` never appear on that side. A module that does not
+    /// parse is a named refusal, exactly like the other fronts.
+    pub fn type_vocabulary(source: &str) -> Result<BTreeSet<String>, String> {
+        let file = syn::parse_file(source)
+            .map_err(|e| format!("type vocabulary: unparseable module: {e}"))?;
+        let mut vocabulary = BTreeSet::new();
+        own_types(&file.items, &mut vocabulary);
+        sig_type_idents(&file.items, &mut vocabulary);
+        Ok(vocabulary)
+    }
+}
+
+/// Every type ident mentioned by any function signature — free fns, impl methods (and the
+/// impl target itself), inline modules — into `out`, unfiltered.
+#[crate::mutate]
+fn sig_type_idents(items: &[syn::Item], out: &mut BTreeSet<String>) {
+    for item in items {
+        match item {
+            syn::Item::Fn(f) => one_sig_idents(&f.sig, out),
+            syn::Item::Impl(im) => {
+                type_idents(&im.self_ty, out);
+                for it in &im.items {
+                    if let syn::ImplItem::Fn(m) = it {
+                        one_sig_idents(&m.sig, out);
+                    }
+                }
+            }
+            syn::Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    sig_type_idents(inner, out);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// One signature's type idents (arguments and return), unfiltered.
+#[crate::mutate]
+fn one_sig_idents(sig: &syn::Signature, out: &mut BTreeSet<String>) {
+    for arg in &sig.inputs {
+        if let syn::FnArg::Typed(pt) = arg {
+            type_idents(&pt.ty, out);
+        }
+    }
+    if let syn::ReturnType::Type(_, t) = &sig.output {
+        type_idents(t, out);
+    }
 }
 
 /// Placement signatures from a plain Rust module's TEXT — the sixth-sense front.
@@ -781,5 +835,24 @@ mod probes {
         assert!(err.contains("closed mid-entry at line 3"), "{err}");
         // and a file with no ops block parses to an empty, settled placement.
         assert!(parse_ops("fn main() {}").unwrap().is_empty());
+    }
+
+    /// The vocabulary front stays audible: a module's own types and its signatures'
+    /// idents both arrive (probe-hook's library voice reads this through `.ok()?`,
+    /// which would silently swallow a deaf refusal — so the conduct pins here,
+    /// lib-side).
+    #[test]
+    fn type_vocabulary_hears_own_types_and_signatures() {
+        let vocabulary = Ticker::type_vocabulary(
+            "pub struct Tally;\npub fn merge(a: Tally, b: Other) -> Tally {\n    a\n}\n",
+        )
+        .expect("parses");
+        for name in ["Tally", "Other"] {
+            assert!(vocabulary.contains(name), "{vocabulary:?}");
+        }
+        assert!(
+            Ticker::type_vocabulary("not rust").is_err(),
+            "an unparseable module refuses by name"
+        );
     }
 }

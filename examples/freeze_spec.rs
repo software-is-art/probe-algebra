@@ -65,6 +65,13 @@ fn main() {
         .certify()
         .expect("a disagreement is fixed upstream, never frozen");
     locks.push(Spec::of::<Bridged<0>>().lock_in(&spec_dir));
+    // the VERB ALGEBRA: the change-history as a theory — its discovered commuting-maps
+    // laws ARE the fork/join rules, its refusals the conflict classes (discover::verbs).
+    locks.push(Spec::of::<boundary_spec::discover::verbs::state::VerbAlgebra>().lock_in(&spec_dir));
+    locks.push(
+        MutationReport::of::<boundary_spec::discover::verbs::state::VerbAlgebra>()
+            .lock_in(&spec_dir),
+    );
     locks.push(MutationReport::of::<Bridged<0>>().lock_in(&spec_dir));
     locks.push(triage.lock_in(&spec_dir));
     // the PROBE CENSUS: every probe lock this crate upholds, with the mechanism that proves
@@ -93,6 +100,8 @@ fn main() {
         "algebra mutation: doc flow",
         "algebra mutation: fabric",
         "the bridged theory's spec",
+        "the verb algebra (fork/join rules)",
+        "algebra mutation: verb algebra",
         "algebra mutation: bridged-bool",
         "the bridge triage (obligations)",
         "the probe census",

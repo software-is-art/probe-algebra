@@ -1622,6 +1622,937 @@ on the dependency graph, not its own text), so an edit-time tier DELTA would nee
 not one file — deferred until that's worth the walk. Everything behavioural stays couriered by
 design, not omission.
 
+## The thirteenth ask: reliances go native — locks ship in the crate (points 1 + 3 BUILT)
+
+From the chattel-cli consumer instance, replacing the fixture lines it almost upstreamed.
+The tenth ask built the downstream register so open text stops feeding the rules — but it
+left the DATA in the wrong repo: upstream holding a mirror of consumer facts only the
+consumer can know is stale, plus a hand-off (or PR access) for every line and every
+deletion. The native mechanism already existed one level down in the same stack — the
+consumer's own CLI judges ITS clients' registers against the theory lock embedded in the
+binary they pin — so probe-algebra now does to itself what its consumer already did.
+
+**Point 1 — the locks ship** (`boundary_spec::Locks`, living in `discover::depend` where
+the judgment that consumes them lives): every behaviour lock, its algebra-mutation
+companion, and the shape catalog, `include_str!`-embedded byte for byte and keyed by lock
+stem. "The version is the certification" becomes an API — a consumer pinned to a tag holds
+exactly that tag's certification data, no filesystem archaeology, no release-notes
+parsing. The roster is DELIBERATE, not "everything": the mutation locks ride because the
+ratified survivors are the guarantee's fine print (the named degrees of freedom a swap
+could hide in), and `shapes.spec` rides as the law-language the equations are written in —
+while repo-meta locks (gates, tiers, qualify, probes, schemata, perimeter, substrate, the
+world lock, the infra exemplar, the seam graph and shape locks) and every hand-authored
+register stay home. A shipped lock is a COMMITMENT: embedding a repo-meta artifact would
+invite reliances on interior facts and make every interior reorganisation a potential
+downstream refusal. The roster is census-gated in both directions, with what ships
+DERIVED from the artifacts' own headers (`# discovered spec:` / `# algebra mutation:`,
+plus the catalog): a registry theory missing its embed line refuses, an unclassified spec
+artifact refuses, a stale home-line refuses, and the embedded bytes are pinned to the
+committed files (locally a tautology; in the packaged crate, proof `spec/` shipped
+coherently). One free property worth stating: the lock and the parser that reads it
+(`Spec::parse_lock`) travel in the same pinned artifact, so grammar skew between lock and
+reader is impossible by construction — the release-notes-parsing route could never
+promise that.
+
+**Point 3 — reliances live consumer-side** (`Dependence::judge_embedded`): a consumer
+commits `upstream-reliances.register` (the existing grammar, unchanged:
+`<theory> | <equation, exactly as the lock renders it>: <consumer> — <why>`) and judges
+it in its own suite against the pinned crate's embedded locks. The cross-repo form
+collapses to the self-judgment form because the lock travels with the pin: a pin bump
+re-runs the judgment against the new version's locks with zero ceremony, and a bump to a
+version that dropped a relied-on law refuses by equation, carrying the consumer's why,
+before a bare compile error explains nothing. Under the hood one shared core
+(`judge_reliances`) serves both register judges — one grammar, one refusal envelope, two
+lock resolvers (the spec directory for the owner, the embedded roster for the pin) — so
+the two forms cannot drift apart.
+
+**Deliberately not in this brick, each with its disposition:**
+
+- *Point 2 (the API surface as a lock)* — its own brick, next. The tenth ask put API
+  reliances in the compiled fixture because the compiler is the strongest available
+  judge; once judgment moves consumer-side the consumer compiles against the pin anyway,
+  so the surface lock's marginal value is the named refusal (why before the compile
+  error) and — the bigger prize — upstream's own public surface becoming a ratified,
+  review-routed lock, which `qualify.spec` (operator-shape, not pub-surface) does not do.
+  #48 just built the exact pattern it needs: a one-source emitter in `boundary-enforce`
+  serving both a frozen lock and a live consumer.
+- *Point 4 (the consumer census)* — recorded as a candidate, WITH the observation that
+  closes its disclosed gap: the census line is an ADDRESS (name + where the register
+  lives), and the world-gate pattern already knows what to do with an address — a weekly
+  `reliances (consumer drift)` gate pulling each censused consumer's register (one
+  anonymous read, the substrate's crates.io move) and judging it against the WORKING
+  TREE's locks gives upstream the release-time half: a breaking re-bless learned before
+  shipping, not at the consumer's bump. Floor semantics (an unreachable register is a
+  disclosed refusal, never silence); a world fact never feeds the countersign.
+- *The fixture shrink* — deferred until the consumer's register lands. The four compiled
+  surface reliances in `downstream-fixture/tests/reliances.rs` stay until their owner
+  re-declares them downstream; then the fixture shrinks to what it uniquely earns, the
+  synthetic consumer proving integration compiles.
+
+**Disclosures, all load-bearing:** renderer stability is now a CROSS-REPO contract —
+registers key on the equation byte-exact, so a pure render-convention change upstream
+reads as GONE in every consumer's suite, indistinguishable from a dropped law until the
+consumer reads the diff (part of why `shapes.spec` ships: the law-language is now
+certification surface). This protects at ADOPTION time, not release time — the candidate
+above is the remedy — and the incident ledger is clean: no upstream change has actually
+broken a consumer yet, so consumer register justifications should say they are foresight,
+not scar tissue (the ask's own instruction, kept). `Locks` is certification DATA, not
+re-derivation — holding the text is holding what discovery earned at release time, not
+the ability to re-run it. And the connection worth a line so it is not rediscovered:
+embedded locks are the data half of DIFFERENTIAL-CERTIFY — a published artifact carrying
+its own certification is exactly what lets release N−1 judge release N — so this brick
+lays the induction rail before that candidate's gate.
+
+## Candidate: the bundle is the source — genesis as a continuation process
+
+Named in conversation with the operator, whose reframe is the headline: genesis is not a
+starter template, it is a CONTINUATION process. The diagnosis behind it, in the operator's
+own accounting of the agent coding experience: finding context is maybe 10% of the battle
+(grep and subagents do fine); the other 90% is fighting entropy — a series of disconnected,
+task-specific edits IS tech debt, and pulling the accumulated shape back into a context
+window to crunch down is exactly what agents are worst at. The wished-for experience: the
+agent writes a SNIPPET OF LOGIC, purely additively, and the apparatus assembles the
+modularity — with the inverse sweep collecting disconnected logic back up.
+
+The pieces mostly exist, and one property makes the whole idea safe rather than wishful.
+Placement is MONOTONE by union-find's own algebra (candidate 14): a new operator joins a
+component or bridges two — it can never re-split or reshuffle what it does not touch. That
+is precisely the guarantee an additive author needs: a snippet cannot silently reorganise
+the rest of the program, so entropy from ADDITION is structurally bounded. Around that
+core: the placer derives the partition from signature text, the sixth sense narrates
+bridges at the edit, genesis renders whole trees from declarations, auto-lift reads
+operators off plain Rust with zero annotation, and cohesion + the spec's silence line
+("operators in no law") are already the disconnected-logic detectors — reports today,
+awaiting actuation.
+
+The precondition, named by the operator because it is easy to mistake for a side detail:
+this works ONLY because the discipline has no primitive obsession. Nets are SORTS, and
+sorts exist only where signatures speak the domain's vocabulary — the sixth sense already
+refuses to net on ubiquitous types (`String`, `i64`, `Vec`) because with open primitives
+everywhere, placement degenerates to soup (everything wires to everything) or silence
+(nothing nets at all). Value objects are not a style choice this candidate happens to sit
+beside; they are what gives the netlist its nets. Which re-reads the spike below: pushing
+the qualify census toward totality is not just measuring the bundle's territory, it is
+MANUFACTURING the signal auto-modularisation runs on.
+
+The real inversion, named plainly: FILE LAYOUT BECOMES A VIEW. Today the placer derives
+placement as a report and a lock, but the files are still hand-arranged and the lock only
+checks agreement. In the continuation form, the module tree is a GENERATED artifact under
+the one rule — never hand-edit, regenerate, ratify the diff — rendered from a BUNDLE
+(operators + meanings + expectations) the way `ci.yml` is rendered from the gate registry.
+Code as a database, files as its placed render: the same authority inversion as every
+brick here, pointed at the last hand-maintained artifact class, source layout itself.
+
+Prior art, honestly cited: Unison built the codebase-as-database experience at the
+FUNCTION level — content-addressed definitions, names as metadata, edits as append. The
+step beyond is AUTO-MODULARISATION: in Unison the namespace is still the human's to
+arrange; here the modularity is derived (net connectivity), continuous (re-placed on every
+change), and ratified (the shape lock). Placement is the tool's output, not the author's
+input.
+
+The rung ladder, round-trip before generation as always:
+
+0. **The type-library surfacing voice — BUILT** (`probe-hook`'s sixth voice,
+   `library_voice`, landed the day after the census learned to see impls — the two bricks
+   compose: 16 modules' operator families are now the library). On any Rust edit, the
+   types the edited file touches (`Ticker::type_vocabulary` — every type ident its
+   signatures mention, own or imported) intersect against the committed
+   `spec/qualify.spec`, and files elsewhere whose sorts overlap are named with their
+   operator families — the existing vocabulary in the window before a twin gets written.
+   The census intersection IS the noise filter (ubiquitous types never appear as census
+   sorts), the edited file's own line never speaks, and the render dedupes per file,
+   re-announcing only when the overlap changes. The anti-duplication sense, attacking the
+   context 10% while the assembly 90% gets built.
+1. **Round-trip — BUILT** (`discover::bundle`). A module parses into a bundle (each
+   top-level item a verbatim segment; operators identified by the sixth sense's net model,
+   grouped by the one placer) and renders back in canonical placed order. The pin is real:
+   `modularize.rs` — the committed file whose whole subject is proposing modularity —
+   round-trips BYTE FOR BYTE (docs, the attributed inline module, the cfg(test) suite all
+   verbatim), and was already canonically placed — checked, not assumed. The
+   non-vacuousness drill scrambles two components and demands the regroup; refusals are
+   named (unparseable text, a non-unique operator name — the dealing is never guessed).
+   One design lesson earned on first contact and worth keeping: SEPARATOR TRIVIA BELONGS
+   TO THE POSITION, NOT THE ITEM — doc comments are attributes inside an item's span and
+   travel with it, but the blank lines between items are the module's furniture, so a
+   reorder dresses the dealt items in the original positions' spacing (the first draft
+   moved gaps with items and produced jammed output; the drill caught it). Disclosed
+   rung-1 limits: only top-level operator fns are re-dealt (impl blocks and inline modules
+   ride whole), and identity is the function name.
+2. **The continuation verb — LIBRARY FORM BUILT** (`Bundle::add`; the name `genesis add`
+   died with the disposition below — the verb is the bundle's). A snippet plus a module
+   in, the module re-rendered in canonical placed order out: the added operator lands
+   WITH ITS COMPONENT (the placer's dealing, not an append), a helper type lands before
+   the trailing `#[cfg(test)]` module (tests stay last), every existing item's bytes
+   survive verbatim (addition is monotone — drilled), and the result is a fixed point of
+   parse∘render. Refusals named: unparseable snippet, empty snippet, and a NAME COLLISION
+   with an existing item — the type-library voice's whisper made a hard stop (an `impl`
+   extends a name, which is precisely not a collision). No I/O in the verb; the caller
+   writes the file. The binary wrapper is deliberately deferred until real usage names
+   its shape — the library call is what an agent's tooling actually invokes.
+3. **The inverse sweep, actuated** — cohesion's latent splits, the silence line, and the
+   placer's seam candidates feed re-render SUGGESTIONS. Cohesion stays a suggestion by
+   design: the machine executes placement, the human keeps ratifying splits — taste
+   enters at the freeze, where it always has.
+
+Disclosures, all load-bearing. The algebra does not reach everything: this repo's own
+qualify census is 3 of 55 files, so the bundle governs the operator-shaped fraction and
+must NAME what it skips (the census move) — the spike below is the measurement of exactly
+that territory. Meanings travel opaquely: a snippet is a signature plus a body; placement
+is signature-derived and the body just rides along, which is why the behaviour locks are
+not decoration on this candidate but the only reason auto-assembly is trustworthy at all.
+And review churn must prove out in practice: if files are views, a re-render moves code,
+and the promise that hierarchical ratification plus the review router keep those diffs
+readable (placement-only reflow = machinery-verified, one agenda line) is the thing rung 1
+and 2 must demonstrate, not assume.
+
+### The disposition on genesis: the bundle continues, genesis births, and the declaration is vocabulary
+
+Settled in conversation with the operator before rung 2's design, because rung 2 must be
+designed against it. The question — "do we need genesis once we have this?" — splits
+genesis along the method's own IS/SHOULD line:
+
+- **Genesis-the-scaffolder dissolves into the bundle.** Scaffolding is rendering a bundle
+  with meaning-holes; migration mode (the fifth field report's largest ask, still open on
+  the v2 list) is `Bundle::parse` — adopting an existing module IS what rung 1 does. The
+  bundle does not just replace the emitter, it delivers the v2 items that were queued for
+  it: patch-not-scaffold, adopt-existing-functions-as-meanings, no holes where
+  implementations live.
+- **Genesis-the-declaration-language survives, as the bundle's INTENTIONAL half.**
+  Everything the bundle/auto-lift path produces is DISCOVERED — what the code is. The
+  declaration grammar (`expects { }`, seams, protocol blocks, validity) is what the code
+  SHOULD be, and no derivation produces it: without declared expectations there is no red
+  target lock, no distance, no unmet law driving work; without declared seams there is no
+  obligation, only candidates. The end state: A DECLARATION IS A BUNDLE ENTRY — an
+  expectation, a seam, a protocol line lives in the same bundle as the operators, written
+  additively like everything else, rendering to the distance gates and target locks the
+  emitter produces today. The same motion the repo already made one level down when
+  genesis's parse-side `Expect` enum dissolved into `discover::expect::Expectation`.
+- **Retirement is by the house rule** (the per-diff mutation gate's rule: retire when the
+  census closes the territory): genesis's emitter retires when a bundle-born crate
+  reproduces the flagship story end to end — expectations declared red, meanings filled,
+  green at both levels, locks fresh from birth — with the demos re-founded on the bundle
+  as proof. Until then it stands; two CI-tested members lean on it.
+- **Naming resolves itself with zero renames.** The continuation tool already has its
+  name (the bundle); the declaration grammar must NOT get a name of its own, because it
+  must not get a separate existence (one vocabulary — the tenth ask's lesson); and
+  "genesis" becomes precisely true by SHRINKING: when the emitter dissolves, what remains
+  under the name is the one genuinely genesis-shaped act — minting the crate shell, once,
+  at origin. The name stays put and the referent contracts to fit it.
+
+One sentence for the record: the bundle continues, genesis births, and the declaration is
+vocabulary, not a tool.
+
+**The declaration entry's first form is BUILT** (`Bundle::declare`, landed the same day as
+the disposition): an expectation declares additively into a module's `#[algebra(...)]`
+attribute — the `expects` grammar exactly as the macro takes it — and the module comes back
+canonically rendered, differing in that one attribute and nothing else (drilled on the
+committed `modularize.rs`: exactly one line moves). Parser-as-gate throughout: a shape word
+outside the ratified catalog is refused TEACHING the vocabulary (the same validator the
+engine panics with, in `Expectation::canonical`'s non-panicking form), a duplicate
+declaration is refused, a module with no `#[algebra]` names the fix, and two `#[algebra]`
+modules refuse as ambiguous.
+
+**Both disclosed rungs closed the next day.** The ZERO-ANNOTATION channel:
+`Liftable::expectations()` (default empty — a plain lift starts with no contract, every
+declaration an explicit act), `Lifted<C>` forwarding it as `Expected`, and
+`AutoLift::scan_module` growing a declarations parameter that vocabulary-gates at scan
+time and BAKES the contract into the generated impl — so
+`Distance::of::<Lifted<C>>()` is a red/green gate for an author who wrote only types and
+Rust. Both arms drilled: the bool carrier's declared laws judge MET, and an overshooting
+declaration (idempotence claimed of an involution) reads UNMET BY NAME — the red target
+lock, in the lifted world.
+
+**And the peak got its name, from the operator: THE CLI IS THE INTERFACE TO THE CODE.**
+Agents should not write text into open files — and the irony is that agents already drive
+everything else through a CLI, including reading and writing the files themselves; the
+bundle just makes the CLI speak in judged transactions instead of bytes. First form:
+`examples/bundle.rs` — `add`, `declare`, `place`, `check`, `lift` — each verb wrapping the
+library form, refusals writing nothing, successes leaving the module canonically placed.
+The proof is `bundle-demo/`, THE BUNDLE-BORN MEMBER: its `src` grown entirely through the
+verbs (every command in its MANIFEST.md — birth as the degenerate case of continuation, an
+`add` onto the empty file), its contract declared through `lift`'s declarations, judged
+MET on every test run, its lift committed as a derived artifact held byte-for-byte to the
+scan, its module held to the round-trip pin, its locks frozen and sensitivity-swept. And
+discovery kept its oldest promise on day one: the four declared laws came back with a
+SURPRISE nobody declared — `bump` is a merge-homomorphism — the flagship's
+declared-plus-discovered story, reproduced by the continuation process. Retirement
+status, honestly: the MODULE level of the criterion is met (grown, declared, judged,
+locked, CLI-only); the SYSTEM level (seams, transports, the two-lifecycle red commit)
+remains, so the genesis emitter stands for now.
+
+### The peak of the peak: review shifts left — the mech suit
+
+The operator's framing, recorded verbatim in spirit: the entire process that sits in PRs
+and code review exists because of POOR LOCAL SENSORY AWARENESS — automating code
+interaction through the CLI eliminates everything you could want to review, leaving a
+continuous process that supports the agent in perception, eliminates toil, and leaves
+only the important things behind. A MECH SUIT for the agent.
+
+This is the pipeline brick's sentence, applied one level up. That brick said: CI stops
+being where verification is defined and keeps only what cannot shift left. This says:
+REVIEW stops being where judgment happens and keeps only what cannot shift left. Review's
+three jobs, taken separately: VERIFICATION (break/duplicate/misplace?) dissolves entirely
+— every verb is a judged transaction, so a change that exists has already survived the
+collision refusal, the vocabulary gate, the placement, the censuses, and the distance
+judgment, by the same judges a reviewer would have to trust anyway; RATIFICATION
+concentrates — the review router's first run already routed a whole branch to "one
+ratification, seven machinery-verified," and the PR of the future is exactly that agenda,
+a stream of lock diffs each asking one signable question; INTENT never shifts left, by
+the method's own epistemology — "what did you mean" stays human, the suit only makes it
+legible (a declaration is one line, a distance report names the gap, a justification is
+the register text no derivation produces).
+
+The suit anatomy, in the parts already built: PERCEPTION is the six voices, the
+session-start topography, the distance and cohesion reports; ACTUATION is the verbs;
+PROTECTION is refusals that fire before damage instead of findings that arrive after.
+And the reason shift-left is SAFE — the load-bearing connection worth stating once —
+is the sensitivity program: you only climb into a suit whose sensors you trust, and
+every judge that moved left carries a can-fail proof (the probe census, the fire drills,
+zero ratified schemata survivors across the compiled population). The suit is
+trustworthy because it has been shot at.
+
+Honest bounds, the method's own: the suit covers the algebra-shaped fraction — which is
+why the 55/55 spike is load-bearing, not cosmetic (every file it converts is territory
+the suit's senses reach; the remainder still gets reviewed the old way); and "eliminates
+everything you could want to review" is precisely true of the MACHINE-CHECKABLE class —
+review does not disappear, it compresses to the ratification stream and the intent
+questions, which is the point.
+
+The rung this names: **the transaction log.** When every change arrives as a verb, the
+PR description stops being prose reconstructed from a diff — it IS the log. The verbs
+journal themselves; the agenda computes from the journal instead of re-deriving classes
+from changed paths; `bundle-demo/MANIFEST.md` is the hand-made prototype of exactly this
+artifact, and deriving it is the next brick of the vision.
+
+### The aim, adopted: zero file patching — all CLI
+
+The operator's directive, now a working rule (CLAUDE.md carries the binding form): code
+changes go through the verbs wherever the verbs reach, and a change the verbs cannot
+express is a FIELD REPORT — the missing verb gets named here before the file gets
+patched. Dogfooding is the only way to find the rough edges; the primary user is the
+agent, and the gaps are the roadmap's fuel. Scope, stated once: this governs CODE —
+prose stays hand-typed (prose is judgment, the house rule already says so), and the
+freeze/bless paths already never hand-edit their artifacts.
+
+The named gaps at adoption, each a missing verb: ~~**edit**~~ (CLOSED the same day — the
+rule's first working session hit it immediately, as predicted: `Bundle::edit` replaces
+one item's text while its SIGNATURE holds, compared token-for-token; a signature move, a
+rename, or a kind change is an interface change wearing an edit's clothes, refused by
+name with both signatures shown. What an edit may change is the meaning and its prose —
+everything a caller cannot observe through the signature — and everything that names the
+item re-judges downstream precisely because the signature held. Dogfooded live on
+`bundle-demo`'s `bump`, where the planted signature-move refusal fired naming
+`fn bump (t : Tally)` against the offered two-argument form), **remove**
+(~~**remove**~~ DISSOLVED by the operator's question — see the collection disposition
+below: garbage collection replaces deletion, with mark derived and sweep ratified),
+~~**collect**~~ (CLOSED — and it is the first verb that implemented its own FROZEN
+SPEC: `spec/verb-algebra.spec` had already discovered collect's laws before the verb
+existed. `Bundle::collectable` is the MARK — every named private item reached by no
+root, the roots each an existing sense (the `pub` boundary, reference by any other
+item, a committed law, a declared expectation, a reliance) — and `Bundle::collect` is
+the SWEEP, one judged journaled transaction that refuses anything the mark did not
+derive, showing the mark set in the refusal. Module-scope, disclosed; the crate-wide
+collector needs the tree walk at item grain), **split** (rung
+3 — executing a ratified cohesion split), ~~**constrains**~~ (CLOSED next — the
+perception verb, and the one the primary user said it would reach for most: everything
+that pins a named operator on one page, derived instead of grepped — its placement
+component, the committed laws naming it, the declared expectations, the ratified freedoms
+at it, and the downstream reliances, with empty sections rendered honestly as findings
+("none — every judged mutant of this operator dies"). Read-only: perception writes
+nothing and journals nothing; an operator the module does not declare refuses. First
+live run on the bundle-born member returned the four declared laws PLUS the discovered
+homomorphism — the report already knows more than the author declared. Pleasing
+side-effect: the reason census re-classified `bundle.rs` as effectful the moment the
+verb grew a filesystem read — the censuses watching the watcher), impl-interior
+placement (exercised as the
+fallback path the same day: building `edit` itself required an impl-interior change the
+verbs cannot express — the second rule's field-report arm, proven on day one),
+~~test authoring~~ (CLOSED across two bricks: a `#[cfg(test)] mod probes` is an ADDABLE
+item, proven when squash's probe suite went in through `add` — and growing an EXISTING
+probes module turned out to already be `edit`'s business: non-Fn/Impl/Trait items edit
+under a name + kind hold, exactly right for a test mod, discovered while killing the
+sweep's findings), and cross-file moves (SHRUNK the
+same day: a module MOUNT is just `add` of a `pub mod` item on `mod.rs`, dissolved before
+it was ever named a gap). ~~**The frozen arm**~~ (named and CLOSED the same night — the
+verbs' vehicle rebuilt behind the same gate as the tree it operates on, so a
+mid-transaction tree blocked the fixing verb; `bundle pin` dissolves it, see the pinned
+suit brick). Refusals should name their fixing verb.
+
+~~Newly named from the first sustained night INSIDE the suit — **the show verb**~~
+(named in the morning, CLOSED by the afternoon — the editor-reach census's first datum,
+gathered by dogfooding instead of survey: every `edit` payload is a whole-item
+replacement, so every edit began with an interior read — sed ranges, awk brace-matching,
+a python extraction script. The reading, named: "what does item X say right now?" is a
+PERCEPTION question, and now the verbs answer it. `bundle show <module.rs> <item>`
+returns the item's VERBATIM SEGMENT, cut by the same spans `edit` holds and `replay`
+reconstructs — pinned by the round-trip probe: editing an item with its own shown text
+is a byte-exact no-op, so `show m.rs x > payload; revise; edit` is an edit cycle that
+never opens a file. `bundle show <module.rs>` with no item is the INVENTORY — the
+module's table of contents with each item's kind, visibility, operator status, and, for
+functions, THE EXACT SIGNATURE THE EDIT HOLD WILL COMPARE, token for token. That last
+column is the published-interface brick riding along: an edit payload can now be
+authored FROM THE CONTRACT (inventory gives the signature, `constrains` gives the laws,
+`trace` gives the conduct) — for a certified operator, the residual reasons to read a
+body are exactly the properties the lock language cannot yet say. Refusals teach: an
+unknown address lists the addressable roster, which also DISCLOSES the grain honestly —
+items inside inline algebra mods address as the mod, inner addressing is a future rung.
+Built through the suit except the two Bundle methods themselves — interface GROWTH,
+which `edit` refuses by design; the impl-interior fallback arm, exercised as intended.)
+
+Two deferrals from the same conversation, recorded so they are not re-litigated:
+
+- **The incremental turn (DBSP), deferred**: the rhyme is real — the journal is a delta
+  stream, replay is integration, squash is delta consolidation, collect is retraction,
+  and delta-render's d/i commutations plus the homomorphism shape are the linearity
+  condition incrementalization turns on. The disposition when it is time: adopt the
+  ALGEBRA, not the engine — incrementalization as a LICENSED optimization (only views
+  whose maintenance the lock certifies linear go incremental; the batch path stays as
+  the standing second source, `incremental(view, δ) == batch(integrate(journal))` as a
+  drift gate), and the verb algebra already knows where the group structure fails (the
+  refused conflicts), so Z-set treatment applies to VIEWS over the item set, never to
+  the raw verb stream. The trigger to revisit: stage 4 making view-derivation the hot
+  loop. Not before — today's measured bottleneck is test execution, which this does not
+  touch.
+- **The totality claim, named without building**: discovery already EXECUTES every
+  operator over every grid tuple on every test run — a panic would fail the suite — so
+  "every operator is total on its declared grid" is already load-bearing; it has simply
+  never been stated as a lock line. When the spec header format next moves for its own
+  reasons, the totality line rides along free. The wider property vocabularies
+  (scaling laws for time, allocation counts, sandbox-carrier effect theories — the
+  store's "stash is a projection" probe is the prototype: an idempotence law about real
+  I/O judged in a scoped world) are the named path for shrinking the read-the-body
+  residue; each is a derive-plus-ratify brick waiting for its consumer.
+
+**The disposition on removal — garbage collection, with the house amendment: MARK IS
+DERIVED, SWEEP IS RATIFIED.** The operator's question ("is there ever really a need to
+remove something? we know how everything hangs together — the unused disconnects and we
+eventually discard it automatically") dissolves the `remove` verb, with one correction
+the method itself demands. Plain auto-discard would be self-attestation: a runtime GC's
+unreachable object is PROVABLY worthless, but an unreferenced item of code can be
+seasonal, staged, or vocabulary awaiting its consumer — liveness has an intentional
+component the reference graph cannot see, the kernel-register lesson again (intent is
+never inferred from conduct). So: the MARK phase is fully derivable and mostly already
+built — an item is COLLECTABLE when no root reaches it, and every root is an existing
+sense (pub-reachability from the tier derivation, the laws' silence line, declared
+expectations, downstream reliances, placement isolation); `collect` is `constrains`
+inverted — find everything that nothing pins — rendered as a derived census with
+evidence per item. The SWEEP is one judged, journaled verb removing exactly the marked
+set: automatic in the sense that matters (zero analysis, one command, machine-authored
+diff), ratified in the sense that keeps it honest (the diff is the signature). The
+journal gives "eventually" its clock — disconnection age in journal order, generations
+in certified releases — so the proposal can escalate on schedule without ever seizing
+authority. And in stage 4 the fear of deletion dissolves entirely: the log never
+forgets, so collect is UN-MATERIALIZE, never un-exist — precisely why GC is safe in
+runtimes. What remains of "remove" is only the BREAKING case, deleting something still
+pinned — and that is not collection, it is interface change, which already has its
+ceremony: the reliance machinery refusing by name until the consumers migrate.
+
+**The standing question, adopted into CLAUDE.md** — "what else are we doing by hand that
+is secretly a derivation plus a signature?" — with the inventory it yields when asked of
+the repo today, each entry a named candidate:
+
+- **Commit messages and PR bodies**: narration of a diff is a derivation — the journal
+  plus the freeze-delta narration already hold the content; the commit itself is the
+  signature. The agenda-from-journal brick subsumes this.
+- ~~**The bless loop**~~ (CLOSED the same day it was named — the standing question's
+  first kill: `Config::autofix_stale`, default on everywhere except CI. A drifted census
+  regenerates INTO THE WORKING TREE and the build fails exactly once — "the regenerated
+  text is now in your working tree; the diff is the ratification: commit it, or revert
+  it to refuse" — so the gate's authority is untouched while the homework disappears.
+  In CI the refusal only reports: a fresh checkout must never mutate itself. Both arms
+  drilled in `census_drifts_then_blesses_then_holds`; the bless variables remain for
+  explicit regeneration.)
+- **Imports in snippets**: `use` lines are name resolution, which is a derivation — a
+  `bundle add` payload should not need to carry them; the verb can derive and splice
+  them. Real toil today, felt while growing bundle-demo.
+- **CLAUDE.md's regenerate table**: artifact → command is registry DATA restated as
+  prose — derivable from the gate/freeze declarations and drift-gated like everything
+  else, so the table can never lie about a command again.
+- **The crate shell** (Cargo.toml, the mod line): mostly derivation (genesis's residue,
+  the shell mint); the hand-typed part shrinks to the dependency DECISIONS.
+- **Test scaffolds**: the probes are already derived; what stays hand-typed is the
+  irreducible base the method has always named — meanings, negative fixtures, and the
+  grammar itself.
+
+What stays hand-typed on principle, so the question is never over-applied: register
+justifications, roadmap dispositions, declared expectations' CHOICE (which laws to
+promise), and every ratification — the signatures themselves. The question hunts
+derivations wearing a signature's clothes, never the reverse.
+
+And the standing question asked FORWARD — dissolving questions queued, unanswered on
+purpose (each wants its own conversation before it becomes a disposition):
+
+- **Do we need branches?** A branch is a speculative journal SEGMENT — merge is append,
+  rebase is replay, conflict is two segments claiming one item. Once the journal is the
+  source, the branch ceremony may be the log's view too.
+- **Is the issue tracker secretly the red-lock list?** A ticket that describes intended
+  behaviour IS a declared expectation not yet met — the target lock committed red was
+  always a ticket with a judge attached. TODO comments are the same fact at lower
+  altitude: each is either a derivable red gate or a disposition, and hand-tracked
+  prose is the worst home for both.
+- **Is a bug report secretly a fixture plus a missing law?** A reproduction is a dent
+  the spec should have caught — fire-drill's lineage says every incident becomes a
+  planted fixture; the dissolving form says it should arrive as one.
+- **Does CI need to re-execute what local gates already judged?** Re-execution exists
+  because the server does not trust the laptop — but a signed transcript of a local
+  gate run is an attestation, and the countersign might verify rather than re-derive.
+  (Trust roots are the hard honest part; differential-certify's provenance story is the
+  rail.)
+- **Is the editor anything but a bundle viewer?** Once files are views and changes are
+  verbs, an "editor" is a perception surface with a verb palette — the open-file
+  buffer, like the PR, survives only as a way of LOOKING. SHARPENED with the operator
+  (who asked the dissolving form: what is a person trying to confirm that we are not
+  currently ratifying?): a person reaches for the editor exactly where the question
+  they are holding IS NOT YET A LOCK CLASS — the interior is the fallback
+  encyclopedia, consulted when derived answers run out. The enumeration: "how does
+  this behave on THIS input" ~~is a missing perception verb~~ (CLOSED —
+  `discover::trace`: a ground term over a theory's operators, evaluated bottom-up with
+  every reduction narrated through the theory's own observation; refusals teach the
+  vocabulary, arity mismatches show both counts, and a partial operator's refusal is a
+  fact shown rather than an error buried. `bundle trace verbs 'add_a(edit_a(empty))'`
+  makes the verb algebra's conflict WATCHABLE — the two orderings traced side by side,
+  the divergence visible without opening any file. Variables stay out deliberately:
+  quantification is the laws' business, discovery's half of the split); "is this fast / allocation-free" is a missing
+  property vocabulary (toleranced BENCHMARK locks — the three-valued judgment's
+  shape, pointed at time); "is this safe" is the capability audit and fabric's
+  reachability brought down one altitude; "what is here that I can use" is the
+  library voice, built; "I don't trust the abstraction" dissolves only by track
+  record. The move: census the editor-reaches (the hand-work inventory pointed at
+  READING) — each reach names the next verb or the next lock class, and interior
+  reads go archaic the same way interior writes did: the answer set grows until the
+  fallback goes quiet.
+- **Do branches, merges, and the reflog survive the journal?** Sharpened with the
+  operator's three observations. (1) The freedom-to-explore that branching grants is
+  already here in different clothes: THE RED LOCK IS IN-PLACE BRANCHING — divergence
+  as declared intent with a judge attached, converging in public, instead of
+  divergence as a parallel tree; and the fear branching protects against shrinks
+  when every change is a judged transaction that lands whole or refuses. (2) The
+  coordination overhead ("who is changing what file") is an artifact of
+  files-as-storage: at verb level, disjoint `add`s COMMUTE by the placer's own
+  monotonicity, and the conflict surface collapses to same-item writes plus lock
+  ratifications — so FORK/JOIN AT SPEC-LOCK LEVEL is: join = replay both journal
+  segments, the judges name what does not commute, the lock diff is the merge
+  review. Merge stops being a textual operation performed in ignorance. (3) The
+  operator's indirection instinct completes the deletion: with CONTENT-ADDRESSED
+  items at add-time (the stage-4 item store, Unison's move), the item universe is a
+  grow-only set whose union is trivially conflict-free, and all remaining conflict
+  concentrates into the BINDING MAP (name → hash, a ratified decision) and the
+  locks — the remove-dissolution's shape again: the mechanical half derives, the
+  decision half signs. And the reflog answer, the startling one: git's reflog is
+  untyped snapshot pointers; the journal is TYPED — verbs are operators over the
+  bundle carrier, segments are terms, and "do these two segments join?" is a
+  COMMUTATION LAW. The merge algebra need not be designed: it can be DISCOVERED —
+  the engine run over the verb algebra itself, the change-history becoming a
+  registry theory whose laws are the fork/join rules. Losing code becomes
+  impossible not by hoarding states but because the journal never forgets and
+  un-materialize never un-exists.
+
+**Stage 2's first form landed with it: THE JOURNAL.** Every mutating verb appends one
+line to `bundle.journal` beside the nearest `Cargo.toml` — `<verb> <module> — <detail>`,
+no timestamps, order the only clock — so the change record is derived, never narrated
+(`bundle-demo/bundle.journal` opened with the dogfooded edit as its first entry, the
+machined successor to MANIFEST.md's hand-written story). The write lands first and a
+journal failure is reported, never swallowed. Disclosed: entries carry names, not
+payloads — the agenda's source and the reviewer's record, not yet replayable;
+tree == replay(journal) is stage 3's business, with the payload store.
+
+And the staged path from here to the operator's horizon — no files on disk or in git:
+
+1. **Verbs-only discipline** (now): every reachable change through the CLI; gaps named.
+2. **The transaction log**: verbs journal themselves; the agenda computes from the
+   journal; the PR body is derived.
+3. **The tree becomes a gated derived artifact**: the journal is committed, and a replay
+   gate holds tree == replay(journal) — the `ci.yml` move at tree scale; a hand-edited
+   file refuses the same way a hand-edited lock does.
+4. **The tree leaves git**: the repository is the journal, the locks, the registers, and
+   the shell; the tree materializes at build/publish time like any target artifact. This
+   needs the content-addressed item store (the bundle stops borrowing the file's bytes as
+   its representation) and judge-version anchoring in journal entries (replay under
+   tomorrow's judges may judge differently — the determinism pin, differential-certify's
+   rail). rustc and the ecosystem keep getting materialized trees; they just stop being
+   the source.
+
+### The verb algebra — the reflog as a theory (BUILT)
+
+Built the session after it was sketched, and the sketch held almost exactly. What landed:
+
+- **The catalog grew its stanza first** — `commuting maps` (`f(g(x)) = g(f(x))`, two
+  unary endomorphisms on one sort), with a new GATE datum rather than a guard:
+  `ordered_ops`, the symmetric-equation dedup (both orderings state one law, so only the
+  canonically-name-ordered binding is admitted — one unordered pair, one lock line).
+- **`discover::verbs`** — the miniature (two named slots × three states × the contract
+  flag, 18 inhabitants; verbs as total functions carrying the CLI's refusal semantics) —
+  and discovery returned 28 laws: EVERY verb a projection (replay safety as law — the
+  refusal semantics make re-applying a journal segment harmless by algebra, not luck),
+  every disjoint pair a commuting-maps JOIN RULE, `declare` commuting with everything,
+  and one finding nobody predicted in the sketch: `collect` ABSORBS `edit` on the same
+  name (the state forgets the edit — no conflict; remembering is the journal's job). The
+  two conflict classes are exactly the ABSENT pairs — add/edit and add/collect on one
+  name — pinned REFUSED the router's way, plus a drill proving the conflict cannot be
+  declared away (the wishful-merge distance stays red). Frozen as
+  `spec/verb-algebra.spec` + its mutation lock — the sweep reports every operator-table
+  mutant killed and every sampled dent pinned, so the fork/join rules of this system
+  carry a full can-fail proof. Embedded in `Locks` (a pin now carries its own merge
+  semantics), covered in the probe census as oracle-swap.
+- **The stanza paid for itself across the workspace the same hour**: delta-render's
+  stream calculus gained `d and i may be applied in either order` (the
+  differentiate/integrate commutation, sayable at last) plus delay/neg commutations, and
+  BOTH layout engines gained `commuting_maps(reorder, theme)` on their scorecards — the
+  growth dynamic (hostile domain → stanza → every theory benefits), demonstrated on
+  contact.
+
+Two follow-ons from the operator's read of the build:
+
+- **Restraint, calibrated**: the house rule is not "make do" — it is EVERY STANZA NAMES
+  ITS CONSUMER (commuting maps named the verbs; inflation/deflation named fabric). The
+  COMPOSITION stanza (`f(g(x)) = h(x)` — three unary slots, h free to be f itself, the
+  absorption form) named its consumer — JOURNAL COMPACTION, squash as algebra — and then
+  LANDED, and it over-delivered the same way commuting maps did. The squash table came
+  back discovered (all six: add-then-collect, edit-then-collect, and collect-then-edit
+  each collapse to collect, both names — lock lines a future `squash` consults as data,
+  the join-verb precedent). And the stanza killed SIX RATIFIED SURVIVORS nobody aimed it
+  at: the verb algebra's four edit/collect confusions (invisible while both were merely
+  projections with identical partners — the composition laws tell them apart, 64 of 64
+  mutants now die) and delta-render's filter-as-zero and map-as-zero confusions, ratified
+  freedoms since that crate's first freeze, now dead. The freedom census SHRANK by six
+  because the vocabulary grew by one stanza — the bias-blindness hunt, industrialised,
+  paying out on theories built months apart. Layout's scorecards gained the composition
+  surprises too (`theme(reorder(x)) = reorder(x)` — theme's invisibility, said
+  compositionally).
+- **The method is not Rust-bound — the substrate interface**: what the machinery requires
+  of a language is (1) an item grammar with faithful parse/render (tree-sitter
+  everywhere; syn is the Rust binding), (2) a net model — types in signatures as sorts
+  (any typed language; the no-primitive-obsession precondition is the real constraint,
+  not the language), (3) an EVAL BRIDGE for behavioural discovery — already proven
+  cross-language: the theory-bridge consumes Lean's exported operator tables today, so
+  any language that can dump finite tables gets spec locks, mutation verdicts, and
+  distance with zero new engine machinery — and (4) the language's own compiler as one
+  gate among many (rustc's actual role). Rust is the HOST and the first SUBSTRATE;
+  layout-probe (geometry), spec-lock's adopters (checklist data), and the verb algebra
+  itself (items and names, no syntax) are the existing proofs that the method outruns
+  its host. Honest bounds: dynamic languages weaken the nets, and the compiled-mutant
+  layer is per-substrate work.
+
+- **The payload language** (the operator's follow-on: "are you writing traits directly
+  with edit?"): the audit says NO — no trait has ever gone through the verbs, the
+  bundle-born member is fully certified with zero traits/generics/nested modules, and
+  the verb grammar treats traits as opaque cargo nothing has missed. The taxonomy
+  underneath: language features split into MEANING features (the body's business) and
+  COMPOSITION features (modules, visibility, traits, interfaces) — compensations for
+  hand-composition, and the apparatus has absorbed them one by one: modules → placement,
+  visibility → tiers, traits → declared expectations + the catalog (A TRAIT IS A NAMED
+  LAW-SET THE COMPILER CANNOT CHECK; the engine's version carries a can-fail proof),
+  semver → locks. What survives of traits is dispatch (a genuine meaning-level need) and
+  the HOST's own generics — the host stays Rust. And the body need not be: the theory
+  bridge already judges Lean's exported tables, so for enumerable carriers the edit
+  payload could be the value TABLE itself — language-free meaning — and for unbounded
+  carriers any language with an eval bridge qualifies, per module. The payload language
+  has a spec already: THE OPERATOR-SHAPE RULE — which re-reads the 55/55 spike as the
+  migration of the codebase INTO the payload language, not a compliance project.
+
+- **Self-hosting** (the operator's question: could probe-algebra be implemented entirely
+  with the verbs?) — three rungs, and the first is already behind us. (1)
+  SELF-DESCRIBING, done quietly: the locks freeze the freezer, the probes census the
+  probes, schemata mutates the mutation machinery, and the verb algebra is the theory of
+  the toolchain's own change process. (2) SELF-CONSTRUCTING — every change to this tree
+  through the verbs. The audit named ONE gap: the host is mostly impls and traits, which
+  the verb grammar treated as cargo — CLOSED the same day: `item_address` gives impls
+  their edit address (`impl Type`, `impl Trait for Type`; two blocks sharing one refuse
+  as ambiguous), traits join `item_name`, and `edit`'s interface-hold scales up one
+  grain — an impl or trait edits under the METHOD-SIGNATURE-SET hold, bodies and docs
+  free, surface held, a moved set refused by count. Smoked on real host code:
+  `modularize.rs`'s own `impl ProposedModule`, edited through the verb, every byte
+  outside the block untouched. What remains of rung 2 is practice, not vocabulary: the
+  second rule's coverage growing as the gaps ledger empties. (3) SELF-TRUSTING — the
+  verbs building the verbs inherits the compiler-compiling-itself question, and the rail
+  is already laid: differential-certify (release N−1 judges N), base case disclosed.
+  Self-describing, self-constructing, self-trusting — each rung keeps the honest frame
+  of the one below it.
+
+The original sketch follows, kept for the record:
+
+- **The carrier is a small bundle-state value** — a `Shaped` miniature of a module (a
+  bounded set of items with names, kinds, and component tags; the stream-carrier lesson:
+  deliberate histories, not combinatorial soup). The VERBS are the operators: `add(item)`,
+  `edit(name)`, `declare(expectation)`, `collect(name)` — each a total function on the
+  carrier (refusals map to the unchanged state or a tagged refusal value; partiality IS in
+  the vocabulary).
+- **What discovery should find, if the design above is honest**: disjoint `add`s commute;
+  `edit`s of distinct names commute; same-name `edit`s do NOT (the non-commutativity is
+  the CONFLICT, pinned the way the router's non-commutativity is pinned — a load-bearing
+  refusal, not a failure); `add` then `collect` of the same name annihilates; `declare`
+  commutes with everything not naming its ops. Every law that comes back green is a
+  fork/join rule with a can-fail proof; every refuted law is a conflict class, NAMED.
+- **The freeze**: `spec/verbs.spec` — the merge semantics of the entire system as a
+  committed, mutation-tested, drift-gated lock. A version-control system whose merge
+  rules carry the same evidence discipline as the code they merge. When the join verb
+  ships, it consults this lock the way `check` consults the placer — the rules are data,
+  never folklore.
+- **The honest frame, inherited**: the miniature carrier proves the algebra's SHAPE; the
+  real journal's items are richer, so the lock is evidence about the design, not a proof
+  about the implementation — the seam between miniature and real join is a transport
+  seam like any other, judged when the join verb exists.
+
+### The log and the anchor
+
+And the question the log raises, asked by the operator and answered here so it is not
+re-litigated: if the log is the record of change, WHAT IS GIT FOR — do we even need it?
+The honest split: git stores STATES, the log stores INTENTS — a diff is a reconstruction
+of what happened, the log IS what happened (patch-first systems — darcs, Pijul — are the
+prior art; Unison again at the term level). So the log becomes the source of CHANGE, and
+git shrinks — the genesis move again, a name contracting to its true referent — into the
+ANCHOR: the content-addressed snapshot store, the countersigned certified line, the
+distribution surface every other tool speaks. The two cross-check by the second-source
+pattern the repo already trusts everywhere: the journal, replayed, must produce the tree
+git holds — agreement is a judged fact, divergence a defect detector (and replay is why
+the log alone is not enough: a verb replayed under tomorrow's judges may judge
+differently, while a snapshot is version-independent — the log needs git's anchor
+exactly the way the incremental mutation gate needs `mutants-green`). Code on disk,
+likewise, keeps three jobs, all derived-artifact jobs: the build's input, the cache that
+keeps verbs fast, and the interop/legibility surface — materialized view #1 of the
+bundle, exactly as `ci.yml` is of the gate registry.
+
+### The squash verb — the lock executes (BUILT)
+
+The composition stanza froze the squash table; this brick makes it run. `bundle squash
+<bundle.journal>` compacts the change record to its LAW-NORMAL FORM, and the compactor's
+entire rule table is READ OFF the discovered laws (`SquashRules::from_spec`, parsing the
+engine's machine-grammar equations): same-item composition laws become the collapses
+(add-then-collect is one collect), projection laws become the replay-noise filter (a
+repeated identical entry is one entry), cross-item commuting-maps laws become MOBILITY
+(which verb pairs may slide past each other on different keys, so non-adjacent pairs can
+meet). Nothing is hand-authored: change the verb algebra, re-freeze, and the compactor's
+behaviour follows — the join-verb design ("the rules are data, never folklore") realised
+on the first verb to need it. Conservatism is silence, and the silences are load-bearing,
+each pinned: add-then-edit on one key composes to NO single verb, so both lines stay (the
+journal keeps the whole story); a verb the algebra does not model (`place`) is opaque and
+nothing slides past it; the one hard refusal is a line the journal grammar cannot read —
+the record is machine-written, so a strange line means a hand touched it. Squash journals
+nothing: it rewrites the record under the record's own warrant, and its trace is the
+journal's diff.
+
+The self-hosting note, one rung sharper than collect's: collect CONSULTED committed locks
+as evidence; squash EXECUTES the frozen spec of the verbs themselves as its engine. And
+the brick was built through the suit end to end: `squash.rs` was born by `add` on a
+missing file (module doc hand-typed after — prose is judgment), its probes went in by
+`add` too (a `#[cfg(test)] mod probes` is an addable item — the "test authoring" gap
+shrank without a new verb), the mount `pub mod squash;` went through `add` on `mod.rs`
+itself (the module-mount gap dissolved before it was ever named; the same transaction
+re-dealt two operator functions `mod.rs` had never had judged, ratified in this diff),
+and the CLI grew its own verb through its own `edit` — `fn run` replaced under the
+signature hold. Payload `use` items rode `add` as unnamed cargo, so the imports gap is
+narrower than feared; the arm's own imports live block-local inside the new match arm.
+
+**Field report — the frozen arm** (the one genuine rough edge, named for the ledger):
+mid-transaction, the tier census correctly derived the not-yet-mounted `squash.rs` as
+INTERIOR (not pub-reachable) and the inward rule refused the build — but `cargo run
+--example bundle` REBUILDS, so the vehicle of the very fix was blocked by the gate it
+was about to satisfy. The prebuilt example binary broke the deadlock. The missing piece:
+the verbs' vehicle must not share the build gate with the tree it operates on — a pinned
+suit binary (the shipped-hook precedent) or a verbs-exempt profile. Pleasing symmetry on
+the way out: the moment the mount landed, the tier census reclassified squash.rs
+INTERIOR → ALGEBRA on its own — the derivation watching the tree change under it.
+
+### The pinned suit (BUILT — the frozen arm, closed the same night it was named)
+
+`bundle pin` installs the RUNNING binary at `.suit/bundle` with a provenance line beside
+it (version, source path, toolchain), so the verbs stop rebuilding behind the gate of the
+tree they operate on. Both incidents that named the gap are dissolved: a mid-transaction
+tree can no longer block the verb that would heal it, and a verification poked mid-sweep
+no longer taxes the sweep's shared build cache. `.suit/` is ignored — the binary is a
+local artifact; the provenance says where it came from. The deeper reason it had to exist
+before stage 3: a replayer that must build from the tree it is reconstructing cannot be a
+second source for that tree.
+
+### Where the sweep's hour went (accounted, and the candidate it names)
+
+The operator asked where the local sweep's time goes and whether we understand what it
+is for. The accounting, from the pipeline's own code: the sweep is ONE build, one
+recorded baseline (the coverage map: which tests touch which site), then per site a
+fail-fast run of ONLY the covering tests — **when nextest is installed**. On the agent's
+box it was not, so the disclosed fallback ran the ENTIRE lib suite per site: ~830 sites ×
+(cargo startup + a ~6s suite) across 4 workers oversubscribing 4 cores — the observed
+60–90 minutes was the fallback tax plus contention, not the design. CI installs nextest
+and runs the same sweep inside the every-change check job on real runners; local
+certification was never load-bearing. Fixed at the environment grain (nextest installed;
+the pinned-suit lesson again — the vehicle's provisioning is part of the tool).
+
+What it is FOR, restated so the cost has a purpose attached: tests judge the code; the
+sweep judges the TESTS — every compiled flip must be detectable by the lib suite or it
+is an unpinned degree of freedom, and this is the mutation gate that let the per-diff
+source gates retire. But per CHANGE the full sweep re-judges hundreds of sites whose
+code and covering tests both stand still — pure recomputation, and the first genuinely
+justified consumer of the deferred incremental turn. **Candidate: the changed-scope
+sweep** — sites are keyed by function path and the census is committed, so a diff since
+`mutants-green` (or since HEAD) names exactly the sites whose guard code changed plus
+the sites whose covering tests changed; sweep that subset in the inner loop and leave
+the full re-certification to CI and the weekly shards, which already exist for exactly
+this division of labour.
+
+**The gates become locks (BUILT — the operator's "make that class of failure
+impossible", same day):** the warm-green class named precisely is a VERDICT HELD WITHOUT
+ITS INPUT KEY — and every judgment in the repo was already staleness-proof except the
+gates themselves, which lived as terminal output and working memory (the bag-of-booleans
+pattern at the CI grain). `discover::verdict` closes it by construction: a verdict is
+keyed by the content fingerprint of everything the gates judge (relative paths + bytes,
+sorted walk, `.git`/`target`/`.suit` disclosed as the skip set), a missing entry FAILS
+CLOSED as unjudged, only green is ever recorded (red demands a tree change, and a
+changed tree is a new key), and the store's entries sit outside their own scope so
+recording cannot stale itself. `bundle gates` runs the owed every-change gates FROM THE
+REGISTRY DECLARATION (the same one ci.yml renders from — "green locally" and "green in
+CI" stay one claim), records verdicts only if the tree the gates judged is the tree that
+exists afterwards (autofix moves the key; the run says so and asks to be re-run), and
+`bundle owes` is the ceremony-sequencing toil dissolved: the to-do list a change owes is
+DERIVED — the gates without verdicts at the current hash — not remembered. Pinned by the
+probes: one moved byte re-opens the debt; identical relative trees share a key (the
+portability the countersign below will stand on); the roster is the registry's
+every-change set, never restated.
+
+**The sampled countersign (BUILT — the candidate below, finished the next day):** the
+sweep now writes a COMMITTED attestation (`attest/sweep.transcript`: tree hash,
+toolchain, baseline, and every site's verdict with the covering tests it was judged by),
+and the mutation gate's one declared command became `schemata verify` — locally and in
+CI, the same claim: a committed attestation matching the checked-out tree and toolchain
+is AUDITED by re-judging a random sample of its sites (seed drawn from entropy after the
+transcript is fixed, so a false `killed` cannot be placed where the audit won't look —
+and it cannot be fabricated from non-covering tests either: tests that never reach the
+flipped guard pass under the mutant and the disagreement fires); a missing, foreign, or
+disagreeing attestation falls back to the full sweep, which re-attests. The register
+still judges the claimed survivor set before any sampling (an unratified survivor is a
+red gate, not a disagreement), the census must name exactly the attested population, and
+`attest/` is EXCLUDED from the tree hash — the attestation describes the tree, so it
+cannot be part of the tree it describes. Timeout portability stays the disclosed edge:
+a slow-box detection can read as a fast-box survivor, a FALSE disagreement that costs a
+redundant sweep and never a false green. Field report from the first run: the
+whole-tree scope makes PROSE edits invalidate the mutation verdict — a docs-only change
+re-owes a nine-minute sweep it cannot affect. The named refinement: PER-GATE SCOPES
+(fmt reads .rs; the sweep reads src and tests; none of the four reads docs/) — the
+verdict key becomes a claim about what each gate actually consumes.
+
+**Candidate behind it (the operator's follow-on): the verdict store with a sampled
+countersign.** "Can a local sweep attest so CI skips?" — the waste diagnosis is right
+(same tree, same pinned toolchain, a deterministic judgment recomputed), but a straight
+skip fails the trust analysis, with same-day evidence: local green lied twice this
+session (warm-cache clippy passes that failed cold), and `mutants-green` works precisely
+because the countersign comes from the one party the working session cannot mint
+signatures for. The version that survives: the local sweep commits its TRANSCRIPT — tree
+hash, toolchain, per-site verdicts, content-addressed like the payload store (a judgment
+store) — and CI re-judges a RANDOM SAMPLE of sites against it: agreement countersigns
+the whole, one divergence triggers the full sweep, the weekly shards stay the
+from-scratch backstop. Derivation local, countersign sampled — CI stays the signer at
+O(sample) cost. Preconditions, disclosed: normalized timeout semantics (a timeout is a
+detection, and timeouts are machine-relative — verdicts must be portable before they are
+shareable) and the attestation claiming its ENVIRONMENT (toolchain already locked;
+cold-build discipline becomes part of the claim). Sequenced after the changed-scope
+sweep, which gets most of the win with none of the new trust surface.
+
+### Stage 3: the payload store and the replay differential (BUILT)
+
+The journal stops being names-only and starts being a SOURCE. `discover::store` adds the
+content-addressed payload store (`bundle.payloads/` beside the journal, FNV-1a 64
+fingerprints, one blob per distinct payload — stash is a projection, so re-recording
+never bloats; a collision REFUSES rather than overwrites); `add`/`edit` stash their
+payloads and the journal entry carries ` @<address>`. `bundle replay <journal>` is the
+differential: reconstruct each journaled file by re-applying its entries' EFFECTS
+(payloads from the store, never re-judging — a verb replayed under tomorrow's judges may
+judge differently, and the ratification already happened; `collect` therefore refuses
+replay by NAMING the effect/judgment split, the disclosed gap), then judge against the
+tree. `tree == replay(journal)` is now measured file by file instead of promised — the
+log-and-anchor disposition's second-source cross-check, live. First real run: every
+existing entry predates the store, so the bar reads an honest ZERO of nine journaled
+files — the metric exists precisely so real work moves it. Squash learned the addresses
+the same hour: a trailing ` @<16 hex>` is NOT part of the compaction key, and when a pair
+collapses the line whose verb the lock names survives (later over earlier — so
+edit-then-edit keeps the LATER payload; the projection law licenses the shape, and
+`replay(squash(j)) == replay(j)` is the differential drill that will judge the transport).
+
+Alongside, the first completed FULL sweep since the verb suite landed returned 12
+findings — debt from the collect/constrains/trace bricks whose sweeps container-restarts
+had killed. Eleven died to new probes (exact-byte splice assertions where contains() let
+padding and cfg-detection flips hide; a single-op-component fixture for the constrains
+matcher; the freedoms filter's conjunction pinned on the demo lock's natural killed-vs-
+SURVIVED split; direct conduct probes for the mutant makers and the doc-flow `edit`);
+ONE was ratified — `mutation::never:deaf -> None`, equivalence by definition (`never` IS
+the constant-None evaluator), the register's first and only line. And the probe work
+surfaced a discovery: TEST MODS ARE ALREADY EDITABLE THROUGH THE VERB — `edit` holds
+non-Fn/Impl/Trait items by name + kind, which for a `#[cfg(test)] mod` is exactly right
+(bodies free, kind held), so growing an existing probes module needed no new vocabulary.
+The test-authoring gap closed by reading the code the verbs already had.
+
+### The name, asked of the whole (disposition)
+
+The operator's question, after the mech-suit exchange: "what do we even call this thing
+now? It's grown way beyond my original feedback-loop domain model." Answered here so it
+is not re-litigated: KEEP THE NAME — not out of inertia, but because the repo grew INTO
+it. Genesis set the precedent of a name contracting to its true referent; this is the
+twin case, a name EXPANDING to its true referent. "Probe algebra" began as a metaphor
+over a feedback-loop domain model; today it is a description: the theories are algebras
+probed by batteries, the shape catalog is an algebra OF law shapes, the change history is
+literally an algebra (`spec/verb-algebra.spec`), and as of the squash brick the tooling
+EXECUTES frozen algebra as its rule table. The layers keep their working names — the
+METHOD is discovery (derive the fact, ratify the decision), the MEDIUM is the bundle
+(modules as databases, files as views), the MODALITY is the verbs (the CLI as the
+interface to the code), and the EXPERIENCE is the mech suit (the operator's coinage, kept
+because it says what it does: the agent supplies intent, the suit carries the load). The
+house naming discipline holds at the top: names say what things do, and this thing probes
+algebras and is increasingly made of them.
+
+## Spike: from 3 of 55 toward 55 of 55 — the operator-shaped interior
+
+The companion measurement, asked for by the operator in the same conversation, aimed at
+the part of the codebase we have been politely walking around: the qualify census says 3
+of 55 files carry an algebra, and the other 52 are the plumbing every vision above quietly
+excludes. The reason to push anyway, in the operator's framing: 90% of what is hard to get
+right in a program is its DOMAIN — and operator-shaping a file is not a formality, it
+FORCES the domain modelling (value objects in, primitives out, effects to the edge). Read
+that way the qualify census is not a compliance number, it is a domain-modelling progress
+bar for the repo's own interior.
+
+Rung 1 is a REASON census, not a refactor — BUILT (`spec/qualify-reasons.spec`, derived by
+`boundary-enforce` in the same walk as the qualify census — one rule, two renders — frozen
+under `BLESS_REASONS`, drift-gated on every build, covered in the probe census as a
+ratified drift-gate probe). The classes are deliberately mechanical (no functions,
+impl-attached surface only, primitive signatures, borrowed types, parameterised types,
+unshaped types, unit returns, zero-argument constants, effectful bodies); reading them into
+the three work classes — (a) value-object debt, (b) missing VOCABULARY (effectful edges,
+builder plumbing — the effects-as-theories direction, given a concrete worklist),
+(c) principled refusals that become register lines — stays a ratification, as it must.
+First numbers, and the headline was visible the moment the lock minted: 56 files, 3
+qualify, 53 refuse — and the single biggest named class was IMPL-ATTACHED SURFACE ONLY
+(15 files): the no-rats-nest rule pushes every public callable onto a typestate, and the
+census read free functions, so the discipline's own crown rule manufactured its largest
+blind spot. (Fittingly, `discover::bundle` itself landed in that class on arrival.)
+
+**Brick 2, built the same day — ASSOCIATED FUNCTIONS ARE OPERATORS.** The one rule, one
+change: a method is judged exactly like a free function with `self`/`&self`/`Self`
+resolved to the impl target (calling convention and spelling, not shape); `&mut self` is
+mutation, refused; a generic impl target is not a sort; methods key `Type::method` — the
+sixth sense's identity convention, keeping two typestates' `new`s distinct. Two honesty
+refinements rode along, both caught by reading the first re-bless before ratifying it:
+`Self` must never leak into the census as a sort, and a TYPE PARAMETER is a variable, not
+a value type — the walk now refuses `fn id<T>(x: T) -> T` and kin, closing a quirk that
+predated the spike. The movement: root census 3 → 16 of 56 (the real algebras were
+sitting behind receivers all along — `kvstore/store.rs` alone carries 18 method operators
+over 10 sorts, `interp/boundary.rs` nine over seven), and the demo members' actual domain
+modules (credit meter, billing, gauge, mixer) all census as the algebras genesis always
+knew they were. The impl-attached class is DISSOLVED from the reason vocabulary — not
+renamed: the walk sees impls now, so those files report their real signature classes
+(a `mutating receivers` class joined for `&mut self`). 40 files still refuse, and the
+remainder is now honestly what it looked like it would be: borrowed/parameterised
+plumbing — the engine speaks `&`, `Vec`, and `Result` — which is where the vocabulary
+work begins.
+
+A milestone landed alongside, found by the same day's full schemata sweep: the last FOUR
+ratified schemata survivors now die (the widened suite reaches their guards), so
+`spec/schemata.register` is EMPTY — zero ratified survivors across all 706 compiled
+mutants. The stale-line drill moved to a fixture register so it outlives the live
+register's population. The target restated honestly, the instrumentation-census shape exactly: totality
+is "every file qualifies OR carries a ratified reason" — the census owns totality from day
+one; what grows is the qualifying fraction. And the tie back to the candidate above is
+direct: only operator-shaped code can live in a bundle, so every file this spike converts
+is territory the continuation process can govern — the two experiments are one programme
+measured from opposite ends.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

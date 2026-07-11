@@ -67,6 +67,14 @@ pub trait Liftable: Shaped + Eq + Ord + Hash + Debug + 'static {
     fn grid_cap() -> usize {
         32
     }
+    /// The DECLARED laws — the zero-annotation world's SHOULD channel. Default empty: a
+    /// plain lift starts with no contract, and every declaration is an explicit act
+    /// (`AutoLift::scan_module`'s declarations parameter bakes them in, vocabulary-gated
+    /// at scan time). With this, `Distance::of::<Lifted<C>>()` answers for a module whose
+    /// author wrote only types and Rust — the red target lock reaches the lifted world.
+    fn expectations() -> Vec<crate::discover::expect::Expectation> {
+        Vec::new()
+    }
 }
 
 /// The single-carrier `Theory` over a [`Liftable`] carrier: one sort, the carrier's `Shaped`
@@ -105,6 +113,17 @@ impl<C: Liftable> Theory for Lifted<C> {
 
     fn observe(v: &C) -> C {
         v.clone()
+    }
+}
+
+/// The lifted theory's declared laws are the carrier's ([`Liftable::expectations`]) — so
+/// `Distance::of::<Lifted<C>>()` runs for a zero-annotation module the moment its author
+/// declares anything, and reports "met" trivially before that (an empty contract is
+/// honestly met, never a lie about coverage — the spec lock still carries what discovery
+/// FOUND).
+impl<C: Liftable> crate::discover::expect::Expected for Lifted<C> {
+    fn expectations() -> Vec<crate::discover::expect::Expectation> {
+        C::expectations()
     }
 }
 
@@ -282,8 +301,17 @@ fn fixity_for(arity: usize) -> &'static str {
 }
 
 /// Render the single-carrier `impl Liftable` — the ops table over one carrier.
-fn render_single(theory_name: &str, carrier: &str, ops: &[(String, Vec<usize>, usize)]) -> String {
-    let mut out = format!("impl ::boundary_spec::discover::lift::Liftable for {carrier} {{\n");
+fn render_single(
+    theory_name: &str,
+    carrier: &str,
+    ops: &[(String, Vec<usize>, usize)],
+    declared: &[(String, Vec<String>)],
+) -> String {
+    // the eval closures clone grid values without knowing the carrier's Copy-ness —
+    // the generated impl carries the allow so a Copy carrier lints clean.
+    let mut out = format!(
+        "#[allow(clippy::clone_on_copy)]\nimpl ::boundary_spec::discover::lift::Liftable for {carrier} {{\n"
+    );
     out.push_str(&format!(
         "    fn theory_name() -> &'static str {{ {theory_name:?} }}\n"
     ));
@@ -293,6 +321,7 @@ fn render_single(theory_name: &str, carrier: &str, ops: &[(String, Vec<usize>, u
     for (name, inputs, _output) in ops {
         let arity = inputs.len();
         let fixity = fixity_for(arity);
+        let binder = if arity == 0 { "_" } else { "a" };
         let args = (0..arity)
             .map(|i| format!("a[{i}].clone()"))
             .collect::<Vec<_>>()
@@ -300,10 +329,30 @@ fn render_single(theory_name: &str, carrier: &str, ops: &[(String, Vec<usize>, u
         out.push_str(&format!(
             "            ::boundary_spec::discover::lift::LiftedOp {{ name: {name:?}, symbol: {name:?}, \
              fixity: ::boundary_spec::discover::engine::Fixity::{fixity}, arity: {arity}, \
-             eval: |a| ::std::option::Option::Some({name}({args})) }},\n"
+             eval: |{binder}| ::std::option::Option::Some({name}({args})) }},\n"
         ));
     }
-    out.push_str("        ]\n    }\n}\n");
+    out.push_str("        ]\n    }\n");
+    // the SHOULD channel, baked in: the declarations ride the generated impl (canonical
+    // shape names — validated at scan time, so `Expectation::of`'s panic path is dead
+    // code by construction).
+    if !declared.is_empty() {
+        out.push_str(
+            "    fn expectations() -> ::std::vec::Vec<::boundary_spec::discover::expect::Expectation> {\n        ::std::vec![\n",
+        );
+        for (shape, args) in declared {
+            let ops = args
+                .iter()
+                .map(|a| format!("{a:?}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.push_str(&format!(
+                "            ::boundary_spec::discover::expect::Expectation::of({shape:?}, ::std::vec![{ops}]),\n"
+            ));
+        }
+        out.push_str("        ]\n    }\n");
+    }
+    out.push_str("}\n");
     out
 }
 
@@ -388,7 +437,32 @@ impl AutoLift {
     /// code is `include!`d where the functions are in scope, so its wrappers call them by bare
     /// name. This is the counterpart of the qualify census's build-time scan, pointed at
     /// generating a theory instead of freezing a surface.
-    pub fn scan_module(source: &str, theory_name: &str) -> Result<String, String> {
+    ///
+    /// `declarations` is the SHOULD channel (the zero-annotation world's `expects`): each
+    /// entry in the declaration grammar (`commutative(and)`) is vocabulary-gated at scan
+    /// time — an unratified shape word refuses TEACHING the catalog, exactly like
+    /// `Bundle::declare` — and bakes into the generated impl's
+    /// [`Liftable::expectations`], so `Distance::of::<Lifted<C>>()` judges the contract on
+    /// every test run. Declarations on a TWO-carrier module are a named refusal (the
+    /// two-sorted declaration channel is not built).
+    pub fn scan_module(
+        source: &str,
+        theory_name: &str,
+        declarations: &[&str],
+    ) -> Result<String, String> {
+        let mut declared: Vec<(String, Vec<String>)> = Vec::new();
+        for text in declarations {
+            let (key, args) = super::bundle::parse_declaration(text)
+                .map_err(|e| e.replace("bundle declare", "lift scan"))?;
+            let canonical = super::expect::Expectation::canonical(&key).ok_or_else(|| {
+                format!(
+                    "lift scan: `{key}` is not in the ratified catalog (spec/shapes.spec). \
+                     Declarable shapes: {}",
+                    super::expect::Expectation::vocabulary_keys().join(", ")
+                )
+            })?;
+            declared.push((canonical.to_string(), args));
+        }
         let file =
             syn::parse_file(source).map_err(|e| format!("lift scan: unparseable module: {e}"))?;
         let mut carriers: Vec<String> = Vec::new();
@@ -426,8 +500,13 @@ impl AutoLift {
         }
         match carriers.len() {
             0 => Err("lift scan: no public functions over a carrier".to_string()),
-            1 => Ok(render_single(theory_name, &carriers[0], &ops)),
-            2 => Ok(render_two(theory_name, &carriers, &ops)),
+            1 => Ok(render_single(theory_name, &carriers[0], &ops, &declared)),
+            2 if declared.is_empty() => Ok(render_two(theory_name, &carriers, &ops)),
+            2 => Err(
+                "lift scan: declarations on a two-carrier module — the two-sorted \
+                 declaration channel is not built; declare on a single-carrier module"
+                    .to_string(),
+            ),
             n => Err(format!(
                 "lift scan: {n} carriers ({}) — the scan lifts one carrier (`Lifted`) or two \
                  (`Lifted2`); three or more is the N-way tag, not built",
@@ -499,6 +578,14 @@ mod probes {
                 },
             ]
         }
+        // the SHOULD channel: what the module's author declares the algebra must hold —
+        // exactly what `scan_module`'s declarations parameter bakes into a generated impl.
+        fn expectations() -> Vec<crate::discover::expect::Expectation> {
+            vec![
+                crate::discover::expect::Expectation::of("commutative", vec!["and"]),
+                crate::discover::expect::Expectation::of("identity", vec!["and", "tru"]),
+            ]
+        }
     }
 
     /// The module source the worked example's functions were written as — the input a
@@ -547,6 +634,95 @@ mod probes {
         );
     }
 
+    /// THE SHOULD CHANNEL reaches the lifted world (the zero-annotation declaration rung):
+    /// the bool carrier declares `commutative(and)` and `identity(and, tru)`, and
+    /// `Distance::of::<Lifted<bool>>()` judges the contract MET — the same engine, the
+    /// declared laws found. An author who wrote only types and Rust now has a red/green
+    /// contract gate.
+    #[test]
+    fn a_lifted_module_holds_its_declared_contract() {
+        let d = crate::discover::expect::Distance::of::<Lifted<bool>>();
+        assert_eq!(d.declared, 2);
+        assert!(
+            d.missing.is_empty(),
+            "the declared boolean laws hold: {:?}",
+            d.missing.iter().map(|e| e.render()).collect::<Vec<_>>()
+        );
+    }
+
+    /// The RED half, drilled: a declaration the module does NOT satisfy reads UNMET by
+    /// name — the red target lock for the zero-annotation world. `shift` is an involution
+    /// (`shift(shift(x)) = x`), so declaring it IDEMPOTENT overshoots, and the distance
+    /// names exactly that overshoot instead of a bare test failure.
+    #[test]
+    fn an_unmet_declaration_reads_red_by_name() {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, crate::Shaped)]
+        enum Gear {
+            Lo,
+            Hi,
+        }
+        fn shift(g: Gear) -> Gear {
+            match g {
+                Gear::Lo => Gear::Hi,
+                Gear::Hi => Gear::Lo,
+            }
+        }
+        impl Liftable for Gear {
+            fn theory_name() -> &'static str {
+                "gears"
+            }
+            fn ops() -> Vec<LiftedOp<Gear>> {
+                vec![LiftedOp {
+                    name: "shift",
+                    symbol: "shift",
+                    fixity: Fixity::Prefix,
+                    arity: 1,
+                    eval: |a| Some(shift(a[0])),
+                }]
+            }
+            fn expectations() -> Vec<crate::discover::expect::Expectation> {
+                vec![crate::discover::expect::Expectation::of(
+                    "idempotent",
+                    vec!["shift"],
+                )]
+            }
+        }
+        let d = crate::discover::expect::Distance::of::<Lifted<Gear>>();
+        assert_eq!(d.missing.len(), 1, "the overshoot is unmet");
+        assert!(
+            d.missing[0].render().contains("idempotent(shift)"),
+            "named, not a bare failure: {}",
+            d.missing[0].render()
+        );
+    }
+
+    /// The scan BAKES DECLARATIONS IN: the generated impl carries `expectations()` under
+    /// the canonical shape names (vocabulary-gated at scan time, so the runtime panic path
+    /// is dead by construction); an unratified word refuses TEACHING the catalog; and
+    /// declarations on a two-carrier module refuse by name.
+    #[test]
+    fn the_scan_bakes_declarations_in() {
+        let generated =
+            AutoLift::scan_module(MODULE_SOURCE, "lifted boolean", &["commutative(and)"])
+                .expect("scans with a declaration");
+        syn::parse_str::<syn::ItemImpl>(&generated).expect("valid Rust");
+        assert!(generated.contains("fn expectations()"), "{generated}");
+        assert!(
+            generated.contains("Expectation::of(\"commutativity\", ::std::vec![\"and\"])"),
+            "canonical shape name baked in: {generated}"
+        );
+        let err = AutoLift::scan_module(MODULE_SOURCE, "x", &["sparkly(and)"]).unwrap_err();
+        assert!(err.contains("not in the ratified catalog"), "{err}");
+        assert!(err.contains("Declarable shapes:"), "{err}");
+        let err = AutoLift::scan_module(
+            "pub fn wrap(a: bool) -> Wrap { Wrap }",
+            "two",
+            &["commutative(wrap)"],
+        )
+        .unwrap_err();
+        assert!(err.contains("two-carrier"), "{err}");
+    }
+
     /// The SCAN closes the zero-annotation loop: `scan_module` reads the plain module source
     /// and generates an `impl Liftable` that (a) parses as valid Rust and (b) describes
     /// exactly the operator table — by name and arity — that the runtime tests above proved.
@@ -555,7 +731,7 @@ mod probes {
     #[test]
     fn the_scan_generates_the_proven_liftable_table() {
         let generated =
-            AutoLift::scan_module(MODULE_SOURCE, "lifted boolean").expect("the module scans");
+            AutoLift::scan_module(MODULE_SOURCE, "lifted boolean", &[]).expect("the module scans");
         syn::parse_str::<syn::ItemImpl>(&generated).expect("the generated impl is valid Rust");
         assert!(generated.contains("Liftable for bool"));
 
@@ -579,7 +755,7 @@ mod probes {
     #[test]
     fn the_scan_refuses_three_carriers() {
         let three = "pub fn mix(a: bool, b: u8) -> char { (a as u8 + b) as char }";
-        let err = AutoLift::scan_module(three, "mixed").expect_err("three carriers refuse");
+        let err = AutoLift::scan_module(three, "mixed", &[]).expect_err("three carriers refuse");
         assert!(err.contains("N-way tag, not built"), "{err}");
     }
 
@@ -594,7 +770,7 @@ mod probes {
             pub fn unwrap(x: Box<bool>) -> bool { *x }
         "#;
         let generated =
-            AutoLift::scan_module(source, "lifted bool/box").expect("two carriers scan");
+            AutoLift::scan_module(source, "lifted bool/box", &[]).expect("two carriers scan");
         syn::parse_str::<syn::File>(&generated).expect("the generated module is valid Rust");
         assert!(generated.contains("Liftable2 for LiftedBoolBox"));
         assert!(generated.contains("type A = bool"));

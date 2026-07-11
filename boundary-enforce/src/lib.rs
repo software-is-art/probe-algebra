@@ -93,11 +93,11 @@
 //! The integration tests in `tests/rules.rs` are the crate's executable spec: one fixture per
 //! rule, readable as the rule inventory.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use syn::visit::{self, Visit};
-use syn::{Fields, FnArg, Item, ItemFn, Meta, ReturnType, Signature, Type, Visibility};
+use syn::{Fields, FnArg, Item, Meta, ReturnType, Signature, Type, Visibility};
 
 /// What to enforce, and where. Construct with [`Config::new`] and override fields as needed —
 /// most importantly [`Config::kernel_allowlist`], which MUST live in the consumer's own
@@ -126,6 +126,20 @@ pub struct Config {
     pub tiers_spec: Option<PathBuf>,
     /// The bless variable for [`Config::tiers_spec`]. Default: `BLESS_TIERS`.
     pub tiers_bless_env: String,
+    /// Where the REASON census is frozen and drift-gated — WHY each non-qualifying file
+    /// refuses the algebra census (the qualify census's complement, derived by the same
+    /// walk). `None` skips the freeze/drift pass (the census is still computed and
+    /// returned).
+    pub reasons_spec: Option<PathBuf>,
+    /// The bless variable for [`Config::reasons_spec`]. Default: `BLESS_REASONS`.
+    pub reasons_bless_env: String,
+    /// THE BLESS LOOP, DISSOLVED: when a census drifts, regenerate it INTO THE WORKING
+    /// TREE and fail the build once — the diff is the ratification (commit it) or the
+    /// refusal (revert it); the homework ("go run the bless command") disappears while
+    /// the gate's authority is untouched. Default: on everywhere except CI (`CI` env
+    /// set), because a fresh checkout must never mutate itself — there, the refusal
+    /// only reports. The bless variables remain for explicit regeneration.
+    pub autofix_stale: bool,
 }
 
 impl Config {
@@ -141,6 +155,9 @@ impl Config {
             bless_env: "BLESS_QUALIFY".to_string(),
             tiers_spec: None,
             tiers_bless_env: "BLESS_TIERS".to_string(),
+            reasons_spec: None,
+            reasons_bless_env: "BLESS_REASONS".to_string(),
+            autofix_stale: std::env::var_os("CI").is_none(),
         }
     }
 }
@@ -156,6 +173,9 @@ pub struct Enforcement {
     /// The rendered tier lock (what [`Config::tiers_spec`] freezes): the derived partition,
     /// one line per file with the evidence that placed it.
     pub tiers_census: String,
+    /// The rendered REASON census (what [`Config::reasons_spec`] freezes): one line per
+    /// non-qualifying file with the mechanical blocker classes its functions exhibit.
+    pub reasons_census: String,
     /// The files and directories whose change must re-trigger enforcement, in emission order.
     pub rerun_paths: Vec<PathBuf>,
 }
@@ -236,6 +256,7 @@ impl Enforcement {
             &config.bless_env,
             "the algebra-qualification census",
             &config.manifest_dir,
+            config.autofix_stale,
             &mut rerun,
             &mut violations,
         );
@@ -252,6 +273,28 @@ impl Enforcement {
             &config.tiers_bless_env,
             "the tier census",
             &config.manifest_dir,
+            config.autofix_stale,
+            &mut rerun,
+            &mut violations,
+        );
+
+        // REASON CENSUS: the qualify census's COMPLEMENT — for every file that does NOT
+        // qualify, the mechanical blocker classes its functions exhibit (no functions,
+        // primitive signatures, borrowed types, effects…). Same walk, same rule,
+        // second render: the census is evidence, the reading of it (value-object debt vs
+        // missing vocabulary vs principled refusal) stays a ratification.
+        let reasons_census = render_reasons(
+            &config.src_root,
+            &config.manifest_dir,
+            &config.reasons_bless_env,
+        );
+        freeze_or_gate(
+            &config.reasons_spec,
+            &reasons_census,
+            &config.reasons_bless_env,
+            "the qualify-reason census",
+            &config.manifest_dir,
+            config.autofix_stale,
             &mut rerun,
             &mut violations,
         );
@@ -262,6 +305,7 @@ impl Enforcement {
             violations,
             qualify_census,
             tiers_census,
+            reasons_census,
             rerun_paths: rerun,
         }
     }
@@ -300,6 +344,7 @@ fn freeze_or_gate(
     bless_env: &str,
     label: &str,
     manifest: &Path,
+    autofix: bool,
     rerun: &mut Vec<PathBuf>,
     violations: &mut Vec<String>,
 ) {
@@ -316,11 +361,36 @@ fn freeze_or_gate(
         let committed = std::fs::read_to_string(spec_path).unwrap_or_default();
         if committed != census {
             let rel = spec_path.strip_prefix(manifest).unwrap_or(spec_path);
-            violations.push(format!(
-                "{} is stale — {label} drifted. Regenerate with `{bless_env}=1 cargo build` \
-                 and ratify the diff.",
-                rel.display(),
-            ));
+            // THE BLESS LOOP, DISSOLVED (the standing question's first catch:
+            // regeneration is pure derivation; only committing the diff is the
+            // signature). With `autofix` on — the default everywhere except CI — the
+            // refusal RUNS its fixing derivation: the regenerated census lands in the
+            // working tree and the build still fails ONCE, so the gate's authority is
+            // untouched (an unratified drift never builds green) while the homework
+            // ("go run the bless command") disappears. Commit the diff to ratify, or
+            // revert it to refuse. In CI there is no tree to ratify into, so the
+            // refusal only reports — a fresh checkout must never mutate itself.
+            if autofix {
+                if let Some(parent) = spec_path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .unwrap_or_else(|e| panic!("create {} ({e})", parent.display()));
+                }
+                std::fs::write(spec_path, census)
+                    .unwrap_or_else(|e| panic!("write {} ({e})", spec_path.display()));
+                violations.push(format!(
+                    "{} was stale — {label} drifted, and the regenerated text is now IN \
+                     YOUR WORKING TREE. The diff is the ratification: commit it, or \
+                     revert it to refuse the drift. (This build fails once so the \
+                     movement is never silent.)",
+                    rel.display(),
+                ));
+            } else {
+                violations.push(format!(
+                    "{} is stale — {label} drifted. Regenerate with `{bless_env}=1 cargo \
+                     build` and ratify the diff.",
+                    rel.display(),
+                ));
+            }
         }
     }
 }
@@ -698,6 +768,230 @@ pub fn qualify_census_lines(src: &Path, manifest: &Path) -> Vec<String> {
     lines
 }
 
+// ===== the REASON census: why each non-qualifying module refuses =====
+
+/// Render the qualify-REASON census: one line per file whose functions form no algebra,
+/// carrying the mechanical blocker classes they exhibit — the qualify census's complement,
+/// derived by the same walk (same `tests.rs` skip, same operator-shape rule, stated once).
+/// The classes are EVIDENCE, deliberately mechanical; reading them into value-object debt,
+/// missing vocabulary, or a principled refusal is a ratification, not a derivation.
+fn render_reasons(src: &Path, manifest: &Path, bless_env: &str) -> String {
+    let mut scanned = 0usize;
+    let mut lines: Vec<String> = Vec::new();
+    collect_reasons(src, manifest, &mut scanned, &mut lines);
+    lines.sort();
+    let mut report = format!(
+        "# qualify reasons — WHY each module refuses the algebra census: the mechanical blockers,\n\
+         # per file, derived by the same walk as the qualify census (one rule, two renders; free\n\
+         # functions AND impl methods, the receiver resolved to the typestate). Classes:\n\
+         # no functions | unit returns | primitive signatures | borrowed types | parameterised\n\
+         # types | unshaped types | zero-argument constants | effectful bodies | mutating\n\
+         # receivers. The classes are evidence; reading them into value-object debt, missing\n\
+         # vocabulary, or a principled refusal is the ratification's job. Regenerate with\n\
+         # `{bless_env}=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files scanned, {} qualify, {} refuse.\n\n",
+        scanned,
+        scanned - lines.len(),
+        lines.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+    report
+}
+
+/// Walk `dir` and push a `REFUSES` line for every parsed file whose functions form no
+/// algebra — the same walk (and skips) as [`collect_qualifications`].
+fn collect_reasons(dir: &Path, manifest: &Path, scanned: &mut usize, out: &mut Vec<String>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_reasons(&path, manifest, scanned, out);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        if path.file_name().and_then(|n| n.to_str()) == Some("tests.rs") {
+            continue;
+        }
+        let Ok(file) = parse(&path) else { continue };
+        *scanned += 1;
+        let classes = refusal_classes_from_items(&file.items);
+        if classes.is_empty() {
+            continue;
+        }
+        let loc = path
+            .strip_prefix(manifest)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        out.push(format!("{loc}: REFUSES — {}", classes.join(", ")));
+    }
+}
+
+/// The blocker classes one file's items exhibit — EMPTY exactly when the file qualifies
+/// (some function is operator-shaped, the same predicate [`qualify_line_from_items`]
+/// answers), so the two censuses partition the scanned files by construction. Free
+/// functions and impl methods are judged alike (the receiver resolved to the typestate —
+/// the "impl-attached surface only" blind spot this census exposed on its first minting is
+/// dissolved by the walk now SEEING impls); a file with no functions at all is its own
+/// class; otherwise the classes aggregate every blocker across the functions, sorted.
+fn refusal_classes_from_items(items: &[Item]) -> Vec<&'static str> {
+    let imports = std_effect_imports(items);
+    let mut ops: Vec<Op> = Vec::new();
+    qualify_items(items, &imports, &mut ops);
+    if !ops.is_empty() {
+        return Vec::new();
+    }
+    let mut fns: Vec<FnRow> = Vec::new();
+    collect_fns(items, &mut fns);
+    if fns.is_empty() {
+        return vec!["no functions"];
+    }
+    let mut classes: BTreeSet<&'static str> = BTreeSet::new();
+    for row in fns {
+        // the same admission `operator_candidate` makes, read for its refusal class: `Self`
+        // resolves to the typestate (or reads as its target's blocker), a type PARAMETER is
+        // generic machinery, and everything else classifies by structure.
+        let class_of = |ty: &Type| -> Option<&'static str> {
+            if let Some(n) = named_value_type(ty) {
+                if n == "Self" {
+                    return match &row.receiver {
+                        Some(Some(_)) => None,
+                        Some(None) => Some("parameterised types"),
+                        None => Some("unshaped types"),
+                    };
+                }
+                if row.type_params.contains(&n) {
+                    return Some("parameterised types");
+                }
+                return None;
+            }
+            type_class(ty)
+        };
+        match &row.sig.output {
+            ReturnType::Default => {
+                classes.insert("unit returns");
+            }
+            ReturnType::Type(_, ty) => {
+                if let Some(class) = class_of(ty) {
+                    classes.insert(class);
+                }
+            }
+        }
+        if row.sig.inputs.is_empty() {
+            classes.insert("zero-argument constants");
+        }
+        for arg in &row.sig.inputs {
+            match arg {
+                FnArg::Receiver(r) => {
+                    if r.reference.is_some() && r.mutability.is_some() {
+                        classes.insert("mutating receivers");
+                    } else if r.colon_token.is_some() {
+                        classes.insert("unshaped types");
+                    } else if row.receiver.as_ref().is_some_and(|target| target.is_none()) {
+                        // `self` on a generic/exotic impl target: the receiver's own type
+                        // is not a bare named value type.
+                        classes.insert("parameterised types");
+                    }
+                }
+                FnArg::Typed(pt) => {
+                    if let Some(class) = class_of(&pt.ty) {
+                        classes.insert(class);
+                    }
+                }
+            }
+        }
+        let mut eff = EffectFinder {
+            found: None,
+            imports: &imports,
+        };
+        eff.visit_block(row.body);
+        if eff.found.is_some() {
+            classes.insert("effectful bodies");
+        }
+    }
+    classes.into_iter().collect()
+}
+
+/// One function the qualify walk judges, with the context its types resolve in: the receiver
+/// is `None` for a free function, `Some(target)` for a method (where `target` is the impl's
+/// bare named value type, or `None` when the impl target is generic/exotic — a receiver whose
+/// type is not a sort), and `type_params` are the in-scope type variables (impl + fn).
+struct FnRow<'a> {
+    sig: &'a syn::Signature,
+    receiver: Option<Option<String>>,
+    type_params: BTreeSet<String>,
+    body: &'a syn::Block,
+}
+
+/// Every function the qualify walk judges — free functions and impl methods, descending into
+/// non-test inline modules: the same traversal as [`qualify_items`], as [`FnRow`]s.
+fn collect_fns<'a>(items: &'a [Item], out: &mut Vec<FnRow<'a>>) {
+    for it in items {
+        match it {
+            Item::Fn(f) if !is_cfg_test(&f.attrs) => out.push(FnRow {
+                sig: &f.sig,
+                receiver: None,
+                type_params: type_params(&f.sig.generics),
+                body: &f.block,
+            }),
+            Item::Impl(i) if !is_cfg_test(&i.attrs) => {
+                let target = named_value_type(&i.self_ty);
+                let impl_params = type_params(&i.generics);
+                for item in &i.items {
+                    if let syn::ImplItem::Fn(m) = item {
+                        if !is_cfg_test(&m.attrs) {
+                            let mut params = impl_params.clone();
+                            params.extend(type_params(&m.sig.generics));
+                            out.push(FnRow {
+                                sig: &m.sig,
+                                receiver: Some(target.clone()),
+                                type_params: params,
+                                body: &m.block,
+                            });
+                        }
+                    }
+                }
+            }
+            Item::Mod(m) if !is_cfg_test(&m.attrs) => {
+                if let Some((_, inner)) = &m.content {
+                    collect_fns(inner, out);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Why a type is not a bare named value type — `None` when it IS one (the same admission
+/// [`named_value_type`] makes, so the classifier and the rule cannot disagree about a type).
+fn type_class(ty: &Type) -> Option<&'static str> {
+    if named_value_type(ty).is_some() {
+        return None;
+    }
+    match ty {
+        Type::Path(tp) => match tp.path.segments.last() {
+            Some(seg) if !matches!(seg.arguments, syn::PathArguments::None) => {
+                Some("parameterised types")
+            }
+            Some(_) => Some("primitive signatures"),
+            None => Some("unshaped types"),
+        },
+        Type::Reference(_) => Some("borrowed types"),
+        Type::Tuple(t) if t.elems.is_empty() => Some("unit returns"),
+        _ => Some("unshaped types"),
+    }
+}
+
 /// An operator read off a function: name, argument sorts, return sort.
 struct Op {
     name: String,
@@ -710,8 +1004,39 @@ fn qualify_items(items: &[Item], imports: &HashMap<String, String>, out: &mut Ve
     for it in items {
         match it {
             Item::Fn(f) if !is_cfg_test(&f.attrs) => {
-                if let Some(op) = operator_candidate(f, imports) {
+                let params = type_params(&f.sig.generics);
+                if let Some(op) = operator_candidate(&f.sig, None, &params, &f.block, imports) {
                     out.push(op);
+                }
+            }
+            // ASSOCIATED FUNCTIONS ARE OPERATORS (the spike's first brick): the no-rats-nest
+            // rule pushes every public callable onto a typestate, so a census that read only
+            // free functions manufactured its own largest blind spot ("impl-attached surface
+            // only", 15 files on the day the reason census minted). A method is judged by the
+            // same one rule with `self`/`&self`/`Self` resolved to the impl target — Rust's
+            // calling convention for a value-object operator, not a shape difference. The
+            // impl target must itself be a bare named value type (a generic target is not a
+            // sort), and methods key `Type::method`, the sixth sense's identity convention.
+            Item::Impl(im) if !is_cfg_test(&im.attrs) => {
+                let target = named_value_type(&im.self_ty);
+                let impl_params = type_params(&im.generics);
+                for item in &im.items {
+                    if let syn::ImplItem::Fn(m) = item {
+                        if is_cfg_test(&m.attrs) {
+                            continue;
+                        }
+                        let mut params = impl_params.clone();
+                        params.extend(type_params(&m.sig.generics));
+                        if let Some(op) = operator_candidate(
+                            &m.sig,
+                            target.as_deref(),
+                            &params,
+                            &m.block,
+                            imports,
+                        ) {
+                            out.push(op);
+                        }
+                    }
                 }
             }
             Item::Mod(m) if !is_cfg_test(&m.attrs) => {
@@ -724,20 +1049,44 @@ fn qualify_items(items: &[Item], imports: &HashMap<String, String>, out: &mut Ve
     }
 }
 
-/// Is `f` an operator over value objects? Every argument and the return must be a BARE NAMED value
-/// type (a path with no generics, not a raw primitive or `bool`), and the body must do no I/O — the
-/// shape `#[algebra]` reads. A `&[Value]`-style evaluator, a primitive return, or an effect is not.
-fn operator_candidate(f: &ItemFn, imports: &HashMap<String, String>) -> Option<Op> {
-    let ret = match &f.sig.output {
-        ReturnType::Type(_, ty) => named_value_type(ty)?,
+/// Is this signature an operator over value objects? Every argument and the return must be a BARE
+/// NAMED value type (a path with no generics, not a raw primitive or `bool`, not a type PARAMETER —
+/// a variable is not a sort), and the body must do no I/O — the shape `#[algebra]` reads. A
+/// `&[Value]`-style evaluator, a primitive return, or an effect is not. `receiver` is the impl
+/// target for a method: `self`, `&self`, and `Self` in the signature all resolve to it (calling
+/// convention and spelling, not shape — the borrow of the carrier is how Rust spells "operator on
+/// a value object"); `&mut self` is mutation, refused; an explicitly-typed receiver
+/// (`self: Box<Self>`) is not bare, refused. Method operators key `Type::method` — the sixth
+/// sense's identity convention, and what keeps two typestates' `new`s distinct in the census.
+fn operator_candidate(
+    sig: &syn::Signature,
+    receiver: Option<&str>,
+    type_params: &BTreeSet<String>,
+    body: &syn::Block,
+    imports: &HashMap<String, String>,
+) -> Option<Op> {
+    let sort_of = |ty: &Type| -> Option<String> {
+        let n = named_value_type(ty)?;
+        if n == "Self" {
+            return receiver.map(str::to_string);
+        }
+        (!type_params.contains(&n)).then_some(n)
+    };
+    let ret = match &sig.output {
+        ReturnType::Type(_, ty) => sort_of(ty)?,
         ReturnType::Default => return None,
     };
     let mut args = Vec::new();
-    for arg in &f.sig.inputs {
-        let FnArg::Typed(pt) = arg else {
-            return None;
-        };
-        args.push(named_value_type(&pt.ty)?);
+    for arg in &sig.inputs {
+        match arg {
+            FnArg::Receiver(r) => {
+                if r.colon_token.is_some() || (r.reference.is_some() && r.mutability.is_some()) {
+                    return None;
+                }
+                args.push(receiver?.to_string());
+            }
+            FnArg::Typed(pt) => args.push(sort_of(&pt.ty)?),
+        }
     }
     if args.is_empty() {
         // an arity-0 constant only counts toward an algebra alongside real operators; on its own a
@@ -748,15 +1097,27 @@ fn operator_candidate(f: &ItemFn, imports: &HashMap<String, String>) -> Option<O
         found: None,
         imports,
     };
-    eff.visit_item_fn(f);
+    eff.visit_block(body);
     if eff.found.is_some() {
         return None;
     }
     Some(Op {
-        name: f.sig.ident.to_string(),
+        name: match receiver {
+            Some(target) => format!("{target}::{}", sig.ident),
+            None => sig.ident.to_string(),
+        },
         args,
         ret,
     })
+}
+
+/// The in-scope type-parameter names of a generics clause — the variables an operator's sorts
+/// must not be.
+fn type_params(generics: &syn::Generics) -> BTreeSet<String> {
+    generics
+        .type_params()
+        .map(|p| p.ident.to_string())
+        .collect()
 }
 
 /// A bare named value type — a path with no generic arguments that is not a raw primitive or `bool`.
@@ -908,7 +1269,16 @@ fn check_loose_pub_fns(loc: &str, file: &syn::File, out: &mut Vec<String>) {
                             syn::ReturnType::Type(_, ty) => named_value_type(ty).is_some(),
                             syn::ReturnType::Default => false,
                         };
-                    if !constant_operator && operator_candidate(f, imports).is_none() {
+                    if !constant_operator
+                        && operator_candidate(
+                            &f.sig,
+                            None,
+                            &type_params(&f.sig.generics),
+                            &f.block,
+                            imports,
+                        )
+                        .is_none()
+                    {
                         out.push(format!(
                             "{loc}: `pub fn {}` is a LOOSE public function — neither attached to \
                              a typestate nor operator-shaped. Make it a method/associated fn on \
@@ -1582,5 +1952,149 @@ mod qualify_line_tests {
     #[test]
     fn an_unparseable_file_is_err_not_none() {
         assert!(qualify_line("pub fn broken( -> {", "src/m.rs").is_err());
+    }
+
+    /// ASSOCIATED FUNCTIONS ARE OPERATORS: `self`/`&self`/`Self` all resolve to the
+    /// typestate, methods key `Type::method` (two typestates' `new`s stay distinct), and
+    /// the census line carries the resolved sorts — no `Self` ever leaks as a sort.
+    #[test]
+    fn impl_methods_qualify_with_the_receiver_resolved() {
+        let src = "pub struct A;\n\
+                   impl A {\n\
+                       pub fn f(self, o: A) -> A { o }\n\
+                       pub fn g(&self, o: Self) -> Self { let _ = o; A }\n\
+                   }\n";
+        assert_eq!(
+            qualify_line(src, "src/m.rs").unwrap().as_deref(),
+            Some("src/m.rs: QUALIFIES — operators [A::f, A::g] over sorts {A}"),
+        );
+    }
+
+    /// The refusals that keep the method rule honest: `&mut self` is mutation, a type
+    /// PARAMETER is a variable not a sort (on the method, the impl, or a free fn), and a
+    /// generic impl target has no typestate to resolve to.
+    #[test]
+    fn method_shape_refusals() {
+        assert_eq!(
+            qualify_line(
+                "pub struct A;\nimpl A { pub fn f(&mut self) -> A { A } }\n",
+                "src/m.rs"
+            ),
+            Ok(None)
+        );
+        assert_eq!(
+            qualify_line(
+                "pub struct A;\nimpl A { pub fn f<T>(self, x: T) -> A { let _ = x; A } }\n",
+                "src/m.rs"
+            ),
+            Ok(None)
+        );
+        assert_eq!(
+            qualify_line("pub fn id<T>(x: T) -> T { x }\n", "src/m.rs"),
+            Ok(None)
+        );
+        assert_eq!(
+            qualify_line(
+                "pub struct W<T>(T);\npub struct A;\n\
+                 impl<T> W<T> { pub fn f(&self, a: A) -> A { a } }\n",
+                "src/m.rs"
+            ),
+            Ok(None)
+        );
+    }
+}
+
+#[cfg(test)]
+mod reason_census_tests {
+    use super::refusal_classes_from_items;
+
+    fn classes(src: &str) -> Vec<&'static str> {
+        refusal_classes_from_items(&syn::parse_file(src).expect("parses").items)
+    }
+
+    /// A QUALIFYING file has NO refusal classes — the two censuses partition the scanned
+    /// files by construction (this is the same predicate the qualify emitter answers).
+    #[test]
+    fn a_qualifying_file_has_no_classes() {
+        assert!(classes("pub struct A;\npub fn f(x: A) -> A { todo!() }\n").is_empty());
+    }
+
+    /// A file with no functions at all (types, data, glue) is its own class — and an
+    /// impl-attached operator now QUALIFIES its file (no refusal classes): the census
+    /// reads impls, so the blind spot the first minting exposed is dissolved, not renamed.
+    #[test]
+    fn no_functions_is_a_class_and_impl_operators_qualify() {
+        assert_eq!(classes("pub struct A;\n"), vec!["no functions"]);
+        assert!(classes("pub struct A;\nimpl A { pub fn f(&self) -> A { A } }\n").is_empty());
+    }
+
+    /// Methods are classified by the same rule as free functions, with the receiver
+    /// resolved: `&mut self` is its own class (mutation is not operator shape), and a
+    /// method on a GENERIC impl target reads as a parameterised receiver.
+    #[test]
+    fn method_receivers_are_classified() {
+        assert_eq!(
+            classes("pub struct A;\nimpl A { pub fn f(&mut self) -> A { A } }\n"),
+            vec!["mutating receivers"]
+        );
+        assert_eq!(
+            classes(
+                "pub struct W<T>(T);\npub struct A;\n\
+                 impl<T> W<T> { pub fn f(&self) -> A { A } }\n"
+            ),
+            vec!["parameterised types"]
+        );
+    }
+
+    /// The signature classes, one probe each: primitives, borrows, parameterised types,
+    /// unit returns, zero-argument constants, unshaped types — aggregated and sorted
+    /// across a file's free functions.
+    #[test]
+    fn signature_classes_name_each_blocker() {
+        assert_eq!(
+            classes("pub fn n(x: u32) -> u32 { x }\n"),
+            vec!["primitive signatures"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: &A) -> A { todo!() }\n"),
+            vec!["borrowed types"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: Option<A>) -> A { todo!() }\n"),
+            vec!["parameterised types"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: A) { let _ = x; }\n"),
+            vec!["unit returns"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f() -> A { A }\n"),
+            vec!["zero-argument constants"]
+        );
+        assert_eq!(
+            classes("pub struct A;\npub fn f(x: (A, A)) -> A { x.0 }\n"),
+            vec!["unshaped types"]
+        );
+        // aggregation is a sorted union across functions:
+        assert_eq!(
+            classes(
+                "pub struct A;\npub fn f(x: u32) -> u32 { x }\npub fn g(x: &A) -> A { todo!() }\n"
+            ),
+            vec!["borrowed types", "primitive signatures"]
+        );
+    }
+
+    /// An effectful body blocks an otherwise operator-shaped function, and the class
+    /// names it — the I/O half of the operator-shape rule, same evidence the qualify
+    /// walk reads.
+    #[test]
+    fn an_effectful_body_is_its_own_class() {
+        assert_eq!(
+            classes(
+                "use std::fs;\npub struct A;\n\
+                 pub fn f(x: A) -> A { let _ = fs::read(\"p\"); x }\n"
+            ),
+            vec!["effectful bodies"]
+        );
     }
 }

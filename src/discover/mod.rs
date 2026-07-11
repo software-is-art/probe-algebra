@@ -22,6 +22,7 @@ pub mod architect;
 pub mod arithmetic;
 pub mod bite;
 pub mod bridge;
+pub mod bundle;
 pub mod coherence;
 pub mod cohesion;
 pub mod composition;
@@ -52,6 +53,8 @@ pub mod schemata;
 pub mod shape;
 pub mod substrate;
 pub mod system;
+pub mod trace;
+pub mod verbs;
 pub mod watch;
 pub mod world;
 
@@ -476,6 +479,12 @@ impl Spec {
     }
 }
 
+/// The interpreter's discovered laws (named value-algebra laws + the `U` law), for consumers that
+/// only need the law list (the example, the freeze).
+pub fn discover_laws() -> Vec<Law> {
+    interpreter_spec().laws
+}
+
 /// The interpreter's discovered spec: the named value-algebra laws (from the generic engine over
 /// the `Arithmetic` theory) plus the structural `U` law. The author supplied only the operators;
 /// everything here was found by running them, not declared.
@@ -502,11 +511,6 @@ pub fn date_spec() -> Spec {
     Spec::of::<date::Calendar>()
 }
 
-/// The TTL store's discovered spec (the first STATEFUL domain: merge monoid, tick action).
-pub fn kvstore_spec() -> Spec {
-    Spec::of::<crate::kvstore::theory::TtlStore>()
-}
-
 /// This repo's own COMPILED `system!` declaration (see `discover::system`): the four
 /// demonstration theories as modules, no seams (the domains share no value objects). The
 /// graph IS the registry — [`all_specs`] reads it off `modules()`, so admitting a theory is
@@ -527,16 +531,15 @@ crate::system! {
     }
 }
 
+/// The TTL store's discovered spec (the first STATEFUL domain: merge monoid, tick action).
+pub fn kvstore_spec() -> Spec {
+    Spec::of::<crate::kvstore::theory::TtlStore>()
+}
+
 /// Every theory's discovered spec — what the freeze records and the staleness gate checks.
 /// No longer a hand-maintained list: it is the [`BoundarySpec`] system's module registry.
 pub fn all_specs() -> Vec<Spec> {
     <BoundarySpec as system::System>::modules()
-}
-
-/// The interpreter's discovered laws (named value-algebra laws + the `U` law), for consumers that
-/// only need the law list (the example, the freeze).
-pub fn discover_laws() -> Vec<Law> {
-    interpreter_spec().laws
 }
 
 // ----- the universal observer U: structure + semantics sensitivity --------
@@ -580,6 +583,14 @@ fn sample_programs() -> Vec<Expr> {
         ),
     ]
 }
+
+pub mod squash;
+
+pub mod store;
+
+pub mod verdict;
+
+pub mod attest;
 
 #[cfg(test)]
 mod tests {

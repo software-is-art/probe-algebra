@@ -240,16 +240,20 @@ mod probes {
             "stable layout: 2 of 3 declared laws hold; MISSING: \
              equivariant(render, rename, relabel); SURPRISES (discovered, never \
              declared — ratify or refute): involution(reorder), projection(reorder), \
-             round_trip(reorder, theme), equivariant(reorder, rename), \
+             round_trip(reorder, theme), commuting_maps(reorder, theme), \
+             composes(reorder, theme), equivariant(reorder, rename), \
              involution(theme), projection(theme), round_trip(theme, reorder), \
-             equivariant(theme, rename), nontrivial(rename), nontrivial(relabel)"
+             composes(theme, reorder), equivariant(theme, rename), \
+             nontrivial(rename), nontrivial(relabel)"
         );
         assert_eq!(
             Distance::of::<EagerLayout>().render(),
             "eager layout: 2 of 3 declared laws hold; MISSING: inert(reorder); \
              SURPRISES (discovered, never declared — ratify or refute): \
+             commuting_maps(reorder, theme), composes(reorder, theme), \
              equivariant(reorder, rename), involution(theme), projection(theme), \
-             equivariant(theme, rename), nontrivial(rename), nontrivial(relabel)"
+             composes(theme, reorder), equivariant(theme, rename), \
+             nontrivial(rename), nontrivial(relabel)"
         );
     }
 }

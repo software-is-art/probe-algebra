@@ -1,0 +1,8 @@
+/// One saturating step upward — the ceiling holds.
+pub fn bump(t: Tally) -> Tally {
+    match t {
+        Tally::T0 => Tally::T1,
+        Tally::T1 => Tally::T2,
+        Tally::T2 => Tally::T2,
+    }
+}

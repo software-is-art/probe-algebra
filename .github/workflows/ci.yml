@@ -51,7 +51,7 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-targets
-      - run: cargo run --features schemata --example schemata -- sweep
+      - run: cargo run --features schemata --example schemata -- verify
 
   # Incremental dogfood on the default branch: a green sweep is a lock over the
   # tree at that sha (the `mutants-green` tag), so a merge mutates only the diff

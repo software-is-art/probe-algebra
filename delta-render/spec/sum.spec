@@ -12,6 +12,8 @@
       neg(neg(x)) = x
 - neg leaves zero fixed.
       neg(zero) = zero
+- neg and sum may be applied in either order.
+      neg(sum(x)) = sum(neg(x))
 - neg turns plus into plus.
       neg((x plus y)) = (neg(x) plus neg(y))
 - sum is a projection — applying it twice is applying it once.

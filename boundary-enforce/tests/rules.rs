@@ -413,9 +413,12 @@ fn census_drifts_then_blesses_then_holds() {
     config.qualify_spec = Some(config.manifest_dir.join(spec_rel));
     // a per-test bless variable, so parallel tests never race on the real BLESS_QUALIFY:
     config.bless_env = "BLESS_QUALIFY_ENFORCE_TEST_CENSUS".to_string();
+    // the CI arm first: no autofix — the refusal reports and touches nothing.
+    config.autofix_stale = false;
 
-    // 1. no committed spec yet — the census has drifted (from empty), and the message names the
-    //    manifest-relative spec path and the configured bless variable:
+    // 1. no committed spec yet — the census has drifted (from empty), the message names the
+    //    manifest-relative spec path and the configured bless variable, and the tree is NOT
+    //    mutated (a fresh checkout must never mutate itself):
     let drifted = Enforcement::run(&config);
     assert_fires(
         &drifted.violations,
@@ -424,6 +427,10 @@ fn census_drifts_then_blesses_then_holds() {
     assert_fires(
         &drifted.violations,
         "`BLESS_QUALIFY_ENFORCE_TEST_CENSUS=1 cargo build`",
+    );
+    assert!(
+        !config.manifest_dir.join(spec_rel).exists(),
+        "the CI arm never writes"
     );
 
     // 2. bless: the census is written where the spec lives, and the run is clean:
@@ -442,6 +449,40 @@ fn census_drifts_then_blesses_then_holds() {
     // 3. and with the spec committed, the gate holds without the env var:
     let held = Enforcement::run(&config);
     assert!(held.violations.is_empty(), "got: {:#?}", held.violations);
+
+    // 4. THE BLESS LOOP, DISSOLVED (the local arm): drift again — grow the module — with
+    //    autofix on. The refusal RUNS its fixing derivation: the regenerated census lands
+    //    in the tree, the run still fails once (the movement is never silent), and the
+    //    message says the diff is the ratification instead of assigning homework:
+    std::fs::write(
+        config.manifest_dir.join("src/domain/internal.rs"),
+        "pub struct Tri;\n\
+         pub fn meet(a: Tri, b: Tri) -> Tri { let _ = b; a }\n\
+         pub fn join(a: Tri, b: Tri) -> Tri { let _ = a; b }\n",
+    )
+    .unwrap();
+    config.autofix_stale = true;
+    let fixed = Enforcement::run(&config);
+    assert_fires(
+        &fixed.violations,
+        "spec/qualify.spec was stale — the algebra-qualification census drifted, and the \
+         regenerated text is now IN YOUR WORKING TREE",
+    );
+    assert_fires(&fixed.violations, "The diff is the ratification");
+    let regenerated = std::fs::read_to_string(config.manifest_dir.join(spec_rel)).unwrap();
+    assert!(
+        regenerated.contains("operators [join, meet] over sorts {Tri}"),
+        "the fixing derivation ran: {regenerated}"
+    );
+
+    // 5. the very next run holds clean — the failure fired exactly once, and what remains
+    //    is the diff awaiting its signature:
+    let settled = Enforcement::run(&config);
+    assert!(
+        settled.violations.is_empty(),
+        "got: {:#?}",
+        settled.violations
+    );
 }
 
 // ===== the clean fixture, end to end ======================================

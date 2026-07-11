@@ -1,0 +1,40 @@
+add src/discover/squash.rs — struct SquashRules
+add src/discover/mod.rs — 
+add src/discover/squash.rs — 
+edit examples/bundle.rs — run
+add src/discover/store.rs — struct PayloadStore, struct Replay
+add src/discover/store.rs — mod probes
+add src/discover/mod.rs — mod store
+edit src/discover/squash.rs — impl SquashRules
+edit examples/bundle.rs — run
+edit src/discover/squash.rs — probes
+edit src/discover/bundle.rs — probes
+edit src/discover/mutation.rs — tests
+edit src/discover/protocol.rs — probes
+edit src/discover/store.rs — probes
+edit src/discover/bundle.rs — impl Bundle @5c53b61b20a3a65d
+edit examples/bundle.rs — run @ffb9fd577408b1a7
+edit src/discover/bundle.rs — probes @bb234699f9d8c2a1
+edit src/discover/bundle.rs — impl Bundle @177aa3370f5b03a7
+edit src/discover/lift.rs — render_single @38b7b446daa57e30
+edit examples/bundle.rs — main @09f4d54a15b6a941
+edit src/discover/bundle.rs — probes @3c1a7f172a744803
+edit src/discover/squash.rs — probes @52c0bfcf39a664a8
+edit src/discover/store.rs — probes @0e6c745f1a90c967
+edit src/discover/watch.rs — probes @bc845bdc3b235eb8
+edit src/discover/squash.rs — probes @3cde842f3e98b364
+add src/discover/verdict.rs — struct VerdictStore @4938fd73abd715c1
+add src/discover/verdict.rs — mod probes @ba6e116b73f37f4a
+add src/discover/mod.rs — mod verdict @d60f22f1fcd38724
+edit examples/bundle.rs — run @9b25e82f6c3e605d
+add src/discover/attest.rs — struct SiteVerdict, struct Transcript @3d5410c389fcad8f
+add src/discover/attest.rs — mod probes @0d1a55b527d80d3e
+add src/discover/mod.rs — mod attest @436e66293ac41200
+edit src/discover/verdict.rs — impl VerdictStore @203fa27dbd0b6ae7
+edit examples/schemata.rs — main @4084980c8222e7d5
+edit examples/schemata.rs — sweep @d91c7a9ac670eb4a
+add examples/schemata.rs — fn verify, fn countersign @887aa3033fb0e1b6
+edit src/discover/gates.rs — impl GateRegistry @f7b614c66c075055
+edit src/discover/gates.rs — impl GateRegistry @c69eb51034ea997f
+edit src/discover/attest.rs — SiteVerdict @cb54ee91a589ad92
+edit src/discover/attest.rs — Transcript @3a1cdf0ecbebb6ba

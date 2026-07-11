@@ -671,6 +671,11 @@ pub struct ShapeGate {
     /// Slot-index pairs that must be DIFFERENT operators (distributivity's two binaries, a
     /// round trip's two conversions).
     pub distinct_ops: &'static [(u8, u8)],
+    /// Slot-index pairs whose operators must arrive in CANONICAL (name) order — the dedup
+    /// for a shape whose equation is SYMMETRIC in two slots (commuting maps): both
+    /// orderings state one law, so only the ordered binding is admitted and one unordered
+    /// pair is one lock line. Strict order also implies distinctness.
+    pub ordered_ops: &'static [(u8, u8)],
 }
 
 /// One operator slot of a gate, over sort variables.
@@ -791,6 +796,14 @@ impl ShapeGate {
                 ));
             }
         }
+        for (a, b) in self.ordered_ops {
+            if names[*a as usize] >= names[*b as usize] {
+                return Err(format!(
+                    "`{}` / `{}`: the equation is symmetric — one unordered pair is one                      law, carried by the canonically-ordered binding",
+                    names[*a as usize], names[*b as usize]
+                ));
+            }
+        }
         Ok(bound)
     }
 }
@@ -903,6 +916,7 @@ impl ShapeCatalog {
                 slots,
                 distinct_sorts: &[],
                 distinct_ops: &[],
+                ordered_ops: &[],
             }
         }
         const BINARY: ShapeGate = open(&[Slot::Binary(0)]);
@@ -911,6 +925,7 @@ impl ShapeCatalog {
             slots: &[Slot::Binary(0), Slot::Binary(0)],
             distinct_sorts: &[],
             distinct_ops: &[(0, 1)],
+            ordered_ops: &[],
         };
         const HETERO: &[(u8, u8)] = &[(0, 1)];
 
@@ -1140,6 +1155,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} with {const} leaves a value unchanged.",
                 lhs: App(0, &[X, C]),
@@ -1161,6 +1177,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1), Slot::Binary(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "Repeated {op} combines its parameters with {other}.",
                 lhs: App(0, &[App(0, &[X, P]), Q]),
@@ -1181,6 +1198,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "Repeated {op} with one parameter settles on the first \
                            application.",
@@ -1202,6 +1220,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} applications commute — the parameter order doesn't matter.",
                 lhs: App(0, &[App(0, &[X, P]), Q]),
@@ -1223,6 +1242,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1), Slot::Binary(0)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} distributes over {other} — acting on a combination is \
                            combining the actions.",
@@ -1245,6 +1265,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1), Slot::Constant(0)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} leaves {const} fixed — no parameter moves it.",
                 lhs: App(0, &[C, P]),
@@ -1273,6 +1294,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1), Slot::Relation(0, 2), Slot::Constant(2)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} only grows a value — never shrinks it (under {via}).",
                 lhs: App(1, &[X, App(0, &[X, P])]),
@@ -1295,6 +1317,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1), Slot::Relation(0, 2), Slot::Constant(2)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} only shrinks a value — never grows it (under {via}).",
                 lhs: App(1, &[App(0, &[X, P]), X]),
@@ -1316,6 +1339,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Relation(0, 1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is symmetric — the arguments' order doesn't matter.",
                 lhs: App(0, &[X, Y]),
@@ -1337,6 +1361,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "A value is never {op} itself.",
                 lhs: App(0, &[X, X]),
@@ -1357,6 +1382,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} of a value with itself gives {const}.",
                 lhs: App(0, &[X, X]),
@@ -1428,6 +1454,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Unary(1, 0), Slot::Unary(0, 1)],
                     distinct_sorts: &[],
                     distinct_ops: &[(0, 1)],
+                    ordered_ops: &[],
                 },
                 template: "{op} undoes {other} — the round trip is the identity.",
                 lhs: App(0, &[App(1, &[X])]),
@@ -1435,6 +1462,52 @@ impl ShapeCatalog {
                 placeholders: &["g", "f"],
                 polarity: Polarity::Equal,
                 holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
+                name: "commuting maps",
+                schema: "f(g(x)) = g(f(x))",
+                gate: "a pair of distinct unary endomorphisms on one sort, admitted in \
+                       canonical name order (the equation is symmetric — one unordered \
+                       pair is one law)",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 0), Slot::Unary(0, 0)],
+                    distinct_sorts: &[],
+                    distinct_ops: &[],
+                    ordered_ops: &[(0, 1)],
+                },
+                template: "{op} and {other} may be applied in either order.",
+                lhs: App(0, &[App(1, &[X])]),
+                rhs: App(1, &[App(0, &[X])]),
+                placeholders: &["f", "g"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other"],
+                mirrored: false,
+                guard: Guard::None,
+                const_rule: ConstRule::Any,
+                premise: None,
+            },
+            ShapeInfo {
+                name: "composition",
+                schema: "f(g(x)) = h(x)",
+                gate: "an ordered pair of distinct unary endomorphisms on one sort plus \
+                       the endomorphism their composite collapses to (h may be f itself — \
+                       absorption — or g, or a third operator)",
+                gate_slots: ShapeGate {
+                    slots: &[Slot::Unary(0, 0), Slot::Unary(0, 0), Slot::Unary(0, 0)],
+                    distinct_sorts: &[],
+                    distinct_ops: &[(0, 1)],
+                    ordered_ops: &[],
+                },
+                template: "{op} after {other} collapses to {via}.",
+                lhs: App(0, &[App(1, &[X])]),
+                rhs: App(2, &[X]),
+                placeholders: &["f", "g", "h"],
+                polarity: Polarity::Equal,
+                holes: &["op", "other", "via"],
                 mirrored: false,
                 guard: Guard::None,
                 const_rule: ConstRule::Any,
@@ -1470,6 +1543,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Action(0, 1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} actually acts — some parameter moves some value.",
                 lhs: App(0, &[X, P]),
@@ -1492,6 +1566,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Relation(0, 1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is not constantly {const}.",
                 lhs: App(0, &[X, Y]),
@@ -1526,6 +1601,7 @@ impl ShapeCatalog {
                     ],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is subadditive over {other} (under {via}).",
                 lhs: App(
@@ -1561,6 +1637,7 @@ impl ShapeCatalog {
                     // on integers); only the order's verdict sort must be foreign.
                     distinct_sorts: &[(1, 2)],
                     distinct_ops: &[(0, 1)],
+                    ordered_ops: &[],
                 },
                 template: "{op} satisfies the triangle inequality with {other} (under {via}).",
                 lhs: App(
@@ -1593,6 +1670,7 @@ impl ShapeCatalog {
                     ],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is monotone in the {other}-order (under {via}).",
                 lhs: App(2, &[App(0, &[X]), App(0, &[App(1, &[X, Y])])]),
@@ -1620,6 +1698,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Unary(0, 0), Slot::Relation(0, 1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is monotone under {other}.",
                 lhs: App(1, &[App(0, &[X]), App(0, &[Y])]),
@@ -1642,6 +1721,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is transitive (chained through {other}).",
                 lhs: App(0, &[X, Z]),
@@ -1665,6 +1745,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is antisymmetric — mutual relation forces equality.",
                 lhs: X,
@@ -1688,6 +1769,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Relation(0, 1), Slot::Binary(1), Slot::Constant(1)],
                     distinct_sorts: HETERO,
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is total under {other} — every pair relates one way or \
                            the other.",
@@ -1735,6 +1817,7 @@ impl ShapeCatalog {
                     slots: &[Slot::Unary(0, 1), Slot::Action(0, 2), Slot::Action(1, 2)],
                     distinct_sorts: &[(0, 2), (1, 2)],
                     distinct_ops: &[],
+                    ordered_ops: &[],
                 },
                 template: "{op} is equivariant — {other} before it becomes {via} after it.",
                 // the param rides sort variable 2 here (0 and 1 are the two

@@ -6,6 +6,12 @@
       reorder(reorder(x)) = reorder(x)
 - reorder undoes theme — the round trip is the identity.
       reorder(theme(x)) = x
+- reorder and theme may be applied in either order.
+      reorder(theme(x)) = theme(reorder(x))
+- reorder after theme collapses to reorder.
+      reorder(theme(x)) = reorder(x)
+- reorder after theme collapses to theme.
+      reorder(theme(x)) = theme(x)
 - reorder leaves every value unchanged.
       reorder(x) = x
 - reorder is equivariant — rename before it becomes rename after it.
@@ -16,6 +22,10 @@
       theme(theme(x)) = theme(x)
 - theme undoes reorder — the round trip is the identity.
       theme(reorder(x)) = x
+- theme after reorder collapses to reorder.
+      theme(reorder(x)) = reorder(x)
+- theme after reorder collapses to theme.
+      theme(reorder(x)) = theme(x)
 - theme leaves every value unchanged.
       theme(x) = x
 - theme is equivariant — rename before it becomes rename after it.
