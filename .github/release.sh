@@ -15,7 +15,7 @@ git fetch --tags --force >/dev/null 2>&1 || true
 git fetch --unshallow >/dev/null 2>&1 || true
 
 sha=$(git rev-parse --short HEAD)
-prev=$(git tag --list 'v2*' --sort=-creatordate | head -n 1)
+prev=$(git tag --list 'v2*' --sort=-creatordate | awk 'NR == 1')
 
 tag="v$(date -u +%Y.%m.%d)"
 n=1
@@ -36,7 +36,10 @@ notes=$(mktemp)
     echo "## The ratified spec diff (the changelog IS the lock diff)"
     echo
     echo '```diff'
-    git diff "${prev}..HEAD" -- spec/ '*/spec/' | head -n 400
+    # awk, not head: under pipefail, head closing the pipe at line 400 kills git
+    # with SIGPIPE (exit 141) — which killed the first release whose spec diff
+    # exceeded 400 lines. awk reads its whole input; same truncation, no signal.
+    git diff "${prev}..HEAD" -- spec/ '*/spec/' | awk 'NR <= 400'
     echo '```'
     echo
     echo "## Signed by change"
