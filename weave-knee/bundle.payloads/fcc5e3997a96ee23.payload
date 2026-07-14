@@ -1,0 +1,36 @@
+/// The weave prompt: frame, rules, and the child exteriors. The weaver sees
+/// exteriors only — never the candidate list, never a foil, never a planted
+/// emergent fact. The synthesis rule licenses the semantic step gain is scored
+/// on, without naming any target.
+pub fn weave(t: &Trial) -> String {
+    let budget = word_budget(t.fanout);
+    let mut s = String::new();
+    s.push_str(&format!(
+        "You are writing the exterior narrative of a fictional system called {} for a \
+         technical stakeholder. Below are the exteriors of its {} modules. Weave them \
+         into ONE cohesive narrative — a single flowing account of how the system works \
+         as a whole.\n\nRules:\n- At most {budget} words.\n- Flowing prose only: no \
+         bullet lists, no headings, no numbered items.\n- Mention every module by its \
+         exact name.\n- State what the exteriors below state and what they jointly \
+         imply; invent nothing beyond them.\n- Where two modules' facts combine into \
+         something neither states alone — a combined bound, a shared floor, a property \
+         of the whole system — state that consequence explicitly, with its number when \
+         it has one.\n- Express every relation between modules; the relations are the \
+         story.\n- Output only the narrative.\n\nModule exteriors:\n",
+        t.system, t.fanout
+    ));
+    for (i, c) in t.children.iter().enumerate() {
+        s.push_str(&format!("\n{} — the {}\n", c.lexeme, c.role));
+        for cl in &c.claims {
+            s.push_str(&format!("- {}\n", cl.text));
+        }
+        for r in &t.relations {
+            if r.from == i {
+                s.push_str(&format!("- relation: {}\n", r.text));
+            } else if r.to == i {
+                s.push_str(&format!("- relation (incoming): {}\n", r.text));
+            }
+        }
+    }
+    s
+}

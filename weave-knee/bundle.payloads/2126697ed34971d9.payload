@@ -1,0 +1,13 @@
+/// An atomic claim and its FOIL — the same claim with one load-bearing parameter
+/// flipped. The narrative must entail the claim and must not entail the foil; an
+/// entailed foil convicts either the weaver of inventing or the judge of nodding.
+/// `kind` is the template index and `param` its drawn number (0 when parameterless)
+/// — recorded so emergent composites can be derived without re-parsing prose.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Claim {
+    pub id: String,
+    pub text: String,
+    pub foil: String,
+    pub kind: usize,
+    pub param: u64,
+}

@@ -1,0 +1,66 @@
+fn claim(id: String, template: usize, lexeme: &str, rng: &mut Rng) -> Claim {
+    match template {
+        0 => {
+            let n = 1 + rng.pick(4);
+            Claim {
+                id,
+                text: format!(
+                    "{lexeme} retries a failed handoff at most {n} times before parking it."
+                ),
+                foil: format!(
+                    "{lexeme} retries a failed handoff at most {} times before parking it.",
+                    n + 2
+                ),
+                kind: 0,
+                param: n as u64,
+            }
+        }
+        1 => Claim {
+            id,
+            text: format!("{lexeme} keeps digests of what it carries, never the bodies."),
+            foil: format!("{lexeme} keeps the full bodies of what it carries, never digests."),
+            kind: 1,
+            param: 0,
+        },
+        2 => {
+            let m = 5 + rng.pick(8);
+            Claim {
+                id,
+                text: format!("{lexeme} evicts anything left unclaimed after {m} ticks."),
+                foil: format!(
+                    "{lexeme} evicts anything left unclaimed after {} ticks.",
+                    2 * m + 3
+                ),
+                kind: 2,
+                param: m as u64,
+            }
+        }
+        3 => Claim {
+            id,
+            text: format!("{lexeme} refuses new writes while its sweep is running."),
+            foil: format!("{lexeme} accepts new writes while its sweep is running."),
+            kind: 3,
+            param: 0,
+        },
+        4 => Claim {
+            id,
+            text: format!("{lexeme} answers reads from its newest snapshot only."),
+            foil: format!("{lexeme} answers reads from its oldest snapshot only."),
+            kind: 4,
+            param: 0,
+        },
+        _ => {
+            let q = 2 + rng.pick(4);
+            Claim {
+                id,
+                text: format!("{lexeme} acts only once {q} of its peers countersign."),
+                foil: format!(
+                    "{lexeme} acts only once {} of its peers countersign.",
+                    q + 1
+                ),
+                kind: 5,
+                param: q as u64,
+            }
+        }
+    }
+}

@@ -1,0 +1,91 @@
+/// A planted EMERGENT FACT: true only of two children jointly (or of the ring as
+/// a whole), one semantic step past anything a single claim states. A weave shows
+/// POSITIVE GAIN by stating these; the foil — the same fact one step wrong —
+/// polices invention. Concatenation states none of them: the zero-gain baseline.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Emergent {
+    pub id: String,
+    pub text: String,
+    pub foil: String,
+}
+
+/// The numeric parameter of a child's claim of `kind`, if it drew one.
+fn numeric(child: &Child, kind: usize) -> Option<u64> {
+    child.claims.iter().find(|c| c.kind == kind).map(|c| c.param)
+}
+
+/// One symmetric composite for an edge whose endpoints share a numeric claim kind:
+/// a sum or a minimum — a number written nowhere in any child. Endpoints arrive
+/// canonically ordered so the same pair derives the same sentence from either edge.
+fn composite(rid: &str, kind: usize, a: &str, pa: u64, b: &str, pb: u64) -> Emergent {
+    match kind {
+        0 => Emergent {
+            id: format!("e{rid}.retry"),
+            text: format!(
+                "Between them, {a} and {b} give a failed handoff at most {} retries \
+                 before both have parked it.",
+                pa + pb
+            ),
+            foil: format!(
+                "Between them, {a} and {b} give a failed handoff at most {} retries \
+                 before both have parked it.",
+                pa.max(pb)
+            ),
+        },
+        2 => Emergent {
+            id: format!("e{rid}.dwell"),
+            text: format!(
+                "No item sits unclaimed in {a} and {b} for more than {} ticks combined.",
+                pa + pb
+            ),
+            foil: format!(
+                "No item sits unclaimed in {a} and {b} for more than {} ticks combined.",
+                pa.max(pb)
+            ),
+        },
+        _ => Emergent {
+            id: format!("e{rid}.quorum"),
+            text: format!(
+                "Neither {a} nor {b} ever acts with fewer than {} countersignatures.",
+                pa.min(pb)
+            ),
+            foil: format!(
+                "Neither {a} nor {b} ever acts with fewer than {} countersignatures.",
+                pa.min(pb) + 1
+            ),
+        },
+    }
+}
+
+/// Derive the trial's emergent facts: the ring-closure fact (always present), plus
+/// composites for every edge whose endpoints share a numeric claim kind. Pure in
+/// the trial; duplicates from the fanout-2 double edge collapse by text.
+pub fn emergents(t: &Trial) -> Vec<Emergent> {
+    let mut out = vec![Emergent {
+        id: "e.ring".to_string(),
+        text: format!(
+            "Following the handoffs of {} from any module returns to that module \
+             after exactly {} steps: the {} modules close into a single ring.",
+            t.system, t.fanout, t.fanout
+        ),
+        foil: format!(
+            "The handoffs of {} form one open chain: followed from end to end they \
+             never return to their starting module.",
+            t.system
+        ),
+    }];
+    for r in &t.relations {
+        let (a, b) = (&t.children[r.from], &t.children[r.to]);
+        let (a, b) = if a.lexeme <= b.lexeme { (a, b) } else { (b, a) };
+        for kind in [0usize, 2, 5] {
+            let (Some(pa), Some(pb)) = (numeric(a, kind), numeric(b, kind)) else {
+                continue;
+            };
+            let e = composite(&r.id, kind, &a.lexeme, pa, &b.lexeme, pb);
+            if out.iter().all(|prior| prior.text != e.text) {
+                out.push(e);
+            }
+        }
+    }
+    out
+}

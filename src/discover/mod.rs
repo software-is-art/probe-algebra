@@ -592,6 +592,8 @@ pub mod verdict;
 
 pub mod attest;
 
+pub mod cli;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,49 @@
+weave-knee trial v1
+fanout: 4
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Saxost turns on a single loop that runs through all four of its modules. Varkel, the vault, is where writes land first, though it refuses new writes while its sweep is running and keeps only digests of what it carries, never the bodies; before it acts at all, it waits for 2 of its peers to countersign. Once settled, Varkel hands its sealed ledger to Nexmir.
+
+  Nexmir, the gate, receives that ledger and holds it under the same discipline: like Varkel, it keeps digests rather than bodies, and it too refuses new writes while its own sweep is running. Anything passing through Nexmir that goes unclaimed for 10 ticks is evicted, and those evictions are streamed onward to Zintol.
+
+  Zintol, the index, takes in Nexmir's evictions but answers reads only from its newest snapshot, never reaching back further. It shares Varkel's caution about writes, refusing them while its sweep runs, and its bar for acting is higher still — it needs 3 of its peers to countersign before proceeding. Whatever overflows Zintol's capacity, it delegates to Braruv.
+
+  Braruv, the scheduler, picks up that delegated overflow. It shares Zintol's read discipline, answering only from its newest snapshot, and shares Varkel's countersigning threshold, acting once 2 peers agree. Braruv evicts anything left unclaimed after 8 ticks — a shorter fuse than Nexmir's 10 — and it closes the loop by signaling backpressure to Varkel, which is what causes Varkel to slow or halt the intake that started the cycle.
+
+  So the four modules form a closed circuit: Varkel seals and passes to Nexmir, Nexmir evicts and streams to Zintol, Zintol delegates overflow to Braruv, and Braruv signals backpressure back to Varkel. Countersigning requirements (2 for Varkel and Braruv, 3 for Zintol) and eviction windows (10 ticks at Nexmir, 8 at Braruv) act as the pacing mechanisms within that circuit, while the shared refusal to accept writes mid-sweep, and the shared reliance on digests or newest-snapshot reads, keep each module's own state consistent as the ledger moves through all four in turn.
+verdicts:
+  c1.0F NOT-ENTAILED
+  r0 ENTAILED
+  c3.1F NOT-ENTAILED
+  c1.1 ENTAILED
+  c1.2 ENTAILED
+  c2.1F NOT-ENTAILED
+  c1.0 ENTAILED
+  c0.2 ENTAILED
+  c1.1F NOT-ENTAILED
+  c2.0 ENTAILED
+  c0.0 ENTAILED
+  c3.2 ENTAILED
+  r3 ENTAILED
+  c2.2F NOT-ENTAILED
+  c3.0 ENTAILED
+  c2.2 ENTAILED
+  c0.0F NOT-ENTAILED
+  r2 ENTAILED
+  c2.1 ENTAILED
+  c3.0F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  c0.1 ENTAILED
+  r2F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  r1 ENTAILED
+  c3.1 ENTAILED
+  c0.1F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c2.0F NOT-ENTAILED

@@ -1,0 +1,25 @@
+weave-knee trial v1
+fanout: 2
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Tolruv serves as the index at the center of Kelzin, answering every read strictly from its newest snapshot and evicting anything left unclaimed after 7 ticks. When its sweep runs, Tolruv refuses new writes outright, and when its own capacity is exceeded, it delegates the overflow to Brazin, the system's monitor. Brazin takes on that delegated overflow but will not act on it alone: it waits until 3 of its peers countersign before proceeding. Like Tolruv, Brazin refuses new writes for the duration of its own sweep, and it enforces a longer patience on unclaimed items, evicting them only after 12 ticks have passed — five ticks later than Tolruv's own threshold. The two modules also watch each other operationally: Brazin reports missed heartbeats back to Tolruv, closing the loop between the index and the monitor it feeds overflow to. In this way Kelzin's two modules form a reciprocal pair — Tolruv fielding reads and pushing what it cannot hold onward to Brazin, and Brazin absorbing that load under its countersignature rule while keeping Tolruv informed of any heartbeats it fails to observe.
+verdicts:
+  c1.2 ENTAILED
+  r1 ENTAILED
+  c0.1 ENTAILED
+  r0 ENTAILED
+  c0.0 ENTAILED
+  c0.2 ENTAILED
+  c1.1 ENTAILED
+  r0F NOT-ENTAILED
+  c1.0 ENTAILED
+  r1F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c1.0F NOT-ENTAILED
+  c0.1F NOT-ENTAILED

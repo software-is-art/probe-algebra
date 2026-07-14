@@ -38,3 +38,30 @@ edit src/discover/gates.rs — impl GateRegistry @f7b614c66c075055
 edit src/discover/gates.rs — impl GateRegistry @c69eb51034ea997f
 edit src/discover/attest.rs — SiteVerdict @cb54ee91a589ad92
 edit src/discover/attest.rs — Transcript @3a1cdf0ecbebb6ba
+add src/kvstore/twin.rs — struct TwinStore @126a991b8aff8960
+add src/kvstore/mod.rs — mod twin @e34a8a55968c2043
+edit src/kvstore/mod.rs — twin @5dc88d4cae768bb2
+add src/kvstore/twin.rs — enum TwinVal, fn twin_store, fn twin_dur, fn empty, fn merge, fn merge_first_wins, fn tick, fn zero, fn plus, fn key, fn val, fn ttl, fn twin_stores, fn twin_durs @1414e856492fd69d
+add src/kvstore/twin.rs —  @09ac48bfcede9edc
+add src/kvstore/twin.rs — mod probes @66b00752ffaee473
+edit src/kvstore/twin.rs — probes @d6ec5f4bea1b8247
+edit src/kvstore/twin.rs — probes @fda552fa4b019b36
+add src/kvstore/twin.rs — struct TtlStoreTwin, struct FirstWinsTwin @4a3a7aba31c12bd7
+edit src/kvstore/mod.rs — twin @83d3a5ac31ec3bbc
+add src/discover/gates.rs — enum Support @86cf64bf20e32dc7
+edit src/discover/gates.rs — Gate @583604492f8aa461
+edit src/discover/gates.rs — impl GateRegistry @2098e71ab61378ae
+edit src/discover/gates.rs — impl Pipeline @8e2005cd6ea85bd1
+edit src/discover/probes.rs — probes_tests @49dc787e34089fe6
+edit src/discover/verdict.rs — probes @8e3f1fd350716d38
+edit examples/bundle.rs — run @79794503d2f6b394
+edit examples/schemata.rs — verify @4d163d32daef5bc4
+edit examples/schemata.rs — sweep @27f4f21739f7854c
+edit src/discover/gates.rs — tests @0cb140ce67a7fab6
+edit examples/schemata.rs — sweep @deab97bef3a1ae8b
+edit examples/schemata.rs — survives @9d106ed974a104e4
+add src/discover/cli.rs — enum Sort, enum Mode, struct Slot, struct VerbSpec, struct CliSpec, struct Invocation, fn bundle_cli, mod probes @0f94035bed5d17e6
+add src/discover/mod.rs — mod cli @2287731756609363
+edit examples/bundle.rs — run @8e32e1fb5adb2db1
+edit src/discover/attest.rs — SiteVerdict @4b67fceef7a30074
+edit src/discover/attest.rs — impl Transcript @c05f6981796caaee

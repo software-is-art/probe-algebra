@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 856 sites.
+# 876 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -192,6 +192,15 @@
 - boundary_spec::discover::bundle::pad_to_blank_line:1: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:0: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:deaf -> Err(String::new())
+- boundary_spec::discover::cli::CliSpec::parse:0: == -> !=
+- boundary_spec::discover::cli::CliSpec::parse:1: < -> >=
+- boundary_spec::discover::cli::CliSpec::parse:2: < -> >=
+- boundary_spec::discover::cli::CliSpec::parse:3: != -> ==
+- boundary_spec::discover::cli::CliSpec::parse:deaf -> Err(String::new())
+- boundary_spec::discover::cli::CliSpec::usage:0: == -> !=
+- boundary_spec::discover::cli::CliSpec::usage:deaf -> String::new()
+- boundary_spec::discover::cli::Slot::render:0: == -> !=
+- boundary_spec::discover::cli::Slot::render:deaf -> String::new()
 - boundary_spec::discover::coherence::CoherenceReport::between:deaf -> Err(String::new())
 - boundary_spec::discover::coherence::coherence_violations:deaf -> Err(String::new())
 - boundary_spec::discover::coherence::coherence_violations:deaf -> Ok(vec![])
@@ -445,6 +454,12 @@
 - boundary_spec::discover::gates::Pipeline::render_workflow:6: == -> !=
 - boundary_spec::discover::gates::Pipeline::render_workflow:deaf -> Err(String::new())
 - boundary_spec::discover::gates::Pipeline::render_workflow:deaf -> Ok(String::new())
+- boundary_spec::discover::gates::Support::admits:0: == -> !=
+- boundary_spec::discover::gates::Support::admits:1: || -> &&
+- boundary_spec::discover::gates::Support::admits:2: ! -> (deleted)
+- boundary_spec::discover::gates::Support::admits:3: || -> &&
+- boundary_spec::discover::gates::Support::admits:deaf -> false
+- boundary_spec::discover::gates::Support::admits:deaf -> true
 - boundary_spec::discover::gates::check_context:deaf -> String::new()
 - boundary_spec::discover::gates::job_slug:0: || -> &&
 - boundary_spec::discover::gates::job_slug:deaf -> String::new()
@@ -816,10 +831,15 @@
 - boundary_spec::discover::trace::trace::of:deaf -> Err(String::new())
 - boundary_spec::discover::trace::trace::render:deaf -> String::new()
 - boundary_spec::discover::verdict::verdict::entry:deaf -> String::new()
+- boundary_spec::discover::verdict::verdict::fingerprint:deaf -> Err(String::new())
+- boundary_spec::discover::verdict::verdict::fingerprint:deaf -> Ok(String::new())
 - boundary_spec::discover::verdict::verdict::held:deaf -> false
 - boundary_spec::discover::verdict::verdict::held:deaf -> true
-- boundary_spec::discover::verdict::verdict::owed:deaf -> vec![]
+- boundary_spec::discover::verdict::verdict::owed:deaf -> Err(String::new())
+- boundary_spec::discover::verdict::verdict::owed:deaf -> Ok(vec![])
 - boundary_spec::discover::verdict::verdict::record:deaf -> Err(String::new())
+- boundary_spec::discover::verdict::verdict::support_hash:deaf -> Err(String::new())
+- boundary_spec::discover::verdict::verdict::support_hash:deaf -> Ok(String::new())
 - boundary_spec::discover::verdict::verdict::tree_hash:deaf -> Err(String::new())
 - boundary_spec::discover::verdict::verdict::tree_hash:deaf -> Ok(String::new())
 - boundary_spec::discover::verdict::verdict::walk:deaf -> Err(String::new())

@@ -1,0 +1,44 @@
+/// Render a record into the committed `.trial` text — the exact inverse of `parse`
+/// for narratives normalised to no trailing whitespace.
+pub fn render(r: &Record) -> String {
+    let mut s = String::new();
+    s.push_str("weave-knee trial v2\n");
+    s.push_str(&format!("fanout: {}\n", r.fanout));
+    s.push_str(&format!("seed: {}\n", r.seed));
+    s.push_str(&format!("weaver: {}\n", r.weaver));
+    s.push_str(&format!("judge: {}\n", r.judge));
+    s.push_str(&format!("quality: {}\n", r.quality));
+    s.push_str("narrative:\n");
+    for line in r.narrative.lines() {
+        if line.is_empty() {
+            s.push('\n');
+        } else {
+            s.push_str("  ");
+            s.push_str(line);
+            s.push('\n');
+        }
+    }
+    s.push_str("verdicts:\n");
+    for (id, entailed) in &r.verdicts {
+        s.push_str(&format!(
+            "  {id} {}\n",
+            if *entailed {
+                "ENTAILED"
+            } else {
+                "NOT-ENTAILED"
+            }
+        ));
+    }
+    s.push_str("stated:\n");
+    for (id, stated) in &r.stated {
+        s.push_str(&format!(
+            "  {id} {}\n",
+            if *stated { "STATED" } else { "NOT-STATED" }
+        ));
+    }
+    s.push_str("edges:\n");
+    for (from, to) in &r.edges {
+        s.push_str(&format!("  {from} -> {to}\n"));
+    }
+    s
+}

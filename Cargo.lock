@@ -603,6 +603,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "weave-knee"
+version = "0.0.0"
+dependencies = [
+ "fire-drill",
+ "spec-lock",
+]
+
+[[package]]
 name = "winapi-util"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

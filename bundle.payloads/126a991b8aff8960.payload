@@ -1,0 +1,72 @@
+use std::collections::BTreeMap;
+
+use crate::kvstore::store::{Clock, Key, Snapshot, Ttl, Val};
+use crate::kvstore::theory::Sort;
+
+/// The twin carrier: the same observable store over a genuinely different
+/// representation — a key-ordered map from key to (value, ABSOLUTE expiry
+/// instant), where the primary keeps a canonically sorted entry list with a
+/// (born, ttl) split. No `Entry`, no `Vec`, no relative life stored anywhere.
+/// It exists to be swapped under the ttl-store theory: if the discovered law
+/// list moves, the spec language leaked representation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TwinStore {
+    slots: BTreeMap<Key, (Val, Clock)>,
+    clock: Clock,
+}
+
+impl TwinStore {
+    /// The empty store at the epoch.
+    pub fn new() -> Self {
+        TwinStore {
+            slots: BTreeMap::new(),
+            clock: Clock::start(),
+        }
+    }
+    /// Bind `key`, replacing any existing binding; the expiry is absolute from
+    /// the moment of writing. Dead bindings linger until the next tick, exactly
+    /// as the primary's unswept entries do.
+    pub fn put(&self, key: Key, val: Val, ttl: Ttl) -> TwinStore {
+        let mut slots = self.slots.clone();
+        slots.insert(key, (val, self.clock.advanced(ttl)));
+        TwinStore {
+            slots,
+            clock: self.clock,
+        }
+    }
+    /// Advance the clock and eagerly sweep everything no longer live (live is
+    /// strictly before expiry — the same one comparison the primary hangs on).
+    pub fn tick(&self, by: Ttl) -> TwinStore {
+        let clock = self.clock.advanced(by);
+        let slots = self
+            .slots
+            .iter()
+            .filter(|(_, (_, expires))| clock < *expires)
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        TwinStore { slots, clock }
+    }
+    /// Right-biased union at the later clock: where both bind a key, `other`
+    /// wins. Raw bindings merge — dead ones included — as in the primary.
+    pub fn merge(&self, other: &TwinStore) -> TwinStore {
+        let mut slots = self.slots.clone();
+        for (k, v) in &other.slots {
+            slots.insert(k.clone(), *v);
+        }
+        TwinStore {
+            slots,
+            clock: self.clock.max(other.clock),
+        }
+    }
+    /// The canonical observation — identical Snapshot type, clock-relative
+    /// remaining life, key-sorted by the map's own order.
+    pub fn view(&self) -> Snapshot {
+        Snapshot::from_rows(
+            self.slots
+                .iter()
+                .filter(|(_, (_, expires))| self.clock < *expires)
+                .map(|(k, (v, expires))| (k.clone(), *v, self.clock.until(*expires)))
+                .collect(),
+        )
+    }
+}

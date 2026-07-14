@@ -1,0 +1,202 @@
+/// One committed trial: what the weaver wrote and what the judge ruled, keyed by
+/// (fanout, seed) so the corpus it was scored against regenerates at gate time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Record {
+    pub fanout: usize,
+    pub seed: u64,
+    pub weaver: String,
+    pub judge: String,
+    pub quality: u8,
+    pub narrative: String,
+    pub verdicts: Vec<(String, bool)>,
+}
+
+/// Render a record into the committed `.trial` text — the exact inverse of `parse`
+/// for narratives normalised to no trailing whitespace.
+pub fn render(r: &Record) -> String {
+    let mut s = String::new();
+    s.push_str("weave-knee trial v1\n");
+    s.push_str(&format!("fanout: {}\n", r.fanout));
+    s.push_str(&format!("seed: {}\n", r.seed));
+    s.push_str(&format!("weaver: {}\n", r.weaver));
+    s.push_str(&format!("judge: {}\n", r.judge));
+    s.push_str(&format!("quality: {}\n", r.quality));
+    s.push_str("narrative:\n");
+    for line in r.narrative.lines() {
+        if line.is_empty() {
+            s.push('\n');
+        } else {
+            s.push_str("  ");
+            s.push_str(line);
+            s.push('\n');
+        }
+    }
+    s.push_str("verdicts:\n");
+    for (id, entailed) in &r.verdicts {
+        s.push_str(&format!(
+            "  {id} {}\n",
+            if *entailed { "ENTAILED" } else { "NOT-ENTAILED" }
+        ));
+    }
+    s
+}
+
+/// Parse a committed `.trial` file. Refusals name the offending line: a corrupt
+/// committed trial is a gate failure, never a shrug.
+pub fn parse(text: &str) -> Result<Record, String> {
+    let mut lines = text.lines();
+    let head = lines.next().unwrap_or_default();
+    if head != "weave-knee trial v1" {
+        return Err(format!("not a weave-knee v1 trial: first line is `{head}`"));
+    }
+    let fanout: usize = field(&mut lines, "fanout")?
+        .parse()
+        .map_err(|e| format!("fanout: {e}"))?;
+    let seed: u64 = field(&mut lines, "seed")?
+        .parse()
+        .map_err(|e| format!("seed: {e}"))?;
+    let weaver = field(&mut lines, "weaver")?.to_string();
+    let judge = field(&mut lines, "judge")?.to_string();
+    let quality: u8 = field(&mut lines, "quality")?
+        .parse()
+        .map_err(|e| format!("quality: {e}"))?;
+    if !(1..=5).contains(&quality) {
+        return Err(format!("quality {quality} outside 1-5"));
+    }
+    let sentinel = lines.next().unwrap_or_default();
+    if sentinel != "narrative:" {
+        return Err(format!("expected `narrative:`, found `{sentinel}`"));
+    }
+    let mut narrative_lines: Vec<&str> = Vec::new();
+    loop {
+        match lines.next() {
+            None => return Err("missing `verdicts:` section".to_string()),
+            Some(l) if l == "verdicts:" => break,
+            Some(l) if l.is_empty() => narrative_lines.push(""),
+            Some(l) => narrative_lines.push(
+                l.strip_prefix("  ")
+                    .ok_or_else(|| format!("narrative line not indented: `{l}`"))?,
+            ),
+        }
+    }
+    let mut verdicts = Vec::new();
+    for l in lines {
+        let l = l
+            .strip_prefix("  ")
+            .ok_or_else(|| format!("verdict line not indented: `{l}`"))?;
+        let (id, word) = l
+            .split_once(' ')
+            .ok_or_else(|| format!("unreadable verdict line: `{l}`"))?;
+        verdicts.push((id.to_string(), verdict_word(word, id)?));
+    }
+    if verdicts.is_empty() {
+        return Err("no verdicts recorded".to_string());
+    }
+    Ok(Record {
+        fanout,
+        seed,
+        weaver,
+        judge,
+        quality,
+        narrative: narrative_lines.join("\n"),
+        verdicts,
+    })
+}
+
+/// Read the judge's raw output: `verdict <id> ENTAILED|NOT-ENTAILED` lines and one
+/// `quality <1-5>` line. Surrounding prose is ignored (models preamble); a malformed
+/// verdict word refuses.
+pub fn parse_judge(raw: &str) -> Result<(Vec<(String, bool)>, u8), String> {
+    let mut verdicts = Vec::new();
+    let mut quality = None;
+    for line in raw.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("verdict ") {
+            let (id, word) = rest
+                .split_once(' ')
+                .ok_or_else(|| format!("unreadable verdict line: `{line}`"))?;
+            verdicts.push((id.to_string(), verdict_word(word.trim(), id)?));
+        } else if let Some(rest) = line.strip_prefix("quality ") {
+            let q: u8 = rest
+                .trim()
+                .parse()
+                .map_err(|_| format!("unreadable quality line: `{line}`"))?;
+            if !(1..=5).contains(&q) {
+                return Err(format!("quality {q} outside 1-5"));
+            }
+            quality = Some(q);
+        }
+    }
+    if verdicts.is_empty() {
+        return Err("the judge produced no verdict lines".to_string());
+    }
+    match quality {
+        Some(q) => Ok((verdicts, q)),
+        None => Err("the judge produced no quality line".to_string()),
+    }
+}
+
+fn field<'a>(lines: &mut std::str::Lines<'a>, name: &str) -> Result<&'a str, String> {
+    let line = lines.next().unwrap_or_default();
+    line.strip_prefix(&format!("{name}: "))
+        .ok_or_else(|| format!("expected `{name}: ...`, found `{line}`"))
+}
+
+fn verdict_word(word: &str, id: &str) -> Result<bool, String> {
+    match word {
+        "ENTAILED" => Ok(true),
+        "NOT-ENTAILED" => Ok(false),
+        other => Err(format!("unknown verdict `{other}` for `{id}`")),
+    }
+}
+
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    fn sample() -> Record {
+        Record {
+            fanout: 3,
+            seed: 7,
+            weaver: "claude-sonnet-5".to_string(),
+            judge: "claude-sonnet-5".to_string(),
+            quality: 4,
+            narrative: "First line.\n\n  An indented line.\nLast line.".to_string(),
+            verdicts: vec![
+                ("c0.0".to_string(), true),
+                ("c0.0F".to_string(), false),
+                ("r0".to_string(), true),
+            ],
+        }
+    }
+
+    #[test]
+    fn render_then_parse_is_identity() {
+        let r = sample();
+        assert_eq!(parse(&render(&r)).expect("round trip"), r);
+    }
+
+    #[test]
+    fn refusals_name_the_offence() {
+        assert!(parse("not a trial").unwrap_err().contains("first line"));
+        let mut doctored = render(&sample()).replace("ENTAILED", "MAYBE");
+        assert!(parse(&doctored).unwrap_err().contains("unknown verdict"));
+        doctored = render(&sample()).replace("quality: 4", "quality: 9");
+        assert!(parse(&doctored).unwrap_err().contains("outside 1-5"));
+    }
+
+    #[test]
+    fn the_judge_parser_skips_preamble_and_demands_quality() {
+        let raw = "Sure, here are my verdicts:\n\nverdict c0.0 ENTAILED\nverdict c0.0F \
+                   NOT-ENTAILED\nquality 3\n";
+        let (verdicts, quality) = parse_judge(raw).expect("parse the judge");
+        assert_eq!(verdicts.len(), 2);
+        assert_eq!(quality, 3);
+        assert!(parse_judge("verdict c0.0 ENTAILED\n")
+            .unwrap_err()
+            .contains("no quality line"));
+        assert!(parse_judge("quality 3\n")
+            .unwrap_err()
+            .contains("no verdict lines"));
+    }
+}

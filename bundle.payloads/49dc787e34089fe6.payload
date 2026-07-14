@@ -1,0 +1,274 @@
+#[cfg(test)]
+mod probes_tests {
+    use super::*;
+    use std::collections::BTreeSet;
+    use std::fs;
+
+    /// Bucket a committed `spec/` artifact by whether it backs a BEHAVIOURAL probe (a theory
+    /// key), a STRUCTURAL probe (a lock name), or is EXCLUDED (a mutation verdict, a
+    /// ratification register, or an apply artifact — none of which is a probe). Kept minimal
+    /// and local: the completeness gate cares only which bucket, not the full agenda taxonomy.
+    enum Backs {
+        Behavioural(String),
+        Structural(&'static str),
+        Excluded,
+    }
+
+    fn bucket(file: &str) -> Backs {
+        let theory = |suffix: &str| file.trim_end_matches(suffix).replace('-', " ");
+        // excluded: the mutation lock IS a probe's verdict, not a probe; registers are
+        // ratification inputs; the ruleset is an apply artifact; the census itself is not
+        // its own probe.
+        if file.ends_with(".mutation.spec")
+            || file.ends_with(".register")
+            || file.ends_with(".ruleset.json")
+            || file == "probes.spec"
+        {
+            return Backs::Excluded;
+        }
+        // structural byte-locks and world judges, keyed to the roster.
+        let structural = match file {
+            "qualify.spec" => Some("surface"),
+            "qualify-reasons.spec" => Some("reasons"),
+            "tiers.spec" => Some("tiers"),
+            "shapes.spec" => Some("catalog"),
+            "gates.spec" => Some("pipeline"),
+            "schemata.spec" => Some("schemata"),
+            "perimeter.spec" => Some("perimeter"),
+            "substrate.spec" => Some("substrate"),
+            _ if file.ends_with(".shape.spec") => Some("shape"),
+            _ if file.ends_with(".system.spec") => Some("seams"),
+            _ if file.ends_with(".world.spec") => Some("world"),
+            _ if file.ends_with(".infra.spec") => Some("infra"),
+            _ => None,
+        };
+        if let Some(key) = structural {
+            return Backs::Structural(key);
+        }
+        // everything else in spec/ is a theory law lock (.spec / .export / .obligations.spec).
+        for suffix in [".obligations.spec", ".export", ".spec"] {
+            if file.ends_with(suffix) {
+                return Backs::Behavioural(theory(suffix));
+            }
+        }
+        Backs::Excluded
+    }
+
+    /// COMPLETENESS: every frozen `spec/` artifact that backs a probe is covered by the
+    /// census, and every census probe is backed by at least one committed artifact. A new
+    /// lock that no probe covers fails here — add it to the roster and ratify. (Reads the
+    /// committed spec directory: the honest source of what locks exist.)
+    #[test]
+    fn the_probe_census_covers_every_frozen_lock() {
+        let census = ProbeCensus::of();
+        let behavioural: BTreeSet<String> = census
+            .probes()
+            .iter()
+            .filter(|p| p.kind == ProbeKind::Behavioural)
+            .map(|p| p.key.clone())
+            .collect();
+        let structural: BTreeSet<&str> = census
+            .probes()
+            .iter()
+            .filter(|p| p.kind == ProbeKind::Structural)
+            .map(|p| p.key.as_str())
+            .collect();
+
+        let spec_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("spec");
+        let mut seen_behavioural: BTreeSet<String> = BTreeSet::new();
+        let mut seen_structural: BTreeSet<&str> = BTreeSet::new();
+        for entry in fs::read_dir(&spec_dir).expect("read spec dir") {
+            let name = entry.expect("dir entry").file_name();
+            let file = name.to_string_lossy().to_string();
+            match bucket(&file) {
+                Backs::Behavioural(theory) => {
+                    assert!(
+                        behavioural.contains(&theory),
+                        "spec/{file} backs behavioural probe `{theory}` — no probe covers it; \
+                         add it to the census and ratify"
+                    );
+                    seen_behavioural.insert(theory);
+                }
+                Backs::Structural(key) => {
+                    assert!(
+                        structural.contains(key),
+                        "spec/{file} backs structural probe `{key}` — no probe covers it; add \
+                         it to STRUCTURAL and ratify"
+                    );
+                    seen_structural.insert(key);
+                }
+                Backs::Excluded => {}
+            }
+        }
+        // reverse: no phantom probes — every census probe is backed by a committed artifact.
+        for key in &behavioural {
+            assert!(
+                seen_behavioural.contains(key),
+                "census names behavioural probe `{key}` with no committed lock — stale roster"
+            );
+        }
+        for key in &structural {
+            assert!(
+                seen_structural.contains(key),
+                "census names structural probe `{key}` with no committed lock — stale roster"
+            );
+        }
+    }
+
+    /// The committed `spec/probes.spec` is FRESH: the live census matches what was frozen.
+    /// Regenerate with `cargo run --example freeze_spec` and ratify the diff.
+    #[test]
+    fn the_committed_probe_census_is_fresh() {
+        let lock = ProbeCensus::of().lock();
+        match spec_lock::check(std::slice::from_ref(&lock)) {
+            Ok(_) => {}
+            Err(stale) => panic!(
+                "the probe census drifted from spec/probes.spec ({}). Run \
+                 `cargo run --example freeze_spec` and ratify the diff.",
+                stale.join(", ")
+            ),
+        }
+    }
+
+    /// The render is grouped, sorted, and mechanism-labelled — byte pins on the shape so a
+    /// silent reformat cannot pass.
+    #[test]
+    fn the_render_groups_and_labels() {
+        let text = ProbeCensus::of().render();
+        assert!(text.contains("## behavioural probes (conduct — laws over a grid)"));
+        assert!(text.contains("## structural probes (shape)"));
+        assert!(text.contains("- perimeter: live-dent"));
+        assert!(text.contains("- surface: drift-gate"));
+        assert!(text.contains("- catalog: fire-drill"));
+        assert!(text.contains("- seams: fire-drill"));
+        assert!(text.contains("- world: fire-drill"));
+        // behavioural section lists a theory as oracle-swap.
+        assert!(text.contains(": oracle-swap"));
+    }
+
+    /// NORMATIVE (rung 2): every probe carries an INDIVIDUAL active mechanism, or its reliance
+    /// on the shared `spec-lock drift gate` is ratified in `spec/probes.register`. Held by set
+    /// difference — an un-ratified drift-gate probe is a new finding, a ratified line for a
+    /// probe that earned an individual drill is stale. The drift-gate set can only shrink.
+    #[test]
+    fn every_probe_has_an_individual_drill_or_is_ratified() {
+        let census = ProbeCensus::of();
+        if let Err(drift) = census.register().check(census.drift_gate_keys()) {
+            panic!(
+                "the probe register drifted from the drift-gate probe set: {drift}\n\
+                 (a byte-lock leaning only on the shared spec-lock drift gate must be ratified \
+                 in spec/probes.register with the reason; give it an individual drill to drop \
+                 the line)"
+            );
+        }
+    }
+
+    /// RUNG 3: every `FireDrill` probe has a LIVE drill that actually FIRES — the census
+    /// classification is not vacuous. Reconciled through `fire_drill::Battery`: the battery
+    /// `requires` exactly the census's FireDrill keys and drills each by planting the probe's
+    /// known-bad fixture, so `verdict()` refuses a FireDrill probe with no drill (UNPROVEN)
+    /// and a drill that stopped firing (VACUOUS). A deleted drill therefore breaks this gate,
+    /// closing the "a FireDrill claim pinned only by a test that could vanish" gap.
+    #[test]
+    fn every_fire_drill_probe_has_a_live_drill_that_fires() {
+        use fire_drill::{Battery, Outcome};
+        fn fired(refused: bool) -> Outcome {
+            if refused {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            }
+        }
+        let census = ProbeCensus::of();
+        let keys: Vec<String> = census
+            .probes()
+            .iter()
+            .filter(|p| p.mechanism == Mechanism::FireDrill)
+            .map(|p| p.key.clone())
+            .collect();
+
+        // catalog — a mis-sorted identity declaration is refused by the shape-data gate.
+        let identity = crate::discover::engine::ShapeCatalog::inventory()
+            .into_iter()
+            .find(|s| s.name == "identity")
+            .expect("identity is ratified")
+            .gate_slots;
+        let missorted: Vec<(Vec<&str>, &str)> = vec![
+            (vec!["credits", "credits"], "credits"),
+            (vec![], "vouchers"),
+        ];
+        let catalog = identity.admit(&missorted, &["merge", "empty"]).is_err();
+
+        // world — a battery of a different size is refused, never row-matched by luck.
+        let world = !crate::discover::world::StoreModel::beliefs()
+            .disagreements(&crate::discover::world::WorldReport::record(
+                "small",
+                4,
+                crate::discover::world::StoreModel::replay,
+            ))
+            .is_empty();
+
+        // pipeline — a Pipeline declaring a bespoke-tier cadence refuses to render a consumer
+        // workflow (that tier is the green-tag countersign economics, not a consumer gate).
+        let bad_pipeline = crate::discover::gates::Pipeline {
+            name: "drill",
+            toolchain: "x",
+            regen: "x",
+            cron: None,
+            gates: vec![crate::discover::gates::Gate {
+                name: "planted",
+                verifies: "",
+                command: &[],
+                cadence: crate::discover::gates::Cadence::DefaultBranch,
+                effect: crate::boundary::Capability::Pure,
+                support: crate::discover::gates::Support::Judged,
+                sharded: false,
+            }],
+        };
+        let pipeline = bad_pipeline.render_workflow().is_err();
+
+        // schemata — the completeness census names an uninstrumented, unexempted function.
+        let planted = syn::parse_str::<syn::File>("fn planted_uninstrumented() {}")
+            .expect("planted source parses");
+        let mut flagged = Vec::new();
+        crate::discover::schemata::uninstrumented(&planted.items, &mut flagged);
+        let schemata = !flagged.is_empty();
+
+        let battery = Battery::named("probe sensitivity")
+            .requires(keys)
+            .drill(
+                "catalog",
+                "a mis-sorted identity declaration",
+                fired(catalog),
+            )
+            .drill(
+                "seams",
+                "a non-homomorphic transform conversion",
+                fired(crate::discover::system::tests::seam_sensitivity_drill_fires()),
+            )
+            .drill(
+                "shape",
+                "a placement disagreeing with the declaration",
+                fired(crate::discover::shape::probes::shape_sensitivity_drill_fires()),
+            )
+            .drill("world", "a mismatched-size world battery", fired(world))
+            .drill(
+                "pipeline",
+                "a Pipeline declaring a bespoke-tier cadence",
+                fired(pipeline),
+            )
+            .drill(
+                "schemata",
+                "an uninstrumented, unexempted function",
+                fired(schemata),
+            );
+
+        if let Err(why) = battery.verdict() {
+            panic!(
+                "the probe-sensitivity battery is not sound: {why}\n(a FireDrill probe with \
+                 no drill is UNPROVEN; a drill that no longer fires is VACUOUS — reconcile \
+                 discover::probes STRUCTURAL against the live drills)"
+            );
+        }
+    }
+}

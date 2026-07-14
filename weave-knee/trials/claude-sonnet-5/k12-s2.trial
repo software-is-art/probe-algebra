@@ -1,0 +1,145 @@
+weave-knee trial v2
+fanout: 12
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 5
+narrative:
+  Word count is roughly 720, well under 800. Here's the narrative.
+
+  Feltol is a ring of twelve modules, each feeding exactly one neighbor and fed by exactly one other, so that the loop closes on itself: Pammir signals backpressure to Felvar, Felvar delegates overflow to Pamkel, Pamkel hands its sealed ledger to Keldor, Keldor publishes its sweep verdicts to Dorbra, Dorbra streams its evictions to Gritol, Gritol reports missed heartbeats to Zinsax, Zinsax signals backpressure to Feldor, Feldor delegates overflow to Varvar, Varvar hands its sealed ledger to Ruvruv, Ruvruv publishes its sweep verdicts to Tolbra, Tolbra streams its evictions to Tolost, and Tolost reports missed heartbeats back to Pammir. Twelve modules, twelve relations, one closed cycle — and the cycle is built from two identical six-step handoffs run in sequence: backpressure, overflow delegation, ledger handoff, verdict publication, eviction stream, heartbeat report, then the same six steps again from Zinsax through Feldor, Varvar, Ruvruv, Tolbra, and Tolost back to Pammir. The system, in other words, is one topology walked twice.
+
+  The scheduler, Pammir, refuses new writes while its own sweep runs and keeps only digests of what passes through it — never the bodies — and it will not act until 3 of its peers countersign. Its backpressure signal reaches Felvar, the gate, which answers reads only from its newest snapshot, evicts anything left unclaimed after 6 ticks, and gives a failed handoff at most 2 retries before parking it. What Felvar cannot absorb it delegates as overflow to Pamkel, the index, which — like Pammir — keeps only digests, refuses writes mid-sweep, and reads only its newest snapshot. Pamkel's sealed ledger passes to Keldor, the vault, which shares Felvar's 2-retry patience but extends the unclaimed window to 9 ticks, and likewise reads only its newest snapshot. Keldor's sweep verdicts are published to Dorbra, the beacon, which refuses writes during its sweep, keeps digests rather than bodies, and is the most patient retrier yet, allowing 3 attempts before parking a failed handoff. Dorbra's evictions stream to Gritol, the registry, which holds the same 9-tick unclaimed window as Keldor, reads only newest snapshots, and keeps digests only. Gritol reports missed heartbeats to Zinsax, the ledger, which refuses writes mid-sweep, evicts after 10 ticks — the second-widest window in the ring — but tolerates only 1 retry before parking, the least forgiving handoff policy of any module here.
+
+  From Zinsax the loop repeats its shape. Zinsax signals backpressure to Feldor, the relay, which refuses writes during sweep, keeps digests only, and evicts after 9 ticks, echoing Keldor and Gritol. Feldor delegates its overflow to Varvar, the archive, which refuses writes mid-sweep, evicts after 10 ticks like Zinsax, and requires 4 countersigning peers before it will act — the highest quorum anywhere in Feltol, stricter than either Pammir's or Ruvruv's threshold of 3. Varvar hands its sealed ledger to Ruvruv, the courier, which reads only newest snapshots, evicts after 8 ticks, and needs 3 countersigning peers. Ruvruv publishes its sweep verdicts to Tolbra, the broker, which keeps digests only, allows 3 retries before parking a failed handoff — tying Dorbra for the ring's most tolerant retry policy — and holds the widest unclaimed window of any module, 12 ticks. Tolbra streams its evictions to Tolost, the sampler, which refuses writes during its own sweep, reads only newest snapshots, and evicts after just 5 ticks — the tightest window anywhere in the system, tighter even than Felvar's 6. Tolost closes the circle by reporting missed heartbeats back to Pammir.
+
+  Because the ring is closed, no module's guarantees stand alone. Data that survives to Keldor or Varvar as a sealed ledger has already passed through at least one digest-only module — Pammir, Pamkel, Dorbra, Feldor, or Tolbra — so by the time it is archived, only its shape is provable, never its original body. And because seven of the twelve modules — Pammir, Pamkel, Dorbra, Zinsax, Feldor, Varvar, and Tolost — refuse writes for the duration of their own sweeps, and each sits on the single path every item must traverse, a sweep at any one of them is enough to stall the whole loop until it clears: the ring has no bypass. Its weakest link for reliability is Zinsax's single retry before parking, and its narrowest survival window is Tolost's 5 ticks — together they mean the ring tolerates least, and fastest, right at the two points nearest its own closure back to Pammir.
+verdicts:
+  c5.1 ENTAILED
+  c4.0 ENTAILED
+  r3 ENTAILED
+  c1.1 ENTAILED
+  c9.0 ENTAILED
+  c6.2 ENTAILED
+  c2.2 ENTAILED
+  c4.2F NOT-ENTAILED
+  c8.1F NOT-ENTAILED
+  r7 ENTAILED
+  c0.2F NOT-ENTAILED
+  c11.2F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  c8.0 ENTAILED
+  c6.1F NOT-ENTAILED
+  c7.1 ENTAILED
+  c11.1F NOT-ENTAILED
+  r10 ENTAILED
+  c8.2F NOT-ENTAILED
+  c9.1F NOT-ENTAILED
+  c7.2F NOT-ENTAILED
+  r1 ENTAILED
+  c4.1 ENTAILED
+  c5.2F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c6.0 ENTAILED
+  c6.1 ENTAILED
+  c0.1 ENTAILED
+  c1.0F NOT-ENTAILED
+  r5 ENTAILED
+  c3.2 ENTAILED
+  r10F NOT-ENTAILED
+  c5.0 ENTAILED
+  r2F NOT-ENTAILED
+  c10.0F NOT-ENTAILED
+  r9 ENTAILED
+  r4 ENTAILED
+  c10.0 ENTAILED
+  c5.1F NOT-ENTAILED
+  c4.1F NOT-ENTAILED
+  c6.0F NOT-ENTAILED
+  c10.1F NOT-ENTAILED
+  r0 ENTAILED
+  c4.2 ENTAILED
+  c2.1 ENTAILED
+  c0.2 ENTAILED
+  c7.0F NOT-ENTAILED
+  c7.2 ENTAILED
+  r1F NOT-ENTAILED
+  c11.0F NOT-ENTAILED
+  c2.2F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  r5F NOT-ENTAILED
+  c2.1F NOT-ENTAILED
+  r6 ENTAILED
+  c3.1F NOT-ENTAILED
+  c7.1F NOT-ENTAILED
+  c2.0 ENTAILED
+  c5.2 ENTAILED
+  r8F NOT-ENTAILED
+  c9.0F NOT-ENTAILED
+  c0.0 ENTAILED
+  c7.0 ENTAILED
+  c11.1 ENTAILED
+  c9.2 ENTAILED
+  c9.1 ENTAILED
+  r8 ENTAILED
+  c3.0 ENTAILED
+  c10.2 ENTAILED
+  c11.0 ENTAILED
+  r11 ENTAILED
+  c2.0F NOT-ENTAILED
+  c9.2F NOT-ENTAILED
+  c1.2 ENTAILED
+  r7F NOT-ENTAILED
+  c1.0 ENTAILED
+  c8.0F NOT-ENTAILED
+  c8.1 ENTAILED
+  c6.2F NOT-ENTAILED
+  r2 ENTAILED
+  r4F NOT-ENTAILED
+  c10.1 ENTAILED
+  r11F NOT-ENTAILED
+  c3.1 ENTAILED
+  c11.2 ENTAILED
+  c8.2 ENTAILED
+  r9F NOT-ENTAILED
+  c5.0F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  c10.2F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  r6F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+stated:
+  er8.quorum NOT-STATED
+  er7.dwellF NOT-STATED
+  er5.dwellF NOT-STATED
+  e.ring STATED
+  er10.dwell NOT-STATED
+  er6.dwell NOT-STATED
+  er5.dwell NOT-STATED
+  er8.dwellF NOT-STATED
+  e.ringF NOT-STATED
+  er9.dwellF NOT-STATED
+  er8.dwell NOT-STATED
+  er3.retry NOT-STATED
+  er3.retryF NOT-STATED
+  er6.dwellF NOT-STATED
+  er10.dwellF NOT-STATED
+  er7.dwell NOT-STATED
+  er9.dwell NOT-STATED
+  er8.quorumF NOT-STATED
+edges:
+  Pammir -> Felvar
+  Felvar -> Pamkel
+  Pamkel -> Keldor
+  Keldor -> Dorbra
+  Dorbra -> Gritol
+  Gritol -> Zinsax
+  Zinsax -> Feldor
+  Feldor -> Varvar
+  Varvar -> Ruvruv
+  Ruvruv -> Tolbra
+  Tolbra -> Tolost
+  Tolost -> Pammir

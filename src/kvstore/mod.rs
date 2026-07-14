@@ -32,5 +32,9 @@ mod internal;
 
 // The per-module probe registry. The file itself carries no `cfg` markers — it is made
 // test-only HERE, the same trick `lib.rs` plays with `mod harness`.
+
+#[cfg(test)]
+mod twin;
+
 #[cfg(test)]
 mod probes;

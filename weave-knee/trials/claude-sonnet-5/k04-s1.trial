@@ -1,0 +1,53 @@
+weave-knee trial v2
+fanout: 4
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Saxost turns on a closed loop that runs through all four modules and back on itself. Varkel, the vault, seals writes only once 2 of its peers countersign, and while its own sweep is running it refuses any new write outright. What it keeps is never the write's body but only a digest of it, and once sealed, that ledger passes to Nexmir, the gate. Nexmir holds the same discipline: it too keeps digests rather than bodies, and it too refuses new writes for the duration of its own sweep — so the digest-only floor and the write-refusal-during-sweep floor both survive the hop from Varkel into Nexmir intact. Anything that lands in Nexmir and goes unclaimed for 10 ticks is evicted, and those evictions stream onward to Zintol, the index. Zintol answers every read from its newest snapshot only, never reaching behind it, and like Varkel and Nexmir before it, it refuses new writes while sweeping. But Zintol's bar for acting is higher: it needs 3 countersigning peers, not 2. What Zintol cannot hold, it delegates as overflow to Braruv, the scheduler. Braruv shares Varkel's threshold of 2 countersigning peers and shares Zintol's snapshot-only reads, but it is the fastest to let go: anything unclaimed in Braruv is evicted after just 8 ticks — two ticks sooner than Nexmir's 10, so overflow that Zintol hands off has less time to be claimed than the ledger data Nexmir evicts upstream. Braruv closes the circuit by signaling backpressure to Varkel, which means the vault that started the chain is itself throttled by the scheduler at the chain's far end. So the four modules do not form a line but a ring — Varkel to Nexmir to Zintol to Braruv to Varkel — in which sealing, gating, indexing, and scheduling each add their own refusal or eviction rule, while digest-only custody and refuse-while-sweeping propagate through the first three hops before backpressure carries the loop's pressure back to its origin.
+verdicts:
+  c1.0F NOT-ENTAILED
+  r0 ENTAILED
+  c3.1F NOT-ENTAILED
+  c1.1 ENTAILED
+  c1.2 ENTAILED
+  c2.1F NOT-ENTAILED
+  c1.0 ENTAILED
+  c0.2 ENTAILED
+  c1.1F NOT-ENTAILED
+  c2.0 ENTAILED
+  c0.0 ENTAILED
+  c3.2 ENTAILED
+  r3 ENTAILED
+  c2.2F NOT-ENTAILED
+  c3.0 ENTAILED
+  c2.2 ENTAILED
+  c0.0F NOT-ENTAILED
+  r2 ENTAILED
+  c2.1 ENTAILED
+  c3.0F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  c0.1 ENTAILED
+  r2F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  r1 ENTAILED
+  c3.1 ENTAILED
+  c0.1F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+stated:
+  e.ring STATED
+  er3.quorumF NOT-STATED
+  er3.quorum STATED
+  er2.quorum NOT-STATED
+  e.ringF NOT-STATED
+  er2.quorumF NOT-STATED
+edges:
+  Varkel -> Nexmir
+  Nexmir -> Zintol
+  Zintol -> Braruv
+  Braruv -> Varkel

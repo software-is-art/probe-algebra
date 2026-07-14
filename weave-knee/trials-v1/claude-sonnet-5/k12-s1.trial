@@ -1,0 +1,119 @@
+weave-knee trial v1
+fanout: 12
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  636 words, under the 800-word limit, and it covers all 12 modules and every stated relation and property.
+
+  Nexsax, the gate, answers every read from its newest snapshot only and keeps only digests of what passes through it, never the bodies. When a handoff fails, Nexsax retries it up to three times before parking it, and streams what it evicts to Ostruv, the relay. Ostruv also answers reads from its newest snapshot only, but is more patient with failure — retrying up to four times before parking — and more demanding of consensus, acting only once four of its peers countersign. What Ostruv takes in from Nexsax it turns into sweep verdicts, which it publishes to Brabra, the broker.
+
+  Brabra keeps the same discipline of digests over bodies, evicts anything left unclaimed after eight ticks, and refuses new writes for the duration of its own sweep. On the verdicts Ostruv publishes to it, Brabra hands its sealed ledger onward to Pambra, the throttle. Pambra likewise answers only from its newest snapshot and keeps digests rather than bodies, but needs just two peers to countersign before it acts — a lower bar than Ostruv's. Taking in Brabra's sealed ledger, Pambra delegates its overflow to Mirfel, the scheduler.
+
+  Mirfel answers reads from its newest snapshot, retries a failed handoff up to two times before parking it, and evicts anything left unclaimed after six ticks. Receiving Pambra's overflow, it reports missed heartbeats to Hulsax, the index. Hulsax refuses new writes while its own sweep runs, retries up to three times before parking a failed handoff, and — like Ostruv — acts only once four peers countersign. On the missed heartbeats Mirfel reports, Hulsax signals backpressure onward to Gribra, the sampler.
+
+  Gribra evicts anything unclaimed after nine ticks, the longest patience in the chain, refuses new writes during its sweep, and answers reads only from its newest snapshot. Absorbing the backpressure Hulsax signals, Gribra streams its own evictions to Ruvfel, the monitor. Ruvfel keeps digests, never bodies, refuses new writes while sweeping, and acts once just two peers countersign — the same low bar as Pambra. Taking in what Gribra streams, Ruvfel publishes its sweep verdicts to Saxtol, the beacon.
+
+  Saxtol answers reads from its newest snapshot only, acts once three peers countersign, and is the least patient with failure of all: it retries a failed handoff just once before parking it. On the verdicts Ruvfel publishes, Saxtol hands its sealed ledger to Feltol, the registry. Feltol evicts anything unclaimed after six ticks, retries a failed handoff up to three times before parking, and keeps digests rather than bodies. Receiving Saxtol's ledger, Feltol delegates its overflow to Mirmir, the cache.
+
+  Mirmir answers reads from its newest snapshot only, evicts anything unclaimed after five ticks — the shortest patience in the system — and refuses new writes while its sweep runs. Taking in Feltol's overflow, Mirmir reports missed heartbeats to Bramir, the warden. Bramir answers reads from its newest snapshot, acts once three peers countersign, and refuses new writes during its own sweep. On the heartbeats Mirmir reports, Bramir signals backpressure back to Nexsax, the gate — closing a circuit that runs from gate to relay, broker, throttle, scheduler, index, sampler, monitor, beacon, registry, cache, and warden, and back again.
+
+  Three habits recur across the circuit with variation. Reading only from the newest snapshot: Nexsax, Ostruv, Pambra, Mirfel, Gribra, Saxtol, Mirmir, Bramir. Keeping digests but never bodies: Nexsax, Brabra, Pambra, Ruvfel, Feltol. Refusing new writes during a sweep: Brabra, Hulsax, Gribra, Ruvfel, Mirmir, Bramir. Eviction windows range from Mirmir's five ticks through Mirfel's and Feltol's six, Brabra's eight, to Gribra's nine. Retry limits before parking range from Saxtol's one through Mirfel's two, Nexsax's, Hulsax's, and Feltol's three, to Ostruv's four. Countersignature thresholds range from two, for Pambra and Ruvfel, through three, for Saxtol and Bramir, to four, for Ostruv and Hulsax.
+verdicts:
+  r6 ENTAILED
+  r9 ENTAILED
+  c8.1F NOT-ENTAILED
+  r9F NOT-ENTAILED
+  c2.1F NOT-ENTAILED
+  r10F NOT-ENTAILED
+  c5.0 ENTAILED
+  r2 ENTAILED
+  c2.2 ENTAILED
+  c4.2F NOT-ENTAILED
+  c3.0 ENTAILED
+  c1.0F NOT-ENTAILED
+  c11.1F NOT-ENTAILED
+  c9.1F NOT-ENTAILED
+  c1.2 ENTAILED
+  c5.1F NOT-ENTAILED
+  c8.2F NOT-ENTAILED
+  r8 ENTAILED
+  c6.0 ENTAILED
+  c2.0F NOT-ENTAILED
+  r7F NOT-ENTAILED
+  c4.1 ENTAILED
+  c10.0 ENTAILED
+  c8.1 ENTAILED
+  c3.2 ENTAILED
+  c6.1 ENTAILED
+  c7.2F NOT-ENTAILED
+  r1 ENTAILED
+  c2.1 ENTAILED
+  c3.2F NOT-ENTAILED
+  r8F NOT-ENTAILED
+  c5.1 ENTAILED
+  c1.1 ENTAILED
+  c2.2F NOT-ENTAILED
+  c8.2 ENTAILED
+  r11F NOT-ENTAILED
+  c7.1 ENTAILED
+  c9.2F NOT-ENTAILED
+  c4.1F NOT-ENTAILED
+  c7.0F NOT-ENTAILED
+  r5F NOT-ENTAILED
+  c5.2 ENTAILED
+  c10.0F NOT-ENTAILED
+  c0.1 ENTAILED
+  r3 ENTAILED
+  c5.0F NOT-ENTAILED
+  c5.2F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  c6.2F NOT-ENTAILED
+  c7.2 ENTAILED
+  c10.2 ENTAILED
+  c11.1 ENTAILED
+  c2.0 ENTAILED
+  c0.0F NOT-ENTAILED
+  r5 ENTAILED
+  r11 ENTAILED
+  r4 ENTAILED
+  r0 ENTAILED
+  c11.2 ENTAILED
+  c7.0 ENTAILED
+  c4.2 ENTAILED
+  c6.2 ENTAILED
+  r0F NOT-ENTAILED
+  c9.1 ENTAILED
+  c9.0F NOT-ENTAILED
+  c3.1 ENTAILED
+  c4.0 ENTAILED
+  c0.2F NOT-ENTAILED
+  r6F NOT-ENTAILED
+  r7 ENTAILED
+  c10.1 ENTAILED
+  r10 ENTAILED
+  c9.0 ENTAILED
+  c8.0 ENTAILED
+  c11.2F NOT-ENTAILED
+  c1.0 ENTAILED
+  c10.1F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c3.1F NOT-ENTAILED
+  c0.2 ENTAILED
+  c0.0 ENTAILED
+  r2F NOT-ENTAILED
+  c11.0 ENTAILED
+  c4.0F NOT-ENTAILED
+  r4F NOT-ENTAILED
+  c9.2 ENTAILED
+  r3F NOT-ENTAILED
+  c10.2F NOT-ENTAILED
+  c8.0F NOT-ENTAILED
+  c6.0F NOT-ENTAILED
+  c6.1F NOT-ENTAILED
+  c11.0F NOT-ENTAILED
+  c7.1F NOT-ENTAILED

@@ -117,9 +117,16 @@ fn assemble_plan(
 /// exit a kill, and exceeding the limit is a DETECTION (the kill path) — the same
 /// doctrine as the source sweeps.
 fn survives(mut cmd: Command, limit: Duration) -> bool {
+    use std::os::unix::process::CommandExt;
+    // The child gets its OWN process group, so the timeout kill reaps the whole tree
+    // (cargo → nextest → test binary). Killing only the direct child orphaned
+    // mutant-flipped runaways: each timed-out mutant leaked a live binary on PPID 1,
+    // and the leaked allocators eventually invited the kernel's memory killer
+    // (observed at 42GB of pressure on a 16GB machine).
     let mut child = cmd
         .stdout(Stdio::null())
         .stderr(Stdio::null())
+        .process_group(0)
         .spawn()
         .expect("cargo spawns");
     let start = Instant::now();
@@ -127,7 +134,10 @@ fn survives(mut cmd: Command, limit: Duration) -> bool {
         match child.try_wait().expect("child waitable") {
             Some(status) => return status.success(),
             None if start.elapsed() > limit => {
-                let _ = child.kill();
+                // negative pid = the whole group; then reap the direct child.
+                let _ = Command::new("kill")
+                    .args(["-9", &format!("-{}", child.id())])
+                    .status();
                 let _ = child.wait();
                 return false;
             }
@@ -220,9 +230,19 @@ fn sweep() {
     let queue: Mutex<VecDeque<(&'static str, Vec<String>)>> = Mutex::new(plan.into());
     let survivors: Mutex<Vec<String>> = Mutex::new(Vec::new());
     let verdicts: Mutex<Vec<(String, String, Vec<String>)>> = Mutex::new(Vec::new());
-    let workers = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    // SCHEMATA_WORKERS caps the worker pool: each worker holds a nextest run (itself
+    // multi-process), so full parallelism on a small-memory machine invites the
+    // kernel's memory killer — the sweep died that way once. Default unchanged (CI
+    // runners are fine); the knob is for constrained hosts.
+    let workers = std::env::var("SCHEMATA_WORKERS")
+        .ok()
+        .and_then(|w| w.parse::<usize>().ok())
+        .filter(|w| *w > 0)
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        });
     std::thread::scope(|scope| {
         for _ in 0..workers {
             scope.spawn(|| loop {
@@ -301,9 +321,16 @@ fn sweep() {
             verdicts.into_inner().expect("verdicts");
         sites.sort();
         let transcript = boundary_spec::discover::attest::Transcript {
-            tree: boundary_spec::discover::verdict::VerdictStore::tree_hash(std::path::Path::new(
-                ".",
-            ))
+            // keyed by the SCHEMATA GATE's declared support (single-sourced from the
+            // registry): an inert edit cannot orphan the attestation.
+            tree: boundary_spec::discover::verdict::VerdictStore::support_hash(
+                std::path::Path::new("."),
+                &boundary_spec::discover::gates::GateRegistry::declared()
+                    .into_iter()
+                    .find(|g| g.name == "mutation (schemata)")
+                    .map(|g| g.support)
+                    .expect("the schemata gate is declared"),
+            )
             .expect("the tree fingerprints"),
             toolchain: boundary_spec::discover::gates::TOOLCHAIN.to_string(),
             baseline_secs: baseline.as_secs(),
@@ -351,7 +378,15 @@ fn sweep() {
 /// falls back to the full sweep, so a false disagreement only ever costs time.
 fn verify() {
     let root = std::path::Path::new(".");
-    let key = match boundary_spec::discover::verdict::VerdictStore::tree_hash(root) {
+    // the key is the SCHEMATA GATE's declared support — single-sourced from the
+    // registry, so an inert edit (docs) neither invalidates the attestation nor
+    // re-owes the sweep.
+    let support = boundary_spec::discover::gates::GateRegistry::declared()
+        .into_iter()
+        .find(|g| g.name == "mutation (schemata)")
+        .map(|g| g.support)
+        .expect("the schemata gate is declared");
+    let key = match boundary_spec::discover::verdict::VerdictStore::support_hash(root, &support) {
         Ok(key) => key,
         Err(refusal) => {
             eprintln!("{refusal}");

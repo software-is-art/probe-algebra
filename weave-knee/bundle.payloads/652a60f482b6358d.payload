@@ -1,0 +1,17 @@
+/// One committed trial: what the weaver wrote and what the judge ruled, keyed by
+/// (fanout, seed) so the corpus it was scored against regenerates at gate time.
+/// v2 adds the gain census (`stated` — emergent facts the narrative made explicit)
+/// and the return leg (`edges` — the topology a fresh reader recovered from the
+/// narrative alone).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Record {
+    pub fanout: usize,
+    pub seed: u64,
+    pub weaver: String,
+    pub judge: String,
+    pub quality: u8,
+    pub narrative: String,
+    pub verdicts: Vec<(String, bool)>,
+    pub stated: Vec<(String, bool)>,
+    pub edges: Vec<(String, String)>,
+}

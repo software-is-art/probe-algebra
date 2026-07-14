@@ -1,0 +1,99 @@
+/// Parse a committed `.trial` file. Refusals name the offending line: a corrupt
+/// committed trial is a gate failure, never a shrug. v1 trials refuse by version —
+/// they were measured under the v1 prompt and live archived in `trials-v1/`.
+pub fn parse(text: &str) -> Result<Record, String> {
+    let mut lines = text.lines();
+    let head = lines.next().unwrap_or_default();
+    if head != "weave-knee trial v2" {
+        return Err(format!("not a weave-knee v2 trial: first line is `{head}`"));
+    }
+    let fanout: usize = field(&mut lines, "fanout")?
+        .parse()
+        .map_err(|e| format!("fanout: {e}"))?;
+    let seed: u64 = field(&mut lines, "seed")?
+        .parse()
+        .map_err(|e| format!("seed: {e}"))?;
+    let weaver = field(&mut lines, "weaver")?.to_string();
+    let judge = field(&mut lines, "judge")?.to_string();
+    let quality: u8 = field(&mut lines, "quality")?
+        .parse()
+        .map_err(|e| format!("quality: {e}"))?;
+    if !(1..=5).contains(&quality) {
+        return Err(format!("quality {quality} outside 1-5"));
+    }
+    let sentinel = lines.next().unwrap_or_default();
+    if sentinel != "narrative:" {
+        return Err(format!("expected `narrative:`, found `{sentinel}`"));
+    }
+    let mut narrative_lines: Vec<&str> = Vec::new();
+    loop {
+        match lines.next() {
+            None => return Err("missing `verdicts:` section".to_string()),
+            Some("verdicts:") => break,
+            Some("") => narrative_lines.push(""),
+            Some(l) => narrative_lines.push(
+                l.strip_prefix("  ")
+                    .ok_or_else(|| format!("narrative line not indented: `{l}`"))?,
+            ),
+        }
+    }
+    let mut verdicts = Vec::new();
+    loop {
+        match lines.next() {
+            None => return Err("missing `stated:` section".to_string()),
+            Some("stated:") => break,
+            Some(l) => {
+                let l = l
+                    .strip_prefix("  ")
+                    .ok_or_else(|| format!("verdict line not indented: `{l}`"))?;
+                let (id, word) = l
+                    .split_once(' ')
+                    .ok_or_else(|| format!("unreadable verdict line: `{l}`"))?;
+                verdicts.push((id.to_string(), verdict_word(word, id)?));
+            }
+        }
+    }
+    let mut stated = Vec::new();
+    loop {
+        match lines.next() {
+            None => return Err("missing `edges:` section".to_string()),
+            Some("edges:") => break,
+            Some(l) => {
+                let l = l
+                    .strip_prefix("  ")
+                    .ok_or_else(|| format!("stated line not indented: `{l}`"))?;
+                let (id, word) = l
+                    .split_once(' ')
+                    .ok_or_else(|| format!("unreadable stated line: `{l}`"))?;
+                stated.push((id.to_string(), stated_word(word, id)?));
+            }
+        }
+    }
+    let mut edges = Vec::new();
+    for l in lines {
+        let l = l
+            .strip_prefix("  ")
+            .ok_or_else(|| format!("edge line not indented: `{l}`"))?;
+        let (from, to) = l
+            .split_once(" -> ")
+            .ok_or_else(|| format!("unreadable edge line: `{l}`"))?;
+        edges.push((from.to_string(), to.to_string()));
+    }
+    if verdicts.is_empty() {
+        return Err("no verdicts recorded".to_string());
+    }
+    if stated.is_empty() {
+        return Err("no stated census recorded".to_string());
+    }
+    Ok(Record {
+        fanout,
+        seed,
+        weaver,
+        judge,
+        quality,
+        narrative: narrative_lines.join("\n"),
+        verdicts,
+        stated,
+        edges,
+    })
+}

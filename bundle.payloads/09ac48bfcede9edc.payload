@@ -1,0 +1,58 @@
+// The twin theory declarations. Same sorts, same variable letters, same operator
+// display names and symbols as the primary — so a discovered law renders to the
+// same bytes, and the only thing that can differ is WHICH laws hold.
+crate::theory! {
+    TtlStoreTwin : "ttl store twin", Value = TwinVal, Obs = (u8, Snapshot, Ttl), Sort = Sort,
+    sort_of = |v: &TwinVal| match v {
+        TwinVal::Store(_) => Sort::Store,
+        TwinVal::Dur(_) => Sort::Duration,
+    },
+    observe = |v: &TwinVal| match v {
+        TwinVal::Store(s) => (0u8, s.view(), Ttl::zero()),
+        TwinVal::Dur(d) => (1u8, Snapshot::empty(), *d),
+    },
+    vars {
+        Sort::Store => &["s", "t", "u"],
+        Sort::Duration => &["p", "q", "r"],
+    }
+    inhabit {
+        Sort::Store => twin_stores(),
+        Sort::Duration => twin_durs(),
+    }
+    ops {
+        Nullary "Empty" "empty" () -> Sort::Store = empty;
+        Infix   "Merge" "<+"    (Sort::Store, Sort::Store) -> Sort::Store = merge;
+        Prefix  "Tick"  "tick"  (Sort::Store, Sort::Duration) -> Sort::Store = tick;
+        Nullary "Zero"  "zero"  () -> Sort::Duration = zero;
+        Infix   "Plus"  "+"     (Sort::Duration, Sort::Duration) -> Sort::Duration = plus;
+    }
+}
+
+// The fire-drill theory: identical except merge is first-write-wins. If swapping
+// THIS in leaves the law list fixed, the drill cannot fire and proves nothing.
+crate::theory! {
+    FirstWinsTwin : "ttl store twin (first write wins)", Value = TwinVal, Obs = (u8, Snapshot, Ttl), Sort = Sort,
+    sort_of = |v: &TwinVal| match v {
+        TwinVal::Store(_) => Sort::Store,
+        TwinVal::Dur(_) => Sort::Duration,
+    },
+    observe = |v: &TwinVal| match v {
+        TwinVal::Store(s) => (0u8, s.view(), Ttl::zero()),
+        TwinVal::Dur(d) => (1u8, Snapshot::empty(), *d),
+    },
+    vars {
+        Sort::Store => &["s", "t", "u"],
+        Sort::Duration => &["p", "q", "r"],
+    }
+    inhabit {
+        Sort::Store => twin_stores(),
+        Sort::Duration => twin_durs(),
+    }
+    ops {
+        Nullary "Empty" "empty" () -> Sort::Store = empty;
+        Infix   "Merge" "<+"    (Sort::Store, Sort::Store) -> Sort::Store = merge_first_wins;
+        Prefix  "Tick"  "tick"  (Sort::Store, Sort::Duration) -> Sort::Store = tick;
+        Nullary "Zero"  "zero"  () -> Sort::Duration = zero;
+        Infix   "Plus"  "+"     (Sort::Duration, Sort::Duration) -> Sort::Duration = plus;
+    }
+}

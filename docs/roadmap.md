@@ -1999,6 +1999,35 @@ items inside inline algebra mods address as the mod, inner addressing is a futur
 Built through the suit except the two Bundle methods themselves — interface GROWTH,
 which `edit` refuses by design; the impl-interior fallback arm, exercised as intended.)
 
+Named on its third firing — **grow** (interface growth as a judged verb). The
+support-projection brick needed two new methods on `VerdictStore` and one signature
+change (`owed` keying per gate support instead of one tree key); `edit` refused by
+design ("7 held, 9 offered"), exactly as it refused the show verb's own two methods
+and the impl-interior change that built `edit` itself. Three firings is a pattern,
+not an incident: the missing verb is roughly `bundle grow <module.rs> <impl> <method
+payload>` — ADDITIVE interface change as one judged transaction (a new method, its
+probes rider, the qualify-census delta carried in the same judgment), with signature
+CHANGES still refused (that is a break, not a growth; the census and the version
+bump own it). Until it exists, interface growth is the fallback arm's most-worn
+path.
+
+Newly named from brick one of the exterior-engine candidate — **member genesis**. The
+knee harness wanted to be a research member (`weave-knee`, the layout-probe /
+delta-render shape: version 0.0.0, publish = false) and no verb founds one — but
+dogfooding shrank the gap below its prediction: the verbs reach INTO a member's
+modules fine (`show` probed on layout-probe before assuming, rather than grepping the
+resolver), and `add` turned out to FOUND a module file that does not exist yet,
+mounts included, so the entire crate body went in through the suit. The true fallback
+footprint was exactly two manifests (the workspace member line, the member's own
+`Cargo.toml`), the crate's `//!` doc header (prose anyway), and bare `mkdir` for
+`examples/`/`tests/` — `add` refuses to create a parent directory it could safely
+imply. Genesis is the adjacent machine — it already scaffolds whole crates — but it
+speaks `system!`, and a research member is not a declared algebra at birth. The
+missing verb is roughly `bundle found <member> --research`: the two manifests and the
+directory skeleton as one judged transaction, with the research-member conventions
+(0.0.0, publish = false, the fire-drill dev-dep) as a judged floor instead of a
+copied header comment.
+
 Two deferrals from the same conversation, recorded so they are not re-litigated:
 
 - **The incremental turn (DBSP), deferred**: the rhyme is real — the journal is a delta
@@ -2552,6 +2581,719 @@ one; what grows is the qualifying fraction. And the tie back to the candidate ab
 direct: only operator-shaped code can live in a bundle, so every file this spike converts
 is territory the continuation process can govern — the two experiments are one programme
 measured from opposite ends.
+
+## Candidate: the exterior engine — every surface a bounded mind consumes
+
+Origin, from a long design conversation (2026-07-13): five years of attempts at
+automatic architecture documentation — hierarchical summarisers, RLM pipelines,
+LLM-designed UI over an atomic design system, plain-HTML5 sites — all fail the same
+way. Each part is locally fine; the whole feels THIN. The diagnosis is this method's
+founding one, transposed: models are not bad at prose or pixels, they are structurally
+blind to recursively structured cohesion, because no harness ever bounded the weave or
+descended a through-line. Thin-ness is what statistical independence of the parts looks
+like; cohesion is correlation, and correlation requires shared conditioning. The
+blindness is in the harness, not the model.
+
+**The founding constraint.** The unit of abstraction is what fits one agentic mind's
+effective context with iteration headroom (~10x drafts). Two budgets, distinct: the
+token budget bounds the context; the CONCEPT budget bounds synthesis, and it binds
+first — meaningful weaving degrades steeply somewhere around 3–7 threads while
+retrieval barely degrades at all. That knee is a DISCOVERABLE CONSTANT per model, not a
+design choice: hold a corpus fixed, vary fanout, score the weave (entailment pass rate,
+register consistency, judged prose quality), find the knee, freeze it. The first brick
+is that harness; every other piece inherits its constant.
+
+**The tree.** Content lives only at leaves. Every non-leaf byte is DERIVED from
+children — exteriors are locks under the standard discipline (regenerate, commit, the
+diff is ratification). Budget per node; depth free (equal depth was considered and
+dropped — balance emerges from the budget, and enforcing it forces padding nodes or
+cuts across natural seams). The parent never reads a child's interior. Split when over
+budget along the minimum-summary cut — a boundary is good exactly when much interior
+compresses to a small exterior, deep modules made mechanical — and merge on underflow,
+with hysteresis so the boundary doesn't thrash. The budget is the missing forcing
+function for pruning: a full leaf makes deletion the cheap default and splitting the
+ratified exception, inverting the economics that make every wiki grow forever. Where
+the code side is under this method, pruning is mechanical: each lock class that grows
+drains the prose — restatements die, justification remains. Steady state is a
+constant-entropy commons of pure WHY on top of a growing lock set.
+
+**The core is structured, not prose.** A node's exterior is: identity (a register
+entry), atomic claims (micro-prose IS canonical — a claim's natural serialisation is a
+sentence; the woven narrative is NOT — it is a rendering), relations (cross-edges roll
+up at the lowest common ancestor, exactly the shape lock's bridge lines), and doors
+(children). One-vocabulary, generalised: authoring the same exterior in two genres is
+the drift engine reintroduced, and is forbidden. The register is MULTIMODAL — one entry
+carries a lexeme, a glyph, a colour, eventually an affordance — and cross-surface
+agreement is by PROVENANCE (every rendered string, box, and label carries the id of the
+core element it renders), never by similarity judging. Byte-pinning, generalised.
+
+**Genres dissolve.** Narrative, diagram, and UI are not three artifact kinds; they are
+mixtures of modal primitives (sentence, label, arrangement, affordance) distinguished
+by who controls traversal: the author (narrative), the eye (diagram), the visitor (UI),
+the clock (slides, video). Doors are a generated space — traversal controller × modal
+mix × consuming mind — and the consuming minds already include the agent (dense plain
+text, the mid-tree functional summaries) and CI (byte-locked specs, the strictest mind
+in the building). Facts flow up; FRAME flows down: the parent hands each child the
+story so far and its chapter's role, the shared conditioning that kills thin-ness. A
+parent's claim about a child is that child's thesis, and entailment along each edge is
+the battery — refutation, never proof. Doors discipline builders THROUGH the schema
+(the memo-culture mechanism, formalised past prose): emphasis descends via the frame;
+doors choose stride, not structure (one tree, cut to the strictest regular consumer —
+coarser doors render several levels per surface); door-needs grow the schema through
+ratification; door-owned content is structurally refused.
+
+**Substrates.** One human door: HTML5 — the DOM is literally a tree of modal regions,
+and provenance-carrying render elements are transclusion, Xanadu's missing feature
+rebuilt as a gate. The register compiles into CSS custom properties: visual vocabulary
+by construction, not by lint. One mechanical battery rides the door for every genre on
+it — headless computed-style checks, screenshots judged against claims, accessibility.
+Machine minds get plain text. Paged print is deferred (print CSS first; a Typst render
+function later only if the board pack's beauty demands it — renders are pure functions
+over the core, so doors are additive). On the gate side, a MEASUREMENT INSTRUMENT, not
+a second renderer: deterministic text layout in the Rust CLI (the cosmic-text /
+HarfBuzz class — metrics from pinned, committed font bytes), with declared tolerance
+margins on fit-gates, because a lock that fails on a sub-pixel shaping disagreement is
+flaky, and flaky locks teach people to ignore locks. The committed-glyph-table trick
+(measure once, ratify the table, pure arithmetic ever after — pretext.js's shape) stays
+in the back pocket for client-side layout that must agree with the gates exactly.
+
+**Behaviour is the fourth modality.** Interactivity is where the candidate rejoins the
+method instead of extending it: a component's interior behaviour is a THEORY (a pure
+`update: (State, Event) → State` — carriers, operations, laws, probed like ttl-store);
+its exterior is a PROTOCOL under the same concept budget; state lives at leaves the way
+content does; events roll up like edges; async is probed in a synthetic world (the
+fabric brick's shape, with DOM carriers); and FEEL is this genre's judgment overlay —
+authored, drift-gated, never derived. The checkability ladder runs prose (LLM-judged)
+→ diagram (structural) → static UI (computed styles) → behaviour (property tests): the
+deeper the interaction, the more mechanical the gate. The collapse it buys: the upper
+tree IS the design documentation and the leaves ARE the shipped artifact, so
+design/implementation divergence stops being a meeting and becomes a failed lock.
+
+**Prior art, and the shared gap.** RAPTOR builds the recursive summary tree (retrieval
+only, no contract); C4 is the drill-down for architecture diagrams; atomic design is
+the roll-up for UI — and fails under LLM composition precisely because the component
+inventory blows the concept budget, so the design system needs the tree treatment too,
+the frame binding a narrowed slice per region; PreTeXt is one-source-many-doors at book
+scale. Every field invented the hierarchy by hand; none has budgets, derivation, drift
+gates, or provenance. The hierarchy is old; the CONTRACT is the contribution.
+
+**Bricks, in order.** (1) The knee harness — derive the weave constant per model,
+freeze it as a lock. (2) The minimal CLI — `check` (budget, no-content-above-leaves,
+staleness by leaf hash), `split` (min-summary cut), `summarize`; every verb a judged
+transaction, a refusal writes nothing. (3) The routing battery (an agent given only
+exteriors must descend to the right leaf) and the leak/vacuity mutation pair: a pure
+refactor that moves an exterior convicts it of leaking; a behaviour change that leaves
+it fixed convicts it of vacuity — a good boundary's exterior is a FIXED POINT under
+interior churn, the placer's criterion applied to prose. (4) The entailment battery per
+edge. (5) The HTML door with the mechanical battery. Build it beside this workspace as
+a probe-algebra project: every gap the doc domain exposes in the verbs is a field
+report, and this is the method's first application whose artifact is not code.
+
+First data (2026-07-13, the same day): brick (1) is built — `weave-knee`, a research
+member in the layout-probe shape — and the pilot sweep REFUTED the naive knee. With
+relations handed to the weaver pre-formed in the exteriors and a word budget that
+scales with fanout, claude-sonnet-5 holds relation coverage at 1.000 through fanout
+12: explicit-relation integration does not collapse where the 3–7 intuition said it
+would, so `spec/knee.spec` honestly reads `knee: >= 12 — a lower bound, keep
+sweeping`. What degrades instead is the judged weave QUALITY (4.0 at fanout 2,
+3.0 by 8–12): every fact survives, the through-line thins — the original thin-ness
+diagnosis showing up in the one dimension the mechanical scores cannot see. The
+harness's next variations are therefore named by the data — and organised by the
+transport lens: the weaver IS an approximate transport functor (structured exteriors
+→ prose, the one door whose functor can never be code), and functors fail in three
+graded ways, so the instrument measures exactly those. IDENTITY preservation (each
+module stays itself — mention and claim coverage; the pilot shows this floor holds
+through 12, a solved dimension). COMPOSITION preservation (the live one: plant
+EMERGENT FACTS, true only of chained behaviour across two or three children with a
+semantic step — "nothing Kelkel evicts is ever lost" — and score their coverage; the
+k12 weave spontaneously surfaced "the twelve modules form a single ring" even as its
+judged quality sagged, so emergence is the variable exactly where the coarse number
+flailed). INVERTIBILITY (the return leg: a fresh judge, given ONLY the narrative,
+reconstructs the topology — who feeds whom; reconstruction accuracy is
+weave-faithfulness with no 1–5 anywhere, and it is brick 3's routing battery arriving
+early). The 1–5 rubric split considered and DISSOLVED: functoriality replaces taste
+with mechanical dimensions, judgment retreats to pure felicity. And the aim, named:
+a weave is worth shipping when the functor is faithful WITH POSITIVE GAIN — it makes
+explicit the composites the children only jointly imply (gain, measured by emergent
+coverage) while inventing nothing underivable (faithfulness, policed by the foils).
+A parent exterior earns its bytes exactly when gain is positive; concatenation is
+the zero-gain baseline. The knee, if it exists, lives where gain goes to zero under
+fanout — the pilot proves the instrument works and moves the question.
+
+The v2 instrument is built (2026-07-13, later the same day): claims carry their kind
+and parameter so composites derive mechanically; `emergents()` plants the ring-closure
+fact plus per-edge sums and minima, each with a one-step-wrong foil; the judge rules
+two censuses under two criteria (ENTAILED for identity, STATED for gain — a composite
+the judge could derive herself but the narrative never makes explicit does not count);
+a third model call reconstructs the topology from the narrative alone; and the spec
+freezes both knees — the identity knee against the relation floor, the gain knee where
+mean gain touches zero. The v1 trials are archived in `weave-knee/trials-v1/` beside
+the spec frozen over them: they were measured under the v1 prompt and cannot sit in a
+v2 curve without lying about what was asked of the weaver.
+
+The v2 sweep RAN (2026-07-14, the v1 grid mirrored: fanouts 2–12, seeds 1–2,
+sonnet-5 weaving and judging; sixteen trials, spec frozen over them). The findings:
+the IDENTITY KNEE moved from "held through 12" to "held through 12 under the harder
+prompt" — relation coverage 1.000 at every fanout, foil rejection 1.000, and the v2
+legs the v1 curve never had both maxed: entailment-foil 1.000 everywhere, topology
+reconstruction 1.000/1.000 everywhere — a fresh reader rebuilt the ring from the
+narrative alone at every fanout. The naive 3–7 knee stays refuted, now with
+invertibility evidence. The GAIN KNEE derived to 2, and that number carries a
+methods caveat worth its own line: the rule is "last fanout before gain touches
+zero," and gain hit 0.00 at fanout 3 on both seeds — but rebounded to 0.43 at 4,
+0.34 at 5, and 0.46 at 8, which two seeds cannot distinguish from sampling noise. A
+first-zero rule is brittle at n=2: either the k3 zero is real (a genuine synthesis
+dead spot at three strands) or the knee rule needs a noise-robust form (last fanout
+with mean gain above a floor across a window). More seeds at 3–4 decide it; the
+committed spec honestly carries the twitchy number until then.
+
+Honest frame, kept: exteriors are generated prose judged by generated tests — the
+batteries refute, they never prove. A summary that survives routing, mutation, and
+entailment is EVIDENCE of a good abstraction, not certainty. That is already the
+epistemics the method runs on, and it is a better position than any surface nothing
+checks.
+
+## Candidate: warrant tiers — the confidence census
+
+Origin (2026-07-13, the conversation straight after the exterior engine's first
+brick): the honest frame says "evidence, not certainty" as if evidence were one
+substance. It is not — the library already holds four distinct warrant strengths and
+the boilerplate claims the weakest for all of them. Unbundled, "this is a good
+abstraction" is four claims: the laws hold, the exterior does not leak, the
+incompleteness is bounded, and it serves its purpose. The first three elevate —
+separately, by different machinery. The fourth is a signature and never elevates
+(intent is never inferred from conduct — the kernel-register lesson is an epistemic
+boundary, not a policy).
+
+The ladder, every rung already in-tree: SAMPLED (bounded grids, batteries — the
+default the boilerplate describes); EXHAUSTED (a finite carrier's grid IS its domain —
+a green Bool law is a decision procedure that ran to completion, and filing it under
+"sample" is underclaiming); PROVED (`lean/ProbeBool.lean`'s `proved:` lines,
+kernel-certified, statement-bites guarding the statements against vacuity);
+DEFINITIONAL (ci.yml cannot drift from the GateRegistry because it is RENDERED from
+it — the error class dissolved, nothing left to prove). Orthogonal and already paid
+for: the mutation registers are certainty of a different currency — an enumeration of
+the remainder, certainty about the uncertainty, the only kind available past Rice.
+
+The brick: a WARRANT TIER on every law line — `sampled(grid)` | `exhausted` |
+`proved` | `definitional` — DERIVED, never typed: the engine knows whether the grid
+covered the whole carrier, the bridge knows which conjectures carry certificates, the
+render layer knows what is generated. Rendered through the one equation source, so
+every lock shows how each law is known. Two consumers ride it: the DEMOTION GATE (a
+law may never silently lose warrant strength — climbing is a diff to ratify happily,
+sliding is a refusal) and the CENSUS (laws per tier, the number the roadmap drains
+upward the way qualify drained interior reads). Delta-render's specs-as-licenses gets
+its sequel: warrants license moves — only a proved law licenses the optimization,
+only a definitional exterior skips the leak battery. Free rider, as its deferral
+predicted: the totality line ("every operator is total on its declared grid") rides
+along, since this IS the spec header format moving for its own reasons.
+
+The definitional program — the aim behind the top tier: a drift gate is a confession
+that two authors exist. Every gate class is either INVERTIBLE (the artifact becomes
+the image of a render function; the second author dissolves; the committed diff stays
+as the ratification checkpoint — what dissolves is the author, never the signature)
+or GENUINELY DUAL-SOURCED, and the reason is a register line. Three things never
+climb to definitional: world-facts (measured, not derived — derive the instrument,
+commit the reading as evidence; weave-knee is the template), the generators' own
+correctness (fire drills and statement-bites live here, the named trusted base), and
+purpose (a signature, forever). Steady state: the hand-typed bytes of the repo are
+declarations, justifications, and signatures; every other byte is an image.
+
+Honest frame, localized rather than deleted: the certificate is conditional —
+guaranteed relative to the declared observables, the trusted kernel, and the ratified
+purpose — with every condition named in the artifact instead of ambient in a
+paragraph like this one.
+
+## Candidate: the agent's terminal loop — perceive, decide, declare, sign
+
+Origin (2026-07-13, the same conversation, one step further): warrant tiers name how
+each fact is known; the definitional program names the aim (every analytic byte an
+image). This candidate names where the AGENT lands when both are driven to their
+fixed points — the working loop reduces to perceive (derived views) → decide
+(judgment) → declare (a verb) → sign (a diff that is pure ratification), and
+everything that used to sit between those verbs is an image, an attestation, or a
+register line someone ratified. Each stage has a beachhead in-tree, a census that
+drives it, and a fixed point that says it is done. The program is self-measuring:
+four derived numbers, each drained toward zero-modulo-a-register, exactly the
+mutation-survivor shape.
+
+PERCEIVE — drain the fallback encyclopedia. Beachhead: `show`, `constrains`, `trace`,
+`owes`, the startup orientation. Driver: the instrument rule's recorded readings —
+each cluster of greps names the perception verb that would have answered it (`show`
+was born this way), and the exterior engine's agent door supplies the subsystem
+grain, budget-sized by the weave-knee constant. Fixed point: interior reads per
+session → 0; the residue is exactly the properties the lock language cannot yet say,
+each one a lock-language brick.
+
+DECIDE — build nothing; feed it and protect it. The substrate's whole contribution
+is calibration in (warrant tiers: spend verification effort only where `sampled`
+lives) and contamination out (prose is judgment, stays hand-typed — the standing
+danger as everything else mechanises is judgment getting templated too). Done when
+deciding is the only stage consuming the concept budget.
+
+DECLARE — close the verb algebra and DERIVE the closure metric. Beachhead: the
+bundle verbs and the field-report loop that grows them. The missing piece is the
+measure, and it is the standing question pointed at the second rule: "how much of
+this commit went through the verbs?" is currently a feeling, but the journal knows
+what the verbs carried and git knows what changed, so VERB COVERAGE PER COMMIT is a
+derivable ratio — a census line, derived never typed. The gap between journal and
+diff IS the field-report list, computed instead of noticed. Fixed point: non-verb
+code bytes → 0, remainder ratified in a register.
+
+SIGN — the pure-ratification diff, the one stage with no beachhead and therefore the
+new brick. A commit today mixes regenerated images, verb-carried code, and hand
+judgment, so ratification attention is diluted by material a machine already vouches
+for. The move: every generated hunk arrives ATTESTED — content-keyed by the
+derivation that produced it, the keying the gate verdicts already use — so a commit's
+reviewable surface reduces to declarations and justifications. "The diff is pure
+ratification" then means literally: everything in it is machine-attested (skim) or
+judgment (read). Composes with the demotion gate: an attested hunk whose derivation
+lost warrant strength is a refusal. Fixed point: unattested generated bytes → 0.
+
+Dependencies, already mostly sequenced: warrant tiers feed perceive's calibration and
+sign's demotion rule; the exterior engine feeds perceive's subsystem grain; verb
+coverage needs only the journal that exists; the attestation keying exists in the
+gate verdicts. No new theory — the method pointed at its own interface, four times.
+
+The constructivity claim, stated so it can be refuted: at the four fixed points the
+repo is AS CONSTRUCTIVE AS POSSIBLE. Every analytic byte is an image; synthetic
+truth enters only as a derived instrument's committed reading (weave-knee is the
+template); the trusted base is enumerated and drilled, never self-attesting; purpose
+is a signature. No method exceeds this — a derivation cannot manufacture information
+about the world or about intent — so the residue is not a shortfall but the floor,
+named. The one frontier that moves a boundary rather than draining a number: the
+cubical arm, where proved cross-representation agreements become computing transports
+and a whole lock family climbs proved → definitional in one move.
+
+Honest frame: the fixed points are asymptotes approached by ratified steps, not
+states a sprint reaches; each census will spend most of its life mid-drain, and the
+loop is real the whole way down — every drained line makes the agent's next session
+more perceive-decide-declare-sign than the last.
+
+The transport arm, expanded (named a frontier above; the purchases, so they are not
+re-derived): a computing transport — constructive univalence's working face — moves
+certification from PER FACT to PER BOUNDARY: prove one equivalence between two
+representations and every law crosses free, including laws not yet discovered. What
+that buys, concretely: the mirror class of locks dissolves (two-authors-plus-a-
+comparator becomes inherited agreement); the world's proof corpus becomes consumable
+wholesale (one isomorphism to a mathlib structure and its entire theorem library
+arrives already-true of the Rust carrier — the structure identity principle as an
+elevator where the bridge climbs retail); a refactor ships its own spec (laws,
+observables, expectations transport; mutant sites and coverage do not — transport's
+boundary lands exactly on the exterior/interior grain the placer already draws);
+releases ship their own migrators (a representational version change carries
+consumers across, and every reliance re-certifies as an executed program, not a
+changelog read); the exterior engine's doors inherit fidelity instead of proving it
+(a new door is a functor definition, not a renderer plus a battery); and perception
+completes (any fact in any presentation, computed from the thing itself, warranted
+definitional). Bounds, kept: nothing sampled climbs, nothing judged climbs,
+enumerable or formalisable carriers only — effectful theories transport at their
+model. The pragmatic path is the repo's standing lesson pointed at type theory:
+never author the trusted base — pin a kernel that exists (Lean today, cubical Agda
+`--safe` when transport must compute), bridge through gated agreements, and let the
+bites keep the statements honest. A field report from before this repo existed: an
+attempted HoTT language with a first-generation agent failed exactly as thin wholes
+fail — a kernel is the one artifact whose value is entirely global invariants, and
+nothing was checking them. The blindness was in the harness, not the model, there
+too.
+
+## Candidate: the freedom budget — no anonymous degrees of freedom (brick 1 BUILT)
+
+Origin (2026-07-14, the conversation that ran from "tests are observational
+evidence" through univalence to the CLI): three threads that arrived separately and
+turned out to be one claim. The aim is not zero degrees of freedom — it is zero
+ANONYMOUS degrees of freedom. Judgment is a degree of freedom with a name and a
+signature; a bug is a degree of freedom nothing constrains and nobody owns. So
+"eliminate bugs by construction" decomposes: every dimension of an artifact is
+either DERIVED (freedom zero — render it, never author it) or DECLARED (freedom
+owned — a register line, a signature), and the gate is that nothing sits in
+between.
+
+The formal footing, so the intuition has something to stand on: take a spec and
+consider the space of implementations satisfying it. Contractible (one inhabitant
+up to identity) means the spec forces the implementation — that is what "derived"
+means, stated as mathematics, and a uniqueness theorem is its proved-tier form.
+Multiple components mean the spec genuinely underdetermines — the components ARE
+the decision register, one line per component, and choosing one is the signature.
+The paths inside a component — implementations that differ but are equivalent —
+are exactly what univalence quotients away: freedom that connects observationally
+equivalent programs is not freedom at all, and a language that identifies
+equivalents cannot even state the distinctions that don't matter. The placer knew
+this first: "a good boundary's exterior is a fixed point under interior churn" is
+the statement that the interior is contractible as seen from outside. And the
+mutation census gains its true name: an empirical sampler of the component count.
+A surviving mutant exhibits two points no probe distinguishes — either they are
+equivalent (a path; quotient it, which is why deleting the degree of freedom
+beats ratifying it) or they sit in different components (a real decision; the
+register line names the one chosen).
+
+The constructive half is already built and running: the bundle CLI. Its verbs are
+introduction rules — the reachable tree-states are an inductive type, ill-formed
+states not rejected but unreachable, and a refusal writes nothing. The journal is
+the proof term (every state carries its derivation; `replay` re-checks it), field
+reports are completeness counterexamples (a well-formed state the constructors
+cannot reach, named), and `bundle pin` is the de Bruijn criterion arrived at
+independently — the kernel is not rebuilt by the tree it is checking, mid-check.
+What keeps the property empirical rather than proved is one number, verb coverage:
+hand edits still exist, so the reachable set is not yet closed under the
+constructors. At coverage 1.0 the drift gates on verb-covered artifacts become
+unable to fire BY THEOREM — decoration by proof rather than by rot, the arrow
+inversion completing itself — and the residual gates defend against exactly one
+thing, bugs in the kernel, which is what a residual gate should do.
+
+The path to the univalent quotient is short because most of it is recognition,
+not construction. The shape catalog is already the poorer language — a law can
+only mention declared operations; there is no syntax for reaching into a carrier
+— so the unstatability property already holds at the layer where theories live,
+and what was missing was the proof that it is real rather than accidental. The
+interior is exempt by design — representation is where performance judgment
+legitimately lives, the placer's exterior/interior split applied to freedom
+itself. And univalence proper arrives by pinning (cubical Agda `--safe` when a
+transport must compute), never by authoring — the transport arm's standing rule.
+
+Brick 1, the swap drill — BUILT (2026-07-14, `src/kvstore/twin.rs`, cfg(test),
+lib-side). The ttl store reimplemented over a genuinely different representation:
+a key-ordered map to (value, ABSOLUTE expiry) where the primary keeps a sorted
+entry list with a (born, ttl) split — no Entry, no Vec, no relative life stored
+anywhere. Same operations, same variable letters, same observation type. The
+drill: the discovered law list must be BYTE-IDENTICAL under the carrier swap. It
+is — the theory names a true equivalence class; the spec language did not leak
+representation. And the drill can fire: a first-write-wins merge (a behaviour
+change, not a representation change) moves the list — the bias law names which
+side wins and cannot survive the flip. The qualify and tier censuses counted the
+twin and their diffs are the ratification.
+
+A reading, recorded (the instrument): building the twin required opening
+`kvstore/internal.rs`, because the committed ttl-store spec UNDERDETERMINES the
+boundary semantics an equivalent implementation needs — that liveness is strictly
+before expiry, that dead entries linger unswept until the next tick, that merge
+unions raw entries rather than live ones. The laws held byte-identical anyway,
+which is the honest bound stated by the drill itself: identical law lists are
+sampled-tier equivalence — the grid may simply be blind to a boundary the spec
+never speaks. The reach names the next brick: an OBSERVATION CONTRACT the spec
+language can state (the liveness comparison is pinned today by probes, not by any
+law), so that the next twin is buildable from the spec alone. When that holds,
+the spec is definitionally sufficient for its own carrier swap — which is what
+"the exterior is the interface" means, made mechanical.
+
+Bricks, onward. (2) A twin per settled theory — the census is theories-with-twins
+over theories, drained like every other census; each green twin is a ratified
+"this theory names an equivalence class", each red one a leak found before it
+bit. (3) The reconciliation gate: the mutation census against the decision
+register, bijectively — every surviving mutant maps to a declared judgment line,
+every judgment line has a surviving mutant; a survivor with no line means the
+design lied about its freedom, a line with no survivor is a vacuous ratification.
+(4) Promote one twin equivalence to proved: state the carrier equivalence in a
+pinned univalent checker, transport the law list wholesale, and retire the
+sampled comparison to the drill role the fire drills play today.
+
+Honest frame: the swap drill refutes leaks, it never proves their absence — a
+bounded grid can miss the observation that separates two carriers, and byte-equal
+law lists are evidence the quotient holds, not a theorem that it does. The ladder
+from one to the other is warrant tiers, and this entry is its "definitional
+program" pointed at the change medium: the same three-step everywhere — recognise
+the quotient, gate it cheaply, prove it only where proof pays.
+
+## Candidate: the language constructor — the change medium becomes a generated artifact
+
+Origin (2026-07-14, the conversation that ran from "is there an algebra of CLIs?"
+through Lucid and DBSP to "the language for agents"). The recognition that starts
+it: everything that made bundle the RIGHT KIND of CLI lives in no verb in
+particular. Judged transactions, refusal-writes-nothing, states reachable only
+through constructors, the journal as derivation, replay as checker, pin as kernel
+separation — none of that is `add`'s code or `edit`'s code; it is the harness.
+What is verb-specific is only a signature (name, typed arguments — seven argument
+types cover all fifteen verbs) and a judgment. So the freedom budget of "a
+morphism-constrained CLI" partitions cleanly: the harness is DERIVED (parser,
+usage, dispatch, refusal plumbing, journal, replay, atomicity — identical for
+every CLI in the class), and the verb list is DECLARED (each verb a signature
+line: `judge: State × Args → Result<Effect, Refusal>`, with the harness owning
+the write). The crucial inversion: today "a refusal writes nothing" is true
+because the author was disciplined fifteen times; in the generated form the verb
+author CANNOT write on refusal — the freedom "when does a verb write" is not
+declared and defended, it is deleted, unrepresentable. Bundle is a hand-built
+witness that the class is inhabited; the constructor makes membership derived.
+There are already two hand-built instances in this repo (bundle and weave-knee's)
+— the classic signal that the abstraction is real.
+
+The name, chosen for its triple truth: in type theory, constructors ARE the
+introduction rules; this thing constructs languages OUT OF constructors; and
+every language it emits admits only constructor-reachable states. Each emitted
+instance is a BY-CONSTRUCTION INTERFACE (equivalently: a judged medium; to the
+planning literature, an action language; to a mathematician, the declaration is
+a presentation — generators and relations — and the harness compiles the
+presented object).
+
+The term language (eval). Verbs compose: `bundle eval <program>`, where a program
+is a term in the free monad on the verb signature functor and the whole term is
+ONE atomic judged transaction — any refusal anywhere and nothing is written. The
+term goes in the journal as the proof term; replay re-evaluates it. Three design
+commitments made before the language exists, because they cannot be retrofitted:
+(1) TOTAL — iteration only as fold over lists the system itself derives, never
+general recursion; every term's judgment terminates by construction, or the
+proof-term property dies. (2) DAG-shaped, not word-shaped — sequencing forced
+only by genuine data or effect dependency, so independence is syntactic:
+independent subterms judge in parallel, and squash normalizes a graph (where
+commutation is visible) rather than a string (where it must be argued). (3) The
+refusal monad's alternative structure makes recovery combinators safe —
+atomicity is a property of the transaction boundary, not threatened by handling
+a refusal inside the term. Consequence for the roadmap's own fuel: field reports
+stop being "missing verb" and become "missing combinator," a far slower-growing
+set.
+
+And the emitted languages COMPOSE. Two declarations glue along their shared
+argument sorts (the small argument-type vocabulary is the gluing site): verb
+signatures compose by sum, carriers by product, and the free monad on a sum of
+signatures is the à-la-carte result — so a term may span domains and is still
+ONE atomic judged transaction, because atomicity and the refusal boundary are
+harness properties, not domain properties. Cross-domain atomicity is the thing
+no schema-per-tool ecosystem can say: "edit the code AND move the tracker" as a
+single term that lands whole or not at all. The delta world composes for free —
+Z-set deltas over disjoint relations commute, so composed domains inherit the
+multi-agent merge property unchanged — and the topography already knows this
+shape: seams between theories (date calculus ↔ ttl store on Duration) are
+exactly what shared sorts between composed domains are. Composition is a
+colimit of presentations, performed at the declaration layer; the constructor
+needs no new code to support it.
+
+The execution layer, general and built once. Two dualities and one calculus:
+the term language is monadic (what a program may do next); the journal is
+comonadic — a Lucid stream of tree-states with transaction succession as `fby`,
+and the medium's deepest laws are intensional statements over that stream
+("a refusal writes nothing" is a `fby` equation). Lucid implementations evaluate
+by EDUCTION — demand-driven, with a warehouse of memoized values keyed by
+context — and this repo already evaluates that way without saying so: a gate
+verdict content-keyed by tree hash IS a warehouse entry, and `owes` is demand.
+DBSP supplies the calculus that unifies it: for ANY computation Q over streams
+of abelian-group deltas, the incremental version is D∘Q∘I — fully general as a
+correctness framework. The efficiency theorems are what's restricted: linear
+operators pass deltas through free, bilinear ones (join) cheaply, and the chain
+rule propagates the wins through composition. For an opaque Q (rustc, a test
+run) the transformation degenerates to integrate-recompute-memoize — which is
+exactly the eduction warehouse. So the warehouse is not a second mechanism
+beside the delta calculus; it is the calculus's degenerate case. ONE execution
+layer: every node is D∘Q∘I; a node EARNS delta propagation by declaring group
+structure; everything else gets memoized recompute; hand-authored incremental
+maintenance is refused everywhere (it is the canonical anonymous degree of
+freedom — a second implementation of the same view, related to the first only
+by discipline).
+
+The generality boundary is the abelian-group requirement on deltas, and it is a
+fact about representation, not about code: a TEXT file's edit is not a signed
+multiset of anything useful, but the verbs already left text — `edit`'s own
+signature treats a module as a keyed set of items. The ideal inverts the current
+arrangement: the item relation (module, item-name, body) becomes the source of
+truth and the `.rs` file a derived rendering, canonical order and all. Then the
+Z-set atom boundary lands exactly on the placer's exterior/interior split — the
+item body is the atom, its interior the exempt representation freedom — the same
+line discovered twice. Payoff: qualify is a projection, tiers a partition, the
+instrumentation census a relation, the reconciliation gate a join — censuses
+become incremental BY THEOREM, with the wholesale `BLESS_*` recompute demoted to
+the gate oracle. Dependency verdict: build the kernel in-house (a few hundred
+lines — Z-set, I, D, z⁻¹, lift, join, distinct), not the Feldera crate; this
+kernel sits under the judgment layer, and our own code goes under `#[mutate]`
+while a dependency's interior is exempt from every instrument we have. The DBSP
+laws (I∘D = id, linearity per declared-linear operator, bilinearity of join)
+freeze as theory shapes — the execution layer becomes the next settled module in
+the topography, with naive recompute as its swap-drill oracle. Precedent:
+schemata displaced cargo-mutants for the same reason. Performance is the
+adoption property (the temptation to bypass a judged interface is latency), and
+the calculus makes the strong form reachable: the judged path becomes the
+CHEAPEST path — a raw edit owes wholesale gates against a new tree hash, a
+judged edit is a delta that maintains derived facts by theorem — at which point
+the temptation inverts. The checkable form is structural ("no census recomputes
+wholesale on the transaction path"); wall-clock budgets stay evidence, never
+locks.
+
+The agent claim, stated with its bounds. An LLM agent's characteristic failures
+are medium failures, and the stack answers the taxonomy point by point: partial
+writes → atomic terms; acting on stale beliefs → eduction (perception is derived
+against the current state hash or explicitly owed — a stale belief becomes a
+state the medium cannot express); transcripts instead of derivations → the
+journal as proof term; runaway scripts → totality at the grammar; ambient
+authority → the verb boundary as the space of expressible intentions. None of it
+constrains the agent's intelligence — it constrains the medium so intelligence
+is the only thing left to vary; choosing the term remains the agent's judgment,
+signed per transaction. The honest bounds: (1) the language governs only the
+formalized region — the world brought inside a declared carrier — and agents
+still live at the wild boundary; the claim is that the constructor makes the
+judged region cheap to EXTEND, one declaration per domain. (2) It is not "the
+language for agents"; it is the language CONSTRUCTOR — instances are
+domain-bound, the scheme is what generalizes, and an MCP server is just one more
+derived rendering of a declaration (schemas for invocation are what the tool
+ecosystem has; judgment, atomicity, journal, and perception discipline are what
+it lacks). One property matters most for what comes after: abelian deltas are a
+MULTI-AGENT property — independent transactions from concurrent agents merge by
+addition, and where two terms do not commute the algebra does not fail, it
+DEFINES the conflict. Non-commutation is what a conflict is, named rather than
+discovered at merge time.
+
+The limit cases, captured while they are cheap. Downward one layer: an OS is
+what a platform must be when userspace is arbitrary machine code — hardware
+refuses what the language cannot. With a userspace of judged terms, each OS
+organ dissolves or changes role. Isolation moves into the grammar
+(cross-domain interference unstatable, not refused) — Singularity proved the
+mechanism with software-isolated processes and typed contract channels, and
+made the MMU optional defense-in-depth: HARDWARE PROTECTION DEMOTED TO THE
+RESIDUAL GATE, defending only against harness-kernel bugs. The filesystem
+dissolves into a journal plus a content-addressed payload store — which
+`bundle.journal` + `bundle.payloads` already is: a log-structured,
+content-addressed FS whose journal is never truncated (ext4 computes the same
+derivation and throws it away after recovery). The scheduler becomes the
+eduction engine — "what runs" is "which demanded facts are stale," budgets as
+refusals. Drivers are declared domains at the wild boundary; legacy software
+enters as opaque operators with content-keyed verdicts (rustc is already
+treated exactly this way by `gates`; a whole OS in a VM is the same move at
+larger grain). Two bounds: Spectre-class timing channels are observations
+outside any grammar, so the residual hardware gate earns its keep; and every
+language-based OS died of the compatibility moat — the reason this is timely
+rather than nostalgic is that AGENTS ARE THE FIRST USERSPACE FOR WHICH THE MOAT
+DOES NOT BIND: they need media for action, not shrink-wrapped binaries, and
+regenerating software as declarations is the one thing that stopped being
+expensive.
+
+Downward again: the metal. Branch prediction and out-of-order execution solve
+for bad code — hardware sympathy is an author discipline, and discipline
+cannot be socialised, so the CPU compensates. The precise form: OoO execution
+IS a dataflow engine — Tomasulo reconstructs at runtime, speculatively, per
+instruction window, the dependence DAG the compiler had (SSA is that graph)
+and discarded in lowering to a linear ISA. A derivation computed, thrown away,
+and re-derived downstream at the cost of most of the die — and of Spectre,
+which is what it looks like when hardware acts on unjudged guesses that leak
+through an observation vocabulary the ISA never speaks. If terms arrive
+DAG-shaped and total, the machine simplifies: no prediction (control flow no
+longer hides data flow), no reordering (the linear order was never real),
+latency tolerance from parallel slackness — many ready nodes — rather than
+speculation. GPUs and Groq's deterministic TSP are the existence proof that
+when the software contract changes, hardware simplifies AND wins; Itanium is
+the honest failure to keep in frame (a static schedule against dynamic memory
+latency loses — the DAG must buy tolerance, not a timetable — and the binary
+moat binds, voided again only by an agent userspace). The Om experiment (an
+FPGA interpreter, asking how few primitives suffice) is this limit's drill:
+the machine whose ISA is the term language, an eduction engine in silicon,
+with "how few primitives" as the hardware form of the verb-coverage number.
+Hardware sympathy becomes a medium property, not an author discipline — the
+freedom-budget move applied to the metal.
+
+Priority (decided 2026-07-14): this trumps the tree-of-minds work — it is
+foundational to how one programs with probe-algebra — and tree-of-minds becomes
+the first dogfood consumer: many minds, one judged medium, commuting deltas
+merged, non-commuting ones surfaced as the decisions they are. Its acceptance
+test is the observation-contract test at project scale: buildable from the
+declared surface alone; any reach around the verbs is a field report against the
+foundation from day one.
+
+Bricks. (1) Found the `cli!` declaration form and its generated harness, through
+the verbs. (2) Dogfood: declare bundle's own fifteen verbs, generate, and pin
+the first lock — generated usage text byte-identical to the hand-written one
+(`spec/cli.spec`); acceptance: both existing journals (root and weave-knee's)
+replay under the generated harness — the journal format is declared surface, not
+derived interior. (3) The Z-set kernel as a theory-bearing module, laws frozen,
+naive-vs-incremental as its oracle gate. (4) The item relation as source of
+truth, files as renderings, censuses migrated to derived deltas. (5) eval, on
+the generated harness, so every emitted language is born with it.
+
+Honest frame: D∘Q∘I is a theorem; everything downstream of it here is design
+warranted by two hand-built instances and one running warehouse. The agent claim
+is a hypothesis with a named test (tree-of-minds builds on it without reaching
+around the verbs), byte-equal naive-vs-incremental is sampled equivalence like
+every drill in this repo, and "the judged path is the cheapest path" is a goal
+the structure makes reachable, not a property it already has.
+
+Brick 1 BUILT, and half of brick 2 with it (2026-07-14, `src/discover/cli.rs`,
+through the verbs except one named fallback). The declaration form landed as data
+stanzas, the catalog idiom, not yet a macro — `cli!`'s sugar starts paying when
+judgment binding arrives, and sugar before then would be syntax with nothing to
+sweeten. What exists: `Sort` (the argument-type vocabulary — Module, Item, Payload,
+Declaration, Journal, Theory, Term; the predicted "seven types cover all fifteen
+verbs" held exactly, with `operator` folding into Item and `theory-name` into
+Theory), `Slot` (sort × label × mode — the sort owns its shell-quoting discipline,
+the mode owns its brackets), `VerbSpec` (a declared `sibling` renders on the
+previous verb's usage row — gates | owes is a presentation judgment, not a derived
+fact), and `CliSpec` with the first two harness derivations: `usage()` and
+`parse()` (argv → bound invocation or the usage refusal, a refusal binding
+nothing). `CliSpec::bundle()` declares the fifteen verbs — the hand-built witness
+is now the class's first instance.
+
+The first lock landed stronger than its plan: not generated-vs-hand-written
+equality (`spec/cli.spec`), but the hand-written usage text DELETED —
+examples/bundle.rs renders its usage from the declaration, so agreement is
+definitional and the probe's byte-pin (lib-side, where the root sweep can see it)
+is the ratification checkpoint on the declaration itself. The mirror stage was
+skipped exactly as the definitional program says to skip it: the second author
+dissolved, the signature stayed. Two censuses moved and their diffs ride this
+commit (qualify-reasons and tiers count the new file; schemata counts nine new
+sites, all killed by the module's three probes).
+
+Field reports from the founding: (a) `add` founds a nested module's FILE but not
+its MOUNT — member genesis's "mounts included" held at a crate root, not inside
+`discover/mod.rs`; the mount itself went through as a second `add` on mod.rs, so
+the verbs reached in two moves where one was predicted. (b) `grow`'s FOURTH
+firing: the boundary discipline refused a loose `pub fn bundle_cli` (rightly — it
+became `CliSpec::bundle()`, the `GateRegistry::declared` idiom), and moving it
+into the impl was interface growth `edit` refuses ("2 held, 3 offered"); the
+fallback arm carried it. (c) A discipline interaction worth knowing: an unmounted
+file tiers INTERIOR ("not pub-reachable") and inherits the inward rule — the
+raw-`String` refusals evaporated when the mount landed and the file tiered
+ALGEBRA. The enforcement judged this session's code exactly as it judges hand
+code, which is the point. Readings, recorded per the instrument: the `#[mutate]`
+label semantics and the tier-rule dispatch were both learned by opening interiors
+(boundary-spec-macros, boundary-enforce) — the question they answered, "what will
+refuse this payload before I offer it," is a preflight-judgment perception no
+verb yet speaks.
+
+Brick 2's remainder, named so it is not re-derived: migrate `run`'s hand-written
+match onto `CliSpec::parse` (the harness owns binding; the arms keep only
+judgment), then the acceptance — both journals replay under the generated
+harness.
+
+## Candidate: the site-keyed sweep — the last long check dissolves into the delta
+
+Named the day the gate supports landed (2026-07-14), from the same felt pain one
+level down. The support projections made prose edits owe nothing; a SOURCE edit
+still owes the full schemata sweep, because the attestation's warehouse key is
+per-TREE: one changed function makes the transcript "foreign" and voids 866
+innocent site verdicts. The key is too coarse — the same disease the supports
+just cured at gate grain, recurring at site grain.
+
+The change: key each site's verdict by the CONTENT OF WHAT IT IS EVIDENCE ABOUT —
+the site's enclosing item plus its covering test items (the attestation already
+records per-site verdicts and per-site covering tests; this is a keying change,
+not a new instrument). On the next run, reuse every verdict whose item and
+covering tests are byte-identical and re-judge only the moved sites: an ordinary
+edit touches one or two items, so the judging phase drops from ~867 site-runs to
+single digits — seconds, with the one build left as the compiler's own bill. The
+moved-item set is not a diff heuristic: changes go through the verbs at item
+granularity, so "what moved since the attested tree" is a JOURNAL QUERY — the
+change medium built for judgment turns out to carry exactly the dependency
+tracking the incremental sweep needs. This is the dataflow kernel's first paying
+customer: site verdicts as a view over the item relation, maintained by deltas,
+with the from-scratch sweep demoted to the oracle.
+
+The honesty ladder is already ratified, not new: the retired since-green mutants
+gate ran only the diff since the certified tree (incrementality-by-diff was
+accepted policy), and the weekly from-scratch shards exist precisely to backstop
+incrementality's one gap — a test edit weakening kills for unchanged code, which
+is also per-site keying's gap (a test's behaviour can shift through code it
+calls without its own text moving; item + covering-test keys cannot see that).
+Sampled tier per change, from-scratch tier weekly: the long check survives only
+where it should — the weekly backstop in CI, and a cold checkout with no
+attestation.
+
+A finding from the day it was named, recorded so the keying change inherits it:
+timeout-as-detection is LOAD-SENSITIVE. A QoS-demoted run timed out two sites
+whose ratified justifications are definitional equivalences; the false kills
+read as stale register lines ("a stale exception is a lie"), the lines were
+deleted, and the next full-speed run — correctly — found the survivors
+unratified and went red. The doctrine (a timeout is a detection) is right for
+CI, where load is uniform; locally it means a verdict can depend on the
+machine's mood, and a register line can be deleted on a lie told by the
+scheduler. Two consequences: a register deletion earned by a demoted or loaded
+run deserves suspicion before ratification (the deleted line's justification
+arguing DEFINITIONAL equivalence is the tell — definitional equivalences do not
+die), and the site-keyed sweep should key timeout verdicts separately or
+re-judge them before treating them as kills, so a slow machine cannot mint
+false facts.
 
 ## Standing follow-ups
 

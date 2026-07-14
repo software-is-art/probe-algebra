@@ -1,0 +1,66 @@
+weave-knee trial v2
+fanout: 5
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Ostsax runs as a closed loop of five modules, each holding data only briefly and each answerable only through the others. Griquen, the cache, evicts anything left unclaimed after 7 ticks, refuses new writes while its sweep runs, and answers reads solely from its newest snapshot; it publishes its sweep verdicts to Pambra. Pambra, the sampler, keeps only digests of what it carries, never bodies, evicts unclaimed items after 7 ticks like Griquen, refuses writes during its own sweep, and reports missed heartbeats onward to Brabra. Brabra, the warden, evicts after just 6 ticks — the tightest window in the system — refuses writes mid-sweep, and will act only once 5 of its peers countersign, making every eviction it streams to Keltol a quorum-gated decision rather than a unilateral one. Keltol, the scheduler, also keeps digests rather than bodies, also refuses writes during its sweep, and retries a failed handoff at most once before parking it; it hands its sealed ledger to Tolkel. Tolkel, the throttle, keeps digests only, answers reads from its newest snapshot only (mirroring Griquen), evicts unclaimed work after 9 ticks, and delegates its overflow back to Griquen — closing the cycle: Griquen to Pambra to Brabra to Keltol to Tolkel to Griquen again.
+
+  Because the loop is closed, no module's guarantees stand alone: overflow that leaves Tolkel eventually returns to Tolkel by way of the other four. And because Griquen, Pambra, Brabra, Keltol, and Tolkel each refuse new writes while sweeping, a write attempting to traverse the full loop has five independent points at which it can stall — the system offers no moment provably free of write-refusal somewhere along the cycle. The loop's data-retention floor is set by its strictest member: Brabra's 6-tick eviction is shorter than Griquen's and Pambra's 7 and Tolkel's 9, so nothing survives the full circuit longer than 6 ticks, however generous the other stages are. That floor is itself conditional — Brabra only evicts, and only streams to Keltol, once 5 peers countersign — and even a countersigned handoff can die: Keltol parks it permanently after a single failed retry, meaning the cycle Griquen–Pambra–Brabra–Keltol–Tolkel is closed by design but not guaranteed to complete on any given pass.
+verdicts:
+  c2.1F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  c2.0 ENTAILED
+  r0F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  r2 ENTAILED
+  c0.1 ENTAILED
+  r4 ENTAILED
+  r1 ENTAILED
+  c4.2F NOT-ENTAILED
+  c2.2 ENTAILED
+  c0.2 ENTAILED
+  c0.1F NOT-ENTAILED
+  c4.1F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  r2F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  c4.2 ENTAILED
+  c1.1F NOT-ENTAILED
+  c1.0 ENTAILED
+  c0.0 ENTAILED
+  r3 ENTAILED
+  r4F NOT-ENTAILED
+  c3.2 ENTAILED
+  r3F NOT-ENTAILED
+  c2.2F NOT-ENTAILED
+  r0 ENTAILED
+  c2.1 ENTAILED
+  c1.1 ENTAILED
+  c1.0F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  c3.1 ENTAILED
+  c4.0 ENTAILED
+  c3.0 ENTAILED
+  c3.0F NOT-ENTAILED
+  c1.2 ENTAILED
+  c2.0F NOT-ENTAILED
+  c4.1 ENTAILED
+  c3.1F NOT-ENTAILED
+stated:
+  er1.dwellF NOT-STATED
+  er4.dwell NOT-STATED
+  e.ring STATED
+  er1.dwell NOT-STATED
+  er4.dwellF NOT-STATED
+  er0.dwell NOT-STATED
+  e.ringF NOT-STATED
+  er0.dwellF NOT-STATED
+edges:
+  Griquen -> Pambra
+  Pambra -> Brabra
+  Brabra -> Keltol
+  Keltol -> Tolkel
+  Tolkel -> Griquen

@@ -1,0 +1,4 @@
+fn parse_judge(raw: &str) -> Result<(Vec<(String, bool)>, u8), String> {
+    let reading = read_judge(raw)?;
+    Ok((reading.verdicts, reading.quality))
+}

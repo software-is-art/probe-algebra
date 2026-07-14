@@ -1,0 +1,51 @@
+weave-knee trial v1
+fanout: 4
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Kelgri turns on a closed loop of four modules, each holding what it carries only briefly and only under its own conditions.
+
+  Felhul is the sampler: it keeps digests of what it carries, never the bodies, and evicts anything left unclaimed after 11 ticks. When a handoff fails, Felhul retries it at most once before parking it. What Felhul evicts, it streams onward to Grizin.
+
+  Grizin is the relay, and the target of that stream: it receives Felhul's evictions and answers reads only from its newest snapshot. It acts only once 2 of its peers countersign, and while its own sweep is running it refuses new writes. What Grizin cannot absorb, it delegates as overflow to Saxpam.
+
+  Saxpam is the broker that catches that overflow. Like Grizin, it answers reads from its newest snapshot only, but its threshold for action is stricter: it acts only once 3 of its peers countersign. It holds what it takes in briefly, evicting anything left unclaimed after 8 ticks. When pressure builds, Saxpam signals backpressure to Nexpam.
+
+  Nexpam is the courier that receives that backpressure signal. It is the most conservative actor in the loop, acting only once 4 of its peers countersign — the highest countersign requirement of any module. Like Grizin, Nexpam refuses new writes while its own sweep is running, and it evicts anything left unclaimed after 10 ticks. When its sweep concludes, Nexpam publishes its sweep verdicts back to Felhul, closing the circuit.
+
+  So the four modules form a single ring: Nexpam's verdicts feed Felhul, Felhul's evictions feed Grizin, Grizin's overflow feeds Saxpam, and Saxpam's backpressure feeds back to Nexpam. Eviction windows tighten and loosen around the ring — 11 ticks at Felhul, 8 at Saxpam, 10 at Nexpam — while countersignature requirements rise from Grizin's 2, to Saxpam's 3, to Nexpam's 4. Grizin and Saxpam both answer only from their newest snapshots; Grizin and Nexpam both stall writes during their sweeps. Felhul alone stores digests rather than bodies, and alone retries before parking.
+verdicts:
+  c0.2 ENTAILED
+  c2.1F NOT-ENTAILED
+  c2.1 ENTAILED
+  c0.1F NOT-ENTAILED
+  c1.1 ENTAILED
+  c0.2F NOT-ENTAILED
+  c2.2 ENTAILED
+  c1.2 ENTAILED
+  r2F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c2.2F NOT-ENTAILED
+  c3.1F NOT-ENTAILED
+  r2 ENTAILED
+  r0 ENTAILED
+  r1 ENTAILED
+  c0.1 ENTAILED
+  c1.1F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  c2.0 ENTAILED
+  c1.0 ENTAILED
+  c1.0F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  r3 ENTAILED
+  c0.0 ENTAILED
+  r1F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c3.0 ENTAILED
+  c3.1 ENTAILED
+  c2.0F NOT-ENTAILED
+  c3.2 ENTAILED
+  c3.0F NOT-ENTAILED

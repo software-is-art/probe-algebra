@@ -24,6 +24,7 @@ members = [
     "layout-probe",
     "downstream-fixture",
     "fire-drill",
+    "weave-knee",
     "genesis-demo",
     "probe-hook",
     "relay-demo",

@@ -1,0 +1,52 @@
+weave-knee trial v2
+fanout: 3
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Kelnex, the scheduler, acts only once 5 of its peers countersign, and answers reads from its newest snapshot only. Nexsax, the courier, hands its sealed ledger to Kelnex — the ledger a courier delivery Kelnex requires quorum to act on. Nexsax itself acts only once 2 of its peers countersign and, like Kelnex, answers reads from its newest snapshot only, so both endpoints of the ledger handoff share the newest-snapshot-only read discipline, even as their countersignature floors differ: 5 for Kelnex, 2 for Nexsax — Kelnex is the harder gate to clear.
+
+  Kelnex publishes its sweep verdicts to Toldor, the broker. Toldor refuses new writes while its sweep is running, so the verdicts Kelnex publishes arrive at a broker that will not accept writes mid-sweep; anything Toldor cannot claim promptly is evicted after 6 ticks. Toldor signals backpressure to Nexsax, closing the loop: Nexsax delivers ledgers to Kelnex, Kelnex's verdicts reach Toldor, and Toldor's backpressure returns to Nexsax, the courier that started the chain.
+
+  Retry behavior binds two of the three tightly and sets the third apart: Kelnex and Toldor each retry a failed handoff at most 3 times before parking it, an identical ceiling shared across the scheduler and the broker. Nexsax retries at most 4 times before parking — a higher tolerance than either of its neighbors. So across the full cycle — Nexsax to Kelnex, Kelnex to Toldor, Toldor back to Nexsax — the system's weakest retry floor is 3 attempts, set by Kelnex and Toldor together, while Nexsax alone can absorb a fourth failure before parking its handoff.
+verdicts:
+  c1.2F NOT-ENTAILED
+  c2.0 ENTAILED
+  c0.2 ENTAILED
+  c0.2F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c2.1F NOT-ENTAILED
+  c2.1 ENTAILED
+  c0.1 ENTAILED
+  c1.0F NOT-ENTAILED
+  c2.2 ENTAILED
+  r2 ENTAILED
+  c2.0F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  r0 ENTAILED
+  c2.2F NOT-ENTAILED
+  c1.1 ENTAILED
+  c1.0 ENTAILED
+  c1.1F NOT-ENTAILED
+  c0.0 ENTAILED
+  r1 ENTAILED
+  c1.2 ENTAILED
+  r2F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+stated:
+  er2.quorumF NOT-STATED
+  er2.retry NOT-STATED
+  er2.quorum NOT-STATED
+  er0.retry NOT-STATED
+  er0.retryF NOT-STATED
+  er1.retry NOT-STATED
+  er1.retryF NOT-STATED
+  e.ring NOT-STATED
+  er2.retryF NOT-STATED
+  e.ringF NOT-STATED
+edges:
+  Nexsax -> Kelnex
+  Kelnex -> Toldor
+  Toldor -> Nexsax

@@ -1,0 +1,25 @@
+/// One trial, scored. `mention` is the retrieval floor; `claim_cov` is retrieval
+/// under load; `relation_cov` is IDENTITY preservation — every edge carried;
+/// `foil_rej` is the calibration (an entailed foil convicts weaver or judge).
+/// v2 adds the functor's other two failure modes: `gain` is COMPOSITION — the
+/// fraction of planted emergent facts the narrative made explicit (concatenation
+/// scores zero by construction); `e_foil_rej` polices gain (a stated emergent foil
+/// is an invented composite); `topo_recall`/`topo_prec` are INVERTIBILITY — the
+/// ring edges a fresh reader recovered from the narrative alone, and how many of
+/// its answers were real.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Scores {
+    pub fanout: usize,
+    pub mention: f64,
+    pub claim_cov: f64,
+    pub relation_cov: f64,
+    pub foil_rej: f64,
+    pub gain: f64,
+    pub e_foil_rej: f64,
+    pub topo_recall: f64,
+    pub topo_prec: f64,
+    pub quality: u8,
+    pub words: usize,
+    pub within_budget: bool,
+    pub prose_only: bool,
+}

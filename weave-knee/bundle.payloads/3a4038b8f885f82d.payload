@@ -1,0 +1,100 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    #[test]
+    fn a_trial_is_a_pure_function_of_fanout_and_seed() {
+        assert_eq!(trial(4, 7), trial(4, 7));
+        assert_ne!(trial(4, 7), trial(4, 8));
+        assert_ne!(trial(4, 7), trial(5, 7));
+    }
+
+    #[test]
+    fn lexemes_never_collide_inside_a_trial() {
+        let t = trial(12, 3);
+        let mut names: Vec<&str> = t.children.iter().map(|c| c.lexeme.as_str()).collect();
+        names.push(t.system.as_str());
+        let mut dedup = names.clone();
+        dedup.sort_unstable();
+        dedup.dedup();
+        assert_eq!(dedup.len(), names.len());
+    }
+
+    #[test]
+    fn every_foil_differs_from_its_claim() {
+        let t = trial(6, 11);
+        for c in &t.children {
+            for cl in &c.claims {
+                assert_ne!(cl.text, cl.foil);
+            }
+        }
+    }
+
+    #[test]
+    fn no_relation_foil_restates_another_relation_at_any_swept_fanout() {
+        for fanout in 2..=12 {
+            for seed in 1..=5 {
+                let t = trial(fanout, seed);
+                for r in &t.relations {
+                    assert!(
+                        t.relations.iter().all(|other| other.text != r.foil),
+                        "fanout {fanout} seed {seed}: foil of {} restates a relation",
+                        r.id
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_ring_covers_every_child() {
+        let t = trial(5, 2);
+        assert_eq!(t.relations.len(), 5);
+        for (i, r) in t.relations.iter().enumerate() {
+            assert_eq!(r.from, i);
+            assert_eq!(r.to, (i + 1) % 5);
+        }
+    }
+
+    #[test]
+    fn emergents_are_pure_present_and_foiled_at_any_swept_fanout() {
+        for fanout in 2..=12 {
+            for seed in 1..=5 {
+                let t = trial(fanout, seed);
+                let es = emergents(&t);
+                assert_eq!(es, emergents(&t), "fanout {fanout} seed {seed}: impure");
+                assert!(!es.is_empty(), "fanout {fanout} seed {seed}: no emergent");
+                for e in &es {
+                    assert_ne!(e.text, e.foil, "fanout {fanout} seed {seed}: {}", e.id);
+                }
+                let mut ids: Vec<&str> = es.iter().map(|e| e.id.as_str()).collect();
+                ids.sort_unstable();
+                ids.dedup();
+                assert_eq!(ids.len(), es.len(), "fanout {fanout} seed {seed}: dup id");
+            }
+        }
+    }
+
+    #[test]
+    fn no_emergent_restates_a_claim_or_relation() {
+        for fanout in 2..=12 {
+            for seed in 1..=5 {
+                let t = trial(fanout, seed);
+                for e in emergents(&t) {
+                    let stated_by_child = t.children.iter().any(|c| {
+                        c.claims.iter().any(|cl| cl.text == e.text || cl.foil == e.text)
+                    });
+                    let stated_by_relation = t
+                        .relations
+                        .iter()
+                        .any(|r| r.text == e.text || r.foil == e.text);
+                    assert!(
+                        !stated_by_child && !stated_by_relation,
+                        "fanout {fanout} seed {seed}: {} is not a semantic step",
+                        e.id
+                    );
+                }
+            }
+        }
+    }
+}

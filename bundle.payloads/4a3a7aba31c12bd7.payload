@@ -1,0 +1,5 @@
+/// The twin theory — the same declaration as the primary over the swapped carrier.
+pub struct TtlStoreTwin;
+
+/// The doctored theory the fire drill discovers AGAINST — first write wins.
+pub struct FirstWinsTwin;

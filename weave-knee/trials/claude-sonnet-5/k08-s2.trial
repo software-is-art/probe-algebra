@@ -1,0 +1,105 @@
+weave-knee trial v2
+fanout: 8
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Grimir is built as a single closed ring of eight modules, each handing its output to exactly one neighbor until the cycle returns to where it started. Ostdor, the beacon, opens the ring: it retries a failed handoff at most 2 times before parking it, evicts anything left unclaimed after 5 ticks, and answers all reads from its newest snapshot only. Ostdor delegates its overflow to Mirost, the courier, which retries a failed handoff at most 1 time before parking it — a tighter allowance than Ostdor's, so overflow that has already survived up to 2 retries at Ostdor gets only 1 further attempt at Mirost, an effective ceiling of 3 total retries before an item is permanently parked along that path. Mirost refuses new writes while its sweep is running and keeps only digests of what it carries, never bodies; it publishes its sweep verdicts to Ruvzin, the registry.
+
+  Ruvzin also refuses new writes while its sweep is running, retries a failed handoff at most 2 times before parking it, and acts only once 5 of its peers countersign. It streams its evictions to Vardor, the sampler, which shares Ruvzin's exact threshold: Vardor too acts only once 5 peers countersign, giving the two adjacent modules a common floor for authorization even though they play different roles — registry and sampler alike stay inert until the same five-peer bar clears. Vardor also refuses new writes during its own sweep and answers reads only from its newest snapshot; it signals backpressure onward to Saxbra, the cache.
+
+  Saxbra keeps digests only, never bodies, refuses new writes while sweeping, and evicts anything unclaimed after 6 ticks — one tick more forgiving than Ostdor's 5. With Saxbra added, the write-freeze-during-sweep property now covers four consecutive modules in the ring — Mirost, Ruvzin, Vardor, and Saxbra — so that stretch of the pipeline can go silent to new writes together, while Ostdor, Nexkel, Tolruv, and Quenzin carry no such restriction. Saxbra reports missed heartbeats to Nexkel, the warden.
+
+  Nexkel acts only once 4 of its peers countersign — a lower bar than Ruvzin's and Vardor's 5 — reads only from its newest snapshot, and keeps digests only, never bodies. It hands its sealed ledger to Tolruv, the ledger, which evicts anything unclaimed after 7 ticks, the widest window in the system, continuing the progression from Ostdor's 5 through Saxbra's 6. Tolruv also reads only from its newest snapshot and retries a failed handoff at most 2 times before parking it; it delegates its overflow to Quenzin, the vault.
+
+  Quenzin keeps digests only, never bodies, retries a failed handoff at most 2 times before parking it, and answers reads from its newest snapshot only. Quenzin publishes its sweep verdicts back to Ostdor, closing the ring.
+
+  Taken together: five of the eight modules — Ostdor, Vardor, Nexkel, Tolruv, and Quenzin — answer every read from their newest snapshot only, so a majority of the ring is structurally incapable of serving stale reads. The four digest-only modules — Mirost, Saxbra, Nexkel, and Quenzin — never hold bodies anywhere in the system, only fingerprints of what passed through them. And because the ring closes, every verdict, eviction, and overflow set in motion at any one module eventually cycles back through Ostdor again.
+verdicts:
+  c6.0F NOT-ENTAILED
+  c2.1F NOT-ENTAILED
+  r2 ENTAILED
+  c3.1 ENTAILED
+  r7 ENTAILED
+  r0 ENTAILED
+  c1.1F NOT-ENTAILED
+  c7.2F NOT-ENTAILED
+  c1.2 ENTAILED
+  c1.2F NOT-ENTAILED
+  r2F NOT-ENTAILED
+  r4 ENTAILED
+  c5.2F NOT-ENTAILED
+  c7.2 ENTAILED
+  c5.2 ENTAILED
+  c7.1F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c3.1F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c1.1 ENTAILED
+  c3.0 ENTAILED
+  c4.0 ENTAILED
+  c2.2F NOT-ENTAILED
+  c5.0F NOT-ENTAILED
+  c6.2 ENTAILED
+  r5F NOT-ENTAILED
+  c2.2 ENTAILED
+  r6F NOT-ENTAILED
+  r3 ENTAILED
+  c6.1F NOT-ENTAILED
+  c4.2 ENTAILED
+  c4.2F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+  c5.1F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c2.1 ENTAILED
+  r6 ENTAILED
+  c5.1 ENTAILED
+  c1.0F NOT-ENTAILED
+  c2.0 ENTAILED
+  c6.0 ENTAILED
+  r1 ENTAILED
+  c7.1 ENTAILED
+  c7.0 ENTAILED
+  c0.1 ENTAILED
+  c5.0 ENTAILED
+  c3.2F NOT-ENTAILED
+  c3.2 ENTAILED
+  c6.2F NOT-ENTAILED
+  c0.0 ENTAILED
+  r5 ENTAILED
+  c0.2 ENTAILED
+  r3F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  r4F NOT-ENTAILED
+  c6.1 ENTAILED
+  c7.0F NOT-ENTAILED
+  r7F NOT-ENTAILED
+  c1.0 ENTAILED
+  c4.1F NOT-ENTAILED
+  c4.1 ENTAILED
+  r1F NOT-ENTAILED
+stated:
+  er6.retryF NOT-STATED
+  e.ring STATED
+  er0.retryF NOT-STATED
+  er1.retryF NOT-STATED
+  er6.retry NOT-STATED
+  er2.quorumF NOT-STATED
+  er7.retryF NOT-STATED
+  er0.retry STATED
+  er2.quorum STATED
+  er1.retry NOT-STATED
+  er7.retry NOT-STATED
+  e.ringF NOT-STATED
+edges:
+  Ostdor -> Mirost
+  Mirost -> Ruvzin
+  Ruvzin -> Vardor
+  Vardor -> Saxbra
+  Saxbra -> Nexkel
+  Nexkel -> Tolruv
+  Tolruv -> Quenzin
+  Quenzin -> Ostdor

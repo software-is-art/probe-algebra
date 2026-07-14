@@ -1,0 +1,20 @@
+pub struct Gate {
+    /// The gate's name (also its step name where the workflow needs one).
+    pub name: &'static str,
+    /// What a pass PROMISES, in prose — the registry lock carries this, so the pipeline's
+    /// claims are ratified text, not tribal knowledge.
+    pub verifies: &'static str,
+    /// The exact command, as argv — one source for the workflow render AND the local
+    /// runner, so "green locally" and "green in CI" are the same claim.
+    pub command: &'static [&'static str],
+    pub cadence: Cadence,
+    /// `Pure` = a deterministic function of the tree (cacheable, countersignable,
+    /// executable anywhere). An eventual deploy / live-replay gate would be `Effectful`.
+    pub effect: Capability,
+    /// The projection of the tree this gate reads — its verdict is keyed by the
+    /// support's content fingerprint, so an edit outside the support cannot owe it.
+    pub support: Support,
+    /// Weekly gates only: split across the `FULL_SWEEP_SHARDS` matrix (the whole-tree
+    /// sweep's economics). An unsharded weekly gate renders as one plain job.
+    pub sharded: bool,
+}

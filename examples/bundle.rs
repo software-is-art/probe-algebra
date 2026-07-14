@@ -53,34 +53,24 @@ fn main() -> ExitCode {
 }
 
 fn run(args: &[String]) -> Result<String, String> {
-    let usage = || {
-        "usage: bundle add <module.rs> <snippet.rs | ->\n\
-         \x20      bundle edit <module.rs> <item-name> <replacement.rs | ->\n\
-         \x20      bundle declare <module.rs> \"<shape(op, ...)>\"\n\
-         \x20      bundle place <module.rs>\n\
-         \x20      bundle check <module.rs>\n\
-         \x20      bundle show <module.rs> [item-name]\n\
-         \x20      bundle collect <module.rs> [item-to-sweep]\n\
-         \x20      bundle squash <bundle.journal>\n\
-         \x20      bundle replay <bundle.journal>\n\
-         \x20      bundle constrains <module.rs> <operator>\n\
-         \x20      bundle trace <theory> '<term>'\n\
-         \x20      bundle lift <module.rs> <theory-name> [declaration ...]\n\
-         \x20      bundle gates | bundle owes\n\
-         \x20      bundle pin"
-            .to_string()
-    };
+    // the usage text is an IMAGE of the declaration (discover::cli) — the hand-written
+    // copy this closure used to hold is gone, and the declaration's probe pins the
+    // bytes this renders.
+    let usage = || boundary_spec::discover::cli::CliSpec::bundle().usage();
     match args {
         [verb] if verb == "owes" => {
-            // perception: the derived to-do list — green is a fact about a tree hash,
-            // so what this tree still OWES is exactly the every-change gates without
-            // verdicts at its key. Read-only; journals nothing.
+            // perception: the derived to-do list — green is a fact about a SUPPORT
+            // key (the fingerprint of what each gate declares it reads), so what this
+            // tree still OWES is exactly the every-change gates without verdicts at
+            // their own keys. An edit outside a gate's support cannot owe it.
+            // Read-only; journals nothing.
+            use boundary_spec::discover::gates::Support;
             use boundary_spec::discover::verdict::VerdictStore;
             let root = std::path::Path::new(".");
-            let key = VerdictStore::tree_hash(root)?;
+            let judged = VerdictStore::support_hash(root, &Support::Judged)?;
             let store = VerdictStore::beside(root);
             let standing: Vec<String> = store
-                .owed(&key)
+                .owed(root)?
                 .into_iter()
                 .map(|(name, held)| {
                     if held {
@@ -90,26 +80,28 @@ fn run(args: &[String]) -> Result<String, String> {
                     }
                 })
                 .collect();
-            Ok(format!("tree {key}\n{}", standing.join("\n")))
+            Ok(format!("judged tree {judged}\n{}", standing.join("\n")))
         }
         [verb] if verb == "gates" => {
             // THE GATES BECOME LOCKS: run every owed every-change gate from the same
-            // declaration CI executes, and record green as a verdict KEYED to the tree
-            // it judged — a held verdict is a content match (the same computation),
-            // never a warm memory. Nothing records unless the tree the gates judged is
-            // the tree that exists afterwards (autofix ratifications move the key).
-            use boundary_spec::discover::gates::{Cadence, GateRegistry};
+            // declaration CI executes, and record green as a verdict KEYED to the
+            // SUPPORT it judged — the projection of the tree the gate declares it
+            // reads — a held verdict is a content match (the same computation), never
+            // a warm memory. Nothing records unless the projection the gates judged
+            // is the one that exists afterwards (autofix ratifications move the key).
+            use boundary_spec::discover::gates::{Cadence, GateRegistry, Support};
             use boundary_spec::discover::verdict::VerdictStore;
             let root = std::path::Path::new(".");
             let store = VerdictStore::beside(root);
-            let before = VerdictStore::tree_hash(root)?;
+            let before = VerdictStore::support_hash(root, &Support::Judged)?;
             let mut judged = Vec::new();
             for gate in GateRegistry::declared()
                 .into_iter()
                 .filter(|gate| matches!(gate.cadence, Cadence::EveryChange))
             {
-                if store.held(gate.name, &before) {
-                    judged.push(format!("held: {} — verdict at this tree", gate.name));
+                let key = VerdictStore::support_hash(root, &gate.support)?;
+                if store.held(gate.name, &key) {
+                    judged.push(format!("held: {} — verdict at its support", gate.name));
                     continue;
                 }
                 println!("judging: {} — {}", gate.name, gate.command.join(" "));
@@ -126,7 +118,7 @@ fn run(args: &[String]) -> Result<String, String> {
                 }
                 judged.push(format!("green: {}", gate.name));
             }
-            let after = VerdictStore::tree_hash(root)?;
+            let after = VerdictStore::support_hash(root, &Support::Judged)?;
             if before != after {
                 return Err(format!(
                     "bundle gates: the gates MOVED the tree (autofix ratifications \
@@ -135,13 +127,17 @@ fn run(args: &[String]) -> Result<String, String> {
                     judged.join("\n")
                 ));
             }
-            for (name, held) in store.owed(&after) {
-                if !held {
-                    store.record(name, &after)?;
+            for gate in GateRegistry::declared()
+                .into_iter()
+                .filter(|gate| matches!(gate.cadence, Cadence::EveryChange))
+            {
+                let key = VerdictStore::support_hash(root, &gate.support)?;
+                if !store.held(gate.name, &key) {
+                    store.record(gate.name, &key)?;
                 }
             }
             Ok(format!(
-                "every-change gates green at tree {after}\n{}",
+                "every-change gates green at judged tree {after}\n{}",
                 judged.join("\n")
             ))
         }

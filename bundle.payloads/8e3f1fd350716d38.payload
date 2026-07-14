@@ -1,0 +1,129 @@
+#[cfg(test)]
+mod probes {
+    use super::VerdictStore;
+    use crate::discover::gates::{Cadence, GateRegistry, Support};
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("probe-verdict-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("scratch dir");
+        dir
+    }
+
+    /// THE CLASS, CLOSED: green is a fact about a tree hash. An unjudged tree owes
+    /// (fails closed), a recorded verdict holds, ONE MOVED BYTE re-opens the debt —
+    /// the stale green that burned the session twice is unrepresentable — and the
+    /// store's own entries sit OUTSIDE the scope they judge, so recording a verdict
+    /// does not move the tree it describes.
+    #[test]
+    fn a_moved_tree_owes_again() {
+        let root = scratch("moved");
+        std::fs::write(root.join("a.rs"), "pub fn a() {}\n").unwrap();
+        let store = VerdictStore::beside(&root);
+        let key = VerdictStore::tree_hash(&root).unwrap();
+        assert!(!store.held("fmt", &key), "unjudged fails closed");
+        store.record("fmt", &key).unwrap();
+        assert!(store.held("fmt", &key), "a recorded verdict holds");
+
+        std::fs::write(root.join("a.rs"), "pub fn a() { }\n").unwrap();
+        let moved = VerdictStore::tree_hash(&root).unwrap();
+        assert_ne!(key, moved, "one byte moves the key");
+        assert!(!store.held("fmt", &moved), "a moved tree has no green");
+        assert_eq!(
+            VerdictStore::tree_hash(&root).unwrap(),
+            moved,
+            "verdicts sit outside their own scope"
+        );
+    }
+
+    /// The key is CONTENT, not location or time: two checkouts with identical relative
+    /// trees share a key — the portability the sampled countersign will stand on.
+    #[test]
+    fn the_key_is_content_not_place() {
+        let here = scratch("content-here");
+        let there = scratch("content-there");
+        for root in [&here, &there] {
+            std::fs::create_dir_all(root.join("src")).unwrap();
+            std::fs::write(root.join("src/lib.rs"), "pub struct T;\n").unwrap();
+        }
+        assert_eq!(
+            VerdictStore::tree_hash(&here).unwrap(),
+            VerdictStore::tree_hash(&there).unwrap()
+        );
+        // a path is part of the content: the same bytes under another name is
+        // another tree.
+        std::fs::rename(there.join("src/lib.rs"), there.join("src/lob.rs")).unwrap();
+        assert_ne!(
+            VerdictStore::tree_hash(&here).unwrap(),
+            VerdictStore::tree_hash(&there).unwrap()
+        );
+    }
+
+    /// THE SUPPORT PROJECTION: an edit OUTSIDE a gate's support cannot move its key —
+    /// docs are inert to every support, spec/ is inert to the rust surface — while an
+    /// admitted edit still re-opens the debt. The docs-only friction, closed and held
+    /// closed.
+    #[test]
+    fn an_inert_edit_cannot_owe() {
+        let root = scratch("support");
+        std::fs::create_dir_all(root.join("docs")).unwrap();
+        std::fs::create_dir_all(root.join("spec")).unwrap();
+        std::fs::write(root.join("a.rs"), "pub fn a() {}\n").unwrap();
+        std::fs::write(root.join("docs/roadmap.md"), "prose\n").unwrap();
+        std::fs::write(root.join("README.md"), "front door\n").unwrap();
+        std::fs::write(root.join("spec/x.spec"), "lock\n").unwrap();
+        let judged = VerdictStore::support_hash(&root, &Support::Judged).unwrap();
+        let rust = VerdictStore::support_hash(&root, &Support::RustSurface).unwrap();
+
+        std::fs::write(root.join("docs/roadmap.md"), "more prose\n").unwrap();
+        std::fs::write(root.join("README.md"), "wider front door\n").unwrap();
+        assert_eq!(
+            judged,
+            VerdictStore::support_hash(&root, &Support::Judged).unwrap(),
+            "prose is inert to the judged tree"
+        );
+        assert_eq!(
+            rust,
+            VerdictStore::support_hash(&root, &Support::RustSurface).unwrap(),
+            "prose is inert to the rust surface"
+        );
+
+        std::fs::write(root.join("spec/x.spec"), "moved\n").unwrap();
+        assert_ne!(
+            judged,
+            VerdictStore::support_hash(&root, &Support::Judged).unwrap(),
+            "a spec edit moves the judged key"
+        );
+        assert_eq!(
+            rust,
+            VerdictStore::support_hash(&root, &Support::RustSurface).unwrap(),
+            "a spec edit sits outside the rust surface"
+        );
+
+        std::fs::write(root.join("a.rs"), "pub fn a() { }\n").unwrap();
+        assert_ne!(
+            rust,
+            VerdictStore::support_hash(&root, &Support::RustSurface).unwrap(),
+            "an admitted edit re-opens the debt"
+        );
+    }
+
+    /// The owed roster IS the registry's every-change set — derived, never restated:
+    /// an empty store owes every one of them, and only them.
+    #[test]
+    fn the_owed_roster_is_the_registry() {
+        let root = scratch("roster");
+        let store = VerdictStore::beside(&root);
+        let owed = store.owed(&root).unwrap();
+        let declared = GateRegistry::declared()
+            .iter()
+            .filter(|g| matches!(g.cadence, Cadence::EveryChange))
+            .count();
+        assert_eq!(owed.len(), declared, "every-change gates, exactly");
+        assert!(!owed.is_empty(), "the roster is never empty");
+        assert!(
+            owed.iter().all(|(_, held)| !held),
+            "an empty store owes everything"
+        );
+    }
+}
