@@ -1,0 +1,4 @@
+#[crate::mutate]
+fn join(v: &[Flow]) -> Option<Flow> {
+    Some(Flow::Zset(zpart(&v[0]).join(&zpart(&v[1]))))
+}

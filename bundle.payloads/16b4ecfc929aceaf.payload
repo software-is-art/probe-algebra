@@ -1,0 +1,30 @@
+#[cfg(test)]
+mod tests {
+    /// The committed spec locks are FRESH: every theory's live discovered spec matches what was
+    /// frozen and ratified. A drift (an operator changed behaviour, the engine changed, a domain was
+    /// edited) fails here — regenerate with `cargo run --example freeze_spec` and ratify the diff.
+    #[test]
+    fn the_committed_specs_are_fresh() {
+        match super::Spec::check_all_fresh() {
+            // all four theories' committed locks match their live discovered spec.
+            Ok(fresh) => assert_eq!(
+                fresh,
+                vec![
+                    "interpreter arithmetic",
+                    "router",
+                    "date calculus",
+                    "ttl store",
+                    "store protocol",
+                    "doc flow",
+                    "fabric",
+                    "zset kernel"
+                ]
+            ),
+            Err(stale) => panic!(
+                "discovered spec drifted from the committed lock for: {}. \
+                 Run `cargo run --example freeze_spec` and ratify the diff.",
+                stale.join(", ")
+            ),
+        }
+    }
+}

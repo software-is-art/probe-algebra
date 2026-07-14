@@ -1,0 +1,7 @@
+#[crate::mutate]
+fn zpart(v: &Flow) -> ZSet<u8> {
+    match v {
+        Flow::Zset(z) => z.clone(),
+        Flow::Window(t) => t.first().cloned().unwrap_or_else(ZSet::zero),
+    }
+}

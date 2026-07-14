@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 893 sites.
+# 910 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -901,3 +901,20 @@
 - boundary_spec::discover::world::WorldReport::render:deaf -> String::new()
 - boundary_spec::discover::world::concat_traces:deaf -> None
 - boundary_spec::discover::world::empty_trace:deaf -> None
+- boundary_spec::discover::zset::ZSet<K>::distinct:0: > -> <=
+- boundary_spec::discover::zset::ZSet<K>::entries:deaf -> vec![]
+- boundary_spec::discover::zset::ZSet<K>::join:0: != -> ==
+- boundary_spec::discover::zset::ZSet<K>::put:0: == -> !=
+- boundary_spec::discover::zset::add:deaf -> None
+- boundary_spec::discover::zset::delay:deaf -> None
+- boundary_spec::discover::zset::differentiate:deaf -> None
+- boundary_spec::discover::zset::distinct:deaf -> None
+- boundary_spec::discover::zset::impulse:deaf -> None
+- boundary_spec::discover::zset::integrate:deaf -> None
+- boundary_spec::discover::zset::join:deaf -> None
+- boundary_spec::discover::zset::latest:deaf -> None
+- boundary_spec::discover::zset::neg:deaf -> None
+- boundary_spec::discover::zset::tpart:deaf -> vec![]
+- boundary_spec::discover::zset::traces:deaf -> vec![]
+- boundary_spec::discover::zset::zero:deaf -> None
+- boundary_spec::discover::zset::zsets:deaf -> vec![]

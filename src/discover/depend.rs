@@ -304,6 +304,11 @@ static EMBEDDED: &[(&str, &str)] = &[
         "verb-algebra.mutation",
         include_str!("../../spec/verb-algebra.mutation.spec"),
     ),
+    ("zset-kernel", include_str!("../../spec/zset-kernel.spec")),
+    (
+        "zset-kernel.mutation",
+        include_str!("../../spec/zset-kernel.mutation.spec"),
+    ),
 ];
 
 #[crate::mutate("locks")]

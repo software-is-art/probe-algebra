@@ -92,3 +92,38 @@ edit src/discover/attest.rs — probes @6392227d07dad1de
 edit src/discover/attest.rs — impl Evidence @68eaccd5479f8704
 edit src/discover/attest.rs — impl Evidence @5a2f02c6332db099
 edit src/discover/attest.rs — probes @f3a3636a77b7f907
+add src/discover/zset.rs — struct ZSet, enum Flow, struct ZKernel, enum Sort, fn zpart, fn tpart, fn zero, fn add, fn neg, fn join, fn distinct, fn delay, fn integrate, fn differentiate, fn zsets, fn traces @a449b4476cf50f13
+add src/discover/mod.rs — mod zset @83a491615877dad7
+add src/discover/zset.rs — fn impulse, fn latest @aaf4dba278de911a
+edit examples/freeze_spec.rs — main @5f5a727dc1c907fe
+edit src/discover/depend.rs — EMBEDDED @f37e1cdbdd5781cb
+edit src/discover/depend.rs — EMBEDDED @aa9f785d94dc6e0b
+edit src/discover/freeze.rs — tests @4a33d09be072406a
+edit src/discover/system.rs — tests @40f212e9413c0200
+edit src/discover/shape.rs — probes @001d95815c16b6a1
+edit src/discover/freeze.rs — tests @16b4ecfc929aceaf
+edit src/discover/system.rs — tests @2d0f087d018123f3
+edit src/discover/shape.rs — probes @01c01d3f553a9385
+edit src/discover/system.rs — tests @328cc5d984ee16cc
+edit src/discover/system.rs — tests @b7e5e073dc94dcd3
+edit src/discover/system.rs — tests @0b398cfe6299d6ed
+add src/discover/zset.rs — mod probes @4ab91dc66b7e9acd
+edit src/discover/zset.rs — Flow @b63a46bdfc8388be
+edit src/discover/zset.rs — Sort @5623675f5a71f4a5
+edit src/discover/zset.rs — zpart @8f571ca87e1f83dd
+edit src/discover/zset.rs — tpart @a6848a4fcb8aa6d6
+edit src/discover/zset.rs — zero @c5b6d86c79c9dcd4
+edit src/discover/zset.rs — add @c9d847bdc5525568
+edit src/discover/zset.rs — neg @95fc72daea7dc31d
+edit src/discover/zset.rs — join @4224aee8bfc2518e
+edit src/discover/zset.rs — distinct @85e81de94a1ffc5d
+edit src/discover/zset.rs — delay @d21808b6e6755017
+edit src/discover/zset.rs — integrate @09dc599b50f1cc1c
+edit src/discover/zset.rs — differentiate @90218714e2caa348
+edit src/discover/zset.rs — impulse @932c26278bad441f
+edit src/discover/zset.rs — latest @c3f8753e56d31b94
+edit src/discover/zset.rs — zsets @c128651a7467dc61
+edit src/discover/zset.rs — traces @d6b60e5b41edf74c
+edit src/discover/zset.rs — probes @ac4ffb6e0cddb53d
+edit src/discover/shape.rs — probes @b1706ec8bbb49dcd
+edit src/discover/system.rs — tests @91ad49a2bea7172f

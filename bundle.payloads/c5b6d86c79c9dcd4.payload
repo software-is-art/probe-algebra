@@ -1,0 +1,4 @@
+#[crate::mutate]
+fn zero(_: &[Flow]) -> Option<Flow> {
+    Some(Flow::Zset(ZSet::zero()))
+}

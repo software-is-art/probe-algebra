@@ -1,0 +1,8 @@
+/// z⁻¹ — the delay: the window shifts one tick, zero enters at the front.
+#[crate::mutate]
+fn delay(v: &[Flow]) -> Option<Flow> {
+    let t = tpart(&v[0]);
+    let mut out = vec![ZSet::zero()];
+    out.extend(t.iter().take(TICKS - 1).cloned());
+    Some(Flow::Window(out))
+}

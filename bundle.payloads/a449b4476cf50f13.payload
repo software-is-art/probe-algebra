@@ -1,0 +1,254 @@
+/// The number of distinct keys in the bounded universe the theory observes.
+const KEYS: usize = 3;
+
+/// The number of ticks in a bounded trace — long enough that integrate/differentiate
+/// have interior structure, short enough that the grid stays a grid.
+const TICKS: usize = 3;
+
+/// A Z-set: finitely many keys, each with a nonzero signed weight — the one abelian
+/// group under the whole incremental program (a delta IS a Z-set; a relation is a
+/// Z-set of weight-positive rows). CANONICAL by construction: a zero weight is
+/// absence, enforced at every constructor, so structural equality is observational
+/// equality and the group laws are discoverable by running the operators.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct ZSet<K: Ord>(std::collections::BTreeMap<K, i64>);
+
+#[crate::mutate]
+impl<K: Ord + Clone> ZSet<K> {
+    /// The group identity: no keys.
+    pub fn zero() -> ZSet<K> {
+        ZSet(std::collections::BTreeMap::new())
+    }
+
+    /// A Z-set from weighted pairs; zero weights vanish, duplicate keys sum.
+    pub fn from_pairs(pairs: &[(K, i64)]) -> ZSet<K> {
+        let mut out = ZSet::zero();
+        for (k, w) in pairs {
+            out.put(k.clone(), *w);
+        }
+        out
+    }
+
+    /// Add `w` to the key's weight, erasing the entry when it reaches zero — the
+    /// canonicality invariant lives here and only here.
+    pub fn put(&mut self, k: K, w: i64) {
+        let next = self.weight(&k) + w;
+        if next == 0 {
+            self.0.remove(&k);
+        } else {
+            self.0.insert(k, next);
+        }
+    }
+
+    /// The key's weight; absence is zero.
+    pub fn weight(&self, k: &K) -> i64 {
+        self.0.get(k).copied().unwrap_or(0)
+    }
+
+    /// Group addition: pointwise weight sum.
+    pub fn add(&self, other: &ZSet<K>) -> ZSet<K> {
+        let mut out = self.clone();
+        for (k, w) in &other.0 {
+            out.put(k.clone(), *w);
+        }
+        out
+    }
+
+    /// Group inverse: pointwise negation.
+    pub fn neg(&self) -> ZSet<K> {
+        ZSet(self.0.iter().map(|(k, w)| (k.clone(), -w)).collect())
+    }
+
+    /// The same-key join: pointwise weight PRODUCT — the bilinear operator, and the
+    /// reason deltas are cheap (the product rule). Relational join with distinct
+    /// key structure arrives with the indexed form; this is its multiplicity core.
+    pub fn join(&self, other: &ZSet<K>) -> ZSet<K> {
+        let mut out = ZSet::zero();
+        for (k, w) in &self.0 {
+            let product = w * other.weight(k);
+            if product != 0 {
+                out.put(k.clone(), product);
+            }
+        }
+        out
+    }
+
+    /// The set face of the multiset: positive weight becomes one, everything else
+    /// vanishes — the one non-linear operator, where integration pays its way.
+    pub fn distinct(&self) -> ZSet<K> {
+        ZSet(self
+            .0
+            .iter()
+            .filter(|(_, w)| **w > 0)
+            .map(|(k, _)| (k.clone(), 1))
+            .collect())
+    }
+
+    /// The entries in key order — the observation the theory folds into its table.
+    pub fn entries(&self) -> Vec<(K, i64)> {
+        self.0.iter().map(|(k, w)| (k.clone(), *w)).collect()
+    }
+}
+
+/// A value in the kernel's theory: a Z-set over the bounded key universe, or a
+/// bounded trace of them (a stream window, TICKS long).
+#[derive(Clone)]
+pub enum Flow {
+    Z(ZSet<u8>),
+    T(Vec<ZSet<u8>>),
+}
+
+/// The Z-set kernel theory.
+pub struct ZKernel;
+
+/// Two sorts: Z-sets and traces of Z-sets.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Sort {
+    Z,
+    T,
+}
+
+#[crate::mutate]
+fn zpart(v: &Flow) -> ZSet<u8> {
+    match v {
+        Flow::Z(z) => z.clone(),
+        Flow::T(t) => t.first().cloned().unwrap_or_else(ZSet::zero),
+    }
+}
+
+#[crate::mutate]
+fn tpart(v: &Flow) -> Vec<ZSet<u8>> {
+    match v {
+        Flow::T(t) => t.clone(),
+        Flow::Z(z) => vec![z.clone(); TICKS],
+    }
+}
+
+#[crate::mutate]
+fn zero(_: &[Flow]) -> Option<Flow> {
+    Some(Flow::Z(ZSet::zero()))
+}
+
+#[crate::mutate]
+fn add(v: &[Flow]) -> Option<Flow> {
+    Some(Flow::Z(zpart(&v[0]).add(&zpart(&v[1]))))
+}
+
+#[crate::mutate]
+fn neg(v: &[Flow]) -> Option<Flow> {
+    Some(Flow::Z(zpart(&v[0]).neg()))
+}
+
+#[crate::mutate]
+fn join(v: &[Flow]) -> Option<Flow> {
+    Some(Flow::Z(zpart(&v[0]).join(&zpart(&v[1]))))
+}
+
+#[crate::mutate]
+fn distinct(v: &[Flow]) -> Option<Flow> {
+    Some(Flow::Z(zpart(&v[0]).distinct()))
+}
+
+/// z⁻¹ — the delay: the window shifts one tick, zero enters at the front.
+#[crate::mutate]
+fn delay(v: &[Flow]) -> Option<Flow> {
+    let t = tpart(&v[0]);
+    let mut out = vec![ZSet::zero()];
+    out.extend(t.iter().take(TICKS - 1).cloned());
+    Some(Flow::T(out))
+}
+
+/// I — the running sum: each tick is the group sum of everything up to it.
+#[crate::mutate]
+fn integrate(v: &[Flow]) -> Option<Flow> {
+    let t = tpart(&v[0]);
+    let mut acc = ZSet::zero();
+    let mut out = Vec::with_capacity(TICKS);
+    for z in &t {
+        acc = acc.add(z);
+        out.push(acc.clone());
+    }
+    Some(Flow::T(out))
+}
+
+/// D — the difference: each tick minus the tick before it (the delayed window),
+/// which is the group form of "what changed".
+#[crate::mutate]
+fn differentiate(v: &[Flow]) -> Option<Flow> {
+    let t = tpart(&v[0]);
+    let mut prev = ZSet::zero();
+    let mut out = Vec::with_capacity(TICKS);
+    for z in &t {
+        out.push(z.add(&prev.neg()));
+        prev = z.clone();
+    }
+    Some(Flow::T(out))
+}
+
+/// The Z-set spread: zero, singletons, negatives, and overlapping multi-key sets,
+/// so the grid can refute a false law (a distinct that pretended linearity, an
+/// inverse that only held on positives).
+#[crate::mutate]
+fn zsets() -> Vec<Flow> {
+    vec![
+        Flow::Z(ZSet::zero()),
+        Flow::Z(ZSet::from_pairs(&[(0, 1)])),
+        Flow::Z(ZSet::from_pairs(&[(0, -1)])),
+        Flow::Z(ZSet::from_pairs(&[(1, 2)])),
+        Flow::Z(ZSet::from_pairs(&[(0, 1), (1, -2)])),
+        Flow::Z(ZSet::from_pairs(&[(1, 1), (2, 3)])),
+    ]
+}
+
+/// The trace spread: built from the same Z-sets — constant, impulse, alternating —
+/// so the stream laws are judged over windows with real interior differences.
+#[crate::mutate]
+fn traces() -> Vec<Flow> {
+    let a = ZSet::from_pairs(&[(0, 1)]);
+    let b = ZSet::from_pairs(&[(1, 2)]);
+    let c = ZSet::from_pairs(&[(0, -1), (2, 1)]);
+    vec![
+        Flow::T(vec![ZSet::zero(); TICKS]),
+        Flow::T(vec![a.clone(), ZSet::zero(), ZSet::zero()]),
+        Flow::T(vec![ZSet::zero(), b.clone(), ZSet::zero()]),
+        Flow::T(vec![a.clone(), b.clone(), c.clone()]),
+        Flow::T(vec![c, a, b]),
+    ]
+}
+
+// The whole two-sorted `Theory` impl is generated from this block — the kernel type
+// (`ZSet`) and the operator functions above are the only authored content.
+crate::theory! {
+    ZKernel : "zset kernel", Value = Flow, Obs = (u8, Vec<i64>), Sort = Sort,
+    sort_of = |v: &Flow| match v {
+        Flow::Z(_) => Sort::Z,
+        Flow::T(_) => Sort::T,
+    },
+    observe = |v: &Flow| match v {
+        Flow::Z(z) => (0u8, (0..KEYS as u8).map(|k| z.weight(&k)).collect()),
+        Flow::T(t) => (
+            1u8,
+            t.iter()
+                .flat_map(|z| (0..KEYS as u8).map(|k| z.weight(&k)).collect::<Vec<_>>())
+                .collect(),
+        ),
+    },
+    vars {
+        Sort::Z => &["a", "b", "c"],
+        Sort::T => &["s", "t", "u"],
+    }
+    inhabit {
+        Sort::Z => zsets(),
+        Sort::T => traces(),
+    }
+    ops {
+        Nullary "Zero"          "zero"          () -> Sort::Z = zero;
+        Infix   "Add"           "+"             (Sort::Z, Sort::Z) -> Sort::Z = add;
+        Prefix  "Neg"           "neg"           (Sort::Z) -> Sort::Z = neg;
+        Infix   "Join"          "join"          (Sort::Z, Sort::Z) -> Sort::Z = join;
+        Prefix  "Distinct"      "distinct"      (Sort::Z) -> Sort::Z = distinct;
+        Prefix  "Delay"         "delay"         (Sort::T) -> Sort::T = delay;
+        Prefix  "Integrate"     "integrate"     (Sort::T) -> Sort::T = integrate;
+        Prefix  "Differentiate" "differentiate" (Sort::T) -> Sort::T = differentiate;
+    }
+}

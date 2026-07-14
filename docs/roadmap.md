@@ -3200,6 +3200,63 @@ around the verbs), byte-equal naive-vs-incremental is sampled equivalence like
 every drill in this repo, and "the judged path is the cheapest path" is a goal
 the structure makes reachable, not a property it already has.
 
+A deferral, recorded so it is not re-litigated (2026-07-15, the substrate
+conversation): the LIMIT of this program is a zero-dependency trusted base — the
+five-construct kernel, a total-term evaluator, the effect rim (journal, blobs,
+spawn, clock), a boundary parser, the hash; ~2–3k auditable lines — with every
+toolchain above it (rustc first) permanently FENCED as an opaque operator, never
+trusted. Rust is the scaffolding language for bricks 3–5, and the pivot, when it
+comes, is a swap drill at substrate scale: the freestanding tissue certified by
+differential against the Rust implementation over the committed corpora, the
+Rust kernel demoting to oracle exactly as cargo-mutants demoted to schemata.
+Two pivot-time problems named now and deliberately deferred: rustc's
+REPRODUCIBILITY (pinned-toolchain builds are mostly deterministic; the wound is
+provenance — rustc is built by rustc, the trusting-trust shadow; diverse double-
+compilation is the known counter), and TOTALITY's edge (operator bodies that
+refuse the total term language stay behind the spawn door; where that line lands
+is measured, not asserted — the Om question). Neither blocks the bricks; both
+gate the pivot.
+
+Brick 3's first half BUILT (2026-07-15, `src/discover/zset.rs`, through the verbs;
+the one hand edit was the `theory!` ops list — macro invocations are not
+addressable items, twice observed today with `system!`, a named verb gap). The
+kernel entered the repo the way the method wants everything to enter: as a
+DISCOVERED THEORY. `ZSet<K>` (canonical: zero weight is absence, so structural
+equality is observational equality) with zero/+/neg/join/distinct, and bounded
+traces with delay/integrate/differentiate — and the engine, running the
+operators, discovered the entire algebra unprompted: the abelian group WITH
+INVERSE (the law that makes D exist), neg an Add-homomorphism, join's ring face
+(commutative, associative, annihilated by zero, distributing over Add), distinct
+a projection, and the DBSP theorem itself — `integrate(differentiate(s)) = s`
+and `differentiate(integrate(s)) = s` — as two discovered round-trips, delay
+commuting past both. Twenty-one laws, every operator in a law, frozen in
+spec/zset-kernel.spec with its 38-mutant algebra-mutation lock beside it.
+
+The instruments each spoke once, and each was right. The PLACER refused the
+first declaration — Z ops and trace ops shared no nets — which exposed a real
+omission: the kernel's cross-sort operators, `impulse` (a delta enters the
+stream at NOW) and `latest` (eduction reads the current value). Adding them
+settled the module (8 of 8) and the engine found `latest(impulse(a)) = a` on its
+own. COHESION named the kernel the fourth latent split (group / calculus /
+bridge pair) — ratified keep-whole beside doc flow: I and D are statements about
+the group, and splitting would sever the calculus from the algebra it computes
+with. The MUTATION battery ratified 20 degrees of freedom the law language
+cannot yet see — constant-zero join satisfies every ring law over an ideal;
+distinct is unconstrained at negative weights; latest is pinned only through
+impulse — each a sharper-shape brick waiting (`distinct(a + a) = distinct(a)` is
+the missing stanza's shape). And a naming lesson for the census: enum VARIANTS
+named `Z`/`T` collided with the GDP kernel's type-level `Z` in rustc's
+trimmed-path diagnostics, moving pinned trybuild stderr — renamed Zset/Window;
+new def names must dodge idents that pinned diagnostics print.
+
+What is NOT yet built, so it is not re-derived: linearity and the product rule
+are pinned as grid probes (`the_operators_earn_their_delta_shortcuts`) because
+the catalog cannot state cross-sort homomorphisms — that is a shape brick; the
+indexed Z-set (real relational join, not the same-key multiplicity core); and
+the executor — the operator DAG, eduction, and the warehouse recognized as the
+nonlinear rule's memo — which is brick 3's second half, with naive recompute as
+its oracle gate.
+
 Brick 1 BUILT, and half of brick 2 with it (2026-07-14, `src/discover/cli.rs`,
 through the verbs except one named fallback). The declaration form landed as data
 stanzas, the catalog idiom, not yet a macro — `cli!`'s sugar starts paying when
