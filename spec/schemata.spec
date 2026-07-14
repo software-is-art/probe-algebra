@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 910 sites.
+# 926 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -290,6 +290,22 @@
 - boundary_spec::discover::depend::locks::text:0: == -> !=
 - boundary_spec::discover::depend::locks::text:1: == -> !=
 - boundary_spec::discover::depend::locks::text:deaf -> None
+- boundary_spec::discover::eduction::Circuit<K>::judge:0: == -> !=
+- boundary_spec::discover::eduction::Circuit<K>::judge:1: != -> ==
+- boundary_spec::discover::eduction::Circuit<K>::latest:0: >= -> <
+- boundary_spec::discover::eduction::Circuit<K>::latest:deaf -> None
+- boundary_spec::discover::eduction::Circuit<K>::pull:0: ! -> (deleted)
+- boundary_spec::discover::eduction::Circuit<K>::pull:1: ! -> (deleted)
+- boundary_spec::discover::eduction::Circuit<K>::tick:0: != -> ==
+- boundary_spec::discover::eduction::Circuit<K>::tick:1: != -> ==
+- boundary_spec::discover::eduction::Circuit<K>::tick:2: == -> !=
+- boundary_spec::discover::eduction::Circuit<K>::tick:deaf -> None
+- boundary_spec::discover::eduction::Circuit<K>::wire:0: < -> >=
+- boundary_spec::discover::eduction::Circuit<K>::wire:1: && -> ||
+- boundary_spec::discover::eduction::Circuit<K>::wire:2: ! -> (deleted)
+- boundary_spec::discover::eduction::Circuit<K>::wire:3: > -> <=
+- boundary_spec::discover::eduction::Circuit<K>::wire:4: || -> &&
+- boundary_spec::discover::eduction::Circuit<K>::wire:deaf -> None
 - boundary_spec::discover::engine::DiscoveredLaw::ops:deaf -> vec![]
 - boundary_spec::discover::engine::Engine<T>::check:0: != -> ==
 - boundary_spec::discover::engine::Engine<T>::check:1: || -> &&

@@ -3217,6 +3217,47 @@ refuse the total term language stay behind the spawn door; where that line lands
 is measured, not asserted — the Om question). Neither blocks the bricks; both
 gate the pivot.
 
+Brick 3's second half BUILT (2026-07-15, `src/discover/eduction.rs`, through the
+verbs, same sitting as the first half). The executor is a Circuit: an operator
+DAG acyclic by construction (`wire` refuses an input that names no existing node,
+and any wiring after the stream starts — the DAG is declared whole, then the
+stream runs), evaluated by EDUCTION — `tick` only records what arrived, `latest`
+demands a node, and only the demanded ancestor cone is judged, each node catching
+up through the recorded ticks by its operator's delta rule. Linear operators
+(add, neg, delay) pass deltas straight through; join pays the product rule from
+its two integrated inputs; distinct is the nonlinear rule D∘distinct∘I, and its
+recompute goes through the WAREHOUSE: values keyed by the content of the
+integrated input they were computed from — never the node, never the tick. The
+probes pin the recognition, not just the mechanism: two distinct nodes walking
+the same content share verdicts node to node, and a retraction that returns the
+content to a judged value returns both to standing evidence — the owes/gates
+verdict table is this same discipline in the degenerate case, with rustc and the
+test suite as the uninterpreted operators and the tree as the integrated input.
+The oracle gate is naive recompute over the same DAG: every node's full value at
+every tick from the plain kernel operators, equal to the incremental answer over
+a grid of circuits and seeded feed schedules, demanded eagerly and again only
+once at the end (catch-up judged against the same oracle). Eduction's economy is
+pinned in node-ticks: a tick judges nothing, a repeated demand judges nothing
+new, a later demand pays only what is still owed. All sixteen of the module's
+schemata sites died to the four probes on the first sweep; the censuses moved
+(qualify REFUSES it — mutating receivers, machinery like the engine; tiers says
+ALGEBRA) and their diffs ride the commit.
+
+Deliberately deferred from this brick, so it is not re-derived: the Opaque node
+(an uninterpreted operator with a content-keyed verdict, the warehouse's real
+tenant) waits for the item-relation brick, because its integrated input — the
+tree — does not exist inside a `ZSet<K>` circuit; when items are Z-set rows, the
+site-keyed sweep's verdicts become exactly a Distinct-shaped view maintained by
+this executor, which is the first paying customer already named below. Readings,
+recorded per the instrument: before naming the new types the pinned trybuild
+stderr was grepped for ident collisions (the Zset/Window lesson applied by hand)
+— "will this def name move a pinned diagnostic" is a perception no verb speaks,
+though the lock's own census computes the answer; and zset.rs was opened to read
+its authoring idiom before writing the sibling module — house style is a
+question nothing ratifies. One verb lesson, the verb teaching rather than
+lacking: `edit` names a generic impl with its parameters (`impl Circuit` was
+refused as a rename; `impl Circuit<K>` held the signature).
+
 Brick 3's first half BUILT (2026-07-15, `src/discover/zset.rs`, through the verbs;
 the one hand edit was the `theory!` ops list — macro invocations are not
 addressable items, twice observed today with `system!`, a named verb gap). The

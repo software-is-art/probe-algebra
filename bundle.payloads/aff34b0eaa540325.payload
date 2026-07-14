@@ -1,0 +1,3 @@
+/// A verdict's address in the warehouse: the operator that judged, and the
+/// CONTENT it judged — never the node, never the tick.
+type Evidence<K> = (&'static str, Vec<(K, i64)>);

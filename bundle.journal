@@ -128,3 +128,10 @@ edit src/discover/zset.rs — probes @ac4ffb6e0cddb53d
 edit src/discover/shape.rs — probes @b1706ec8bbb49dcd
 edit src/discover/system.rs — tests @91ad49a2bea7172f
 edit examples/schemata.rs — outcome @52a9e6a0178f1595
+add src/discover/eduction.rs — enum Node, struct Cell, struct Warehouse, struct Circuit @07ad126c1c93a9d5
+add src/discover/mod.rs — mod eduction @e964d80b5ea8a512
+add src/discover/eduction.rs — mod probes @c3f7793445380e4a
+add src/discover/eduction.rs —  @aff34b0eaa540325
+edit src/discover/eduction.rs — Warehouse @43538c44f19a8c34
+edit src/discover/eduction.rs — impl Circuit<K> @6609df5f29dd6556
+edit src/discover/eduction.rs — probes @07f6d9fb9b4c22bf

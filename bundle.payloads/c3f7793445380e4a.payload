@@ -1,0 +1,304 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    /// The oracle: naive recompute. Every node's full value at every tick, from
+    /// scratch, by the plain kernel operators over integrated inputs — no deltas,
+    /// no memo, no laziness. The executor is gated against this; it never runs it.
+    fn naive(plan: &[Node], fed: &[Vec<ZSet<u8>>]) -> Vec<Vec<ZSet<u8>>> {
+        let mut values: Vec<Vec<ZSet<u8>>> = Vec::new();
+        for (t, arrivals) in fed.iter().enumerate() {
+            let mut now: Vec<ZSet<u8>> = Vec::new();
+            for (id, node) in plan.iter().enumerate() {
+                let value = match *node {
+                    Node::Source => {
+                        let before = if t == 0 {
+                            ZSet::zero()
+                        } else {
+                            values[t - 1][id].clone()
+                        };
+                        before.add(&arrivals[id])
+                    }
+                    Node::Add(a, b) => now[a].add(&now[b]),
+                    Node::Neg(a) => now[a].neg(),
+                    Node::Delay(a) => {
+                        if t == 0 {
+                            ZSet::zero()
+                        } else {
+                            values[t - 1][a].clone()
+                        }
+                    }
+                    Node::Join(a, b) => now[a].join(&now[b]),
+                    Node::Distinct(a) => now[a].distinct(),
+                };
+                now.push(value);
+            }
+            values.push(now);
+        }
+        values
+    }
+
+    /// A circuit from a declared plan — every wire lands because the plans list
+    /// nodes in dependency order.
+    fn build(plan: &[Node]) -> Circuit<u8> {
+        let mut circuit: Circuit<u8> = Circuit::new();
+        for node in plan {
+            circuit.wire(*node).expect("declared in dependency order");
+        }
+        circuit
+    }
+
+    /// The delta spread the schedules draw from: zero, insertions, a retraction,
+    /// a mixed-sign set — so the grid exercises weights crossing zero, distinct
+    /// flipping, and the product rule's cross term.
+    fn spread() -> Vec<ZSet<u8>> {
+        vec![
+            ZSet::zero(),
+            ZSet::from_pairs(&[(0, 1)]),
+            ZSet::from_pairs(&[(0, -1)]),
+            ZSet::from_pairs(&[(1, 2)]),
+            ZSet::from_pairs(&[(0, 1), (1, -2)]),
+            ZSet::from_pairs(&[(2, 3)]),
+        ]
+    }
+
+    /// A deterministic feed schedule, [tick][node]: each source walks the spread
+    /// on its own stride, non-sources receive zero.
+    fn schedule(plan: &[Node], ticks: usize, seed: usize) -> Vec<Vec<ZSet<u8>>> {
+        let pool = spread();
+        (0..ticks)
+            .map(|t| {
+                plan.iter()
+                    .enumerate()
+                    .map(|(id, node)| {
+                        if *node == Node::Source {
+                            pool[(seed + 2 * t + 3 * id) % pool.len()].clone()
+                        } else {
+                            ZSet::zero()
+                        }
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// THE ORACLE GATE: over a grid of circuits (every operator, shared fan-out,
+    /// distinct-of-join, join-of-distincts, delay in and out of cones) and seeded
+    /// feed schedules, the incremental executor equals naive recompute at every
+    /// node after every tick — demanded eagerly, and again demanded only once at
+    /// the end, so catch-up is judged against the same oracle as step-by-step.
+    /// Sampled equivalence, like every drill here: evidence, not proof.
+    #[test]
+    fn the_incremental_executor_matches_naive_recompute() {
+        let plans: Vec<Vec<Node>> = vec![
+            vec![
+                Node::Source,
+                Node::Distinct(0),
+                Node::Delay(1),
+                Node::Join(1, 2),
+                Node::Neg(0),
+                Node::Add(3, 4),
+            ],
+            vec![
+                Node::Source,
+                Node::Source,
+                Node::Join(0, 1),
+                Node::Distinct(2),
+                Node::Add(3, 0),
+                Node::Delay(4),
+                Node::Neg(5),
+                Node::Add(6, 3),
+            ],
+            vec![
+                Node::Source,
+                Node::Source,
+                Node::Neg(1),
+                Node::Add(0, 2),
+                Node::Distinct(3),
+                Node::Distinct(0),
+                Node::Join(4, 5),
+                Node::Delay(6),
+                Node::Add(6, 7),
+            ],
+        ];
+        for (which, plan) in plans.iter().enumerate() {
+            for seed in 0..spread().len() {
+                let fed = schedule(plan, 5, seed);
+                let values = naive(plan, &fed);
+                let feed_at = |t: usize| -> Vec<(usize, ZSet<u8>)> {
+                    plan.iter()
+                        .enumerate()
+                        .filter(|(_, node)| **node == Node::Source)
+                        .map(|(id, _)| (id, fed[t][id].clone()))
+                        .collect()
+                };
+                let mut eager = build(plan);
+                for t in 0..fed.len() {
+                    eager.tick(&feed_at(t)).expect("every feed names a source");
+                    for id in 0..plan.len() {
+                        assert_eq!(
+                            eager.latest(id),
+                            Some(values[t][id].clone()),
+                            "eager divergence: plan {which}, seed {seed}, tick {t}, node {id}"
+                        );
+                    }
+                }
+                let mut lazy = build(plan);
+                for t in 0..fed.len() {
+                    lazy.tick(&feed_at(t)).expect("every feed names a source");
+                }
+                for id in 0..plan.len() {
+                    assert_eq!(
+                        lazy.latest(id),
+                        Some(values[fed.len() - 1][id].clone()),
+                        "catch-up divergence: plan {which}, seed {seed}, node {id}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Eduction's economy, pinned in node-ticks: a tick judges nothing, a demand
+    /// judges exactly its ancestor cone through the recorded ticks, a repeated
+    /// demand judges nothing new, and a later demand pays only what is still owed
+    /// — after which the caught-up value still matches the oracle.
+    #[test]
+    fn eduction_judges_the_demanded_cone_and_only_it() {
+        let plan = vec![
+            Node::Source,
+            Node::Distinct(0),
+            Node::Source,
+            Node::Neg(2),
+            Node::Add(1, 3),
+        ];
+        let mut circuit = build(&plan);
+        let a = ZSet::from_pairs(&[(0u8, 1)]);
+        let b = ZSet::from_pairs(&[(1u8, 2)]);
+        for _ in 0..4 {
+            circuit
+                .tick(&[(0, a.clone()), (2, b.clone())])
+                .expect("both feeds name sources");
+        }
+        assert_eq!(circuit.judged(), 0, "tick records; it never judges");
+        let _ = circuit.latest(1);
+        assert_eq!(
+            circuit.judged(),
+            8,
+            "the distinct branch's cone: two nodes, four ticks"
+        );
+        let _ = circuit.latest(1);
+        assert_eq!(
+            circuit.judged(),
+            8,
+            "a second demand with nothing new judges nothing"
+        );
+        let fed: Vec<Vec<ZSet<u8>>> = (0..4)
+            .map(|_| {
+                vec![
+                    a.clone(),
+                    ZSet::zero(),
+                    b.clone(),
+                    ZSet::zero(),
+                    ZSet::zero(),
+                ]
+            })
+            .collect();
+        assert_eq!(
+            circuit.latest(4),
+            Some(naive(&plan, &fed)[3][4].clone()),
+            "the sink caught up to the oracle"
+        );
+        assert_eq!(
+            circuit.judged(),
+            20,
+            "the sink's demand judged only the three nodes still owing"
+        );
+    }
+
+    /// The warehouse is the nonlinear rule's memo, and content is its only key:
+    /// two distinct nodes walking the same integrated content share verdicts node
+    /// to node, and a retraction that returns the content to a value already
+    /// judged returns BOTH to standing evidence — not the node, not the tick,
+    /// the content. The owes/gates verdict table is this same discipline with
+    /// the tree as the integrated input.
+    #[test]
+    fn the_warehouse_is_the_nonlinear_rules_memo() {
+        let plan = vec![
+            Node::Source,
+            Node::Distinct(0),
+            Node::Source,
+            Node::Distinct(2),
+        ];
+        let mut circuit = build(&plan);
+        let a = ZSet::from_pairs(&[(0u8, 1), (1, -2)]);
+        let b = ZSet::from_pairs(&[(2u8, 3)]);
+        for delta in [a.clone(), b.clone(), b.neg()] {
+            circuit
+                .tick(&[(0, delta.clone()), (2, delta)])
+                .expect("both feeds name sources");
+            let one = circuit.latest(1).expect("wired");
+            let two = circuit.latest(3).expect("wired");
+            assert_eq!(one, two, "same content, same verdict");
+        }
+        assert_eq!(
+            circuit.recalled(),
+            (4, 2),
+            "two contents judged once each; every other demand carried"
+        );
+        assert_eq!(
+            circuit.latest(1),
+            Some(a.distinct()),
+            "the carried verdicts are the computed ones"
+        );
+    }
+
+    /// The declaration verbs refuse what they cannot wire, and a refusal writes
+    /// nothing: inputs must exist, the DAG is declared whole before the stream
+    /// starts, feeds must name sources (duplicate mentions sum), and a node never
+    /// wired has no value — while a wired, unfed source honestly reads zero.
+    #[test]
+    fn the_circuit_refuses_what_it_cannot_wire() {
+        let mut circuit: Circuit<u8> = Circuit::new();
+        assert_eq!(
+            circuit.wire(Node::Neg(0)),
+            None,
+            "an input must name an existing node"
+        );
+        let s = circuit.wire(Node::Source).expect("a source needs nothing");
+        assert_eq!(
+            circuit.wire(Node::Add(s, 7)),
+            None,
+            "both inputs must exist"
+        );
+        assert_eq!(
+            circuit.tick(&[(9, ZSet::zero())]),
+            None,
+            "a feed naming no source refuses the whole tick"
+        );
+        assert_eq!(
+            circuit.tick(&[]),
+            Some(0),
+            "an empty tick still advances the stream"
+        );
+        assert_eq!(
+            circuit.wire(Node::Neg(s)),
+            None,
+            "wiring after the stream starts is refused — the DAG is declared whole"
+        );
+        assert_eq!(circuit.latest(9), None, "a node never wired has no value");
+        assert_eq!(
+            circuit.latest(s),
+            Some(ZSet::zero()),
+            "a source that received nothing reads zero"
+        );
+        let d = ZSet::from_pairs(&[(3u8, 2)]);
+        circuit
+            .tick(&[(s, d.clone()), (s, d.clone())])
+            .expect("a source, twice");
+        assert_eq!(
+            circuit.latest(s),
+            Some(d.add(&d)),
+            "duplicate mentions of a source sum"
+        );
+    }
+}
