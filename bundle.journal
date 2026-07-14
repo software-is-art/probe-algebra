@@ -127,3 +127,4 @@ edit src/discover/zset.rs — traces @d6b60e5b41edf74c
 edit src/discover/zset.rs — probes @ac4ffb6e0cddb53d
 edit src/discover/shape.rs — probes @b1706ec8bbb49dcd
 edit src/discover/system.rs — tests @91ad49a2bea7172f
+edit examples/schemata.rs — outcome @52a9e6a0178f1595

@@ -3405,7 +3405,14 @@ The numbers: ~50 min (fallback, per change) → 301 s (full nextest sweep, the
 one-time transition) → an ordinary edit now re-judges only the sites whose
 module or coverers moved, at 2 workers on this machine — the example-file edit
 that moved no site's evidence carried 799 of 891 mid-repair, and with keys fully
-minted the steady state is carrying everything but the edited module's handful.
+minted the steady state landed at 59 s for the COMPLETE gates run (format, lint,
+test, mutation — 910 verdicts carried, zero judged). One more leak found on the
+way there, the documented runaway incident one layer down: nextest puts each
+test in its OWN process group, so `outcome`'s group kill reached cargo and
+nextest but not a hung mutant's test binary, which reparented to pid 1 and spun
+(ten orphans at ~70% CPU after two timeout judgments). The reap now also kills
+our test binaries whose parent has become 1 — precise, because a live worker's
+tests still hold their nextest parent.
 The remaining fixed costs are the build and one baseline suite run (~35 s
 together, warm), which are the dataflow kernel's next targets — site verdicts as
 a maintained view over the item relation is this brick's principled form, and

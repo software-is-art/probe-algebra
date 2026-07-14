@@ -356,6 +356,29 @@ fn outcome(mut cmd: Command, limit: Duration) -> &'static str {
                     .args(["-9", &format!("-{}", child.id())])
                     .status();
                 let _ = child.wait();
+                // NEXTEST puts each test in its OWN process group, so the group
+                // kill above reaches cargo and nextest but not a hung test binary,
+                // which reparents to pid 1 and spins (observed twice: ten orphans
+                // at ~70% CPU each after two timeout judgments). Reap exactly
+                // those: our test binaries whose parent is now 1 — a live
+                // worker's tests still have their nextest parent, so this cannot
+                // touch a concurrent judgment.
+                if let Ok(out) = Command::new("ps")
+                    .args(["-axo", "pid=,ppid=,comm="])
+                    .output()
+                {
+                    for line in String::from_utf8_lossy(&out.stdout).lines() {
+                        let mut fields = line.split_whitespace();
+                        let (Some(pid), Some(ppid), Some(comm)) =
+                            (fields.next(), fields.next(), fields.next())
+                        else {
+                            continue;
+                        };
+                        if ppid == "1" && comm.contains("target/debug/deps/") {
+                            let _ = Command::new("kill").args(["-9", pid]).status();
+                        }
+                    }
+                }
                 return "timeout";
             }
             None => std::thread::sleep(Duration::from_millis(100)),
