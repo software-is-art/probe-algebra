@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 876 sites.
+# 893 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -71,6 +71,23 @@
 - boundary_spec::discover::arithmetic::one:deaf -> None
 - boundary_spec::discover::arithmetic::run:deaf -> None
 - boundary_spec::discover::arithmetic::zero:deaf -> None
+- boundary_spec::discover::attest::Evidence::carry:0: == -> !=
+- boundary_spec::discover::attest::Evidence::carry:1: == -> !=
+- boundary_spec::discover::attest::Evidence::carry:2: && -> ||
+- boundary_spec::discover::attest::Evidence::carry:3: != -> ==
+- boundary_spec::discover::attest::Evidence::carry:4: && -> ||
+- boundary_spec::discover::attest::Evidence::carry:deaf -> None
+- boundary_spec::discover::attest::Evidence::label:0: > -> <=
+- boundary_spec::discover::attest::Evidence::label:1: == -> !=
+- boundary_spec::discover::attest::Evidence::label:2: && -> ||
+- boundary_spec::discover::attest::Evidence::label:deaf -> None
+- boundary_spec::discover::attest::Evidence::module_text:0: ! -> (deleted)
+- boundary_spec::discover::attest::Evidence::module_text:1: && -> ||
+- boundary_spec::discover::attest::Evidence::module_text:2: == -> !=
+- boundary_spec::discover::attest::Evidence::module_text:3: ! -> (deleted)
+- boundary_spec::discover::attest::Evidence::module_text:4: ! -> (deleted)
+- boundary_spec::discover::attest::Evidence::module_text:deaf -> None
+- boundary_spec::discover::attest::Evidence::of:deaf -> String::new()
 - boundary_spec::discover::attest::attest::parse:0: || -> &&
 - boundary_spec::discover::attest::attest::parse:1: ! -> (deleted)
 - boundary_spec::discover::attest::attest::parse:deaf -> Err(String::new())

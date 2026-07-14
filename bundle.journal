@@ -65,3 +65,30 @@ add src/discover/mod.rs — mod cli @2287731756609363
 edit examples/bundle.rs — run @8e32e1fb5adb2db1
 edit src/discover/attest.rs — SiteVerdict @4b67fceef7a30074
 edit src/discover/attest.rs — impl Transcript @c05f6981796caaee
+add src/discover/attest.rs — struct Evidence @61d767a42dca582a
+edit src/discover/attest.rs — probes @f600269e14bcc18c
+add examples/schemata.rs — fn outcome @f63f16a7d242a3c9
+add examples/schemata.rs — fn sweep_with @1a8b2cc981b289de
+edit examples/schemata.rs — sweep @1a0a88f43ca1a6a1
+edit examples/schemata.rs — sweep_with @6170e37ff53e265a
+edit examples/schemata.rs — countersign @c073ad1cdbab56cf
+edit examples/schemata.rs — verify @a23f4bf3c751674a
+edit examples/schemata.rs — outcome @79f22c82e62096cf
+edit examples/schemata.rs — countersign @dd6b6ea895aabfb9
+edit examples/schemata.rs — probes @393f99dd6a9aa3b7
+collect examples/schemata.rs — survives
+edit src/discover/gates.rs — impl GateRegistry @6152b004e1af3977
+add examples/schemata.rs —  @7361fd030e8db76f
+edit examples/schemata.rs — sweep_with @c24863530467c828
+edit examples/schemata.rs — sweep_with @c4ba83a575d01f9b
+edit examples/schemata.rs — sweep_with @e65447ddc811f1fe
+edit src/discover/schemata.rs — impl Schemata @79331796ca857942
+add examples/schemata.rs — fn physical_memory_gb @58e2b118fbb53d23
+edit examples/schemata.rs — sweep_with @0fc4e130756d5f06
+edit examples/schemata.rs — sweep_with @0fc4e130756d5f06
+edit examples/schemata.rs — sweep_with @f55084ed700a994a
+edit src/discover/attest.rs — impl Evidence @6ec72ee39c55172b
+edit src/discover/attest.rs — probes @6392227d07dad1de
+edit src/discover/attest.rs — impl Evidence @68eaccd5479f8704
+edit src/discover/attest.rs — impl Evidence @5a2f02c6332db099
+edit src/discover/attest.rs — probes @f3a3636a77b7f907

@@ -1,0 +1,21 @@
+/// Physical memory in GB — macOS `sysctl -n hw.memsize`, Linux `/proc/meminfo` —
+/// because bytes, not cores, are the judging pool's binding constraint. None when
+/// neither source speaks; the caller falls back conservatively.
+fn physical_memory_gb() -> Option<usize> {
+    if let Ok(out) = Command::new("sysctl").args(["-n", "hw.memsize"]).output() {
+        if out.status.success() {
+            if let Ok(bytes) = String::from_utf8_lossy(&out.stdout).trim().parse::<u64>() {
+                return Some((bytes / 1_073_741_824) as usize);
+            }
+        }
+    }
+    let text = std::fs::read_to_string("/proc/meminfo").ok()?;
+    let kb: u64 = text
+        .lines()
+        .find(|l| l.starts_with("MemTotal:"))?
+        .split_whitespace()
+        .nth(1)?
+        .parse()
+        .ok()?;
+    Some((kb / 1_048_576) as usize)
+}

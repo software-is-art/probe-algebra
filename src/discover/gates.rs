@@ -683,14 +683,19 @@ impl GateRegistry {
                            router's classifier, the reliance judge) ships in ONE build \
                            behind the PROBE_MUTANT selector — a green run with a flip \
                            active is a survivor, ratified by key in \
-                           spec/schemata.register or killed with a probe. `verify` is \
-                           the sampled countersign: a committed attestation \
-                           (attest/sweep.transcript) matching this tree and toolchain \
-                           is audited by re-judging a random sample of its sites — \
-                           derivation local, signature cold — and a missing, foreign, \
-                           or disagreeing attestation falls back to the full sweep, \
-                           which re-attests. The weekly shards stay the from-scratch \
-                           backstop",
+                           spec/schemata.register or killed with a probe. `verify` \
+                           holds three honesty tiers by what the record affords: a \
+                           committed attestation (attest/sweep.transcript) matching \
+                           this tree and toolchain is COUNTERSIGNED by re-judging a \
+                           random sample of its sites — derivation local, signature \
+                           cold; a same-toolchain attestation from another tree feeds \
+                           INCREMENTAL re-judgment — each site's verdict carries \
+                           exactly when its evidence key (its module plus its covering \
+                           tests' modules, by content) still stands, timeouts never \
+                           carry, and only the moved sites are judged; anything else, \
+                           or any disagreement, earns the FULL sweep, which \
+                           re-attests. The weekly shards stay the from-scratch \
+                           backstop for what content keys cannot see",
                 command: &[
                     "cargo",
                     "run",

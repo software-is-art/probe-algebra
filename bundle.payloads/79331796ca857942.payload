@@ -1,0 +1,152 @@
+impl Schemata {
+    /// Is this site's flip active? A drill's forced site wins; otherwise the
+    /// `PROBE_MUTANT` environment selector, read once per process. With neither set
+    /// this is a cached `None` comparison — the instrumented functions run their
+    /// original expressions.
+    pub fn active(site: &'static str) -> bool {
+        Self::record(site);
+        if let Some(forced) = FORCED.with(|f| *f.borrow()) {
+            return forced == site;
+        }
+        static SELECTED: OnceLock<Option<String>> = OnceLock::new();
+        SELECTED
+            .get_or_init(|| std::env::var("PROBE_MUTANT").ok())
+            .as_deref()
+            == Some(site)
+    }
+
+    /// COVERAGE recording: with `SCHEMATA_RECORD=<dir>` set, every site whose guard
+    /// executes is appended (once) to a per-FILTER file headed by this process's
+    /// test filter (nextest runs one test per process, so the file IS the site→test
+    /// edge list). The map makes the sweep EXACT and selective: a mutant can only
+    /// change behaviour where its guard executes, so running just the covering tests
+    /// loses nothing — and a site no test reaches is a survivor before any run.
+    /// Without the variable this is one cached `None` check.
+    fn record(site: &'static str) {
+        struct Recorder {
+            file: Mutex<(std::fs::File, BTreeSet<&'static str>)>,
+        }
+        static RECORDER: OnceLock<Option<Recorder>> = OnceLock::new();
+        let recorder = RECORDER.get_or_init(|| {
+            let dir = std::env::var("SCHEMATA_RECORD").ok()?;
+            // the test names in this process's argv (nextest passes the exact
+            // filter; test paths are the `::`-carrying arguments).
+            let tests: Vec<String> = std::env::args().filter(|a| a.contains("::")).collect();
+            // the file is keyed by the FILTER, never the pid: a recycled pid would
+            // append one test's edges under another test's header, and the last
+            // header wins — coverage sets flapped across identical trees (~90
+            // spurious re-judgments per incremental run), and the sharp direction
+            // of the same lie is a sole coverer clobbered into another test's
+            // file, whose site is then judged by a test that never reaches its
+            // guard: a false survivor. Same filter, same file, truncated —
+            // self-overwrites are idempotent, cross-test appends unrepresentable.
+            let joined = tests.join(" ");
+            let mut name: u64 = 0xcbf2_9ce4_8422_2325;
+            for byte in joined.bytes() {
+                name ^= u64::from(byte);
+                name = name.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            let path = PathBuf::from(dir).join(format!("{name:016x}.touch"));
+            let mut file = std::fs::File::create(path).ok()?;
+            writeln!(file, "T {joined}").ok()?;
+            Some(Recorder {
+                file: Mutex::new((file, BTreeSet::new())),
+            })
+        });
+        if let Some(recorder) = recorder {
+            if let Ok(mut guard) = recorder.file.lock() {
+                if guard.1.insert(site) {
+                    let (file, _) = &mut *guard;
+                    let _ = writeln!(file, "S {site}");
+                }
+            }
+        }
+    }
+
+    /// Run `probe` with one site's flip forced on THIS thread — the drill hook, so a
+    /// probe can watch a mutant change behaviour without environment plumbing. The
+    /// force is dropped even if the probe panics.
+    pub fn force<R>(site: &'static str, probe: impl FnOnce() -> R) -> R {
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                FORCED.with(|f| *f.borrow_mut() = None);
+            }
+        }
+        FORCED.with(|f| *f.borrow_mut() = Some(site));
+        let _reset = Reset;
+        probe()
+    }
+
+    /// The site census: sorted (link order is arbitrary), a duplicate id REFUSED by
+    /// name — two functions sharing a `#[mutate]` label would make the selector
+    /// ambiguous, and an ambiguous mutant is no mutant.
+    pub fn census() -> Result<Vec<&'static str>, String> {
+        let mut sites: Vec<&'static str> = MUTANT_SITES.iter().copied().collect();
+        sites.sort_unstable();
+        for pair in sites.windows(2) {
+            if pair[0] == pair[1] {
+                return Err(format!(
+                    "schemata site `{}` is registered twice — two `#[mutate]` \
+                     functions share a label; pass distinct labels",
+                    pair[0]
+                ));
+            }
+        }
+        Ok(sites)
+    }
+
+    /// The human-readable census — what `spec/schemata.spec` freezes.
+    pub fn render() -> Result<String, String> {
+        let sites = Self::census()?;
+        let mut out = format!(
+            "# the schemata census, DERIVED — every expression-flip mutant this build\n\
+             # carries (`#[mutate]` sites, registered at link time), one per line. The\n\
+             # every-change `mutation (schemata)` gate builds once and runs the lib suite\n\
+             # once per site with the flip active; survivors are ratified by key in\n\
+             # spec/schemata.register or killed with a probe. Instrumenting a function\n\
+             # (or moving its sites) is a ratified diff to this file. Regenerate with\n\
+             # `cargo run --example freeze_gates`.\n\
+             #\n\
+             # {} sites.\n\n",
+            sites.len()
+        );
+        for site in sites {
+            out.push_str(&format!("- {site}\n"));
+        }
+        Ok(out)
+    }
+
+    /// `spec/schemata.spec` — the census, frozen. REFUSES outside the schemata build:
+    /// without the feature the slice is empty, and freezing emptiness over the
+    /// committed census would erase it silently.
+    pub fn lock() -> Result<Lock, String> {
+        if !cfg!(feature = "schemata") {
+            return Err(
+                "the schemata census only exists under `--features schemata` — \
+                 freeze with `cargo run --example freeze_gates --features schemata`"
+                    .to_string(),
+            );
+        }
+        Ok(Lock {
+            name: "schemata".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("spec")
+                .join("schemata.spec"),
+            live: Self::render()?,
+        })
+    }
+
+    /// The ratified-survivor register: `spec/schemata.register`, one
+    /// `<site>: <justification>` line per mutant the suite provably cannot kill and a
+    /// human has accepted as equivalent (or as a freedom). Judged with the standard
+    /// set-difference semantics on every sweep.
+    pub fn register() -> Register {
+        Register {
+            name: "schemata survivors".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("spec")
+                .join("schemata.register"),
+        }
+    }
+}

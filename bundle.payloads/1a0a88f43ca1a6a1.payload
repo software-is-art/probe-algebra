@@ -1,0 +1,7 @@
+/// The from-scratch oracle: every site judged fresh, nothing carried — what
+/// incremental re-judgment is audited against. `verify` reaches for this when the
+/// attestation is missing, unreadable, from another toolchain, or disagreeing
+/// under the countersign (a record that cannot stand must not be leaned on).
+fn sweep() {
+    sweep_with(None)
+}

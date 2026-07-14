@@ -1,0 +1,63 @@
+/// The mutation gate's ONE command, three honesty tiers by what the record affords:
+/// a transcript matching this tree and toolchain is COUNTERSIGNED by sampled
+/// re-judgment (derivation local, signature cold, cost O(sample)); a same-toolchain
+/// transcript from another tree feeds INCREMENTAL re-judgment (verdicts carried
+/// where their evidence — site module plus covering-test modules, by content —
+/// still stands; only the moved sites judged); anything else earns the FULL sweep.
+/// Every tier writes or preserves an attestation the next run can lean on, any
+/// disagreement falls back a tier, and a false disagreement only ever costs time.
+fn verify() {
+    let root = std::path::Path::new(".");
+    // the key is the SCHEMATA GATE's declared support — single-sourced from the
+    // registry, so an inert edit (docs) neither invalidates the attestation nor
+    // re-owes the sweep.
+    let support = boundary_spec::discover::gates::GateRegistry::declared()
+        .into_iter()
+        .find(|g| g.name == "mutation (schemata)")
+        .map(|g| g.support)
+        .expect("the schemata gate is declared");
+    let key = match boundary_spec::discover::verdict::VerdictStore::support_hash(root, &support) {
+        Ok(key) => key,
+        Err(refusal) => {
+            eprintln!("{refusal}");
+            std::process::exit(1);
+        }
+    };
+    let committed =
+        std::fs::read_to_string(boundary_spec::discover::attest::Transcript::location(root))
+            .ok()
+            .and_then(|text| boundary_spec::discover::attest::Transcript::parse(&text).ok());
+    match committed {
+        Some(transcript)
+            if transcript.tree == key
+                && transcript.toolchain == boundary_spec::discover::gates::TOOLCHAIN =>
+        {
+            if countersign(&transcript) {
+                return;
+            }
+            eprintln!("countersign: the attestation cannot stand — sweeping from scratch");
+            sweep();
+        }
+        Some(transcript) if transcript.toolchain == boundary_spec::discover::gates::TOOLCHAIN => {
+            println!(
+                "attestation names tree {}, this is tree {key} — carrying what its \
+                 evidence still warrants, judging the moved",
+                transcript.tree
+            );
+            sweep_with(Some(transcript));
+        }
+        Some(transcript) => {
+            println!(
+                "attestation toolchain {} — this toolchain is {}; nothing carries \
+                 across a toolchain, sweeping anew",
+                transcript.toolchain,
+                boundary_spec::discover::gates::TOOLCHAIN
+            );
+            sweep();
+        }
+        None => {
+            println!("no readable attestation at attest/sweep.transcript — sweeping");
+            sweep();
+        }
+    }
+}

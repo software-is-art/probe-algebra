@@ -1,0 +1,24 @@
+# ratified divergent mutants — one line per compiled flip DETECTED by divergence:
+# its covering tests, green in seconds unmutated, run past the derived limit under
+# the flip, consistently, on a calm machine. The timeout is the mutant's nature,
+# not the scheduler's mood, so incremental re-judgment may carry it at standing
+# evidence instead of re-proving non-termination at full limit every run. The
+# sweep judges staleness one-way: a ratified line whose site, when re-judged,
+# comes back killed or survived (not timeout) is a lie and goes red — divergence
+# that stopped diverging must lose its line. The weekly from-scratch shards carry
+# nothing and re-observe every one of these. Keys contain colons, so they are
+# backtick-quoted.
+#
+# Evidence for the initial seven (2026-07-14): three consecutive sweeps timed each
+# out, the last on an idle 16 GB machine at 2 workers (baseline 16s, limit 91s);
+# `engine::gcd:0` was additionally hand-checked — its 89 coverers pass in 20s
+# unmutated and completed zero tests in 40s under the flip. Mechanisms verified
+# against the source before signing.
+
+`boundary_spec::discover::cohesion::find:0: != -> ==`: union-find's root walk (`while parent[x] != x`) — flipped, the loop runs exactly when x IS its own root, and a root lookup spins forever.
+`boundary_spec::discover::engine::Engine<T>::new:1: <= -> >`: the exhaustive-vs-sampled grid gate (`space <= exhaustive_cap`) — flipped, a space of up to 2^96 assignments is enumerated exhaustively instead of sampled: unbounded memory and time (this flip is the observed multi-GB worker class).
+`boundary_spec::discover::engine::gcd:0: == -> !=`: Euclid's base case (`b == 0`) — flipped, gcd of coprime-adjacent inputs returns the wrong operand and the discovery loops that normalize by gcd never reach their fixed points.
+`boundary_spec::discover::fabric::closure:1: && -> ||`: the closure's join filter (`b == c && insert`) — weakened to `||`, every pair of links composes, the set saturates toward all-pairs and the quartic rounds outlive any limit.
+`boundary_spec::discover::fabric::closure:2: ! -> (deleted)`: the closure's fixed-point exit (`if !grew`) — deleted, a closed input never returns: the loop's only exit is reached exactly when nothing grew.
+`boundary_spec::discover::layering::connected_components:0: ! -> (deleted)`: the BFS seen-guard (`if !seen[v]`) — deleted, adjacent vertices re-enqueue each other forever on the first edge.
+`boundary_spec::discover::shape::find:0: != -> ==`: the same union-find root walk as cohesion's — flipped, any root lookup spins forever.

@@ -3295,6 +3295,71 @@ die), and the site-keyed sweep should key timeout verdicts separately or
 re-judge them before treating them as kills, so a slow machine cannot mint
 false facts.
 
+BUILT, the day it was named (2026-07-14, through the verbs; one interface-growth
+fallback on `SiteVerdict` — which `edit` allowed, teaching that struct fields are
+interior while impl method sets are surface). The shape as landed: each site's
+transcript row gains a fourth field, the EVIDENCE key — FNV-64 (the verdict
+store's fold) over the site's module file and every covering test's module file,
+names mixed in. Module grain, not the item grain the candidate sketched: item
+grain must wait for total impl addressing, because a missed generic impl would
+carry a verdict whose code moved — the one direction this design refuses
+everywhere (anything unresolvable keys empty, and an empty key is never carried;
+reuse is earned, judgment is the default). `verify` now holds three honesty
+tiers: countersign at a matching tree, incremental re-judgment at a foreign
+same-toolchain tree (carry at standing evidence, judge the moved), full sweep
+otherwise. Elder three-field transcripts parse with empty keys — one honest
+transition sweep, then incremental forever. The covering-set gap (a test's
+behaviour shifting through code it calls without any keyed module moving) is the
+same gap the retired since-green gate ratified, and keeps the same backstop: the
+weekly from-scratch shards, which carry nothing.
+
+The timeout doctrine grew a fourth artifact the day's data demanded:
+`spec/divergence.register`. Timeouts never carry (the load-sensitivity rule,
+kept), but seven flips timed out on three consecutive runs including an idle
+machine — and inspection confirmed each is DETECTED BY DIVERGENCE (two union-find
+root walks that spin on any root when `!=` flips, the closure's fixed-point exit
+deleted, the BFS seen-guard deleted, Euclid's base case corrupted, and the
+exhaustive-vs-sampled grid gate flipped into enumerating 2^96 assignments — the
+multi-GB worker class, caught by name). Re-proving non-termination at full limit
+every run is a treadmill, so a ratified line — mechanism verified before signing
+— lets the sweep carry that timeout at standing evidence, and the register is
+judged ONE-WAY stale at every sweep: a ratified divergence that stops timing out
+goes red and must lose its line.
+
+What the instrument caught while the brick went in, each found by the evidence
+keys refusing to stabilise: (1) cargo-nextest was absent on this machine, so
+every sweep had been the fallback path — full suite per site, ~50 minutes, no
+attestation written; installing it alone was 6x. (2) The coverage recorder keyed
+touch files by PROCESS ID with append — a recycled pid appended one test's edges
+under another's header, coverage sets flapped ~90 sites between identical trees,
+and the sharp direction is a sole coverer clobbered into another test's file:
+its site judged by a test that never reaches it, a false survivor. Filter-keyed,
+truncate-created files fixed it; back-to-back baselines now differ on zero of
+891 sites. (3) The worker pool sized itself by cores when bytes are the binding
+constraint — twelve workers put 58 GB of pressure on this 16 GB machine (and an
+orphaned by-hand timeout reproduced the documented runaway incident to the
+letter); the derived default is now min(cores − 2, GB/8), knob kept. (4) The
+name resolver needed the own-file case (an inline `mod tests` in `mod.rs` held
+the coverers of 92 sites) and the full `:deaf -> ` suffix (a function honestly
+named `deaf_battery` was truncated by the bare `:deaf` cut). Each fix carries a
+probe.
+
+The numbers: ~50 min (fallback, per change) → 301 s (full nextest sweep, the
+one-time transition) → an ordinary edit now re-judges only the sites whose
+module or coverers moved, at 2 workers on this machine — the example-file edit
+that moved no site's evidence carried 799 of 891 mid-repair, and with keys fully
+minted the steady state is carrying everything but the edited module's handful.
+The remaining fixed costs are the build and one baseline suite run (~35 s
+together, warm), which are the dataflow kernel's next targets — site verdicts as
+a maintained view over the item relation is this brick's principled form, and
+the from-scratch sweep is already demoted to the oracle role that design needs.
+Named while retiring `survives` for `outcome` (tri-state; the timeout named
+apart): `edit` refused the signature change and the refusal text pointed the
+way — "retire the item and add its successor" — which `collect` then carried
+out; the mark census kept the item alive until prose stopped mentioning it,
+which is `collect` working exactly as declared, and worth knowing: retirement
+is uses-then-mentions-then-sweep.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
