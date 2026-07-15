@@ -1,0 +1,152 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    /// The sweep's semantics are PINNED where they live: the timeout derives 5x+10
+    /// from the baseline; a touch-file parses to its edge list; the plan pairs every
+    /// census site with exactly its covering tests, and an unreached site gets the
+    /// empty list — the uncovered-survivor rule's precondition.
+    #[test]
+    fn the_sweep_semantics_are_pinned() {
+        assert_eq!(
+            derive_limit(std::time::Duration::from_secs(4)),
+            std::time::Duration::from_secs(30)
+        );
+        let (tests, sites) = parse_touch("T a::b c::d\nS x:0: == -> !=\nS y:deaf -> None\n");
+        assert_eq!(tests, vec!["a::b", "c::d"]);
+        assert_eq!(sites, vec!["x:0: == -> !=", "y:deaf -> None"]);
+        let plan = assemble_plan(
+            &["covered:0: == -> !=", "unreached:0: == -> !="],
+            &[(
+                vec!["a::b".to_string()],
+                vec!["covered:0: == -> !=".to_string()],
+            )],
+        );
+        assert_eq!(plan[0].1, vec!["a::b"]);
+        assert!(plan[1].1.is_empty(), "unreached site: empty = survivor");
+    }
+
+    /// The runner's two data paths hold: the census lists the committed sites, and
+    /// the register judgment is the standard set-difference (an unratified survivor
+    /// drifts as a new finding).
+    #[test]
+    fn the_census_and_register_paths_hold() {
+        let sites = Schemata::census().expect("collision-free");
+        if cfg!(feature = "schemata") {
+            assert!(
+                sites.contains(&"boundary_spec::discover::substrate::TagLaw::matches:0: == -> !=")
+            );
+        } else {
+            assert!(
+                sites.is_empty(),
+                "instrumentation must not leak into normal builds"
+            );
+        }
+        // the committed register and the ratified survivors are one set: exactly the
+        // ratified keys hold (today that set is EMPTY — every compiled mutant dies), and
+        // an unratified survivor drifts, named.
+        let ratified: Vec<String> = Schemata::register()
+            .entries()
+            .expect("register parses")
+            .into_iter()
+            .map(|(k, _)| k)
+            .collect();
+        assert!(Schemata::register()
+            .check(ratified.iter().map(String::as_str))
+            .is_ok());
+        let err = Schemata::register()
+            .check(
+                ratified
+                    .iter()
+                    .map(String::as_str)
+                    .chain(["classify:1: == -> !="]),
+            )
+            .unwrap_err();
+        assert!(err.contains("classify:1"), "{err}");
+        // the STALE-LINE flag, drilled on a fixture so the drill outlives the live
+        // register's population (which reached zero when the last four ratified
+        // survivors died): a ratified line whose mutant now dies is a lie
+        // the check must name.
+        let dir = std::env::temp_dir().join(format!("schemata-register-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("fixture dir");
+        let path = dir.join("stale.register");
+        std::fs::write(
+            &path,
+            "`ghost::site:0: == -> !=`: a mutant the suite has since learned to kill\n",
+        )
+        .expect("fixture register");
+        let fixture = spec_lock::Register {
+            name: "schemata survivors".to_string(),
+            path,
+        };
+        assert!(fixture.check([]).is_err(), "stale lines flag");
+    }
+
+    /// The judgment's tri-state, pinned on real processes: a green exit is a
+    /// survival, a red exit is a kill, and a blown limit is a TIMEOUT — the
+    /// detection that incremental re-judgment refuses to carry, so a loaded
+    /// machine's verdicts die with the run that minted them.
+    #[test]
+    fn the_outcome_tristate_is_pinned() {
+        let limit = std::time::Duration::from_secs(10);
+        assert_eq!(outcome(Command::new("true"), limit), "SURVIVED");
+        assert_eq!(outcome(Command::new("false"), limit), "killed");
+        let mut slow = Command::new("sleep");
+        slow.arg("30");
+        assert_eq!(
+            outcome(slow, std::time::Duration::from_millis(100)),
+            "timeout"
+        );
+    }
+
+    /// The lib cone is the declared evidence of the sweep's fixed costs, run at the
+    /// real tree: the lib at item grain, manifests and registers at file grain, the
+    /// runner's own text included (its text IS the sweep's semantics) — and what
+    /// the lib build cannot read excluded, which is exactly what lets an
+    /// examples-only edit carry build and baseline. The fingerprint is content's
+    /// pure function: stable across two walks, moved by any row.
+    #[test]
+    fn the_lib_cone_is_the_declared_evidence() {
+        let cone = lib_cone(std::path::Path::new(".")).expect("the cone derives");
+        let rows = cone.entries();
+        assert!(rows.iter().all(|(_, w)| *w == 1), "a walk is weight 1");
+        assert!(
+            rows.iter().any(|(i, _)| i.module == "src/discover/eduction.rs"),
+            "the lib is in the cone at item grain"
+        );
+        assert!(
+            rows.iter()
+                .any(|(i, _)| i.module == "Cargo.toml" && i.name == ":file:"),
+            "manifests ride at file grain"
+        );
+        assert!(
+            rows.iter().any(|(i, _)| i.module == "examples/schemata.rs"),
+            "the runner's own text is evidence"
+        );
+        assert!(
+            !rows
+                .iter()
+                .any(|(i, _)| i.module.starts_with("examples/")
+                    && i.module != "examples/schemata.rs"),
+            "other examples are unread by the lib build"
+        );
+        assert!(
+            !rows.iter().any(|(i, _)| i.module.starts_with("tests/")),
+            "root tests are unread by the lib build"
+        );
+        assert!(
+            !rows.iter().any(|(i, _)| i.module.starts_with("docs/")),
+            "prose is inert"
+        );
+        let fp = cone_fp(&cone);
+        assert_eq!(fp.len(), 16, "the fold renders 16 hex: `{fp}`");
+        assert_eq!(fp, cone_fp(&cone), "same content, same fingerprint");
+        let moved = cone.add(&one_row(verdict_row("build", "green")));
+        assert_ne!(cone_fp(&moved), fp, "any row moves the fingerprint");
+        assert_eq!(
+            verdict_body(&one_row(verdict_row("baseline", "green 34")), "baseline"),
+            "green 34",
+            "a tenant's row and its reader agree"
+        );
+    }
+}

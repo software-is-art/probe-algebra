@@ -1,0 +1,13 @@
+/// The executor: an operator DAG over Z-set streams, evaluated by EDUCTION.
+/// `tick` only records what arrived; `latest` demands a node, and only the
+/// demanded ancestor cone is judged, each node catching up through the recorded
+/// ticks by its operator's delta rule. Naive recompute over the same DAG is the
+/// oracle this engine is gated against (see `probes`), never the engine itself.
+pub struct Circuit<K: Ord> {
+    nodes: Vec<Node>,
+    cells: Vec<Cell<K>>,
+    tenants: Vec<Tenant<K>>,
+    warehouse: Warehouse<K>,
+    ticks: usize,
+    judged: u64,
+}

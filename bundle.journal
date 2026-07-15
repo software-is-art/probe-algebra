@@ -144,3 +144,26 @@ edit src/discover/items.rs — probes @a2d706671c5f2051
 add examples/bundle.rs — fn maintain_census @1dfaec3351838960
 edit examples/bundle.rs — commit @acdb78005004d67e
 edit src/discover/items.rs — probes @a2d706671c5f2051
+edit src/discover/eduction.rs — Node @87c715c0d077c0bb
+add src/discover/eduction.rs — struct Tenant @853176573a491ef4
+edit src/discover/eduction.rs — Circuit @24db62d3f8b2eba9
+edit src/discover/eduction.rs — impl Circuit<K> @6b1e094fe885831f
+add src/discover/eduction.rs —  @7e9ea5e646345426
+edit src/discover/eduction.rs — probes @df85faec29355138
+edit src/discover/eduction.rs — probes @32de32cc82a44430
+edit src/discover/attest.rs — Transcript @0502e106d305ca43
+edit src/discover/attest.rs — impl Transcript @1ed97ae45a13774e
+edit src/discover/attest.rs — probes @240df1b21e88bc8b
+add examples/schemata.rs — fn lib_cone, fn cone_fp, fn verdict_row, fn one_row, fn verdict_body @79da456a45991307
+edit examples/schemata.rs — sweep_with @60683eaafcb69dd2
+edit examples/schemata.rs — probes @03e4d25e23206712
+edit examples/schemata.rs — sweep_with @06c148a31ac0844e
+edit examples/schemata.rs — probes @a365f4cf95220622
+edit src/discover/eduction.rs — probes @36dab8182c13be10
+add src/discover/eduction.rs —  @8a1104cc149b4596
+edit src/discover/eduction.rs — Tenant @2924b526416b7044
+edit src/discover/eduction.rs — probes @60be43189f9206e4
+edit examples/schemata.rs — lib_cone @1c7b1d617ab2f72f
+edit examples/schemata.rs — probes @ab4a4373bfa903cd
+edit examples/bundle.rs — read_payload @2c4a1bb5dc237042
+edit examples/bundle.rs — read_payload @7364ae3073ddd7db

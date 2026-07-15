@@ -3654,6 +3654,76 @@ verb — and content-keyed verdicts eliminated superstitious re-running entirely
 the frozen-tree window during a gates run is the one honest cost, and it is
 exactly what brick 3's maintained views shrink toward nothing.
 
+Brick 4 BUILT (2026-07-15, the day's fourth): THE OPAQUE NODE — the executor's
+deferred tenant, seated, with the tree as its integrated input. `Node::Opaque`
+is `distinct`'s rule with the recompute handed to an ADMITTED TENANT the
+executor never looks inside (D∘f∘I, verdicts warehoused by the integrated
+input's content); `admit` is a judged transaction (the name is the operator's
+identity in the warehouse, so a spoken name is refused, and both admission and
+wiring close when the stream starts); and `carry` is the transcript's carry
+spoken in the executor's vocabulary — standing evidence enters before the
+stream runs, and a carried verdict answers a demand with the tenant never
+invoked. The probes pin the recognitions, not just the mechanism: the oracle
+grid runs opaque plans against naive recompute (the tenant's own function over
+the fully integrated input); an opaque node whose tenant is distinct's function
+agrees with the interpreted `Distinct` at every tick and through catch-up —
+interpreting an operator changes what the executor can SAY about it, never what
+it computes; the tenant's economy is pinned in INVOCATIONS (at most once per
+novel content, shared node to node, zero on a retraction to a judged state);
+and the headline probe feeds an opaque census tenant the ITEM RELATION with a
+verb-shaped two-row edit delta — keyed by evidence, not by answer: an edit that
+leaves the view unmoved still pays once, and the retraction pays nothing.
+
+And the tenants are real: the schemata sweep's two FIXED COSTS are now nodes in
+a live circuit — Source(lib cone) → Opaque(build) → Opaque(baseline), the cone
+fed as one Z-set (Rust modules at item grain through `of_module`, the
+manifest/spec/register remainder at file grain), the baseline keyed by the
+build row, which embeds the cone's fingerprint. The LIB CONE is the declared
+evidence of both verdicts: the Judged support minus what `cargo test -p
+boundary-spec --lib` cannot read (`examples/` less the runner's own text, the
+root `tests/`) — a conservative over-approximation in the gate supports' exact
+sense, narrowing carries the burden of proof. The transcript grew an `evidence`
+line naming the cone (an elder transcript parses with the empty key and carries
+neither cost — the same honest transition the site keys made), and because
+every site's evidence lives INSIDE the cone, a standing cone carries the WHOLE
+verdict set wholesale: population checked against the census, any unratified
+timeout forfeits the carry (load-sensitivity, kept), and the run re-attests at
+the new tree for the cost of a walk. Acceptance at the real tree: the
+transition sweep attested 953 sites and minted the first cone key; an
+out-of-cone edit (a judged doc tweak to examples/bundle.rs) then earned the
+COMPLETE mutation-gate verdict in 3.7 SECONDS — build carried, baseline
+carried, 953 site verdicts carried, 0 judged — and the reverting edit did it
+again in 3.6. The ladder so far: ~50 min (fallback) → 301 s (full nextest
+sweep) → 59 s (site keys) → under 4 s (the cone standing). What remains when
+the cone stands is literally one tree walk and one register comparison; what
+remains when it moves is exactly what moved.
+
+Field reports. (a) THE SIBLING-IMPL AMBIGUITY — the grow dissolution's residue,
+hit in anger: growth by sibling impl mints a SECOND item at one address, and
+`edit`/`show` rightly refuse to guess (`impl Circuit<K>` twice, once admit and
+carry rode in as the grow idiom; `impl ItemRelation` twice since the tree-walk
+brick). One hand edit fell back through the gap — respelling `admit`'s
+parameter to the `Judge<K>` alias the lint gate demanded — because the verbs
+could not name WHICH impl to hold. The verb set that dissolved `grow` now owes
+the address grammar a discriminator, or the method-grain rung the authoring
+readings already named: the same brick seen from two sides. (b) Payload
+formatting, reading (c) reconfirmed with a workable idiom: `cargo fmt --check`
+named drift in three authored payloads; running rustfmt on the payload FILES
+outside the tree and re-offering them whole through `edit` kept the second rule
+intact. Offer-time formatting inside the transaction is still the missing half.
+(c) On the credit side: `edit` held enum-variant growth (Node) and struct-field
+growth (Circuit, Transcript) as interior — the SiteVerdict lesson, now twice
+confirmed — so the kernel's entire change went through the verbs except (a)'s
+one line. (d) A near-miss the acceptance scenario caught before it shipped: the
+first cone included `bundle.journal` and `bundle.payloads/` (Judged admits
+them), and the journal moves on EVERY judged transaction — standing evidence
+would have been unreachable and the brick silently inert. The change medium's
+own ledger records the tree, it does not build it: excluded, on the `attest/`
+scope rule's exact reasoning, one shelf down. The lesson generalizes: a
+content key's worth is decided by what routinely moves, so every new evidence
+cone owes its design one question — "what churns in here that the operator
+never reads?"
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

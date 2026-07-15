@@ -1,0 +1,119 @@
+#[crate::mutate("attest")]
+impl Transcript {
+    /// Where the committed transcript lives.
+    pub fn location(crate_root: &Path) -> PathBuf {
+        crate_root.join("attest/sweep.transcript")
+    }
+
+    /// The deterministic text form — what gets committed and what the countersign
+    /// parses back. The `evidence` line renders only when the sweep minted one:
+    /// an empty key is never written, exactly as it is never carried.
+    pub fn render(&self) -> String {
+        let mut out = format!(
+            "# sweep transcript — the sampled countersign's subject; regenerate by \
+             running the sweep.\ntree {}\ntoolchain {}\nbaseline {}\n",
+            self.tree, self.toolchain, self.baseline_secs
+        );
+        if !self.evidence.is_empty() {
+            out.push_str(&format!("evidence {}\n", self.evidence));
+        }
+        for entry in &self.sites {
+            out.push_str(&format!(
+                "{}\t{}\t{}\t{}\n",
+                entry.verdict,
+                entry.site,
+                entry.tests.join(","),
+                entry.evidence
+            ));
+        }
+        out
+    }
+
+    /// Parse a committed transcript; refusals are named — a malformed line means a
+    /// hand touched the record, and a hand-touched attestation must not be audited,
+    /// it must be re-derived.
+    pub fn parse(text: &str) -> Result<Transcript, String> {
+        let mut tree = None;
+        let mut toolchain = None;
+        let mut baseline = None;
+        // the cone evidence arrived with the opaque build and baseline nodes; a
+        // transcript from before it carries the empty key, so neither is
+        // reusable and both are re-judged — the same honest transition as the
+        // site keys' arrival.
+        let mut evidence = String::new();
+        let mut sites = Vec::new();
+        for (n, line) in text.lines().enumerate() {
+            if line.starts_with('#') || line.trim().is_empty() {
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("tree ") {
+                tree = Some(rest.trim().to_string());
+            } else if let Some(rest) = line.strip_prefix("toolchain ") {
+                toolchain = Some(rest.trim().to_string());
+            } else if let Some(rest) = line.strip_prefix("baseline ") {
+                baseline = rest.trim().parse::<u64>().ok();
+            } else if let Some(rest) = line.strip_prefix("evidence ") {
+                evidence = rest.trim().to_string();
+            } else {
+                let mut fields = line.split('\t');
+                let (verdict, site, tests) = (fields.next(), fields.next(), fields.next());
+                let (Some(verdict), Some(site), Some(tests)) = (verdict, site, tests) else {
+                    return Err(format!(
+                        "attest: line {} is not `<verdict>\\t<site>\\t<tests>` — a \
+                         hand-touched transcript is re-derived, never audited: `{line}`",
+                        n + 1
+                    ));
+                };
+                // the fourth field arrived with incremental re-judgment; a transcript
+                // from before it carries no evidence keys, so nothing is reusable and
+                // the one honest transition is a full sweep.
+                let evidence = fields.next().unwrap_or("").to_string();
+                sites.push(SiteVerdict {
+                    site: site.to_string(),
+                    verdict: verdict.to_string(),
+                    tests: tests
+                        .split(',')
+                        .filter(|t| !t.is_empty())
+                        .map(str::to_string)
+                        .collect(),
+                    evidence,
+                });
+            }
+        }
+        match (tree, toolchain, baseline) {
+            (Some(tree), Some(toolchain), Some(baseline_secs)) => Ok(Transcript {
+                tree,
+                toolchain,
+                baseline_secs,
+                evidence,
+                sites,
+            }),
+            _ => Err(
+                "attest: the transcript header must carry `tree`, `toolchain`, and \
+                 `baseline` lines — an incomplete claim audits nothing"
+                    .to_string(),
+            ),
+        }
+    }
+
+    /// A deterministic K-sample of site indices for a given seed — the countersign
+    /// draws its seed from entropy (unpredictability is the audit's teeth: which
+    /// sites get re-judged cannot be known when the transcript is written), but the
+    /// walk from seed to sample is a pure function, so it pins here.
+    pub fn sample(&self, k: usize, seed: u64) -> Vec<&SiteVerdict> {
+        let len = self.sites.len();
+        if len == 0 {
+            return Vec::new();
+        }
+        let want = k.min(len);
+        let mut picked = std::collections::BTreeSet::new();
+        let mut x = seed | 1;
+        while picked.len() < want {
+            x = x
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            picked.insert((x % len as u64) as usize);
+        }
+        picked.into_iter().map(|i| &self.sites[i]).collect()
+    }
+}

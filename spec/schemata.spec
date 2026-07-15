@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 936 sites.
+# 953 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -91,6 +91,7 @@
 - boundary_spec::discover::attest::attest::parse:0: || -> &&
 - boundary_spec::discover::attest::attest::parse:1: ! -> (deleted)
 - boundary_spec::discover::attest::attest::parse:deaf -> Err(String::new())
+- boundary_spec::discover::attest::attest::render:0: ! -> (deleted)
 - boundary_spec::discover::attest::attest::render:deaf -> String::new()
 - boundary_spec::discover::attest::attest::sample:0: == -> !=
 - boundary_spec::discover::attest::attest::sample:1: < -> >=
@@ -292,6 +293,20 @@
 - boundary_spec::discover::depend::locks::text:0: == -> !=
 - boundary_spec::discover::depend::locks::text:1: == -> !=
 - boundary_spec::discover::depend::locks::text:deaf -> None
+- boundary_spec::discover::eduction::Circuit<K>::admit:0: == -> !=
+- boundary_spec::discover::eduction::Circuit<K>::admit:1: == -> !=
+- boundary_spec::discover::eduction::Circuit<K>::admit:2: || -> &&
+- boundary_spec::discover::eduction::Circuit<K>::admit:3: > -> <=
+- boundary_spec::discover::eduction::Circuit<K>::admit:4: || -> &&
+- boundary_spec::discover::eduction::Circuit<K>::admit:deaf -> None
+- boundary_spec::discover::eduction::Circuit<K>::carry:0: == -> !=
+- boundary_spec::discover::eduction::Circuit<K>::carry:1: == -> !=
+- boundary_spec::discover::eduction::Circuit<K>::carry:2: || -> &&
+- boundary_spec::discover::eduction::Circuit<K>::carry:3: ! -> (deleted)
+- boundary_spec::discover::eduction::Circuit<K>::carry:4: > -> <=
+- boundary_spec::discover::eduction::Circuit<K>::carry:5: || -> &&
+- boundary_spec::discover::eduction::Circuit<K>::carry:6: || -> &&
+- boundary_spec::discover::eduction::Circuit<K>::carry:deaf -> None
 - boundary_spec::discover::eduction::Circuit<K>::judge:0: == -> !=
 - boundary_spec::discover::eduction::Circuit<K>::judge:1: != -> ==
 - boundary_spec::discover::eduction::Circuit<K>::latest:0: >= -> <
@@ -304,9 +319,11 @@
 - boundary_spec::discover::eduction::Circuit<K>::tick:deaf -> None
 - boundary_spec::discover::eduction::Circuit<K>::wire:0: < -> >=
 - boundary_spec::discover::eduction::Circuit<K>::wire:1: && -> ||
-- boundary_spec::discover::eduction::Circuit<K>::wire:2: ! -> (deleted)
-- boundary_spec::discover::eduction::Circuit<K>::wire:3: > -> <=
-- boundary_spec::discover::eduction::Circuit<K>::wire:4: || -> &&
+- boundary_spec::discover::eduction::Circuit<K>::wire:2: < -> >=
+- boundary_spec::discover::eduction::Circuit<K>::wire:3: && -> ||
+- boundary_spec::discover::eduction::Circuit<K>::wire:4: ! -> (deleted)
+- boundary_spec::discover::eduction::Circuit<K>::wire:5: > -> <=
+- boundary_spec::discover::eduction::Circuit<K>::wire:6: || -> &&
 - boundary_spec::discover::eduction::Circuit<K>::wire:deaf -> None
 - boundary_spec::discover::engine::DiscoveredLaw::ops:deaf -> vec![]
 - boundary_spec::discover::engine::Engine<T>::check:0: != -> ==

@@ -1,0 +1,10 @@
+/// An admitted opaque operator: the name its verdicts are warehoused under, and
+/// the judge the executor calls on a warehouse miss. The name IS the operator's
+/// identity — same name, same content, same verdict — which is why `admit`
+/// refuses a name already spoken. The judge may be effectful (rustc and the test
+/// suite are the intended tenants); the warehouse guarantees it runs at most once
+/// per novel content.
+struct Tenant<K: Ord> {
+    name: &'static str,
+    judge: Judge<K>,
+}

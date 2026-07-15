@@ -34,16 +34,19 @@ pub struct SiteVerdict {
 }
 
 /// The committed sweep TRANSCRIPT — the sampled countersign's subject: tree hash,
-/// toolchain, baseline seconds (the timeout's seed), and every site's verdict. It lives
-/// in `attest/`, which the tree hash EXCLUDES: the attestation describes the tree, so
-/// it cannot be part of the tree it describes (the verdict-store scope rule, promoted
-/// to committed form). Deterministic render, tab-separated fields — census sites carry
-/// spaces and colons, never tabs.
+/// toolchain, baseline seconds (the timeout's seed), the cone EVIDENCE — the
+/// fingerprint of the lib cone the sweep's build and baseline verdicts are facts
+/// about (empty on an elder transcript, which carries neither) — and every site's
+/// verdict. It lives in `attest/`, which the tree hash EXCLUDES: the attestation
+/// describes the tree, so it cannot be part of the tree it describes (the
+/// verdict-store scope rule, promoted to committed form). Deterministic render,
+/// tab-separated fields — census sites carry spaces and colons, never tabs.
 #[derive(Debug)]
 pub struct Transcript {
     pub tree: String,
     pub toolchain: String,
     pub baseline_secs: u64,
+    pub evidence: String,
     pub sites: Vec<SiteVerdict>,
 }
 
@@ -55,13 +58,17 @@ impl Transcript {
     }
 
     /// The deterministic text form — what gets committed and what the countersign
-    /// parses back.
+    /// parses back. The `evidence` line renders only when the sweep minted one:
+    /// an empty key is never written, exactly as it is never carried.
     pub fn render(&self) -> String {
         let mut out = format!(
             "# sweep transcript — the sampled countersign's subject; regenerate by \
              running the sweep.\ntree {}\ntoolchain {}\nbaseline {}\n",
             self.tree, self.toolchain, self.baseline_secs
         );
+        if !self.evidence.is_empty() {
+            out.push_str(&format!("evidence {}\n", self.evidence));
+        }
         for entry in &self.sites {
             out.push_str(&format!(
                 "{}\t{}\t{}\t{}\n",
@@ -81,6 +88,11 @@ impl Transcript {
         let mut tree = None;
         let mut toolchain = None;
         let mut baseline = None;
+        // the cone evidence arrived with the opaque build and baseline nodes; a
+        // transcript from before it carries the empty key, so neither is
+        // reusable and both are re-judged — the same honest transition as the
+        // site keys' arrival.
+        let mut evidence = String::new();
         let mut sites = Vec::new();
         for (n, line) in text.lines().enumerate() {
             if line.starts_with('#') || line.trim().is_empty() {
@@ -92,6 +104,8 @@ impl Transcript {
                 toolchain = Some(rest.trim().to_string());
             } else if let Some(rest) = line.strip_prefix("baseline ") {
                 baseline = rest.trim().parse::<u64>().ok();
+            } else if let Some(rest) = line.strip_prefix("evidence ") {
+                evidence = rest.trim().to_string();
             } else {
                 let mut fields = line.split('\t');
                 let (verdict, site, tests) = (fields.next(), fields.next(), fields.next());
@@ -123,6 +137,7 @@ impl Transcript {
                 tree,
                 toolchain,
                 baseline_secs,
+                evidence,
                 sites,
             }),
             _ => Err(
@@ -317,6 +332,7 @@ mod probes {
             tree: "00aa11bb22cc33dd".to_string(),
             toolchain: "1.94.1".to_string(),
             baseline_secs: 7,
+            evidence: "feedfacefeedface".to_string(),
             sites: vec![
                 SiteVerdict {
                     site: "a::b::f:0: == -> !=".to_string(),
@@ -342,7 +358,7 @@ mod probes {
 
     /// THE HEADLINE: the transcript round-trips byte-losslessly — what the sweep
     /// attests is exactly what the countersign audits, spaces-and-colons site names,
-    /// empty covering sets, and all.
+    /// empty covering sets, cone evidence, and all.
     #[test]
     fn the_transcript_round_trips() {
         let t = transcript();
@@ -350,6 +366,7 @@ mod probes {
         assert_eq!(parsed.tree, t.tree);
         assert_eq!(parsed.toolchain, t.toolchain);
         assert_eq!(parsed.baseline_secs, t.baseline_secs);
+        assert_eq!(parsed.evidence, t.evidence);
         assert_eq!(parsed.sites.len(), t.sites.len());
         for (a, b) in parsed.sites.iter().zip(t.sites.iter()) {
             assert_eq!(a.site, b.site);
@@ -359,11 +376,18 @@ mod probes {
         }
         assert_eq!(parsed.render(), t.render(), "render is a fixed point");
         // a transcript from before evidence keys still parses — its sites carry the
-        // empty key, so nothing is reusable and the one honest transition is a sweep.
+        // empty key and it names no cone, so nothing is reusable and the one honest
+        // transition is a sweep. An empty cone key is never rendered, so the elder
+        // form is also a fixed point of its own parse.
         let elder =
             Transcript::parse("tree x\ntoolchain y\nbaseline 3\nkilled\ts:0: == -> !=\ta::t\n")
                 .expect("the elder format parses");
         assert_eq!(elder.sites[0].evidence, "");
+        assert_eq!(elder.evidence, "", "an elder transcript names no cone");
+        assert!(
+            !elder.render().contains("evidence"),
+            "an empty cone key is never written"
+        );
     }
 
     /// Refusals are named: a hand-touched line and a headless transcript both refuse —
@@ -476,6 +500,7 @@ mod probes {
             tree: "t".to_string(),
             toolchain: "tc".to_string(),
             baseline_secs: 1,
+            evidence: String::new(),
             sites: vec![
                 SiteVerdict {
                     site: "s1".to_string(),

@@ -1,0 +1,4 @@
+/// The judge an opaque tenant runs on a warehouse miss: an uninterpreted, possibly
+/// effectful function of the integrated input — rustc and the test suite are the
+/// intended occupants. Boxed, because the executor stores what it must not read.
+pub type Judge<K> = Box<dyn FnMut(&ZSet<K>) -> ZSet<K>>;

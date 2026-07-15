@@ -1,348 +1,13 @@
-use super::zset::ZSet;
-
-/// A node in the operator DAG. Every input names an EARLIER node, so the graph is
-/// acyclic by construction and one forward fold is a complete schedule — order in
-/// the executor comes only from real dependencies, never from a program counter.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Node {
-    /// A stream entering from outside; its deltas are fed at `tick`, never computed.
-    Source,
-    /// Group addition — linear, so the delta passes straight through.
-    Add(usize, usize),
-    /// Group inverse — linear.
-    Neg(usize),
-    /// z⁻¹ — linear: the delta stream itself is delayed one tick.
-    Delay(usize),
-    /// The bilinear operator: its delta obeys the product rule
-    /// Δ(a⋈b) = Δa⋈b + a⋈Δb + Δa⋈Δb, paid for by integrating both inputs.
-    Join(usize, usize),
-    /// The nonlinear operator: D∘distinct∘I — recompute over the integrated
-    /// input, memoized in the warehouse by that input's CONTENT.
-    Distinct(usize),
-    /// The UNINTERPRETED operator: D∘f∘I with the recompute handed to an admitted
-    /// tenant the executor never looks inside — `distinct`'s rule generalized,
-    /// verdicts warehoused by the integrated input's CONTENT. The second field
-    /// names the tenant `admit` returned.
-    Opaque(usize, usize),
-}
-
-/// A node's standing state: its output-delta history (append-only), how many ticks
-/// it has judged, the integrated inputs its rule needs, and its integrated output
-/// (which is both `latest`'s answer and the nonlinear rule's previous value).
-#[derive(Clone)]
-struct Cell<K: Ord> {
-    deltas: Vec<ZSet<K>>,
-    done: usize,
-    left: ZSet<K>,
-    right: ZSet<K>,
-    out: ZSet<K>,
-}
-
-#[crate::mutate]
-impl<K: Ord + Clone> Cell<K> {
-    /// A cell before any tick: empty history, everything zero.
-    fn fresh() -> Cell<K> {
-        Cell {
-            deltas: Vec::new(),
-            done: 0,
-            left: ZSet::zero(),
-            right: ZSet::zero(),
-            out: ZSet::zero(),
-        }
-    }
-}
-
-/// The nonlinear rule's memo: values keyed by the CONTENT of the integrated input
-/// they were computed from, never by when or where they were computed. The
-/// owes/gates verdict warehouse is this same table in the degenerate case — rustc
-/// and the test suite as uninterpreted operators, the tree as the integrated input.
-struct Warehouse<K: Ord> {
-    memo: std::collections::BTreeMap<Evidence<K>, ZSet<K>>,
-    hits: u64,
-    misses: u64,
-}
-
-#[crate::mutate]
-impl<K: Ord + Clone> Warehouse<K> {
-    /// An empty warehouse: no standing evidence.
-    fn empty() -> Warehouse<K> {
-        Warehouse {
-            memo: std::collections::BTreeMap::new(),
-            hits: 0,
-            misses: 0,
-        }
-    }
-
-    /// The one move: carry at standing evidence, judge only what has no key.
-    fn recall(
-        &mut self,
-        op: &'static str,
-        key: Vec<(K, i64)>,
-        judge: impl FnOnce() -> ZSet<K>,
-    ) -> ZSet<K> {
-        match self.memo.entry((op, key)) {
-            std::collections::btree_map::Entry::Occupied(found) => {
-                self.hits += 1;
-                found.get().clone()
-            }
-            std::collections::btree_map::Entry::Vacant(missing) => {
-                self.misses += 1;
-                missing.insert(judge()).clone()
-            }
-        }
-    }
-}
-
-/// The executor: an operator DAG over Z-set streams, evaluated by EDUCTION.
-/// `tick` only records what arrived; `latest` demands a node, and only the
-/// demanded ancestor cone is judged, each node catching up through the recorded
-/// ticks by its operator's delta rule. Naive recompute over the same DAG is the
-/// oracle this engine is gated against (see `probes`), never the engine itself.
-pub struct Circuit<K: Ord> {
-    nodes: Vec<Node>,
-    cells: Vec<Cell<K>>,
-    tenants: Vec<Tenant<K>>,
-    warehouse: Warehouse<K>,
-    ticks: usize,
-    judged: u64,
-}
-
-#[crate::mutate]
-impl<K: Ord + Clone> Circuit<K> {
-    /// An empty circuit: no nodes, no tenants, no ticks, an empty warehouse.
-    pub fn new() -> Circuit<K> {
-        Circuit {
-            nodes: Vec::new(),
-            cells: Vec::new(),
-            tenants: Vec::new(),
-            warehouse: Warehouse::empty(),
-            ticks: 0,
-            judged: 0,
-        }
-    }
-
-    /// Declare a node; a refusal wires nothing. Refused: an input that names no
-    /// existing node, an opaque node naming no admitted tenant, and any wiring
-    /// after the stream has started — the DAG is declared whole, then the stream
-    /// runs, so no node ever has a gap in its history that judgment would have to
-    /// invent.
-    pub fn wire(&mut self, node: Node) -> Option<usize> {
-        let reaches = |input: usize| input < self.nodes.len();
-        let sound = match node {
-            Node::Source => true,
-            Node::Neg(a) | Node::Delay(a) | Node::Distinct(a) => reaches(a),
-            Node::Add(a, b) | Node::Join(a, b) => reaches(a) && reaches(b),
-            Node::Opaque(a, who) => reaches(a) && who < self.tenants.len(),
-        };
-        if !sound || self.ticks > 0 {
-            return None;
-        }
-        self.nodes.push(node);
-        self.cells.push(Cell::fresh());
-        Some(self.nodes.len() - 1)
-    }
-
-    /// Record one tick: each source's arriving delta (absent sources receive
-    /// zero, duplicate mentions sum). Nothing is computed — computation belongs
-    /// to eduction. A feed naming a non-source refuses the whole tick.
-    pub fn tick(&mut self, feed: &[(usize, ZSet<K>)]) -> Option<usize> {
-        if feed
-            .iter()
-            .any(|(id, _)| self.nodes.get(*id) != Some(&Node::Source))
-        {
-            return None;
-        }
-        for (id, node) in self.nodes.iter().enumerate() {
-            if *node != Node::Source {
-                continue;
-            }
-            let mut arrived = ZSet::zero();
-            for (fed, z) in feed {
-                if *fed == id {
-                    arrived = arrived.add(z);
-                }
-            }
-            self.cells[id].deltas.push(arrived);
-        }
-        self.ticks += 1;
-        Some(self.ticks - 1)
-    }
-
-    /// Eduction's read: demand the node, judging its cone through every recorded
-    /// tick, and return its integrated value NOW. A node that was never wired
-    /// refuses.
-    pub fn latest(&mut self, node: usize) -> Option<ZSet<K>> {
-        if node >= self.nodes.len() {
-            return None;
-        }
-        self.pull(node);
-        Some(self.cells[node].out.clone())
-    }
-
-    /// How many node-ticks judgment has actually run — the eduction probe's
-    /// evidence that demand computes the cone and only the cone.
-    pub fn judged(&self) -> u64 {
-        self.judged
-    }
-
-    /// The warehouse's ledger, (hits, misses): content-keyed reuse, observable.
-    pub fn recalled(&self) -> (u64, u64) {
-        (self.warehouse.hits, self.warehouse.misses)
-    }
-
-    /// Mark the demanded node's ancestor cone (one reverse fold over the declared
-    /// order — acyclicity makes this complete), then judge the marked nodes in
-    /// declaration order, each catching up through the recorded ticks.
-    fn pull(&mut self, node: usize) {
-        let mut wanted = vec![false; self.nodes.len()];
-        wanted[node] = true;
-        for id in (0..=node).rev() {
-            if !wanted[id] {
-                continue;
-            }
-            match self.nodes[id] {
-                Node::Source => {}
-                Node::Neg(a) | Node::Delay(a) | Node::Distinct(a) | Node::Opaque(a, _) => {
-                    wanted[a] = true
-                }
-                Node::Add(a, b) | Node::Join(a, b) => {
-                    wanted[a] = true;
-                    wanted[b] = true;
-                }
-            }
-        }
-        for (id, marked) in wanted.iter().enumerate().take(node + 1) {
-            if !*marked {
-                continue;
-            }
-            for t in self.cells[id].done..self.ticks {
-                self.judge(id, t);
-            }
-        }
-    }
-
-    /// One node, one tick: compute the output delta by the operator's rule,
-    /// append it to the history, fold it into the integrated output.
-    fn judge(&mut self, id: usize, t: usize) {
-        let dout = match self.nodes[id] {
-            Node::Source => self.cells[id].deltas[t].clone(),
-            Node::Add(a, b) => self.cells[a].deltas[t].add(&self.cells[b].deltas[t]),
-            Node::Neg(a) => self.cells[a].deltas[t].neg(),
-            Node::Delay(a) => {
-                if t == 0 {
-                    ZSet::zero()
-                } else {
-                    self.cells[a].deltas[t - 1].clone()
-                }
-            }
-            Node::Join(a, b) => {
-                let da = self.cells[a].deltas[t].clone();
-                let db = self.cells[b].deltas[t].clone();
-                let right = self.cells[id].right.add(&db);
-                let dout = da.join(&right).add(&self.cells[id].left.join(&db));
-                self.cells[id].left = self.cells[id].left.add(&da);
-                self.cells[id].right = right;
-                dout
-            }
-            Node::Distinct(a) => {
-                let held = self.cells[id].left.add(&self.cells[a].deltas[t]);
-                let fresh = self
-                    .warehouse
-                    .recall("distinct", held.entries(), || held.distinct());
-                let dout = fresh.add(&self.cells[id].out.neg());
-                self.cells[id].left = held;
-                dout
-            }
-            Node::Opaque(a, who) => {
-                let held = self.cells[id].left.add(&self.cells[a].deltas[t]);
-                let tenant = &mut self.tenants[who];
-                let fresh = self
-                    .warehouse
-                    .recall(tenant.name, held.entries(), || (tenant.judge)(&held));
-                let dout = fresh.add(&self.cells[id].out.neg());
-                self.cells[id].left = held;
-                dout
-            }
-        };
-        if self.nodes[id] != Node::Source {
-            self.cells[id].deltas.push(dout.clone());
-        }
-        self.cells[id].out = self.cells[id].out.add(&dout);
-        self.cells[id].done = t + 1;
-        self.judged += 1;
-    }
-}
-
-#[crate::mutate]
-impl<K: Ord + Clone> Default for Circuit<K> {
-    fn default() -> Circuit<K> {
-        Circuit::new()
-    }
-}
-
-/// A verdict's address in the warehouse: the operator that judged, and the
-/// CONTENT it judged — never the node, never the tick.
-type Evidence<K> = (&'static str, Vec<(K, i64)>);
-
-/// An admitted opaque operator: the name its verdicts are warehoused under, and
-/// the judge the executor calls on a warehouse miss. The name IS the operator's
-/// identity — same name, same content, same verdict — which is why `admit`
-/// refuses a name already spoken. The judge may be effectful (rustc and the test
-/// suite are the intended tenants); the warehouse guarantees it runs at most once
-/// per novel content.
-struct Tenant<K: Ord> {
-    name: &'static str,
-    judge: Judge<K>,
-}
-
-#[crate::mutate]
-impl<K: Ord + Clone> Circuit<K> {
-    /// Admit an opaque tenant; a refusal admits nothing. The name is the
-    /// operator's identity in the warehouse — same name, same content, same
-    /// verdict — so a name already spoken is refused (the interpreted operator
-    /// speaks `distinct`), and admission after the stream has started is refused
-    /// exactly as late wiring is: the circuit is declared whole, then run.
-    pub fn admit(&mut self, name: &'static str, judge: Judge<K>) -> Option<usize> {
-        let spoken = name == "distinct" || self.tenants.iter().any(|t| t.name == name);
-        if spoken || self.ticks > 0 {
-            return None;
-        }
-        self.tenants.push(Tenant { name, judge });
-        Some(self.tenants.len() - 1)
-    }
-
-    /// Standing evidence enters before the stream runs: a verdict carried from an
-    /// earlier life of the same operator over the same content — the transcript's
-    /// carry, spoken in the executor's vocabulary. Refused, carrying nothing: an
-    /// operator this circuit does not run, evidence already standing (carried or
-    /// judged, the first word holds), and any carry after the stream has started.
-    pub fn carry(&mut self, op: &'static str, key: Vec<(K, i64)>, verdict: ZSet<K>) -> Option<()> {
-        let runs = op == "distinct" || self.tenants.iter().any(|t| t.name == op);
-        if !runs || self.ticks > 0 || self.warehouse.memo.contains_key(&(op, key.clone())) {
-            return None;
-        }
-        self.warehouse.memo.insert((op, key), verdict);
-        Some(())
-    }
-}
-
-/// The judge an opaque tenant runs on a warehouse miss: an uninterpreted, possibly
-/// effectful function of the integrated input — rustc and the test suite are the
-/// intended occupants. Boxed, because the executor stores what it must not read.
-pub type Judge<K> = Box<dyn FnMut(&ZSet<K>) -> ZSet<K>>;
-
 #[cfg(test)]
 mod probes {
     use super::*;
 
-    /// A grid tenant: a name and a PURE judge, as a plain function pointer — so
-    /// the naive oracle can run the very same judges the circuit admits.
-    type GridTenant = (&'static str, fn(&ZSet<u8>) -> ZSet<u8>);
-
-    /// The pure tenants the grid admits: `support` is distinct's own function
-    /// under a name of its own (the recognition probe's subject), and `square`
-    /// is a genuinely foreign nonlinear operator (self-join).
-    const TENANTS: &[GridTenant] = &[("support", support), ("square", square)];
+    /// The pure tenants the grid admits, by (name, judge): `support` is distinct's
+    /// own function under a name of its own (the recognition probe's subject), and
+    /// `square` is a genuinely foreign nonlinear operator (self-join). Plain
+    /// function pointers, so the naive oracle can run the same judges.
+    const TENANTS: &[(&str, fn(&ZSet<u8>) -> ZSet<u8>)] =
+        &[("support", support), ("square", square)];
 
     /// Distinct's function, admitted as an uninterpreted tenant.
     fn support(z: &ZSet<u8>) -> ZSet<u8> {
@@ -398,7 +63,7 @@ mod probes {
         let mut circuit: Circuit<u8> = Circuit::new();
         for (name, judge) in TENANTS {
             circuit
-                .admit(name, Box::new(*judge))
+                .admit(name, Box::new(move |z| judge(z)))
                 .expect("the grid tenants' names are fresh");
         }
         for node in plan {
@@ -759,7 +424,6 @@ mod probes {
             .tick(&[(s1, b.neg())])
             .expect("the feed names a source");
         let _ = circuit.latest(o1);
-        let _ = circuit.latest(o2);
         assert_eq!(
             calls.get(),
             2,
@@ -895,18 +559,12 @@ mod probes {
             .tick(&[(tree, a1.add(&b))])
             .expect("the feed names the tree");
         let first = circuit.latest(view).expect("wired");
-        assert_eq!(
-            first,
-            census(&a1.add(&b)),
-            "the view is the tenant's answer"
-        );
+        assert_eq!(first, census(&a1.add(&b)), "the view is the tenant's answer");
         assert_eq!(calls.get(), 1, "novel tree: judged once");
 
         let edit = a2.add(&a1.neg());
         assert_eq!(edit.entries().len(), 2, "an edit is a two-row delta");
-        circuit
-            .tick(&[(tree, edit)])
-            .expect("the verbs feed deltas");
+        circuit.tick(&[(tree, edit)]).expect("the verbs feed deltas");
         assert_eq!(
             circuit.latest(view),
             Some(first.clone()),

@@ -390,28 +390,28 @@ fn outcome(mut cmd: Command, limit: Duration) -> &'static str {
 /// (its module and its covering tests' modules, by content) matches the prior
 /// transcript carries its verdict forward without a run — except timeouts, which
 /// are load-sensitive and always re-judged — and only the moved sites pay for
-/// judgment. `sweep` is this with nothing to lean on; the weekly from-scratch
-/// shards stay the backstop for what content keys cannot see (a covering test's
-/// behaviour shifting through code it calls without its own module moving — the
-/// same ratified gap as the retired since-green gate).
+/// judgment. The sweep's two FIXED COSTS are opaque nodes in an eduction circuit:
+/// Source(lib cone) → build → baseline, verdicts warehoused by the cone's content
+/// and seeded from the prior transcript's `evidence` line — rustc and the suite
+/// run when the cone is novel, never because the sweep happened to run. And since
+/// every site's evidence lives INSIDE the cone, a standing cone carries the whole
+/// verdict set with it: the sweep's answer is a maintained view, re-attested for
+/// the cost of a walk. `sweep` is this with nothing to lean on; the weekly
+/// from-scratch shards stay the backstop for what content keys cannot see (a
+/// covering test's behaviour shifting through code it calls without its own
+/// module moving — the same ratified gap as the retired since-green gate).
 fn sweep_with(prior: Option<boundary_spec::discover::attest::Transcript>) {
-    // one build serves every verdict below.
-    let built = Command::new("cargo")
-        .args([
-            "test",
-            "-q",
-            "-p",
-            "boundary-spec",
-            "--lib",
-            "--features",
-            "schemata",
-            "--no-run",
-        ])
-        .status()
-        .expect("cargo runs");
-    if !built.success() {
-        std::process::exit(1);
-    }
+    use boundary_spec::discover::eduction::{Circuit, Node};
+
+    let root = std::path::Path::new(".");
+    let cone = match lib_cone(root) {
+        Ok(cone) => cone,
+        Err(refusal) => {
+            eprintln!("schemata: {refusal}");
+            std::process::exit(1);
+        }
+    };
+    let fp = cone_fp(&cone);
     let census = match Schemata::census() {
         Ok(sites) => sites,
         Err(collision) => {
@@ -426,45 +426,224 @@ fn sweep_with(prior: Option<boundary_spec::discover::attest::Transcript>) {
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
-
-    // the baseline: unmutated, timed, RECORDED — a red baseline would make every
-    // mutant verdict meaningless, so it refuses before judging anything.
     let record = std::env::temp_dir().join(format!("schemata-record-{}", std::process::id()));
     std::fs::create_dir_all(&record).expect("record dir");
-    let start = Instant::now();
-    let mut baseline_cmd = Command::new("cargo");
-    if have_nextest {
-        baseline_cmd
-            .args([
-                "nextest",
-                "run",
-                "-p",
-                "boundary-spec",
-                "--lib",
-                "--features",
-                "schemata",
-            ])
-            .env("SCHEMATA_RECORD", &record);
-    } else {
-        baseline_cmd.args([
-            "test",
-            "-q",
-            "-p",
-            "boundary-spec",
-            "--lib",
-            "--features",
-            "schemata",
-        ]);
+    // ratified divergence: the one class of timeout that MAY carry — the register
+    // line (spec/divergence.register) is the signature that the timeout is the
+    // flip's nature, not the machine's mood; staleness is judged after the run.
+    let divergent: std::collections::BTreeSet<String> = spec_lock::Register {
+        name: "ratified divergence".to_string(),
+        path: std::path::PathBuf::from("spec/divergence.register"),
     }
-    if outcome(baseline_cmd, Duration::from_secs(3600)) != "SURVIVED" {
-        eprintln!("schemata: the UNMUTATED suite is red — fix the suite before judging mutants");
-        std::process::exit(1);
+    .entries()
+    .map(|entries| entries.into_iter().map(|(k, _)| k).collect())
+    .unwrap_or_default();
+
+    // THE DAG: build and baseline as opaque tenants over the tree relation.
+    let mut circuit: Circuit<boundary_spec::discover::items::Item> = Circuit::new();
+    let build_tenant = circuit
+        .admit(
+            "build",
+            Box::new(|tree| {
+                // one build serves every verdict below.
+                let built = Command::new("cargo")
+                    .args([
+                        "test",
+                        "-q",
+                        "-p",
+                        "boundary-spec",
+                        "--lib",
+                        "--features",
+                        "schemata",
+                        "--no-run",
+                    ])
+                    .status()
+                    .expect("cargo runs");
+                if !built.success() {
+                    std::process::exit(1);
+                }
+                one_row(verdict_row("build", &format!("green {}", cone_fp(tree))))
+            }),
+        )
+        .expect("a fresh name");
+    let coverage = record.clone();
+    let baseline_tenant = circuit
+        .admit(
+            "baseline",
+            Box::new(move |_built| {
+                // the baseline: unmutated, timed, RECORDED — a red baseline would
+                // make every mutant verdict meaningless, so it refuses before
+                // judging anything. Keyed by the build row it consumes, which
+                // carries the cone's fingerprint: same content, same seconds.
+                let start = Instant::now();
+                let mut baseline_cmd = Command::new("cargo");
+                if have_nextest {
+                    baseline_cmd
+                        .args([
+                            "nextest",
+                            "run",
+                            "-p",
+                            "boundary-spec",
+                            "--lib",
+                            "--features",
+                            "schemata",
+                        ])
+                        .env("SCHEMATA_RECORD", &coverage);
+                } else {
+                    baseline_cmd.args([
+                        "test",
+                        "-q",
+                        "-p",
+                        "boundary-spec",
+                        "--lib",
+                        "--features",
+                        "schemata",
+                    ]);
+                }
+                if outcome(baseline_cmd, Duration::from_secs(3600)) != "SURVIVED" {
+                    eprintln!(
+                        "schemata: the UNMUTATED suite is red — fix the suite before \
+                         judging mutants"
+                    );
+                    std::process::exit(1);
+                }
+                one_row(verdict_row(
+                    "baseline",
+                    &format!("green {}", start.elapsed().as_secs()),
+                ))
+            }),
+        )
+        .expect("a fresh name");
+    let tree = circuit.wire(Node::Source).expect("wired");
+    let built = circuit
+        .wire(Node::Opaque(tree, build_tenant))
+        .expect("wired");
+    let timed = circuit
+        .wire(Node::Opaque(built, baseline_tenant))
+        .expect("wired");
+
+    // STANDING EVIDENCE: the prior transcript's `evidence` line names the cone its
+    // build and baseline were facts about; a matching fingerprint seeds the
+    // warehouse and neither tenant runs. Forfeited whole when the site population
+    // moved (the cheap disagreement check the census affords), when any prior
+    // timeout is unratified (load-sensitive detections are re-judged, never
+    // inherited), or without nextest (the fallback path writes no auditable
+    // record to carry into).
+    let attested: BTreeSet<&str> = prior
+        .as_ref()
+        .map(|p| p.sites.iter().map(|s| s.site.as_str()).collect())
+        .unwrap_or_default();
+    let same_population =
+        census.len() == attested.len() && census.iter().all(|s| attested.contains(s));
+    let unsettled_timeout = prior.as_ref().is_some_and(|p| {
+        p.sites
+            .iter()
+            .any(|s| s.verdict == "timeout" && !divergent.contains(&s.site))
+    });
+    let standing = have_nextest
+        && same_population
+        && !unsettled_timeout
+        && prior
+            .as_ref()
+            .is_some_and(|p| !p.evidence.is_empty() && p.evidence == fp);
+    if standing {
+        let secs = prior
+            .as_ref()
+            .expect("standing evidence has a prior")
+            .baseline_secs;
+        let build_row = one_row(verdict_row("build", &format!("green {fp}")));
+        circuit
+            .carry("build", cone.entries(), build_row.clone())
+            .expect("evidence enters before the stream");
+        circuit
+            .carry(
+                "baseline",
+                build_row.entries(),
+                one_row(verdict_row("baseline", &format!("green {secs}"))),
+            )
+            .expect("evidence enters before the stream");
     }
-    let baseline = start.elapsed();
-    let limit = derive_limit(baseline);
+    circuit
+        .tick(&[(tree, cone.clone())])
+        .expect("the feed names the tree");
+    let baseline_secs: u64 = verdict_body(&circuit.latest(timed).expect("wired"), "baseline")
+        .strip_prefix("green ")
+        .and_then(|s| s.parse().ok())
+        .expect("a green baseline row carries its seconds");
+    let limit = derive_limit(Duration::from_secs(baseline_secs));
+
+    if standing {
+        // the whole verdict set rides the standing cone: re-attest at this tree,
+        // then judge the carried claims exactly as a judging run would.
+        let p = prior.expect("standing evidence has a prior");
+        let transcript = boundary_spec::discover::attest::Transcript {
+            // keyed by the SCHEMATA GATE's declared support (single-sourced from
+            // the registry): an inert edit cannot orphan the attestation.
+            tree: boundary_spec::discover::verdict::VerdictStore::support_hash(
+                root,
+                &boundary_spec::discover::gates::GateRegistry::declared()
+                    .into_iter()
+                    .find(|g| g.name == "mutation (schemata)")
+                    .map(|g| g.support)
+                    .expect("the schemata gate is declared"),
+            )
+            .expect("the tree fingerprints"),
+            toolchain: boundary_spec::discover::gates::TOOLCHAIN.to_string(),
+            baseline_secs,
+            evidence: fp.clone(),
+            sites: p.sites,
+        };
+        std::fs::create_dir_all("attest").expect("attest dir");
+        let location = boundary_spec::discover::attest::Transcript::location(root);
+        std::fs::write(&location, transcript.render()).expect("attestation written");
+        println!(
+            "cone {fp} standing: build, baseline ({baseline_secs}s attested), and {} \
+             site verdict(s) carried; 0 judged",
+            transcript.sites.len()
+        );
+        // divergence staleness, one-way as ever: every ratified line must still be
+        // claimed by a timeout verdict — here, a carried one.
+        let timed_out: BTreeSet<&str> = transcript
+            .sites
+            .iter()
+            .filter(|s| s.verdict == "timeout")
+            .map(|s| s.site.as_str())
+            .collect();
+        let stale: Vec<&String> = divergent
+            .iter()
+            .filter(|d| !timed_out.contains(d.as_str()))
+            .collect();
+        if !stale.is_empty() {
+            for line in &stale {
+                eprintln!(
+                    "divergence register: `{line}` did not time out this run — a ratified \
+                     divergence that stopped diverging is a stale claim; delete the line \
+                     or re-earn it"
+                );
+            }
+            std::process::exit(1);
+        }
+        let survivors: Vec<&str> = transcript
+            .sites
+            .iter()
+            .filter(|s| s.verdict == "SURVIVED")
+            .map(|s| s.site.as_str())
+            .collect();
+        match Schemata::register().check(survivors.iter().copied()) {
+            Ok(()) => println!(
+                "schemata sweep clean: {} survivor(s), all ratified.",
+                survivors.len()
+            ),
+            Err(drift) => {
+                eprintln!("{drift}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     println!(
-        "baseline {}s green; per-mutant timeout {}s (derived, 5x + 10)",
-        baseline.as_secs(),
+        "baseline {baseline_secs}s green; per-mutant timeout {}s (derived, 5x + 10); \
+         cone {fp}",
         limit.as_secs()
     );
 
@@ -487,16 +666,6 @@ fn sweep_with(prior: Option<boundary_spec::discover::attest::Transcript>) {
             (site, tests, key)
         })
         .collect();
-    // ratified divergence: the one class of timeout that MAY carry — the register
-    // line (spec/divergence.register) is the signature that the timeout is the
-    // flip's nature, not the machine's mood; staleness is judged after the run.
-    let divergent: std::collections::BTreeSet<String> = spec_lock::Register {
-        name: "ratified divergence".to_string(),
-        path: std::path::PathBuf::from("spec/divergence.register"),
-    }
-    .entries()
-    .map(|entries| entries.into_iter().map(|(k, _)| k).collect())
-    .unwrap_or_default();
     let mut carried: Vec<Judged> = Vec::new();
     let mut owed: VecDeque<(&'static str, Vec<String>, String)> = VecDeque::new();
     for (site, tests, key) in keyed {
@@ -653,7 +822,8 @@ fn sweep_with(prior: Option<boundary_spec::discover::attest::Transcript>) {
             )
             .expect("the tree fingerprints"),
             toolchain: boundary_spec::discover::gates::TOOLCHAIN.to_string(),
-            baseline_secs: baseline.as_secs(),
+            baseline_secs,
+            evidence: fp,
             sites: sites
                 .into_iter()
                 .map(|(site, verdict, tests, evidence)| {
@@ -739,6 +909,116 @@ fn physical_memory_gb() -> Option<usize> {
         .parse()
         .ok()?;
     Some((kb / 1_048_576) as usize)
+}
+
+/// The tree relation's rows, as the sweep consumes them: the item relation's
+/// vocabulary, verdict rows included.
+type Cone = boundary_spec::discover::zset::ZSet<boundary_spec::discover::items::Item>;
+
+/// THE LIB CONE: the content the sweep's build and baseline verdicts are facts
+/// about — everything the Judged support admits except what `cargo test -p
+/// boundary-spec --lib` cannot read: `examples/` (this runner itself rides along,
+/// since its text IS the sweep's semantics) and the root `tests/`. A conservative
+/// over-approximation, exactly as the gate supports are: admitting too much only
+/// costs a re-run; admitting too little would carry a stale green, the one
+/// direction this design refuses everywhere. Rust modules enter at ITEM grain
+/// (the item relation — the same rows the verbs feed), everything else at file
+/// grain; a non-UTF-8 file still keys honestly by length plus lossy form. The
+/// change medium's own ledger (`bundle.journal`, `bundle.payloads/`) is also
+/// out: it RECORDS changes to the tree, it does not participate in the build —
+/// the `attest/` scope rule, one shelf down — and leaving it in would move the
+/// cone on every judged transaction, making standing evidence unreachable.
+fn lib_cone(root: &std::path::Path) -> Result<Cone, String> {
+    use boundary_spec::discover::gates::Support;
+    use boundary_spec::discover::items::{Item, ItemRelation};
+    use boundary_spec::discover::verdict::VerdictStore;
+    use boundary_spec::discover::zset::ZSet;
+    let mut out = ZSet::zero();
+    for relative in VerdictStore::files(root)? {
+        let unread = (relative.starts_with("examples/") && relative != "examples/schemata.rs")
+            || relative.starts_with("tests/")
+            || relative == "bundle.journal"
+            || relative.starts_with("bundle.payloads/");
+        if unread || !Support::Judged.admits(&relative) {
+            continue;
+        }
+        let bytes = std::fs::read(root.join(&relative))
+            .map_err(|e| format!("lib cone: cannot read {relative} ({e})"))?;
+        let source = match String::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(raw) => format!(
+                "{}\u{0}{}",
+                raw.as_bytes().len(),
+                String::from_utf8_lossy(raw.as_bytes())
+            ),
+        };
+        if relative.ends_with(".rs") {
+            out = out.add(
+                &ItemRelation::of_module(&relative, &source)
+                    .map_err(|e| format!("lib cone: {relative} — {e}"))?,
+            );
+        } else {
+            out = out.add(&ZSet::from_pairs(&[(
+                Item {
+                    module: relative.clone(),
+                    name: ":file:".to_string(),
+                    body: source,
+                },
+                1,
+            )]));
+        }
+    }
+    Ok(out)
+}
+
+/// The cone's fingerprint: FNV-64 (the verdict store's fold) over every row —
+/// module, name, body, weight, all mixed in — rendered to the transcript's
+/// `evidence` line and compared before any carry.
+fn cone_fp(cone: &Cone) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut eat = |bytes: &[u8]| {
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        hash ^= 0xff;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    };
+    for (item, weight) in cone.entries() {
+        eat(item.module.as_bytes());
+        eat(item.name.as_bytes());
+        eat(item.body.as_bytes());
+        eat(&weight.to_le_bytes());
+    }
+    format!("{hash:016x}")
+}
+
+/// A verdict as a row in the relation vocabulary: the module column names the
+/// ledger, the name column the operator, the body the verdict's content.
+fn verdict_row(operator: &str, body: &str) -> boundary_spec::discover::items::Item {
+    boundary_spec::discover::items::Item {
+        module: ":attest:".to_string(),
+        name: operator.to_string(),
+        body: body.to_string(),
+    }
+}
+
+/// One verdict row as a Z-set — the shape a sweep tenant returns.
+fn one_row(item: boundary_spec::discover::items::Item) -> Cone {
+    boundary_spec::discover::zset::ZSet::from_pairs(&[(item, 1)])
+}
+
+/// The body of the one row a sweep node holds. The sweep's tenants exit on red
+/// rather than answer, so a demanded node always integrates to exactly one green
+/// row at weight 1 — anything else is a broken invariant, named and fatal.
+fn verdict_body(z: &Cone, operator: &str) -> String {
+    match z.entries().as_slice() {
+        [(item, 1)] if item.name == operator => item.body.clone(),
+        _ => {
+            eprintln!("schemata: the {operator} node did not hold a single verdict row");
+            std::process::exit(1);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -839,6 +1119,65 @@ mod probes {
         assert_eq!(
             outcome(slow, std::time::Duration::from_millis(100)),
             "timeout"
+        );
+    }
+
+    /// The lib cone is the declared evidence of the sweep's fixed costs, run at the
+    /// real tree: the lib at item grain, manifests and registers at file grain, the
+    /// runner's own text included (its text IS the sweep's semantics) — and what
+    /// the lib build cannot read excluded, which is exactly what lets an
+    /// examples-only edit carry build and baseline. The fingerprint is content's
+    /// pure function: stable across two walks, moved by any row.
+    #[test]
+    fn the_lib_cone_is_the_declared_evidence() {
+        let cone = lib_cone(std::path::Path::new(".")).expect("the cone derives");
+        let rows = cone.entries();
+        assert!(rows.iter().all(|(_, w)| *w == 1), "a walk is weight 1");
+        assert!(
+            rows.iter()
+                .any(|(i, _)| i.module == "src/discover/eduction.rs"),
+            "the lib is in the cone at item grain"
+        );
+        assert!(
+            rows.iter()
+                .any(|(i, _)| i.module == "Cargo.toml" && i.name == ":file:"),
+            "manifests ride at file grain"
+        );
+        assert!(
+            rows.iter().any(|(i, _)| i.module == "examples/schemata.rs"),
+            "the runner's own text is evidence"
+        );
+        assert!(
+            !rows
+                .iter()
+                .any(|(i, _)| i.module.starts_with("examples/")
+                    && i.module != "examples/schemata.rs"),
+            "other examples are unread by the lib build"
+        );
+        assert!(
+            !rows.iter().any(|(i, _)| i.module.starts_with("tests/")),
+            "root tests are unread by the lib build"
+        );
+        assert!(
+            !rows.iter().any(|(i, _)| i.module.starts_with("docs/")),
+            "prose is inert"
+        );
+        assert!(
+            !rows
+                .iter()
+                .any(|(i, _)| i.module == "bundle.journal"
+                    || i.module.starts_with("bundle.payloads/")),
+            "the change medium's ledger records the tree; it does not build it"
+        );
+        let fp = cone_fp(&cone);
+        assert_eq!(fp.len(), 16, "the fold renders 16 hex: `{fp}`");
+        assert_eq!(fp, cone_fp(&cone), "same content, same fingerprint");
+        let moved = cone.add(&one_row(verdict_row("build", "green")));
+        assert_ne!(cone_fp(&moved), fp, "any row moves the fingerprint");
+        assert_eq!(
+            verdict_body(&one_row(verdict_row("baseline", "green 34")), "baseline"),
+            "green 34",
+            "a tenant's row and its reader agree"
         );
     }
 }
