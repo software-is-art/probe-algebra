@@ -160,6 +160,21 @@ impl VerdictStore {
     }
 }
 
+#[crate::mutate("verdict")]
+impl VerdictStore {
+    /// The verdict walk's PUBLIC FACE: every file both keys fingerprint, sorted,
+    /// relative — one walk, one opinion about what the tree is, now consumable by
+    /// derivations beyond the keys (the item relation is the first).
+    ///
+    /// Capability: Effectful — reads directory structure only, never file contents.
+    pub fn files(crate_root: &Path) -> Result<Vec<String>, String> {
+        let mut files = Vec::new();
+        Self::walk(crate_root, crate_root, &mut files)?;
+        files.sort();
+        Ok(files)
+    }
+}
+
 #[cfg(test)]
 mod probes {
     use super::VerdictStore;

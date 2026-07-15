@@ -138,3 +138,6 @@ edit src/discover/eduction.rs — probes @07f6d9fb9b4c22bf
 edit examples/bundle.rs — run @c1b40df7b8c08fa5
 add src/discover/items.rs — struct Item, struct ItemRelation, mod probes @6964d79e45f92168
 add src/discover/mod.rs — mod items @b9f9061c27e6e1a5
+add src/discover/verdict.rs —  @cfd08b34391cbc11
+add src/discover/items.rs —  @ef31fc2b7e1cb8a1
+edit src/discover/items.rs — probes @a2d706671c5f2051

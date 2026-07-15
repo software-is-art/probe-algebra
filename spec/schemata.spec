@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 930 sites.
+# 936 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -666,6 +666,10 @@
 - boundary_spec::discover::infra::Meaning::describe:deaf -> String::new()
 - boundary_spec::discover::items::ItemRelation::of_files:deaf -> Err(String::new())
 - boundary_spec::discover::items::ItemRelation::of_module:deaf -> Err(String::new())
+- boundary_spec::discover::items::ItemRelation::of_tree:0: ! -> (deleted)
+- boundary_spec::discover::items::ItemRelation::of_tree:1: ! -> (deleted)
+- boundary_spec::discover::items::ItemRelation::of_tree:2: || -> &&
+- boundary_spec::discover::items::ItemRelation::of_tree:deaf -> Err(String::new())
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Err(vec![])
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Ok(vec![])
 - boundary_spec::discover::layering::ComponentLayering::is_atomic:deaf -> false
@@ -868,6 +872,8 @@
 - boundary_spec::discover::trace::trace::of:deaf -> Err(String::new())
 - boundary_spec::discover::trace::trace::render:deaf -> String::new()
 - boundary_spec::discover::verdict::verdict::entry:deaf -> String::new()
+- boundary_spec::discover::verdict::verdict::files:deaf -> Err(String::new())
+- boundary_spec::discover::verdict::verdict::files:deaf -> Ok(vec![])
 - boundary_spec::discover::verdict::verdict::fingerprint:deaf -> Err(String::new())
 - boundary_spec::discover::verdict::verdict::fingerprint:deaf -> Ok(String::new())
 - boundary_spec::discover::verdict::verdict::held:deaf -> false

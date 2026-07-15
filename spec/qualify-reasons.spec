@@ -28,7 +28,7 @@ src/discover/fabric.rs: REFUSES — borrowed types, parameterised types, unshape
 src/discover/floor.rs: REFUSES — borrowed types, parameterised types, primitive signatures, unshaped types
 src/discover/gates.rs: REFUSES — borrowed types, parameterised types, primitive signatures, zero-argument constants
 src/discover/genesis.rs: REFUSES — borrowed types, parameterised types, primitive signatures, unshaped types
-src/discover/items.rs: REFUSES — borrowed types, parameterised types
+src/discover/items.rs: REFUSES — borrowed types, effectful bodies, parameterised types
 src/discover/judgment.rs: REFUSES — borrowed types, parameterised types, unshaped types
 src/discover/layering.rs: REFUSES — borrowed types, parameterised types, primitive signatures, unit returns, zero-argument constants
 src/discover/lift.rs: REFUSES — borrowed types, parameterised types, primitive signatures, unit returns, zero-argument constants

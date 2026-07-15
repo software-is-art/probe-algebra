@@ -3560,6 +3560,45 @@ incremental, demoting recompute to the gate oracle; (4) the opaque node — the
 executor's deferred tenant gets its integrated input (the tree as Z-set), and
 build + baseline-run, the sweep's last fixed costs, become nodes in the DAG.
 
+Brick 2 BUILT the same afternoon: `of_tree` — the relation at repo scale, walked
+by `VerdictStore::files`, the NEW public face of the exact walk the gates'
+support keys already trust, filtered to the `.rs` subset of the declared
+`RustSurface` projection. No second walker, no second opinion about what the
+tree is. The self-recognition probe pins it: the tree relation contains the row
+that declares the relation, every row a walked `.rs` path at weight 1. All six
+new mutation sites killed.
+
+And the brick's real discovery, which rewrites the `grow` story: GROWTH IS
+ALREADY AN `add`. The address grammar's own doc said it all along — two impl
+blocks for one type are legal Rust and extending an address is not an `add`
+collision — so `VerdictStore::files` and `of_tree` both rode in as SIBLING IMPL
+BLOCKS through `add`, zero hand edits, judged transactions end to end. Five
+`grow` firings, and the fifth (`Bundle::rows`, this morning) was the last one
+that will ever fall back: the verb set was complete for growth all along, just
+unnoticed. What remains of `grow` is only a PLACEMENT judgment — whether one
+type's methods should live in one impl block — which is `place`'s business to
+learn someday, not a new transaction. The most field-demanded verb gap in the
+log dissolves into an idiom, which is the cheapest kind of brick there is.
+
+Readings from the authoring session, recorded per the instrument (asked "how was
+it to author with the CLI," answered honestly). (a) `impl Bundle` is one item, so
+reading ONE METHOD meant piping `show` through `sed` twice — a fallback reading
+wearing a verb's clothing; a method-grain address (`show`'s inventory face scoped
+inside an impl) is the perception half of the rung `edit` already has named. (b)
+The blessing sequence is hand-sequenced convention: after a new module, the
+author must KNOW to run `BLESS_QUALIFY`/`BLESS_TIERS`/`freeze_gates` — the first
+build's two violations went unread and the fix was guessed from lore. `owes`
+derives what gates the tree owes; it does not derive what BLESSINGS a change
+owes, and that is a derivation wearing a convention's clothing — the standing
+question's exact shape. (c) Payload formatting is the author's burden: the
+transaction accepts bytes the fmt gate will refuse minutes later; the judged
+transaction could carry that judgment at offer time. (d) On the credit side, for
+the record: refusals that list the addressable roster convert a wrong guess into
+the next correct call with no doc lookup — the property to preserve in every new
+verb — and content-keyed verdicts eliminated superstitious re-running entirely;
+the frozen-tree window during a gates run is the one honest cost, and it is
+exactly what brick 3's maintained views shrink toward nothing.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

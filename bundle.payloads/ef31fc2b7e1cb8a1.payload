@@ -1,0 +1,30 @@
+use std::path::Path;
+
+use super::gates::Support;
+use super::verdict::VerdictStore;
+
+#[crate::mutate]
+impl ItemRelation {
+    /// THE TREE RELATION: every Rust module the verdict walk yields, as one Z-set —
+    /// the repo-scale integral the executor's opaque nodes will consume. The walk
+    /// is the SAME walk the gates' support keys trust (`VerdictStore::files`),
+    /// filtered to the `.rs` subset of the declared Rust surface — no second
+    /// walker, no second opinion about what the tree is. A refusal names the file
+    /// that broke the derivation and derives nothing.
+    ///
+    /// Capability: Effectful — reads every module the walk admits.
+    pub fn of_tree(root: &Path) -> Result<ZSet<Item>, String> {
+        let mut out = ZSet::zero();
+        for relative in VerdictStore::files(root)? {
+            if !Support::RustSurface.admits(&relative) || !relative.ends_with(".rs") {
+                continue;
+            }
+            let source = std::fs::read_to_string(root.join(&relative))
+                .map_err(|e| format!("item relation: cannot read {relative} ({e})"))?;
+            let module = ItemRelation::of_module(&relative, &source)
+                .map_err(|e| format!("item relation: {relative} — {e}"))?;
+            out = out.add(&module);
+        }
+        Ok(out)
+    }
+}
