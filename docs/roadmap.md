@@ -3580,6 +3580,39 @@ type's methods should live in one impl block — which is `place`'s business to
 learn someday, not a new transaction. The most field-demanded verb gap in the
 log dissolves into an idiom, which is the cheapest kind of brick there is.
 
+Brick 3 BUILT (2026-07-15, the day's third): THE FIRST MAINTAINED VIEW — the
+qualify census pair updates at the verb, and the `BLESS_QUALIFY`/`BLESS_REASONS`
+ceremony is no longer owed at the edit. The pieces, each in its right home:
+`boundary-enforce` grew `reasons_line` (qualify_line's complement — the partition
+now reachable from text on both sides), `render_census_from`/`render_reasons_from`
+(the format extracted to from-parts renderers, stated once — the wholesale walk
+and the maintained update render through the SAME bytes), and `maintain_qualify`
+(retract the loc's line from both files, re-judge the source, assert on the side
+the rule assigns, re-derive both headers from the line sets). The bundle example's
+`commit` now calls it on every writing verb: the crate's census pair is found
+beside the journal, the bless env names are READ FROM THE COMMITTED HEADERS
+(never configured — a member crate's pair maintains identically), and a module
+outside the census's `src/` walk moves nothing. Seven probes pin the view: no-op
+is byte-identity, an edit replaces exactly its own line, a partition crossing
+moves between the files with both headers re-derived, a new loc grows the roster,
+maintenance is idempotent, unparseable is no-signal, `tests.rs` is the walk's own
+skip. The acceptance ran at the real tree: a judged no-op edit through the new
+binary reproduced both committed censuses byte-for-byte, and the next `cargo
+build` — the drift gate, now formally the ORACLE — was green with no bless env
+anywhere. This is the dataflow design's claim made concrete at census number one:
+the wholesale scan was not replaced, it was DEMOTED to the oracle role, exactly
+the naive-recompute pattern the executor's probes already pin. Censuses remaining
+for the same treatment: tiers, reasons' member twins, instrumentation, schemata.
+
+Field report from brick 3 (a verb gap, named): the DEPENDENCY DECLARATION.
+Wiring the example to `boundary-enforce` took one hand line in `Cargo.toml`
+([dev-dependencies]) — manifests are outside every verb's reach, yet a dependency
+edge is exactly the kind of judged, journal-worthy change the verbs exist for
+(it moves the build graph, the perimeter's supply chain, and the qualify walk's
+scope all at once). A `depend` verb — declare an edge, judge it against a policy
+the tree ratifies, journal it — is the sixth firing's shape, one layer up from
+`grow`'s.
+
 Readings from the authoring session, recorded per the instrument (asked "how was
 it to author with the CLI," answered honestly). (a) `impl Bundle` is one item, so
 reading ONE METHOD meant piping `show` through `sed` twice — a fallback reading

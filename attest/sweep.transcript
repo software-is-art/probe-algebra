@@ -1,7 +1,7 @@
 # sweep transcript — the sampled countersign's subject; regenerate by running the sweep.
-tree 4308006adfc04ae3
+tree 7af5d424899680fe
 toolchain 1.94.1
-baseline 20
+baseline 21
 killed	boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=	discover::agenda::probes::the_guard_voices_derive_from_the_tree	28aa92d724074251
 killed	boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&	discover::agenda::probes::the_guard_voices_derive_from_the_tree	28aa92d724074251
 killed	boundary_spec::discover::agenda::agenda::of:deaf -> Err(String::new())	discover::agenda::probes::a_diff_routes_to_its_ratifications,discover::agenda::probes::an_infra_lock_routes_to_its_own_class,discover::agenda::probes::an_interior_diff_requires_no_ratification,discover::agenda::probes::an_unknown_lock_class_refuses,discover::agenda::probes::consumer_taught_classes_route_before_the_builtins,discover::agenda::probes::member_lock_paths_classify_by_suffix,discover::agenda::probes::the_perimeter_artifacts_route_to_their_own_class,discover::agenda::probes::the_probe_census_routes_to_its_own_class,discover::agenda::probes::the_schemata_census_routes_to_its_own_class,discover::agenda::probes::the_substrate_lock_routes_to_its_own_class	4e66b63a60acbeea

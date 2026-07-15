@@ -1,0 +1,9 @@
+/// Render the qualify census by the wholesale walk — the collector gathers, the
+/// from-parts renderer ([`render_census_from`]) owns the format, stated once for
+/// this walk and for the maintained update alike.
+fn render_census(src: &Path, manifest: &Path, bless_env: &str) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    let mut scanned = 0usize;
+    collect_qualifications(src, manifest, &mut scanned, &mut lines);
+    render_census_from(&lines, scanned, bless_env)
+}

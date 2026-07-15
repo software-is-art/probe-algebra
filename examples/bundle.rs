@@ -405,13 +405,15 @@ fn read_payload(verb: &str, source: &str) -> Result<String, String> {
 
 /// The write half of a judged transaction: the module lands AND the verb records itself —
 /// one line appended to `bundle.journal` beside the nearest `Cargo.toml` (the crate is
-/// the journal's scope). The write happens first; a journal failure is reported, never
-/// silently swallowed — a change the record missed is exactly what the journal exists to
-/// prevent.
+/// the journal's scope) — AND the qualify census pair updates at the delta (the
+/// maintained view; the build gate stays the oracle). The write happens first; a journal
+/// or census failure is reported, never silently swallowed — a change the record missed
+/// is exactly what the record exists to prevent.
 fn commit(module_path: &str, content: &str, verb: &str, detail: &str) -> Result<(), String> {
     std::fs::write(module_path, content)
         .map_err(|e| format!("bundle {verb}: cannot write: {e}"))?;
-    let journal = nearest_crate_root(module_path).join("bundle.journal");
+    let root = nearest_crate_root(module_path);
+    let journal = root.join("bundle.journal");
     let entry = Bundle::journal_entry(verb, module_path, detail);
     use std::io::Write;
     std::fs::OpenOptions::new()
@@ -419,7 +421,8 @@ fn commit(module_path: &str, content: &str, verb: &str, detail: &str) -> Result<
         .append(true)
         .open(&journal)
         .and_then(|mut f| f.write_all(entry.as_bytes()))
-        .map_err(|e| format!("bundle {verb}: wrote the module but NOT the journal ({e})"))
+        .map_err(|e| format!("bundle {verb}: wrote the module but NOT the journal ({e})"))?;
+    maintain_census(&root, module_path, content, verb)
 }
 
 /// The nearest ancestor directory carrying a `Cargo.toml` — the journal's home. Falls
@@ -439,4 +442,64 @@ fn nearest_crate_root(module_path: &str) -> std::path::PathBuf {
             None => return start.to_path_buf(),
         }
     }
+}
+
+/// THE MAINTAINED VIEW at the verb (the item-relation program's brick 3): every
+/// committing verb re-derives its own module's line in the crate's qualify census
+/// pair — retract, re-judge, re-render through the census's own from-parts
+/// renderers — so the drift gate that re-derives the pair wholesale on every build
+/// (the ORACLE) cannot fire for a verb-carried change, and the `BLESS_*` ceremony
+/// stops being owed at the edit. A crate without the pair owes nothing; a module
+/// outside the census's `src/` walk moves nothing; the bless env names are read
+/// from the committed headers, never configured.
+fn maintain_census(
+    root: &std::path::Path,
+    module_path: &str,
+    content: &str,
+    verb: &str,
+) -> Result<(), String> {
+    let census_path = root.join("spec/qualify.spec");
+    let reasons_path = root.join("spec/qualify-reasons.spec");
+    if !census_path.exists() || !reasons_path.exists() {
+        return Ok(());
+    }
+    let loc = std::path::Path::new(module_path)
+        .strip_prefix(root)
+        .unwrap_or(std::path::Path::new(module_path))
+        .display()
+        .to_string();
+    if !loc.starts_with("src/") {
+        return Ok(());
+    }
+    let env = |text: &str, fallback: &str| -> String {
+        text.lines()
+            .find_map(|l| {
+                let (_, rest) = l.split_once("Regenerate with `")?;
+                let (name, _) = rest.split_once("=1 cargo build")?;
+                Some(name.to_string())
+            })
+            .unwrap_or_else(|| fallback.to_string())
+    };
+    let census = std::fs::read_to_string(&census_path)
+        .map_err(|e| format!("bundle {verb}: census unreadable ({e})"))?;
+    let reasons = std::fs::read_to_string(&reasons_path)
+        .map_err(|e| format!("bundle {verb}: reasons census unreadable ({e})"))?;
+    let (fresh_census, fresh_reasons) = boundary_enforce::maintain_qualify(
+        &census,
+        &reasons,
+        &loc,
+        content,
+        &env(&census, "BLESS_QUALIFY"),
+        &env(&reasons, "BLESS_REASONS"),
+    )
+    .map_err(|e| format!("bundle {verb}: wrote the module but the census did not follow ({e})"))?;
+    if fresh_census != census {
+        std::fs::write(&census_path, fresh_census)
+            .map_err(|e| format!("bundle {verb}: census unwritable ({e})"))?;
+    }
+    if fresh_reasons != reasons {
+        std::fs::write(&reasons_path, fresh_reasons)
+            .map_err(|e| format!("bundle {verb}: reasons census unwritable ({e})"))?;
+    }
+    Ok(())
 }

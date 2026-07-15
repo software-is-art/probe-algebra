@@ -654,28 +654,14 @@ fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierR
     }
 }
 
+/// Render the qualify census by the wholesale walk — the collector gathers, the
+/// from-parts renderer ([`render_census_from`]) owns the format, stated once for
+/// this walk and for the maintained update alike.
 fn render_census(src: &Path, manifest: &Path, bless_env: &str) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut scanned = 0usize;
     collect_qualifications(src, manifest, &mut scanned, &mut lines);
-    lines.sort();
-
-    let mut report = format!(
-        "# qualify census — modules that meet the algebra spec by STRUCTURE: their functions are\n\
-         # operator-shaped (every argument and the return a bare named value type, no primitives, no\n\
-         # I/O). Boundary-hood is a COMPUTED property here, not the `boundary.rs` file convention — a\n\
-         # module qualifies wherever it lives. Regenerate with `{bless_env}=1 cargo build`.\n",
-    );
-    report.push_str(&format!(
-        "# {} files scanned, {} qualify.\n\n",
-        scanned,
-        lines.len()
-    ));
-    for l in &lines {
-        report.push_str(l);
-        report.push('\n');
-    }
-    report
+    render_census_from(&lines, scanned, bless_env)
 }
 
 /// Walk `dir`, parsing each `.rs` file, and push a `QUALIFIES` line for every file whose functions
@@ -770,37 +756,18 @@ pub fn qualify_census_lines(src: &Path, manifest: &Path) -> Vec<String> {
 
 // ===== the REASON census: why each non-qualifying module refuses =====
 
-/// Render the qualify-REASON census: one line per file whose functions form no algebra,
-/// carrying the mechanical blocker classes they exhibit — the qualify census's complement,
-/// derived by the same walk (same `tests.rs` skip, same operator-shape rule, stated once).
-/// The classes are EVIDENCE, deliberately mechanical; reading them into value-object debt,
-/// missing vocabulary, or a principled refusal is a ratification, not a derivation.
+/// Render the qualify-REASON census by the wholesale walk: one line per file whose
+/// functions form no algebra, carrying the mechanical blocker classes they exhibit —
+/// the qualify census's complement, derived by the same walk (same `tests.rs` skip,
+/// same operator-shape rule, stated once). The classes are EVIDENCE, deliberately
+/// mechanical; reading them into value-object debt, missing vocabulary, or a
+/// principled refusal is a ratification, not a derivation. The format lives in
+/// [`render_reasons_from`], shared with the maintained update.
 fn render_reasons(src: &Path, manifest: &Path, bless_env: &str) -> String {
     let mut scanned = 0usize;
     let mut lines: Vec<String> = Vec::new();
     collect_reasons(src, manifest, &mut scanned, &mut lines);
-    lines.sort();
-    let mut report = format!(
-        "# qualify reasons — WHY each module refuses the algebra census: the mechanical blockers,\n\
-         # per file, derived by the same walk as the qualify census (one rule, two renders; free\n\
-         # functions AND impl methods, the receiver resolved to the typestate). Classes:\n\
-         # no functions | unit returns | primitive signatures | borrowed types | parameterised\n\
-         # types | unshaped types | zero-argument constants | effectful bodies | mutating\n\
-         # receivers. The classes are evidence; reading them into value-object debt, missing\n\
-         # vocabulary, or a principled refusal is the ratification's job. Regenerate with\n\
-         # `{bless_env}=1 cargo build`.\n",
-    );
-    report.push_str(&format!(
-        "# {} files scanned, {} qualify, {} refuse.\n\n",
-        scanned,
-        scanned - lines.len(),
-        lines.len()
-    ));
-    for l in &lines {
-        report.push_str(l);
-        report.push('\n');
-    }
-    report
+    render_reasons_from(&lines, scanned, bless_env)
 }
 
 /// Walk `dir` and push a `REFUSES` line for every parsed file whose functions form no
@@ -1914,6 +1881,271 @@ impl<'ast> Visit<'ast> for PurityVisitor {
             ));
         }
         visit::visit_path(self, node);
+    }
+}
+
+/// The reasons census line a file's SOURCE TEXT would contribute — [`qualify_line`]'s
+/// complement, the same rule reached from text (one walk, two renders, stated once).
+/// `Ok(Some(line))` refuses with its blocker classes, `Ok(None)` qualifies (no
+/// classes), and `Err` is an unparseable file — no signal yet, never a movement.
+pub fn reasons_line(source: &str, loc: &str) -> Result<Option<String>, String> {
+    let file = syn::parse_file(source).map_err(|e| format!("unparseable: {e}"))?;
+    let classes = refusal_classes_from_items(&file.items);
+    Ok((!classes.is_empty()).then(|| format!("{loc}: REFUSES — {}", classes.join(", "))))
+}
+
+/// The qualify census REPORT from its parts — the one place the census format lives,
+/// whether the lines arrive from the wholesale walk ([`render_census`]) or from a
+/// maintained update ([`maintain_qualify`]). Lines are sorted here so every caller
+/// renders the same bytes for the same set.
+pub fn render_census_from(lines: &[String], scanned: usize, bless_env: &str) -> String {
+    let mut lines: Vec<String> = lines.to_vec();
+    lines.sort();
+    let mut report = format!(
+        "# qualify census — modules that meet the algebra spec by STRUCTURE: their functions are\n\
+         # operator-shaped (every argument and the return a bare named value type, no primitives, no\n\
+         # I/O). Boundary-hood is a COMPUTED property here, not the `boundary.rs` file convention — a\n\
+         # module qualifies wherever it lives. Regenerate with `{bless_env}=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files scanned, {} qualify.\n\n",
+        scanned,
+        lines.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+    report
+}
+
+/// The reasons census REPORT from its parts — [`render_census_from`]'s complement,
+/// the format stated once for both the wholesale walk and the maintained update.
+pub fn render_reasons_from(lines: &[String], scanned: usize, bless_env: &str) -> String {
+    let mut lines: Vec<String> = lines.to_vec();
+    lines.sort();
+    let mut report = format!(
+        "# qualify reasons — WHY each module refuses the algebra census: the mechanical blockers,\n\
+         # per file, derived by the same walk as the qualify census (one rule, two renders; free\n\
+         # functions AND impl methods, the receiver resolved to the typestate). Classes:\n\
+         # no functions | unit returns | primitive signatures | borrowed types | parameterised\n\
+         # types | unshaped types | zero-argument constants | effectful bodies | mutating\n\
+         # receivers. The classes are evidence; reading them into value-object debt, missing\n\
+         # vocabulary, or a principled refusal is the ratification's job. Regenerate with\n\
+         # `{bless_env}=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files scanned, {} qualify, {} refuse.\n\n",
+        scanned,
+        scanned - lines.len(),
+        lines.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+    report
+}
+
+/// THE MAINTAINED VIEW: apply ONE module's movement to the committed qualify census
+/// pair without the wholesale walk. The caller's verbs are the delta source, this is
+/// the view update, and the build gate that re-derives both files from the tree stays
+/// the ORACLE — maintenance never replaces the wholesale scan, it makes the scan's
+/// drift gate unable to fire for verb-carried changes. Body lines are recognized
+/// (non-`#`, non-blank), the edited `loc`'s line is retracted from BOTH files, the
+/// fresh line is asserted on the side the rule assigns (a parsed file lands in
+/// exactly one census — the partition), and both headers re-derive from the line
+/// sets. An unparseable source refuses with no movement; a `tests.rs` loc is the
+/// walk's own skip, identity by declaration.
+pub fn maintain_qualify(
+    census: &str,
+    reasons: &str,
+    loc: &str,
+    source: &str,
+    census_env: &str,
+    reasons_env: &str,
+) -> Result<(String, String), String> {
+    if loc.ends_with("tests.rs") {
+        return Ok((census.to_string(), reasons.to_string()));
+    }
+    let body = |text: &str| -> Vec<String> {
+        text.lines()
+            .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+            .filter(|l| !l.starts_with(&format!("{loc}: ")))
+            .map(str::to_string)
+            .collect()
+    };
+    let mut census_lines = body(census);
+    let mut reasons_lines = body(reasons);
+    if let Some(line) = qualify_line(source, loc)? {
+        census_lines.push(line);
+    } else if let Some(line) = reasons_line(source, loc)? {
+        reasons_lines.push(line);
+    }
+    let scanned = census_lines.len() + reasons_lines.len();
+    Ok((
+        render_census_from(&census_lines, scanned, census_env),
+        render_reasons_from(&reasons_lines, scanned, reasons_env),
+    ))
+}
+
+#[cfg(test)]
+mod maintain_tests {
+    use super::*;
+
+    const QUALIFIES: &str = "pub struct A;\npub fn f(x: A) -> A { todo!() }\n";
+    const REFUSES: &str = "pub struct A;\n";
+
+    fn pair() -> (String, String) {
+        let q = qualify_line(QUALIFIES, "src/a.rs").unwrap().unwrap();
+        let r = reasons_line(REFUSES, "src/b.rs").unwrap().unwrap();
+        (
+            render_census_from(&[q], 2, "BLESS_QUALIFY"),
+            render_reasons_from(&[r], 2, "BLESS_REASONS"),
+        )
+    }
+
+    /// Re-deriving a module from the SAME source is byte-identity on both files —
+    /// the stability every verb commit relies on, and the partition in miniature
+    /// (a qualifying source contributes no reasons line, a refusing one no census
+    /// line).
+    #[test]
+    fn no_op_maintenance_is_byte_identity() {
+        let (census, reasons) = pair();
+        assert!(reasons_line(QUALIFIES, "src/a.rs").unwrap().is_none());
+        assert!(qualify_line(REFUSES, "src/b.rs").unwrap().is_none());
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            QUALIFIES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(c2, census);
+        assert_eq!(r2, reasons);
+    }
+
+    /// An edit replaces exactly its own line: the moved module's line is fresh, the
+    /// untouched module's line and both headers carry — the delta's image outside
+    /// its support is zero.
+    #[test]
+    fn maintenance_replaces_exactly_its_own_line() {
+        let (census, reasons) = pair();
+        let grown = "pub struct A;\npub struct B;\npub fn f(x: A) -> B { todo!() }\n";
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            grown,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        let fresh = qualify_line(grown, "src/a.rs").unwrap().unwrap();
+        assert_eq!(c2, render_census_from(&[fresh], 2, "BLESS_QUALIFY"));
+        assert_eq!(r2, reasons);
+    }
+
+    /// A module crossing the partition MOVES between the files, and both headers
+    /// re-derive: retracted from the census, asserted in the reasons, scanned
+    /// constant.
+    #[test]
+    fn a_crossing_moves_between_the_files() {
+        let (census, reasons) = pair();
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            REFUSES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(c2, render_census_from(&[], 2, "BLESS_QUALIFY"));
+        let b = reasons_line(REFUSES, "src/b.rs").unwrap().unwrap();
+        let a = reasons_line(REFUSES, "src/a.rs").unwrap().unwrap();
+        assert_eq!(r2, render_reasons_from(&[a, b], 2, "BLESS_REASONS"));
+    }
+
+    /// A loc neither file has ever seen grows the roster: scanned rises by one on
+    /// both headers — `add` founding a module is ordinary maintenance, not a
+    /// special case.
+    #[test]
+    fn a_new_module_grows_the_roster() {
+        let (census, reasons) = pair();
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/c.rs",
+            QUALIFIES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert!(c2.contains("# 3 files scanned, 2 qualify.\n"));
+        assert!(r2.contains("# 3 files scanned, 2 qualify, 1 refuse.\n"));
+    }
+
+    /// Maintenance is idempotent: the same delta applied twice is the same view.
+    #[test]
+    fn maintenance_is_idempotent() {
+        let (census, reasons) = pair();
+        let once = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            REFUSES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        let twice = maintain_qualify(
+            &once.0,
+            &once.1,
+            "src/a.rs",
+            REFUSES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(once, twice);
+    }
+
+    /// An unparseable source is NO SIGNAL: the refusal names it and nothing moves —
+    /// a half-written edit must never read as a qualification change.
+    #[test]
+    fn an_unparseable_source_refuses_with_no_movement() {
+        let (census, reasons) = pair();
+        let refusal = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            "fn broken(",
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .expect_err("refuses");
+        assert!(refusal.contains("unparseable"));
+    }
+
+    /// A `tests.rs` loc is the walk's own skip: identity by declaration, so the
+    /// maintained view and the wholesale scan agree about what a file even is.
+    #[test]
+    fn a_tests_rs_loc_is_the_walks_own_skip() {
+        let (census, reasons) = pair();
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/tests.rs",
+            QUALIFIES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(c2, census);
+        assert_eq!(r2, reasons);
     }
 }
 

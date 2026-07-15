@@ -141,3 +141,6 @@ add src/discover/mod.rs — mod items @b9f9061c27e6e1a5
 add src/discover/verdict.rs —  @cfd08b34391cbc11
 add src/discover/items.rs —  @ef31fc2b7e1cb8a1
 edit src/discover/items.rs — probes @a2d706671c5f2051
+add examples/bundle.rs — fn maintain_census @1dfaec3351838960
+edit examples/bundle.rs — commit @acdb78005004d67e
+edit src/discover/items.rs — probes @a2d706671c5f2051
