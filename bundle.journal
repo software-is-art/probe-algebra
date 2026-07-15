@@ -136,3 +136,5 @@ edit src/discover/eduction.rs — Warehouse @43538c44f19a8c34
 edit src/discover/eduction.rs — impl Circuit<K> @6609df5f29dd6556
 edit src/discover/eduction.rs — probes @07f6d9fb9b4c22bf
 edit examples/bundle.rs — run @c1b40df7b8c08fa5
+add src/discover/items.rs — struct Item, struct ItemRelation, mod probes @6964d79e45f92168
+add src/discover/mod.rs — mod items @b9f9061c27e6e1a5

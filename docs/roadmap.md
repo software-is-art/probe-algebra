@@ -3523,6 +3523,43 @@ status, candidates, readings). A zoomed rendering — one line per entry at
 altitude zero, expand on demand — is the cheapest honest test of the family,
 and the consumer is real: every session opens with exactly this need.
 
+## The item relation, brick 1: the tree recognized as data (BUILT)
+
+Built 2026-07-15, the same day brick 2 closed the CLI loop — the two are one
+program (the memory of the 07-14 session: item relation as source of truth, eval
+as total DAG language, performance as the adoption property). What landed:
+`src/discover/items.rs` — `Item` rows as (module, name, body), body the verbatim
+segment `show` prints and `edit` holds; `ItemRelation::of_module` the addressable
+projection of one module into a `ZSet<Item>`; `of_files` the group sum. The
+recognition, not the inversion: files stay authoritative, the relation is derived
+from them, and the renderer that makes `.rs` files derived renderings is a later
+brick. Five probes pin the load-bearing facts — one span rule shared with `show`
+(no second vocabulary), an edit is a TWO-ROW DELTA (retract old body, assert
+new — the verbs are delta sources, which is the entire mechanism by which the
+kernel will maintain censuses instead of recomputing them), the tree relation is
+LINEAR in its files (an untouched module contributes zero to any delta), and
+refusals are named. All four new mutation sites killed; qualify, tiers, and
+schemata censuses moved with ratified diffs.
+
+Field report, `grow`'s FIFTH firing: the relation's feed (`Bundle::rows`, the
+(address, segment) row list) belongs on `Bundle` — same spans, same address
+grammar, attached not loose exactly as the enforcement demands — and `edit`
+rightly refuses interface growth ("an interface change is not an edit"), so the
+method went in by hand, the fallback arm's one touch in this brick. Five firings
+is a pattern, not a coincidence: the missing verb has a stable shape (grow an
+impl's held signature set by one, judged — a signature ADDITION with the existing
+set held, dual to `edit`'s signature-held body swap). It is now the most
+field-demanded verb gap in the log.
+
+Next bricks, named so they are not re-derived: (2) the tree walk — `of_tree`
+over the workspace's committed modules, the relation at repo scale, with the
+walker shared with an existing census rather than a second one; (3) the first
+maintained view — feed verb deltas through the eduction circuit to keep a census
+(candidate: the qualify census, whose oracle is the existing wholesale scan)
+incremental, demoting recompute to the gate oracle; (4) the opaque node — the
+executor's deferred tenant gets its integrated input (the tree as Z-set), and
+build + baseline-run, the sweep's last fixed costs, become nodes in the DAG.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

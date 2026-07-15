@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 926 sites.
+# 930 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -178,6 +178,8 @@
 - boundary_spec::discover::bundle::bundle::parse:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::render:0: == -> !=
 - boundary_spec::discover::bundle::bundle::render:deaf -> String::new()
+- boundary_spec::discover::bundle::bundle::rows:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::bundle::rows:deaf -> Ok(vec![])
 - boundary_spec::discover::bundle::bundle::show:0: == -> !=
 - boundary_spec::discover::bundle::bundle::show:1: > -> <=
 - boundary_spec::discover::bundle::bundle::show:deaf -> Err(String::new())
@@ -662,6 +664,8 @@
 - boundary_spec::discover::infra::LiveInfra::dents:7: == -> !=
 - boundary_spec::discover::infra::LiveInfra::dents:deaf -> vec![]
 - boundary_spec::discover::infra::Meaning::describe:deaf -> String::new()
+- boundary_spec::discover::items::ItemRelation::of_files:deaf -> Err(String::new())
+- boundary_spec::discover::items::ItemRelation::of_module:deaf -> Err(String::new())
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Err(vec![])
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Ok(vec![])
 - boundary_spec::discover::layering::ComponentLayering::is_atomic:deaf -> false

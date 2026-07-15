@@ -599,6 +599,8 @@ pub mod zset;
 
 pub mod eduction;
 
+pub mod items;
+
 #[cfg(test)]
 mod tests {
     use super::*;
