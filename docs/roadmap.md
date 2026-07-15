@@ -3604,14 +3604,36 @@ the wholesale scan was not replaced, it was DEMOTED to the oracle role, exactly
 the naive-recompute pattern the executor's probes already pin. Censuses remaining
 for the same treatment: tiers, reasons' member twins, instrumentation, schemata.
 
-Field report from brick 3 (a verb gap, named): the DEPENDENCY DECLARATION.
-Wiring the example to `boundary-enforce` took one hand line in `Cargo.toml`
-([dev-dependencies]) — manifests are outside every verb's reach, yet a dependency
-edge is exactly the kind of judged, journal-worthy change the verbs exist for
-(it moves the build graph, the perimeter's supply chain, and the qualify walk's
-scope all at once). A `depend` verb — declare an edge, judge it against a policy
-the tree ratifies, journal it — is the sixth firing's shape, one layer up from
-`grow`'s.
+Field report from brick 3 (a verb gap, named — then dispositioned): the
+DEPENDENCY DECLARATION. Wiring the example to `boundary-enforce` took one hand
+line in `Cargo.toml` ([dev-dependencies]) — manifests are outside every verb's
+reach, yet a dependency edge moves the build graph, the perimeter's supply
+chain, and the qualify walk's scope all at once, and manifests have changed 35
+times in this repo's life — not rare.
+
+The disposition, taken the same day (asked "does depend make sense in the
+larger picture?"): DON'T BUILD THE VERB — the manifest is secretly a derivation
+plus a signature, the standing question's answer one more time. Split it along
+the freedom budget's axis: the EDGE SET is derivable from the item relation
+(`use boundary_enforce` in a module body witnesses the edge, and WHERE the
+references live — examples vs lib — derives the dev/lib placement; today's
+hand line is witnessed by exactly two references a machine could have read);
+the VERSIONS, FEATURES, and PROFILES are genuine decisions (nobody derives
+`1.0.117`, and layout-probe's `opt-level = 2` already carries register-shaped
+reasoned prose). So the endgame is the manifest joining ci.yml and the
+perimeter ruleset as a RENDERED artifact — edges derived, decisions ratified
+in a register, drift-gated against both; unused and missing dependencies
+become census violations, not lints. Genesis already emits manifests from
+declarations for the demo crates, so the renderer half has an in-tree
+precedent. Note also the vocabulary: `depend` is TAKEN — `discover::depend`
+is the reliance system, and its shape (a reliance is a register line, judged
+against the record) is exactly the shape this disposition lands on: a crate
+dependency is a reliance on an API surface, and the repo's precedent for that
+species was never "a verb that edits a file." Priority: behind brick 4 and
+the census conversions, per the level-up rule — and when its turn comes,
+build the derivation, not the editor. The `grow` dissolution is the template:
+the best answer to a missing verb is sometimes discovering the change was
+never a free decision at all.
 
 Readings from the authoring session, recorded per the instrument (asked "how was
 it to author with the CLI," answered honestly). (a) `impl Bundle` is one item, so
