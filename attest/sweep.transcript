@@ -1,5 +1,5 @@
 # sweep transcript — the sampled countersign's subject; regenerate by running the sweep.
-tree fd00027977a01c0a
+tree 618254712b4539f8
 toolchain 1.94.1
 baseline 16
 killed	boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=	discover::agenda::probes::the_guard_voices_derive_from_the_tree	28aa92d724074251

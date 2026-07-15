@@ -3340,10 +3340,22 @@ label semantics and the tier-rule dispatch were both learned by opening interior
 refuse this payload before I offer it," is a preflight-judgment perception no
 verb yet speaks.
 
-Brick 2's remainder, named so it is not re-derived: migrate `run`'s hand-written
-match onto `CliSpec::parse` (the harness owns binding; the arms keep only
-judgment), then the acceptance — both journals replay under the generated
-harness.
+Brick 2 BUILT (2026-07-15). `run`'s hand-written arity match is gone: argv flows
+through `CliSpec::parse`, a refusal is the derived usage text and binds nothing,
+and the arms keep only judgment — the declaration is now the single author of
+what argv can say, with one honest residual arm (a verb the declaration speaks
+but no judgment consumes refuses with the teaching text — declaration/dispatch
+drift, named). The migration was itself a judged transaction: the suit edited its
+own source (`bundle edit examples/bundle.rs run`, signature held, payload
+stashed), which is the change medium eating its own change. Acceptance held: both
+journals' replay differentials are byte-identical to their pre-change baselines
+(the one standing divergence — examples/bundle.rs's line-4 edit predating the
+payload store — unchanged and already named honestly by the report), refusals
+verified uniform across empty argv, unknown verb, missing slot, and stray
+argument, and the gates ran green with 926 verdicts carried, zero sites
+re-judged. What brick 2 buys: a new verb is now a declaration plus a judgment
+arm — parsing, usage, and refusal plumbing arrive derived — which is the cost
+model the item-relation brick's perception verbs (the portal instances) assume.
 
 ## Candidate: the site-keyed sweep — the last long check dissolves into the delta
 
@@ -3464,6 +3476,52 @@ way — "retire the item and add its successor" — which `collect` then carried
 out; the mark census kept the item alive until prose stopped mentioning it,
 which is `collect` working exactly as declared, and worth knowing: retirement
 is uses-then-mentions-then-sweep.
+
+## Idea, logged: semantic zoom — the rendering is a function of altitude
+
+Source: the Pad++ papers (Bederson & Hollan, mid-90s zooming interfaces). Two of
+their moves name things this project is already circling, and one is a design
+constraint worth adopting before the item-relation brick lands.
+
+First, their throwaway line is our thesis: "instead of showing huge numbers it
+might make more sense to show the computations from which the numbers were
+derived or a history of interaction with them." Every number this repo shows IS
+a derivation — a census total, a verdict count, a settled-module tally — and the
+journal already holds the interaction history. `delta()` and `constrains` are
+the first renderings that answer with the computation instead of the value; the
+idea says that is the general contract, not a feature of two verbs.
+
+Second, SEMANTIC zooming: representation changes with scale non-geometrically —
+zoomed out you don't get smaller text, you get a different rendering of the same
+object. That is exactly the ladder a bounded mind climbs here already, ad hoc:
+topography line → theory spec → item list → item body. The item-relation brick
+makes it principled: if a module is a Z-set of (module, item, body), then each
+zoom level is a derived rendering of the same relation, and "what does the agent
+see at altitude k" becomes a declared function, not a pile of separately
+maintained summaries. Pad++ built this for human spatial cognition; our consumer
+is an agent with a token budget — the same vast-surface-through-small-aperture
+problem, with context window as viewport. This is the exterior-engine candidate
+("every surface a bounded mind consumes") given its rendering discipline.
+
+Third, PORTALS: standing views that look anywhere on the surface and re-represent
+what they see. Under the dataflow kernel a portal is precisely an incrementally
+maintained query over the item relation — pan and zoom are cheap because views
+are maintained, not recomputed on look. `constrains <module> <op>` is a
+proto-portal that recomputes; the kernel makes portals the cheap default, which
+is what would let perception verbs multiply without each one buying its own
+walk of the tree.
+
+Nothing to build yet — the brick underneath (item relation as source of truth)
+is already queued. The log entry is the constraint to carry into it: design the
+renderings as one family indexed by altitude, so the perception verbs that
+follow are portal instances, not bespoke reports.
+
+First application, named at logging time (Callum): THIS FILE. The roadmap is the
+biggest single surface an agent reads — thousands of lines, consulted at full
+altitude every session — and its structure is already implicit zoom (entries with
+status, candidates, readings). A zoomed rendering — one line per entry at
+altitude zero, expand on demand — is the cheapest honest test of the family,
+and the consumer is real: every session opens with exactly this need.
 
 ## Standing follow-ups
 
