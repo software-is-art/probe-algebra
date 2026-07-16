@@ -3772,6 +3772,43 @@ missing perception: the reverse edge — uses-of an item across the workspace,
 because a maintained view's first design question is always "who else holds this
 fact."
 
+## Candidate: the declared agenda — a change ships its bill of materials first
+
+Named from inside brick 5 (2026-07-16, the suit's own operator reporting). The
+observation: the verbs' biggest effect on the work was not safety but
+DECOMPOSITION PRESSURE. Because `edit` holds signatures and `add` places items,
+the change had to exist as a named item roster — five adds, three edits — before
+anything touched the tree. A file editor lets design and implementation smear
+together across a diff; the verbs force the design artifact to exist first. And
+that pressure is not a side effect, it is what funds the delta economy: every
+incremental instrument here (evidence keys, carried verdicts, maintained views)
+prices a change by its SUPPORT, which only works because the medium refuses
+ill-formed deltas. Brick 1's "an edit is a two-row delta" is a fact the verbs
+make true.
+
+The gap: the bill of materials is real and nothing holds it. It lived in the
+operator's head and scratchpad; the journal records the transactions only after
+they land. The candidate is the dual of agenda-from-journal (PR bodies derived
+from the record): JOURNAL-TOWARD-AGENDA. Declare the intended transaction set —
+which items, which files, add vs edit — as a judged artifact, and the suit
+tracks discharge: `owes`, but for a change instead of a tree. Two in-tree
+precedents: genesis declares target locks and converges to green (this is the
+same pattern one level down — a change declares its roster and converges to
+done), and `owes` already derives obligation from declaration. Two named
+consumers: review shifts left another rung (judge the nine-line roster before
+any payload exists — cheaper than judging 584 lines after), and any multi-agent
+split where one mind plans and another discharges.
+
+The honest counterweight, recorded with the candidate: decomposition pressure
+taxes exploration. Brick 5 decomposed cleanly because `show` made recon cheap
+and the shape was derivable; a change whose items are unknown until tried would
+fight an agenda. What the operator actually did — draft freely in a scratchpad,
+offer finished payloads whole — reproduces the tier system in the change
+process itself: an INTERIOR drafting table, a strict grammar at the boundary.
+So the agenda must stay a declaration of intent, revisable by the same judged
+means, never a cage; the payload store is already half the drafting table made
+first-class.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
