@@ -3724,6 +3724,54 @@ content key's worth is decided by what routinely moves, so every new evidence
 cone owes its design one question — "what churns in here that the operator
 never reads?"
 
+Brick 5 BUILT (2026-07-16): THE SECOND MAINTAINED VIEW — the tier census updates
+at the verb, and `BLESS_TIERS` is no longer owed at the edit. Tiers forced the
+family's second shape: qualify was a LOCAL judgment (one file's line derives from
+its own source), but a tier reads two global facts — the pub-reachability
+fixpoint and the fronting relation — so the qualify recipe (retract, re-judge,
+assert) does not transfer as-is. The recognition that makes it maintainable
+anyway: THE COMMITTED CENSUS IS ITSELF STANDING EVIDENCE. A non-KERNEL row states
+its own reachability (roots by definition, INTERIOR means unreachable, the rest
+reachable), and the INTERIOR rows are exactly the frontable set — so a delta that
+leaves the module tree's shape alone moves at most its own line, re-derived
+TREE-FREE from the same four facts the oracle reads (`assign_tier`, extracted so
+oracle and view state the rule once). A structural delta — a mount, an unmount, a
+parent whose reachability a KERNEL row masks — is detected by checking every
+direct child the census knows against the reachability this source implies, and
+falls back to the oracle's own `derive_partition` over the tree: recompute, the
+honest answer when standing evidence cannot carry the verdict, and byte-faithful
+by construction. KERNEL is the third shape inside the shape: a decision, never
+derived — a registered file's line carries verbatim at any verb, the kernel set
+is read from the census's own KERNEL rows, and a register edit keeps its bless
+ceremony (derivations lose their ceremony; decisions keep theirs). One semantics
+adjustment was needed to make the census self-describing: fronting a
+KERNEL-registered unreachable file no longer makes a door — the trusted floor is
+a ratified privilege, not a workshop being fronted. The change moved ZERO
+committed census lines across all four tiers.spec files (verified by the drift
+gates), so it is pinned only by its new probe. Nine probes pin the view, headed
+by the two that state the design: the local path is exercised with a manifest
+naming NO REAL DIRECTORY (standing evidence carries the whole verdict — also
+what makes always-recompute mutants killable), and every maintained answer is
+judged against the naive-recompute oracle byte for byte, including through a
+mount/unmount round trip where the mounted module's line moves without its own
+text moving. Acceptance at the real tree: a judged no-op edit through the new
+binary reproduced all three committed censuses byte-for-byte. Authoring note:
+the whole brick went through the verbs — five `add`s, three `edit`s, zero hand
+edits in code — with payloads formatted outside the tree per the standing idiom.
+Censuses remaining for the treatment: reasons' member twins, instrumentation
+(schemata already carries by cone, brick 4).
+
+Reading from brick 5, recorded per the instrument: the design work consulted
+`show` throughout (the verb carried it — item bodies, impl rosters, no raw
+opens), but three questions still fell back to grep: "who FEEDS this parameter"
+(the kernel allowlist's build.rs wiring), "who CONSUMES this function" (callers
+of `maintain_qualify` across crates), and "which TEST FIXTURES does a semantics
+change touch" (the kernel/fronting fixtures in rules.rs). All three are the same
+missing perception: the reverse edge — uses-of an item across the workspace,
+`constrains` read backwards. The census-maintenance work keeps needing it
+because a maintained view's first design question is always "who else holds this
+fact."
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

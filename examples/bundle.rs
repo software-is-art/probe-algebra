@@ -444,25 +444,22 @@ fn nearest_crate_root(module_path: &str) -> std::path::PathBuf {
     }
 }
 
-/// THE MAINTAINED VIEW at the verb (the item-relation program's brick 3): every
-/// committing verb re-derives its own module's line in the crate's qualify census
-/// pair — retract, re-judge, re-render through the census's own from-parts
-/// renderers — so the drift gate that re-derives the pair wholesale on every build
-/// (the ORACLE) cannot fire for a verb-carried change, and the `BLESS_*` ceremony
-/// stops being owed at the edit. A crate without the pair owes nothing; a module
-/// outside the census's `src/` walk moves nothing; the bless env names are read
-/// from the committed headers, never configured.
+/// THE MAINTAINED VIEWS at the verb (the item-relation program, bricks 3 and 5):
+/// every committing verb re-derives what its module's movement owes the crate's
+/// committed censuses — the qualify pair by re-judging the one module (a local
+/// judgment), the tier census from the standing lines' own evidence with the
+/// oracle's derivation as the structural fallback — so the drift gates that
+/// re-derive them wholesale on every build (the ORACLES) cannot fire for a
+/// verb-carried change, and the `BLESS_*` ceremony stops being owed at the edit.
+/// A crate without a census owes nothing for it; a module outside the `src/` walk
+/// moves nothing; the bless env names are read from the committed headers, never
+/// configured.
 fn maintain_census(
     root: &std::path::Path,
     module_path: &str,
     content: &str,
     verb: &str,
 ) -> Result<(), String> {
-    let census_path = root.join("spec/qualify.spec");
-    let reasons_path = root.join("spec/qualify-reasons.spec");
-    if !census_path.exists() || !reasons_path.exists() {
-        return Ok(());
-    }
     let loc = std::path::Path::new(module_path)
         .strip_prefix(root)
         .unwrap_or(std::path::Path::new(module_path))
@@ -480,26 +477,50 @@ fn maintain_census(
             })
             .unwrap_or_else(|| fallback.to_string())
     };
-    let census = std::fs::read_to_string(&census_path)
-        .map_err(|e| format!("bundle {verb}: census unreadable ({e})"))?;
-    let reasons = std::fs::read_to_string(&reasons_path)
-        .map_err(|e| format!("bundle {verb}: reasons census unreadable ({e})"))?;
-    let (fresh_census, fresh_reasons) = boundary_enforce::maintain_qualify(
-        &census,
-        &reasons,
-        &loc,
-        content,
-        &env(&census, "BLESS_QUALIFY"),
-        &env(&reasons, "BLESS_REASONS"),
-    )
-    .map_err(|e| format!("bundle {verb}: wrote the module but the census did not follow ({e})"))?;
-    if fresh_census != census {
-        std::fs::write(&census_path, fresh_census)
-            .map_err(|e| format!("bundle {verb}: census unwritable ({e})"))?;
+    let read = |path: &std::path::Path| -> Result<String, String> {
+        std::fs::read_to_string(path).map_err(|e| format!("bundle {verb}: census unreadable ({e})"))
+    };
+    let write_if_moved =
+        |path: &std::path::Path, fresh: &str, standing: &str| -> Result<(), String> {
+            if fresh != standing {
+                std::fs::write(path, fresh)
+                    .map_err(|e| format!("bundle {verb}: census unwritable ({e})"))?;
+            }
+            Ok(())
+        };
+    let census_path = root.join("spec/qualify.spec");
+    let reasons_path = root.join("spec/qualify-reasons.spec");
+    if census_path.exists() && reasons_path.exists() {
+        let census = read(&census_path)?;
+        let reasons = read(&reasons_path)?;
+        let (fresh_census, fresh_reasons) = boundary_enforce::maintain_qualify(
+            &census,
+            &reasons,
+            &loc,
+            content,
+            &env(&census, "BLESS_QUALIFY"),
+            &env(&reasons, "BLESS_REASONS"),
+        )
+        .map_err(|e| {
+            format!("bundle {verb}: wrote the module but the census did not follow ({e})")
+        })?;
+        write_if_moved(&census_path, &fresh_census, &census)?;
+        write_if_moved(&reasons_path, &fresh_reasons, &reasons)?;
     }
-    if fresh_reasons != reasons {
-        std::fs::write(&reasons_path, fresh_reasons)
-            .map_err(|e| format!("bundle {verb}: reasons census unwritable ({e})"))?;
+    let tiers_path = root.join("spec/tiers.spec");
+    if tiers_path.exists() {
+        let tiers = read(&tiers_path)?;
+        let fresh_tiers = boundary_enforce::maintain_tiers(
+            &tiers,
+            &loc,
+            content,
+            root,
+            &env(&tiers, "BLESS_TIERS"),
+        )
+        .map_err(|e| {
+            format!("bundle {verb}: wrote the module but the tier census did not follow ({e})")
+        })?;
+        write_if_moved(&tiers_path, &fresh_tiers, &tiers)?;
     }
     Ok(())
 }

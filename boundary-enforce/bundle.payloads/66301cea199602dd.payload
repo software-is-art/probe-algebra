@@ -1,0 +1,58 @@
+/// A tier name from the committed vocabulary, as the `'static` string the renderer
+/// holds — an unknown tier is a census this build does not speak.
+fn tier_static(tier: &str) -> Option<&'static str> {
+    ["KERNEL", "BOUNDARY", "INTERIOR", "ALGEBRA"]
+        .into_iter()
+        .find(|t| *t == tier)
+}
+
+/// The committed tier census parsed back into rows — the standing evidence the
+/// maintained view consumes. A line that does not speak the lock's own grammar
+/// (`- <loc>: <TIER> (<evidence>)`) refuses: maintenance never guesses.
+fn parse_tier_lines(census: &str) -> Result<Vec<(String, &'static str, String)>, String> {
+    census
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+        .map(|line| {
+            let err = || format!("unreadable tier census line `{line}`");
+            let rest = line.strip_prefix("- ").ok_or_else(err)?;
+            let (loc, rest) = rest.split_once(": ").ok_or_else(err)?;
+            let (tier, evidence) = rest.split_once(" (").ok_or_else(err)?;
+            let evidence = evidence.strip_suffix(')').ok_or_else(err)?;
+            let tier = tier_static(tier).ok_or_else(err)?;
+            Ok((loc.to_string(), tier, evidence.to_string()))
+        })
+        .collect()
+}
+
+/// The reachability a committed row states. The crate roots are reachable by
+/// definition; an INTERIOR row is exactly a non-kernel unreachable file; BOUNDARY
+/// and ALGEBRA rows are reachable. A KERNEL row masks reachability — `None`, and
+/// the caller treats the unknown as a structural question for the oracle.
+fn row_reachable(loc: &str, tier: &str) -> Option<bool> {
+    if loc == "src/lib.rs" || loc == "src/main.rs" {
+        return Some(true);
+    }
+    match tier {
+        "INTERIOR" => Some(false),
+        "BOUNDARY" | "ALGEBRA" => Some(true),
+        _ => None,
+    }
+}
+
+/// If `path` is a file that a `mod <stem>;` resolving under `child_dir` would name
+/// (`<child_dir>/<stem>.rs` or `<child_dir>/<stem>/mod.rs`), the stem.
+fn direct_child_stem(child_dir: &Path, path: &Path) -> Option<String> {
+    let name = path.file_name()?.to_str()?;
+    if name == "mod.rs" {
+        let dir = path.parent()?;
+        if dir.parent() == Some(child_dir) {
+            return Some(dir.file_name()?.to_str()?.to_string());
+        }
+        None
+    } else if path.parent() == Some(child_dir) {
+        Some(path.file_stem()?.to_str()?.to_string())
+    } else {
+        None
+    }
+}

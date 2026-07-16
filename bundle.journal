@@ -167,3 +167,5 @@ edit examples/schemata.rs — lib_cone @1c7b1d617ab2f72f
 edit examples/schemata.rs — probes @ab4a4373bfa903cd
 edit examples/bundle.rs — read_payload @2c4a1bb5dc237042
 edit examples/bundle.rs — read_payload @7364ae3073ddd7db
+edit examples/bundle.rs — maintain_census @e5508faceaed2bfe
+edit src/discover/items.rs — Item @5a2473da55d9a068

@@ -2,3 +2,10 @@ edit boundary-enforce/src/lib.rs — freeze_or_gate
 add boundary-enforce/src/lib.rs — fn reasons_line, fn render_census_from, fn render_reasons_from, fn maintain_qualify, mod maintain_tests @d5592bfb06b782b5
 edit boundary-enforce/src/lib.rs — render_census @d4713df07456bc96
 edit boundary-enforce/src/lib.rs — render_reasons @5db048d987061b1d
+add boundary-enforce/src/lib.rs — fn has_substance, fn child_mods, fn child_dir_of @35964f273494d03e
+add boundary-enforce/src/lib.rs — fn assign_tier @ddb6bc5f65743acc
+add boundary-enforce/src/lib.rs — fn tier_static, fn parse_tier_lines, fn row_reachable, fn direct_child_stem @66301cea199602dd
+add boundary-enforce/src/lib.rs — fn maintain_tiers @966d534759233fb9
+add boundary-enforce/src/lib.rs — mod maintain_tiers_tests @bf90540dd7d32c4b
+edit boundary-enforce/src/lib.rs — collect_tier_rows @4071ec4a65bc7009
+edit boundary-enforce/src/lib.rs — derive_partition @955997ef0ccd8675

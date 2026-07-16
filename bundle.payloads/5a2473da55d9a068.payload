@@ -1,0 +1,14 @@
+/// One row of the ITEM RELATION: a module's addressable item as (module, name,
+/// body). The body is the item's verbatim segment — the same bytes `show` prints
+/// and `edit` holds — so the row is exactly the placer's exempt interior, keyed
+/// by where it lives and what it answers to. Ord is (module, name, body): the
+/// relation's canonical key order, nothing semantic.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Item {
+    /// The module path the row lives in, as given to the derivation.
+    pub module: String,
+    /// The item's edit address (`double`, `impl Bundle`, `probes`).
+    pub name: String,
+    /// The verbatim segment, docs through last token.
+    pub body: String,
+}

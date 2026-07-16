@@ -1,0 +1,33 @@
+/// Does a parsed file carry anything beyond module declarations and re-exports?
+/// Pure glue gives the rules nothing to judge, so its tier follows reachability.
+fn has_substance(file: &syn::File) -> bool {
+    file.items
+        .iter()
+        .any(|it| !matches!(it, Item::Mod(_) | Item::Use(_)))
+}
+
+/// The child-module declarations a parsed file makes: `(name, is_pub)` for each
+/// out-of-line `mod name;` (an inline module resolves to no file).
+fn child_mods(file: &syn::File) -> Vec<(String, bool)> {
+    file.items
+        .iter()
+        .filter_map(|it| match it {
+            Item::Mod(m) if m.content.is_none() => Some((
+                m.ident.to_string(),
+                matches!(m.vis, syn::Visibility::Public(_)),
+            )),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The directory a file's child modules resolve under: `lib.rs` / `main.rs` /
+/// `mod.rs` resolve children beside themselves, a plain `foo.rs` under `foo/`.
+fn child_dir_of(path: &Path) -> PathBuf {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if matches!(name, "lib.rs" | "main.rs" | "mod.rs") {
+        path.parent().unwrap_or(Path::new("")).to_path_buf()
+    } else {
+        path.with_extension("")
+    }
+}

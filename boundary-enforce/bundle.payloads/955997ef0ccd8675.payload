@@ -1,0 +1,96 @@
+/// The DERIVED partition: every file's tier, computed — the single source both the rule
+/// dispatch and the tier lock consume. INTERIOR is non-pub reachability from the crate
+/// roots; BOUNDARY is being a DOOR (production edge impls, or fronting an interior
+/// sibling — the tier-2 relation read backwards); ALGEBRA is the reachable remainder;
+/// pure glue takes its reachability's tier (its content gives the rules nothing to
+/// judge either way). KERNEL is never derived: it comes from the ratified allowlist the
+/// consumer's build.rs feeds (in this workspace, parsed from `spec/kernel.register`,
+/// where every exemption carries a justification).
+fn derive_partition(
+    src: &Path,
+    manifest: &Path,
+    kernel_allowlist: &[String],
+) -> Vec<(PathBuf, String, &'static str, String)> {
+    let mut rows: Vec<(PathBuf, TierRow)> = Vec::new();
+    collect_tier_rows(src, manifest, &mut rows);
+
+    // pub-reachability, from the crate roots: a file is PUB-REACHABLE when a chain of
+    // `pub mod` declarations connects a root (lib.rs / main.rs) to it. Roots count as
+    // reachable themselves.
+    let mut reachable: Vec<PathBuf> = rows
+        .iter()
+        .map(|(p, _)| p.clone())
+        .filter(|p| {
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            (name == "lib.rs" || name == "main.rs") && p.parent() == Some(src)
+        })
+        .collect();
+    let mut frontier = reachable.clone();
+    while let Some(path) = frontier.pop() {
+        let Some((_, row)) = rows.iter().find(|(p, _)| p == &path) else {
+            continue;
+        };
+        for (name, is_pub) in &row.mods {
+            if !is_pub {
+                continue;
+            }
+            for candidate in [
+                row.child_dir.join(format!("{name}.rs")),
+                row.child_dir.join(name).join("mod.rs"),
+            ] {
+                if rows.iter().any(|(p, _)| p == &candidate) && !reachable.contains(&candidate) {
+                    reachable.push(candidate.clone());
+                    frontier.push(candidate);
+                }
+            }
+        }
+    }
+
+    // the BOUNDARY evidence, half one: production edge impls (Morphism/Construction/
+    // Branch/Guarded, non-generic, non-test) — the same collector the probe-completeness
+    // pass runs. Operator-shape stays the QUALIFY census's fact: a discoverable algebra
+    // wherever it lives is not a tier claim.
+    let mut edges: Vec<EdgeImpl> = Vec::new();
+    let mut probed: HashSet<String> = HashSet::new();
+    collect_edges_and_probes(src, manifest, &mut edges, &mut probed);
+    let edge_locs: HashSet<&str> = edges.iter().map(|e| e.loc.as_str()).collect();
+
+    // half two, the FRONTING relation — the tier system's own semantics as evidence:
+    // INTERIOR is not merely unreachable, it is fronted, and the front is the file that
+    // delegates into it. A pub-reachable file that references an interior sibling (a
+    // non-pub-reachable module in its own directory) by path is a door. Doors are
+    // boundaries. KERNEL files front nothing: the trusted floor is a ratified privilege,
+    // not a workshop — which also keeps the committed census self-describing (its
+    // INTERIOR rows ARE this set, the standing evidence `maintain_tiers` reads).
+    let interior_stems: Vec<(PathBuf, String)> = rows
+        .iter()
+        .filter(|(p, _)| !reachable.contains(p))
+        .filter(|(_, row)| !kernel_allowlist.iter().any(|k| k == &row.loc))
+        .filter_map(|(p, _)| {
+            Some((
+                p.parent()?.to_path_buf(),
+                p.file_stem()?.to_str()?.to_string(),
+            ))
+        })
+        .collect();
+
+    rows.into_iter()
+        .map(|(path, row)| {
+            if kernel_allowlist.iter().any(|k| k == &row.loc) {
+                return (
+                    path,
+                    row.loc,
+                    "KERNEL",
+                    "registered — a decision, never derived".to_string(),
+                );
+            }
+            let is_reachable = reachable.contains(&path);
+            let carries_edges = edge_locs.contains(row.loc.as_str());
+            let fronts = interior_stems.iter().any(|(dir, stem)| {
+                Some(dir.as_path()) == path.parent() && row.source.contains(&format!("{stem}::"))
+            });
+            let (tier, evidence) = assign_tier(row.substance, is_reachable, carries_edges, fronts);
+            (path, row.loc, tier, evidence)
+        })
+        .collect()
+}
