@@ -1,0 +1,103 @@
+/// The tree relation's rows, as the sweep consumes them: the item relation's
+/// vocabulary, verdict rows included.
+type Cone = boundary_spec::discover::zset::ZSet<boundary_spec::discover::items::Item>;
+
+/// THE LIB CONE: the content the sweep's build and baseline verdicts are facts
+/// about — everything the Judged support admits except what `cargo test -p
+/// boundary-spec --lib` cannot read: `examples/` (this runner itself rides along,
+/// since its text IS the sweep's semantics) and the root `tests/`. A conservative
+/// over-approximation, exactly as the gate supports are: admitting too much only
+/// costs a re-run; admitting too little would carry a stale green, the one
+/// direction this design refuses everywhere. Rust modules enter at ITEM grain
+/// (the item relation — the same rows the verbs feed), everything else at file
+/// grain; a non-UTF-8 file still keys honestly by length plus lossy form.
+fn lib_cone(root: &std::path::Path) -> Result<Cone, String> {
+    use boundary_spec::discover::gates::Support;
+    use boundary_spec::discover::items::{Item, ItemRelation};
+    use boundary_spec::discover::verdict::VerdictStore;
+    use boundary_spec::discover::zset::ZSet;
+    let mut out = ZSet::zero();
+    for relative in VerdictStore::files(root)? {
+        let unread = (relative.starts_with("examples/") && relative != "examples/schemata.rs")
+            || relative.starts_with("tests/");
+        if unread || !Support::Judged.admits(&relative) {
+            continue;
+        }
+        let bytes = std::fs::read(root.join(&relative))
+            .map_err(|e| format!("lib cone: cannot read {relative} ({e})"))?;
+        let source = match String::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(raw) => format!(
+                "{}\u{0}{}",
+                raw.as_bytes().len(),
+                String::from_utf8_lossy(raw.as_bytes())
+            ),
+        };
+        if relative.ends_with(".rs") {
+            out = out.add(
+                &ItemRelation::of_module(&relative, &source)
+                    .map_err(|e| format!("lib cone: {relative} — {e}"))?,
+            );
+        } else {
+            out = out.add(&ZSet::from_pairs(&[(
+                Item {
+                    module: relative.clone(),
+                    name: ":file:".to_string(),
+                    body: source,
+                },
+                1,
+            )]));
+        }
+    }
+    Ok(out)
+}
+
+/// The cone's fingerprint: FNV-64 (the verdict store's fold) over every row —
+/// module, name, body, weight, all mixed in — rendered to the transcript's
+/// `evidence` line and compared before any carry.
+fn cone_fp(cone: &Cone) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut eat = |bytes: &[u8]| {
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        hash ^= 0xff;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    };
+    for (item, weight) in cone.entries() {
+        eat(item.module.as_bytes());
+        eat(item.name.as_bytes());
+        eat(item.body.as_bytes());
+        eat(&weight.to_le_bytes());
+    }
+    format!("{hash:016x}")
+}
+
+/// A verdict as a row in the relation vocabulary: the module column names the
+/// ledger, the name column the operator, the body the verdict's content.
+fn verdict_row(operator: &str, body: &str) -> boundary_spec::discover::items::Item {
+    boundary_spec::discover::items::Item {
+        module: ":attest:".to_string(),
+        name: operator.to_string(),
+        body: body.to_string(),
+    }
+}
+
+/// One verdict row as a Z-set — the shape a sweep tenant returns.
+fn one_row(item: boundary_spec::discover::items::Item) -> Cone {
+    boundary_spec::discover::zset::ZSet::from_pairs(&[(item, 1)])
+}
+
+/// The body of the one row a sweep node holds. The sweep's tenants exit on red
+/// rather than answer, so a demanded node always integrates to exactly one green
+/// row at weight 1 — anything else is a broken invariant, named and fatal.
+fn verdict_body(z: &Cone, operator: &str) -> String {
+    match z.entries().as_slice() {
+        [(item, 1)] if item.name == operator => item.body.clone(),
+        _ => {
+            eprintln!("schemata: the {operator} node did not hold a single verdict row");
+            std::process::exit(1);
+        }
+    }
+}

@@ -623,6 +623,27 @@ impl Bundle {
         Ok(module[start..end].to_string())
     }
 
+    /// THE ITEM RELATION'S FEED: every addressable item as an (address, verbatim
+    /// segment) row, cut by the same spans `show` prints and `edit` holds — one
+    /// vocabulary, no restatement. Items nothing addresses (uses, macro calls) are
+    /// not rows, and the trivia between items belongs to the RENDERING, not the
+    /// relation — the row list is the module's addressable projection, disclosed as
+    /// such. Read-only; journals nothing.
+    pub fn rows(module: &str) -> Result<Vec<(String, String)>, String> {
+        let file =
+            syn::parse_file(module).map_err(|e| format!("bundle rows: module unparseable: {e}"))?;
+        Ok(file
+            .items
+            .iter()
+            .filter_map(|item| {
+                let address = item_address(item)?;
+                let start = byte_offset(module, item.span().start());
+                let end = byte_offset(module, item.span().end());
+                Some((address, module[start..end].to_string()))
+            })
+            .collect())
+    }
+
     /// The module's TABLE OF CONTENTS — orientation without an interior read: every
     /// addressable item with its kind, visibility, operator status, and (for functions)
     /// the exact signature `edit` will hold, token for token — the published interface,

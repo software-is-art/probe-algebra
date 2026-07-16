@@ -1,0 +1,231 @@
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+use fire_drill::{Battery, Outcome};
+use weave_knee::corpus::trial;
+use weave_knee::prompt::candidates;
+use weave_knee::record::{parse, render as render_record, Record};
+use weave_knee::score::score;
+use weave_knee::{knee, record};
+
+/// The drift gate: the committed knee spec must equal what the committed trials
+/// re-derive. Missing is stale, never fresh. Runs mechanically — no model call.
+#[test]
+fn the_committed_knee_spec_is_fresh() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let lock = knee::lock_in(&root.join("spec"), &root.join("trials"))
+        .expect("re-derive the knee lock from committed trials");
+    if let Err(stale) = spec_lock::check(std::slice::from_ref(&lock)) {
+        panic!(
+            "stale knee spec {stale:?} — regenerate: cargo run -p weave-knee --example knee -- freeze"
+        );
+    }
+}
+
+fn perfect_record(t: &weave_knee::corpus::Trial) -> Record {
+    let narrative = t
+        .children
+        .iter()
+        .map(|c| c.lexeme.as_str())
+        .collect::<Vec<_>>()
+        .join(" weaves into ");
+    Record {
+        fanout: t.fanout,
+        seed: t.seed,
+        weaver: "synthetic".to_string(),
+        judge: "synthetic".to_string(),
+        quality: 5,
+        narrative,
+        verdicts: candidates(t)
+            .iter()
+            .map(|c| (c.id.clone(), c.truth))
+            .collect(),
+        stated: weave_knee::prompt::emergent_candidates(t)
+            .iter()
+            .map(|c| (c.id.clone(), c.truth))
+            .collect(),
+        edges: t
+            .relations
+            .iter()
+            .map(|r| {
+                (
+                    t.children[r.from].lexeme.clone(),
+                    t.children[r.to].lexeme.clone(),
+                )
+            })
+            .collect(),
+    }
+}
+
+/// The fire drills: doctored inputs proving each gate can FIRE. A gate that cannot
+/// go red is decoration.
+#[test]
+fn every_gate_still_fires() {
+    let dir = std::env::temp_dir().join("weave-knee-fire-drill");
+    std::fs::create_dir_all(&dir).expect("a scratch dir for planted locks");
+
+    let t = trial(3, 1);
+    let perfect = perfect_record(&t);
+
+    // a spec frozen over the honest scores, held against a live derivation whose
+    // relation verdicts were flipped — the curve must move and redden the lock.
+    let honest = {
+        let mut groups = BTreeMap::new();
+        groups.insert(
+            ("synthetic".to_string(), "synthetic".to_string()),
+            vec![score(&t, &perfect).expect("score the honest record")],
+        );
+        knee::render(&groups)
+    };
+    let doctored = {
+        let mut rec = perfect.clone();
+        for v in &mut rec.verdicts {
+            if v.0.starts_with('r') && !v.0.ends_with('F') {
+                v.1 = false;
+            }
+        }
+        let mut groups = BTreeMap::new();
+        groups.insert(
+            ("synthetic".to_string(), "synthetic".to_string()),
+            vec![score(&t, &rec).expect("score the doctored record")],
+        );
+        knee::render(&groups)
+    };
+    let gain_doctored = {
+        let mut rec = perfect.clone();
+        for s in &mut rec.stated {
+            if !s.0.ends_with('F') {
+                s.1 = false;
+            }
+        }
+        let mut groups = BTreeMap::new();
+        groups.insert(
+            ("synthetic".to_string(), "synthetic".to_string()),
+            vec![score(&t, &rec).expect("score the gain-doctored record")],
+        );
+        knee::render(&groups)
+    };
+    let committed = dir.join("planted-knee.spec");
+    std::fs::write(&committed, &honest).expect("plant the committed spec");
+    let flipped_lock = spec_lock::Lock {
+        name: "knee vs flipped relations".into(),
+        path: committed.clone(),
+        live: doctored,
+    };
+    let gain_lock = spec_lock::Lock {
+        name: "knee vs silenced gain".into(),
+        path: committed,
+        live: gain_doctored,
+    };
+    let missing_lock = spec_lock::Lock {
+        name: "never frozen".into(),
+        path: dir.join("never-frozen.spec"),
+        live: honest,
+    };
+
+    let battery = Battery::named("weave-knee's gates")
+        .requires(["knee gate", "trial parser", "verdict census"])
+        .drill(
+            "knee gate",
+            "every relation verdict flipped false — the relation curve must move and \
+             redden the committed spec",
+            if spec_lock::check(std::slice::from_ref(&flipped_lock)).is_err() {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            },
+        )
+        .drill(
+            "knee gate",
+            "every emergent fact ruled NOT-STATED — the gain curve must move and \
+             redden the committed spec",
+            if spec_lock::check(std::slice::from_ref(&gain_lock)).is_err() {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            },
+        )
+        .drill(
+            "knee gate",
+            "a spec whose committed file was never written (missing is stale, never \
+             fresh)",
+            if spec_lock::check(std::slice::from_ref(&missing_lock)).is_err() {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            },
+        )
+        .drill(
+            "trial parser",
+            "a committed trial whose verdict word rotted (`MAYBE`) — parse must refuse, \
+             naming the word",
+            if parse(&render_record(&perfect).replace("ENTAILED", "MAYBE")).is_err() {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            },
+        )
+        .drill(
+            "trial parser",
+            "a committed trial whose edge arrow rotted — parse must refuse, naming the \
+             line",
+            if parse(&render_record(&perfect).replace(" -> ", " => ")).is_err() {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            },
+        )
+        .drill(
+            "verdict census",
+            "a judge that skipped one candidate — scoring must refuse the incomplete \
+             census, never average around the hole",
+            {
+                let mut rec = perfect.clone();
+                rec.verdicts.pop();
+                if score(&t, &rec).is_err() {
+                    Outcome::Fired
+                } else {
+                    Outcome::Passed
+                }
+            },
+        )
+        .drill(
+            "verdict census",
+            "a judge that skipped one emergent ruling — scoring must refuse the \
+             incomplete gain census the same way",
+            {
+                let mut rec = perfect.clone();
+                rec.stated.pop();
+                if score(&t, &rec).is_err() {
+                    Outcome::Fired
+                } else {
+                    Outcome::Passed
+                }
+            },
+        )
+        .drill(
+            "trial parser",
+            "the judge's raw output with no stated section — read_judge must refuse",
+            if record::read_judge("verdict c0.0 ENTAILED\nquality 3\n").is_err() {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            },
+        )
+        .drill(
+            "trial parser",
+            "the judge's raw output with no quality line — read_judge must refuse",
+            if record::read_judge("verdict c0.0 ENTAILED\nstated e.ring STATED\n").is_err() {
+                Outcome::Fired
+            } else {
+                Outcome::Passed
+            },
+        );
+
+    if let Err(rot) = battery.verdict() {
+        panic!(
+            "a gate went vacuous:\n{rot}\n\nregister:\n{}",
+            battery.render()
+        );
+    }
+}

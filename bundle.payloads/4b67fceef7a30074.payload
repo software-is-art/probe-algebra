@@ -1,0 +1,17 @@
+/// One judged site in a sweep transcript: its census name, the verdict the sweep
+/// reached, the covering tests it was judged BY — carried so a countersign can
+/// re-run exactly the judgment being audited — and the EVIDENCE key: a fingerprint
+/// of the site's enclosing source item plus its covering tests' enclosing items,
+/// the content this verdict is evidence ABOUT. An incremental re-judgment may carry
+/// a verdict forward exactly when the evidence key still matches; an empty key
+/// carries nothing. The lie direction that matters is a false `killed` (a hidden
+/// degree of freedom), and it cannot be fabricated from non-covering tests: tests
+/// that never reach the flipped guard pass under the mutant, the sampled
+/// re-judgment observes a survivor, and the disagreement fires.
+#[derive(Debug)]
+pub struct SiteVerdict {
+    pub site: String,
+    pub verdict: String,
+    pub tests: Vec<String>,
+    pub evidence: String,
+}

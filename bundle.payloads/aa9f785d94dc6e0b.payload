@@ -1,0 +1,65 @@
+/// The embedded roster, sorted by key. Keys are lock-file stems: a theory's lock under
+/// its slug (`date-calculus`), its mutation companion under `<slug>.mutation`, the
+/// catalog under `shapes`.
+static EMBEDDED: &[(&str, &str)] = &[
+    ("bridged-bool", include_str!("../../spec/bridged-bool.spec")),
+    (
+        "bridged-bool.mutation",
+        include_str!("../../spec/bridged-bool.mutation.spec"),
+    ),
+    (
+        "date-calculus",
+        include_str!("../../spec/date-calculus.spec"),
+    ),
+    (
+        "date-calculus.mutation",
+        include_str!("../../spec/date-calculus.mutation.spec"),
+    ),
+    ("doc-flow", include_str!("../../spec/doc-flow.spec")),
+    (
+        "doc-flow.mutation",
+        include_str!("../../spec/doc-flow.mutation.spec"),
+    ),
+    ("fabric", include_str!("../../spec/fabric.spec")),
+    (
+        "fabric.mutation",
+        include_str!("../../spec/fabric.mutation.spec"),
+    ),
+    (
+        "interpreter-arithmetic",
+        include_str!("../../spec/interpreter-arithmetic.spec"),
+    ),
+    (
+        "interpreter-arithmetic.mutation",
+        include_str!("../../spec/interpreter-arithmetic.mutation.spec"),
+    ),
+    ("router", include_str!("../../spec/router.spec")),
+    (
+        "router.mutation",
+        include_str!("../../spec/router.mutation.spec"),
+    ),
+    ("shapes", include_str!("../../spec/shapes.spec")),
+    (
+        "store-protocol",
+        include_str!("../../spec/store-protocol.spec"),
+    ),
+    (
+        "store-protocol.mutation",
+        include_str!("../../spec/store-protocol.mutation.spec"),
+    ),
+    ("ttl-store", include_str!("../../spec/ttl-store.spec")),
+    (
+        "ttl-store.mutation",
+        include_str!("../../spec/ttl-store.mutation.spec"),
+    ),
+    ("verb-algebra", include_str!("../../spec/verb-algebra.spec")),
+    (
+        "verb-algebra.mutation",
+        include_str!("../../spec/verb-algebra.mutation.spec"),
+    ),
+    ("zset-kernel", include_str!("../../spec/zset-kernel.spec")),
+    (
+        "zset-kernel.mutation",
+        include_str!("../../spec/zset-kernel.mutation.spec"),
+    ),
+];

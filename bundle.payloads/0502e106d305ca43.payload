@@ -1,0 +1,16 @@
+/// The committed sweep TRANSCRIPT — the sampled countersign's subject: tree hash,
+/// toolchain, baseline seconds (the timeout's seed), the cone EVIDENCE — the
+/// fingerprint of the lib cone the sweep's build and baseline verdicts are facts
+/// about (empty on an elder transcript, which carries neither) — and every site's
+/// verdict. It lives in `attest/`, which the tree hash EXCLUDES: the attestation
+/// describes the tree, so it cannot be part of the tree it describes (the
+/// verdict-store scope rule, promoted to committed form). Deterministic render,
+/// tab-separated fields — census sites carry spaces and colons, never tabs.
+#[derive(Debug)]
+pub struct Transcript {
+    pub tree: String,
+    pub toolchain: String,
+    pub baseline_secs: u64,
+    pub evidence: String,
+    pub sites: Vec<SiteVerdict>,
+}

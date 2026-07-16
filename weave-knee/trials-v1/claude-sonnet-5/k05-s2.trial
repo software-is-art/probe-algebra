@@ -1,0 +1,57 @@
+weave-knee trial v1
+fanout: 5
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  At the center of Kelpam sits a loop of five modules, each holding the others accountable through countersignature and each passing forward a distinct kind of trust. Grivar, the sampler, answers reads only from its newest snapshot and evicts anything left unclaimed after ten ticks; when its own capacity is exceeded, Grivar delegates overflow to Kelquen, acting on any decision only once two of its peers countersign. Kelquen, the monitor, receives that overflow but keeps only digests of what it carries, never the bodies themselves; it retries a failed handoff up to three times before parking it, and withholds action until five of its peers countersign — a stricter bar than Grivar's. Once satisfied, Kelquen signals backpressure onward to Pamzin.
+
+  Pamzin, the archive, treats that backpressure as pressure on its own retention: anything left unclaimed in Pamzin for nine ticks is evicted, and while its sweep runs it refuses all new writes. Pamzin shares Kelquen's five-countersign threshold before acting. From its sweep, Pamzin reports missed heartbeats to Pamtol.
+
+  Pamtol, the vault, takes those heartbeat reports as input to its own state: it answers reads from its newest snapshot only, like Grivar, and it too refuses new writes while sweeping — but Pamtol needs only three countersigning peers to act, a lighter bar than either Kelquen or Pamzin. Pamtol publishes its sweep verdicts to Dorruv.
+
+  Dorruv, the beacon, is the lightest-gated of all, acting once just two peers countersign, matching Grivar. Like Kelquen, Dorruv keeps only digests of what passes through it, discarding bodies, and it evicts anything unclaimed after seven ticks — the shortest patience in the system. Dorruv closes the circuit by handing its sealed ledger to Grivar.
+
+  That handoff completes the ring: Grivar's overflow becomes Kelquen's backpressure, which becomes Pamzin's heartbeat report, which becomes Pamtol's sweep verdict, which becomes Dorruv's sealed ledger, which returns to Grivar as the record it reads from its newest snapshot. Trust tightens and loosens as it circulates — five countersigns required at Kelquen and Pamzin, three at Pamtol, two at Dorruv and Grivar — while patience for the unclaimed varies the same way, from Dorruv's seven ticks up through Pamzin's nine to Grivar's ten. Two modules, Kelquen and Dorruv, guard their contents by holding only digests; two others, Pamtol and Pamzin, guard their consistency by refusing writes mid-sweep. Around this asymmetry the ledger keeps moving.
+verdicts:
+  c2.2F NOT-ENTAILED
+  c1.2 ENTAILED
+  r0 ENTAILED
+  c2.0 ENTAILED
+  c0.2 ENTAILED
+  c2.1F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  c4.1F NOT-ENTAILED
+  c1.1 ENTAILED
+  c0.2F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  c2.2 ENTAILED
+  c0.0 ENTAILED
+  r4 ENTAILED
+  r4F NOT-ENTAILED
+  r3 ENTAILED
+  c4.0 ENTAILED
+  r1F NOT-ENTAILED
+  c1.0F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  c2.1 ENTAILED
+  c3.1 ENTAILED
+  c3.2 ENTAILED
+  r1 ENTAILED
+  c4.2 ENTAILED
+  c3.1F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c4.2F NOT-ENTAILED
+  c4.1 ENTAILED
+  r2 ENTAILED
+  c1.0 ENTAILED
+  c0.1 ENTAILED
+  c3.0 ENTAILED
+  c1.2F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  r2F NOT-ENTAILED

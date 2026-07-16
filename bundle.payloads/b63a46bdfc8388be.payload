@@ -1,0 +1,7 @@
+/// A value in the kernel's theory: a Z-set over the bounded key universe, or a
+/// bounded trace of them (a stream window, TICKS long).
+#[derive(Clone)]
+pub enum Flow {
+    Zset(ZSet<u8>),
+    Window(Vec<ZSet<u8>>),
+}

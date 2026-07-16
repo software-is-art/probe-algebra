@@ -1,0 +1,51 @@
+/// The mutation gate's ONE command: countersign a matching committed attestation by
+/// sampled re-judgment, or sweep from scratch (writing a fresh attestation) when the
+/// transcript is missing, foreign, or disagreeing. Locally, right after a sweep, this
+/// is a fast audit of your own record; on a cold checkout it is the sampled
+/// countersign — derivation local, signature cold, cost O(sample) — and any mismatch
+/// falls back to the full sweep, so a false disagreement only ever costs time.
+fn verify() {
+    let root = std::path::Path::new(".");
+    // the key is the SCHEMATA GATE's declared support — single-sourced from the
+    // registry, so an inert edit (docs) neither invalidates the attestation nor
+    // re-owes the sweep.
+    let support = boundary_spec::discover::gates::GateRegistry::declared()
+        .into_iter()
+        .find(|g| g.name == "mutation (schemata)")
+        .map(|g| g.support)
+        .expect("the schemata gate is declared");
+    let key = match boundary_spec::discover::verdict::VerdictStore::support_hash(root, &support) {
+        Ok(key) => key,
+        Err(refusal) => {
+            eprintln!("{refusal}");
+            std::process::exit(1);
+        }
+    };
+    let committed =
+        std::fs::read_to_string(boundary_spec::discover::attest::Transcript::location(root))
+            .ok()
+            .and_then(|text| boundary_spec::discover::attest::Transcript::parse(&text).ok());
+    match committed {
+        Some(transcript)
+            if transcript.tree == key
+                && transcript.toolchain == boundary_spec::discover::gates::TOOLCHAIN =>
+        {
+            if countersign(&transcript) {
+                return;
+            }
+            eprintln!("countersign: the attestation cannot stand — sweeping from scratch");
+            sweep();
+        }
+        Some(transcript) => {
+            println!(
+                "attestation names tree {}, this is tree {key} — sweeping anew",
+                transcript.tree
+            );
+            sweep();
+        }
+        None => {
+            println!("no readable attestation at attest/sweep.transcript — sweeping");
+            sweep();
+        }
+    }
+}

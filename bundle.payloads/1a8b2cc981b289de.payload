@@ -1,0 +1,276 @@
+/// The sweep with a prior attestation to lean on: every census site whose EVIDENCE
+/// (its module and its covering tests' modules, by content) matches the prior
+/// transcript carries its verdict forward without a run — except timeouts, which
+/// are load-sensitive and always re-judged — and only the moved sites pay for
+/// judgment. `sweep` is this with nothing to lean on; the weekly from-scratch
+/// shards stay the backstop for what content keys cannot see (a covering test's
+/// behaviour shifting through code it calls without its own module moving — the
+/// same ratified gap as the retired since-green gate).
+fn sweep_with(prior: Option<boundary_spec::discover::attest::Transcript>) {
+    // one build serves every verdict below.
+    let built = Command::new("cargo")
+        .args([
+            "test",
+            "-q",
+            "-p",
+            "boundary-spec",
+            "--lib",
+            "--features",
+            "schemata",
+            "--no-run",
+        ])
+        .status()
+        .expect("cargo runs");
+    if !built.success() {
+        std::process::exit(1);
+    }
+    let census = match Schemata::census() {
+        Ok(sites) => sites,
+        Err(collision) => {
+            eprintln!("{collision}");
+            std::process::exit(1);
+        }
+    };
+    let have_nextest = Command::new("cargo")
+        .args(["nextest", "--version"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    // the baseline: unmutated, timed, RECORDED — a red baseline would make every
+    // mutant verdict meaningless, so it refuses before judging anything.
+    let record = std::env::temp_dir().join(format!("schemata-record-{}", std::process::id()));
+    std::fs::create_dir_all(&record).expect("record dir");
+    let start = Instant::now();
+    let mut baseline_cmd = Command::new("cargo");
+    if have_nextest {
+        baseline_cmd
+            .args([
+                "nextest",
+                "run",
+                "-p",
+                "boundary-spec",
+                "--lib",
+                "--features",
+                "schemata",
+            ])
+            .env("SCHEMATA_RECORD", &record);
+    } else {
+        baseline_cmd.args([
+            "test",
+            "-q",
+            "-p",
+            "boundary-spec",
+            "--lib",
+            "--features",
+            "schemata",
+        ]);
+    }
+    if !survives(baseline_cmd, Duration::from_secs(3600)) {
+        eprintln!("schemata: the UNMUTATED suite is red — fix the suite before judging mutants");
+        std::process::exit(1);
+    }
+    let baseline = start.elapsed();
+    let limit = derive_limit(baseline);
+    println!(
+        "baseline {}s green; per-mutant timeout {}s (derived, 5x + 10)",
+        baseline.as_secs(),
+        limit.as_secs()
+    );
+
+    let mut touches = Vec::new();
+    for entry in std::fs::read_dir(&record).expect("record readable") {
+        let text = std::fs::read_to_string(entry.expect("entry").path()).unwrap_or_default();
+        touches.push(parse_touch(&text));
+    }
+    let plan = assemble_plan(&census, &touches);
+
+    // the CARRY partition: each site's evidence key is minted against THIS tree; a
+    // prior verdict whose site and key both match is carried without a run. The
+    // fallback path never learns coverage, so its keys can never match a committed
+    // (nextest-written) transcript — reuse composes only with auditable records.
+    let mut evidence =
+        boundary_spec::discover::attest::Evidence::under(std::path::Path::new("."));
+    let keyed: Vec<(&'static str, Vec<String>, String)> = plan
+        .into_iter()
+        .map(|(site, tests)| {
+            let key = evidence.of(site, &tests);
+            (site, tests, key)
+        })
+        .collect();
+    let mut carried: Vec<(String, String, Vec<String>, String)> = Vec::new();
+    let mut owed: VecDeque<(&'static str, Vec<String>, String)> = VecDeque::new();
+    for (site, tests, key) in keyed {
+        match prior.as_ref().and_then(|p| {
+            boundary_spec::discover::attest::Evidence::carry(p, site, &key)
+        }) {
+            Some(verdict) => {
+                carried.push((site.to_string(), verdict.to_string(), tests, key));
+            }
+            None => owed.push_back((site, tests, key)),
+        }
+    }
+    println!(
+        "carrying {} verdict(s) at standing evidence; judging {} moved site(s)",
+        carried.len(),
+        owed.len()
+    );
+
+    let queue: Mutex<VecDeque<(&'static str, Vec<String>, String)>> = Mutex::new(owed);
+    let survivors: Mutex<Vec<String>> = Mutex::new(
+        carried
+            .iter()
+            .filter(|(_, verdict, _, _)| verdict == "SURVIVED")
+            .map(|(site, _, _, _)| site.clone())
+            .collect(),
+    );
+    let verdicts: Mutex<Vec<(String, String, Vec<String>, String)>> = Mutex::new(carried);
+    // SCHEMATA_WORKERS caps the worker pool: each worker holds a nextest run (itself
+    // multi-process), so full parallelism on a small-memory machine invites the
+    // kernel's memory killer — the sweep died that way once. Default unchanged (CI
+    // runners are fine); the knob is for constrained hosts.
+    let workers = std::env::var("SCHEMATA_WORKERS")
+        .ok()
+        .and_then(|w| w.parse::<usize>().ok())
+        .filter(|w| *w > 0)
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        });
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| loop {
+                let Some((site, tests, key)) = queue.lock().expect("queue").pop_front() else {
+                    return;
+                };
+                let verdict = if have_nextest {
+                    if tests.is_empty() {
+                        // no test executes this site's guard: unkillable, disclosed.
+                        println!("SURVIVED {site} (uncovered — no test reaches it)");
+                        survivors.lock().expect("survivors").push(site.to_string());
+                        verdicts.lock().expect("verdicts").push((
+                            site.to_string(),
+                            "SURVIVED".to_string(),
+                            Vec::new(),
+                            key,
+                        ));
+                        continue;
+                    }
+                    let expr = tests
+                        .iter()
+                        .map(|t| format!("test(={t})"))
+                        .collect::<Vec<_>>()
+                        .join(" or ");
+                    let mut cmd = Command::new("cargo");
+                    cmd.args([
+                        "nextest",
+                        "run",
+                        "-p",
+                        "boundary-spec",
+                        "--lib",
+                        "--features",
+                        "schemata",
+                        "--fail-fast",
+                        "--test-threads",
+                        "2",
+                        "-E",
+                        &expr,
+                    ])
+                    .env("PROBE_MUTANT", site);
+                    outcome(cmd, limit)
+                } else {
+                    let mut cmd = Command::new("cargo");
+                    cmd.args([
+                        "test",
+                        "-q",
+                        "-p",
+                        "boundary-spec",
+                        "--lib",
+                        "--features",
+                        "schemata",
+                    ])
+                    .env("PROBE_MUTANT", site);
+                    outcome(cmd, limit)
+                };
+                match verdict {
+                    "SURVIVED" => {
+                        println!("SURVIVED {site}");
+                        survivors.lock().expect("survivors").push(site.to_string());
+                    }
+                    // a timeout is a DETECTION (the doctrine holds), named apart so
+                    // the record shows which kills are load-sensitive — those are
+                    // never carried by a later incremental run.
+                    "timeout" => println!("timeout  {site} (detection)"),
+                    _ => println!("killed   {site}"),
+                }
+                verdicts.lock().expect("verdicts").push((
+                    site.to_string(),
+                    verdict.to_string(),
+                    tests,
+                    key,
+                ));
+            });
+        }
+    });
+
+    // the ATTESTATION: the whole derivation, committed for the sampled countersign —
+    // written before the register judgment so a red gate still leaves an honest
+    // record, and only under nextest (the fallback path never learned which tests
+    // cover which site, so its transcript could not be audited).
+    if have_nextest {
+        let mut sites: Vec<(String, String, Vec<String>, String)> =
+            verdicts.into_inner().expect("verdicts");
+        sites.sort();
+        let transcript = boundary_spec::discover::attest::Transcript {
+            // keyed by the SCHEMATA GATE's declared support (single-sourced from the
+            // registry): an inert edit cannot orphan the attestation.
+            tree: boundary_spec::discover::verdict::VerdictStore::support_hash(
+                std::path::Path::new("."),
+                &boundary_spec::discover::gates::GateRegistry::declared()
+                    .into_iter()
+                    .find(|g| g.name == "mutation (schemata)")
+                    .map(|g| g.support)
+                    .expect("the schemata gate is declared"),
+            )
+            .expect("the tree fingerprints"),
+            toolchain: boundary_spec::discover::gates::TOOLCHAIN.to_string(),
+            baseline_secs: baseline.as_secs(),
+            sites: sites
+                .into_iter()
+                .map(|(site, verdict, tests, evidence)| {
+                    boundary_spec::discover::attest::SiteVerdict {
+                        site,
+                        verdict,
+                        tests,
+                        evidence,
+                    }
+                })
+                .collect(),
+        };
+        std::fs::create_dir_all("attest").expect("attest dir");
+        let location =
+            boundary_spec::discover::attest::Transcript::location(std::path::Path::new("."));
+        std::fs::write(&location, transcript.render()).expect("attestation written");
+        println!(
+            "attested: {} — {} sites at tree {}",
+            location.display(),
+            transcript.sites.len(),
+            transcript.tree
+        );
+    }
+
+    let survivors = survivors.into_inner().expect("survivors");
+    match Schemata::register().check(survivors.iter().map(String::as_str)) {
+        Ok(()) => println!(
+            "schemata sweep clean: {} survivor(s), all ratified.",
+            survivors.len()
+        ),
+        Err(drift) => {
+            eprintln!("{drift}");
+            std::process::exit(1);
+        }
+    }
+}

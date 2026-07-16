@@ -1,0 +1,135 @@
+#[crate::mutate]
+impl Evidence {
+    /// A resolver rooted at a crate: names resolve under `<root>/src`, and each
+    /// file's text is read once per resolver — one run, one reading of the tree.
+    pub fn under(root: &Path) -> Evidence {
+        Evidence {
+            root: root.to_path_buf(),
+            files: std::collections::BTreeMap::new(),
+        }
+    }
+
+    /// The site's evidence key: FNV-64 (the verdict store's fold) over the module
+    /// file the site resolves to and the module file of every covering test, names
+    /// mixed in, tests in sorted order. Empty when anything fails to resolve.
+    pub fn of(&mut self, site: &str, tests: &[String]) -> String {
+        let Some(label) = Evidence::label(site) else {
+            return String::new();
+        };
+        let Some(own) = self.module_text(&label, true) else {
+            return String::new();
+        };
+        let mut parts = vec![(label, own)];
+        let mut sorted: Vec<&String> = tests.iter().collect();
+        sorted.sort();
+        for test in sorted {
+            let Some(text) = self.module_text(test, false) else {
+                return String::new();
+            };
+            parts.push((test.clone(), text));
+        }
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        let mut eat = |bytes: &[u8]| {
+            for byte in bytes {
+                hash ^= u64::from(*byte);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            hash ^= 0xff;
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        };
+        for (name, text) in &parts {
+            eat(name.as_bytes());
+            eat(text.as_bytes());
+        }
+        format!("{hash:016x}")
+    }
+
+    /// Carry a prior verdict forward — exactly when the prior transcript names this
+    /// site with the SAME non-empty evidence key and the verdict is not a timeout.
+    /// A timeout is load-sensitive: a slow machine's detection is re-judged, never
+    /// inherited, so no verdict ever depends on a past machine's mood.
+    pub fn carry<'t>(prior: &'t Transcript, site: &str, evidence: &str) -> Option<&'t str> {
+        if evidence.is_empty() {
+            return None;
+        }
+        prior
+            .sites
+            .iter()
+            .find(|s| s.site == site && s.evidence == evidence && s.verdict != "timeout")
+            .map(|s| s.verdict.as_str())
+    }
+
+    /// The census name with its mutant suffix stripped — `a::b::f:0: == -> !=` and
+    /// `a::b::g:deaf -> None` both yield the label path the site lives at. A name
+    /// with no recognisable suffix is not a site and resolves to nothing.
+    fn label(site: &str) -> Option<String> {
+        if let Some(i) = site.find(":deaf") {
+            return Some(site[..i].to_string());
+        }
+        let mut from = 0;
+        while let Some(j) = site[from..].find(':').map(|j| from + j) {
+            let rest = &site[j + 1..];
+            let digits = rest.bytes().take_while(|b| b.is_ascii_digit()).count();
+            if digits > 0 && rest.as_bytes().get(digits) == Some(&b':') {
+                return Some(site[..j].to_string());
+            }
+            from = j + 1;
+        }
+        None
+    }
+
+    /// Resolve a `::`-path to the module file it lives in: segments walk
+    /// directories under `src/` until one names a `.rs` file — or until a segment
+    /// that is neither a file nor a directory, which names an item (an inline mod
+    /// included) in the CURRENT module's own file: `mod.rs` here, `lib.rs` at the
+    /// crate root. At least one segment must remain beyond the file (the item
+    /// chain). Sites are crate-rooted (the leading crate name is dropped);
+    /// nextest's test names are not. A name that resolves to nothing yields None.
+    fn module_text(&mut self, name: &str, crate_rooted: bool) -> Option<String> {
+        let mut segs: Vec<&str> = name.split("::").collect();
+        if crate_rooted && !segs.is_empty() {
+            segs.remove(0);
+        }
+        let src = self.root.join("src");
+        let mut dir = src.clone();
+        let mut idx = 0;
+        let mut own_item: Option<&str> = None;
+        let file = loop {
+            let seg = *segs.get(idx)?;
+            let as_file = dir.join(format!("{seg}.rs"));
+            if as_file.is_file() {
+                idx += 1;
+                break as_file;
+            }
+            let as_dir = dir.join(seg);
+            if as_dir.is_dir() {
+                dir = as_dir;
+                idx += 1;
+                continue;
+            }
+            let own = if dir == src {
+                dir.join("lib.rs")
+            } else {
+                dir.join("mod.rs")
+            };
+            if own.is_file() {
+                // the segment must actually appear in the claimed file — without
+                // this, every unresolvable name would silently key itself to a
+                // parent file it does not live in.
+                own_item = Some(seg);
+                break own;
+            }
+            return None;
+        };
+        segs.get(idx)?;
+        if !self.files.contains_key(&file) {
+            let text = std::fs::read_to_string(&file).ok();
+            self.files.insert(file.clone(), text);
+        }
+        let text = self.files.get(&file).and_then(|t| t.clone())?;
+        match own_item {
+            Some(seg) if !text.contains(seg) => None,
+            _ => Some(text),
+        }
+    }
+}

@@ -1,0 +1,34 @@
+#[crate::mutate]
+impl<K: Ord + Clone> Circuit<K> {
+    /// Admit an opaque tenant; a refusal admits nothing. The name is the
+    /// operator's identity in the warehouse — same name, same content, same
+    /// verdict — so a name already spoken is refused (the interpreted operator
+    /// speaks `distinct`), and admission after the stream has started is refused
+    /// exactly as late wiring is: the circuit is declared whole, then run.
+    pub fn admit(
+        &mut self,
+        name: &'static str,
+        judge: Box<dyn FnMut(&ZSet<K>) -> ZSet<K>>,
+    ) -> Option<usize> {
+        let spoken = name == "distinct" || self.tenants.iter().any(|t| t.name == name);
+        if spoken || self.ticks > 0 {
+            return None;
+        }
+        self.tenants.push(Tenant { name, judge });
+        Some(self.tenants.len() - 1)
+    }
+
+    /// Standing evidence enters before the stream runs: a verdict carried from an
+    /// earlier life of the same operator over the same content — the transcript's
+    /// carry, spoken in the executor's vocabulary. Refused, carrying nothing: an
+    /// operator this circuit does not run, evidence already standing (carried or
+    /// judged, the first word holds), and any carry after the stream has started.
+    pub fn carry(&mut self, op: &'static str, key: Vec<(K, i64)>, verdict: ZSet<K>) -> Option<()> {
+        let runs = op == "distinct" || self.tenants.iter().any(|t| t.name == op);
+        if !runs || self.ticks > 0 || self.warehouse.memo.contains_key(&(op, key.clone())) {
+            return None;
+        }
+        self.warehouse.memo.insert((op, key), verdict);
+        Some(())
+    }
+}

@@ -1,0 +1,69 @@
+weave-knee trial v1
+fanout: 6
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 3
+narrative:
+  Griost's cycle begins with Hulbra, the sampler, which keeps only digests of what it carries, never the bodies, and acts only once 2 of its peers countersign; when a handoff fails, Hulbra retries it at most 1 time before parking it. Once its work is sealed, Hulbra hands its sealed ledger to Tolsax, the courier.
+
+  Tolsax also keeps digests of what it carries rather than the bodies, evicts anything left unclaimed after 6 ticks, and gives a failed handoff up to 3 retries before parking it. Tolsax publishes its sweep verdicts to Grinex, the broker.
+
+  Grinex refuses new writes while its own sweep is running, keeps digests rather than bodies, and parks a failed handoff after just 1 retry — the least forgiving retry budget in the system. Grinex reports missed heartbeats to Brabra, the registry.
+
+  Brabra likewise refuses new writes while its sweep is running, answers reads only from its newest snapshot, and allows 2 retries before parking a failed handoff. Brabra delegates overflow to Felkel, the ledger.
+
+  Felkel acts only once 2 of its peers countersign, answers reads from its newest snapshot only, and keeps digests of what it carries, never the bodies. Felkel streams its evictions to Mirdor, the throttle.
+
+  Mirdor refuses new writes while its own sweep is running, evicts anything left unclaimed after 10 ticks — the longest unclaimed window in the system — and acts only once 5 of its peers countersign, the highest countersignature bar in the system. Mirdor signals backpressure to Hulbra, closing the loop back to the sampler.
+
+  In this way the six modules form a single ring rather than a hierarchy: the sampler's sealed ledger becomes the courier's cargo, the courier's verdicts become the broker's input, the broker's missed heartbeats become the registry's concern, the registry's overflow becomes the ledger's responsibility, the ledger's evictions become the throttle's stream, and the throttle's backpressure returns to the sampler that started it. Across that ring, three modules — Tolsax, Grinex, and Hulbra — carry digests rather than bodies, as does Felkel. Three modules — Grinex, Brabra, and Mirdor — refuse new writes while their sweeps run. Two modules — Felkel and Mirdor — act only once countersigned by a threshold of peers, at 2 and 5 respectively. And four modules — Tolsax, Grinex, Brabra, and Hulbra — bound their failed handoffs with a retry ceiling before parking them, ranging from Grinex's single retry to Tolsax's three. Griost is, in effect, a chain of custody that never breaks: each module's output is exactly the next module's input, and the final signal — Mirdor's backpressure — arrives back at the point of origin.
+verdicts:
+  c0.0F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c3.1F NOT-ENTAILED
+  c4.2 ENTAILED
+  c0.2 ENTAILED
+  c4.2F NOT-ENTAILED
+  c4.0 ENTAILED
+  c2.1 ENTAILED
+  c1.2F NOT-ENTAILED
+  c1.2 ENTAILED
+  c3.1 ENTAILED
+  c2.0 ENTAILED
+  r4F NOT-ENTAILED
+  r2F NOT-ENTAILED
+  c0.1 ENTAILED
+  c3.2 ENTAILED
+  c2.1F NOT-ENTAILED
+  c1.1 ENTAILED
+  r0 ENTAILED
+  c5.2 ENTAILED
+  r1F NOT-ENTAILED
+  c3.0 ENTAILED
+  c5.0 ENTAILED
+  c4.1F NOT-ENTAILED
+  r4 ENTAILED
+  c4.1 ENTAILED
+  c1.0 ENTAILED
+  r5F NOT-ENTAILED
+  c5.2F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  c5.1F NOT-ENTAILED
+  r5 ENTAILED
+  r3 ENTAILED
+  c1.1F NOT-ENTAILED
+  r1 ENTAILED
+  c5.1 ENTAILED
+  c0.0 ENTAILED
+  c2.2 ENTAILED
+  r2 ENTAILED
+  c3.2F NOT-ENTAILED
+  c1.0F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  c5.0F NOT-ENTAILED
+  c2.2F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c0.1F NOT-ENTAILED

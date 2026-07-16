@@ -1,0 +1,41 @@
+add weave-knee/src/lib.rs — mod corpus @eb83719fb07c6805
+add weave-knee/src/corpus.rs — struct Rng, struct Claim, struct Child, struct Relation, struct Trial, fn word_budget, fn trial, fn invent, fn shuffled_roles, fn claims_for, fn claim, fn ring_relations, mod probes @4d0bf3ff1d0f5a9e
+add weave-knee/src/lib.rs — mod prompt @5f947e78aa31c537
+add weave-knee/src/lib.rs — mod record @d929cfd19c067400
+add weave-knee/src/lib.rs — mod score @8bbb3bfb8d4a4f63
+add weave-knee/src/lib.rs — mod knee @64886fa6ea1c892a
+add weave-knee/src/prompt.rs — struct Candidate, fn weave, fn candidates, fn judge, mod probes @5e7e9f74ce45700f
+add weave-knee/src/record.rs — struct Record, fn render, fn parse, fn parse_judge, fn field, fn verdict_word, mod probes @cb4bf25f0dbd5774
+add weave-knee/src/score.rs — struct Scores, fn score, fn is_listish, mod probes @ded85f716c80e948
+add weave-knee/src/knee.rs — struct CurvePoint, fn curve, enum Knee, fn knee, fn render, fn lock_in, fn trial_files, mod probes @be43a5994b617aa9
+add weave-knee/examples/knee.rs — fn main, fn root, fn gen, fn sweep, fn freeze, fn flag, fn list, fn sanitize, fn call @c6eb882f6d08d5c8
+add weave-knee/tests/gates.rs — fn the_committed_knee_spec_is_fresh, fn perfect_record, fn every_gate_still_fires @f55d8458b79fcc98
+edit weave-knee/src/record.rs — parse @025f1db302f64347
+edit weave-knee/src/corpus.rs — Claim @2126697ed34971d9
+edit weave-knee/src/corpus.rs — claim @87057476c935fe2e
+add weave-knee/src/corpus.rs — struct Emergent, fn numeric, fn composite, fn emergents @40ffdcc481ea041a
+edit weave-knee/src/corpus.rs — probes @3a4038b8f885f82d
+edit weave-knee/src/prompt.rs — weave @fcc5e3997a96ee23
+add weave-knee/src/prompt.rs — fn emergent_candidates, fn reconstruct @9cefe1bd6cdbcd47
+edit weave-knee/src/prompt.rs — judge @d4f4d9e63fcb7618
+edit weave-knee/src/prompt.rs — probes @fa7e0501d02c63cc
+edit weave-knee/src/record.rs — Record @652a60f482b6358d
+edit weave-knee/src/record.rs — render @357a17d559363224
+edit weave-knee/src/record.rs — parse @cac932e55de54024
+add weave-knee/src/record.rs — struct JudgeReading, fn stated_word, fn read_judge, fn parse_edges @7b790bad8af8b716
+edit weave-knee/src/record.rs — probes @ac557dfb98a0d566
+edit weave-knee/src/score.rs — Scores @2c46e1f4ac60d3ac
+edit weave-knee/src/score.rs — score @f0ecefe86b113925
+edit weave-knee/src/score.rs — score @29f109cf64e73ba6
+edit weave-knee/src/score.rs — probes @5ab3344b43a8c0d9
+edit weave-knee/src/knee.rs — CurvePoint @d2590085a31f7288
+edit weave-knee/src/knee.rs — curve @f089dafd8e3a04f6
+add weave-knee/src/knee.rs — fn gain_knee @0f44ca96b4085a20
+edit weave-knee/src/knee.rs — render @7c4d4803e75fd9ef
+edit weave-knee/src/knee.rs — probes @484873af3a547ee3
+edit weave-knee/examples/knee.rs — sweep @16cb067127a047a7
+edit weave-knee/tests/gates.rs — perfect_record @4e618aeeaad2c78d
+edit weave-knee/tests/gates.rs — every_gate_still_fires @ee5434dfafc8604d
+edit weave-knee/src/record.rs — parse_judge @69e5a941be165165
+collect weave-knee/src/record.rs — parse_judge
+edit weave-knee/tests/gates.rs — perfect_record @31b40c6d3f641ae3

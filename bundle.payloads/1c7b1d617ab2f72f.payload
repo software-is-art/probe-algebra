@@ -1,0 +1,55 @@
+/// THE LIB CONE: the content the sweep's build and baseline verdicts are facts
+/// about — everything the Judged support admits except what `cargo test -p
+/// boundary-spec --lib` cannot read: `examples/` (this runner itself rides along,
+/// since its text IS the sweep's semantics) and the root `tests/`. A conservative
+/// over-approximation, exactly as the gate supports are: admitting too much only
+/// costs a re-run; admitting too little would carry a stale green, the one
+/// direction this design refuses everywhere. Rust modules enter at ITEM grain
+/// (the item relation — the same rows the verbs feed), everything else at file
+/// grain; a non-UTF-8 file still keys honestly by length plus lossy form. The
+/// change medium's own ledger (`bundle.journal`, `bundle.payloads/`) is also
+/// out: it RECORDS changes to the tree, it does not participate in the build —
+/// the `attest/` scope rule, one shelf down — and leaving it in would move the
+/// cone on every judged transaction, making standing evidence unreachable.
+fn lib_cone(root: &std::path::Path) -> Result<Cone, String> {
+    use boundary_spec::discover::gates::Support;
+    use boundary_spec::discover::items::{Item, ItemRelation};
+    use boundary_spec::discover::verdict::VerdictStore;
+    use boundary_spec::discover::zset::ZSet;
+    let mut out = ZSet::zero();
+    for relative in VerdictStore::files(root)? {
+        let unread = (relative.starts_with("examples/") && relative != "examples/schemata.rs")
+            || relative.starts_with("tests/")
+            || relative == "bundle.journal"
+            || relative.starts_with("bundle.payloads/");
+        if unread || !Support::Judged.admits(&relative) {
+            continue;
+        }
+        let bytes = std::fs::read(root.join(&relative))
+            .map_err(|e| format!("lib cone: cannot read {relative} ({e})"))?;
+        let source = match String::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(raw) => format!(
+                "{}\u{0}{}",
+                raw.as_bytes().len(),
+                String::from_utf8_lossy(raw.as_bytes())
+            ),
+        };
+        if relative.ends_with(".rs") {
+            out = out.add(
+                &ItemRelation::of_module(&relative, &source)
+                    .map_err(|e| format!("lib cone: {relative} — {e}"))?,
+            );
+        } else {
+            out = out.add(&ZSet::from_pairs(&[(
+                Item {
+                    module: relative.clone(),
+                    name: ":file:".to_string(),
+                    body: source,
+                },
+                1,
+            )]));
+        }
+    }
+    Ok(out)
+}

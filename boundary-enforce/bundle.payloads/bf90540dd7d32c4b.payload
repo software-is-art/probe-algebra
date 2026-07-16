@@ -1,0 +1,294 @@
+#[cfg(test)]
+mod maintain_tiers_tests {
+    use super::*;
+
+    /// Materialize a source tree under `temp_dir` and return its manifest root.
+    fn tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
+        let root =
+            std::env::temp_dir().join(format!("maintain-tiers-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for (rel, content) in files {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, content).unwrap();
+        }
+        root
+    }
+
+    /// The naive recompute every maintained answer is judged against.
+    fn oracle(manifest: &Path, kernel: &[&str]) -> String {
+        let kernel: Vec<String> = kernel.iter().map(|s| s.to_string()).collect();
+        render_tiers(
+            &derive_partition(&manifest.join("src"), manifest, &kernel),
+            "BLESS_TIERS",
+        )
+    }
+
+    const KERNEL: &[&str] = &["src/lib.rs", "src/dom/floor.rs"];
+    const LIB: &str = "pub mod dom;\n";
+    const GLUE: &str = "pub mod door;\npub mod law;\nmod work;\n";
+    const WORK: &str = "pub(crate) fn helper() {}\n";
+    const DOOR: &str =
+        "pub struct Door;\nimpl Door { pub fn go(&self) { crate::dom::work::helper() } }\n";
+    const LAW: &str = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n";
+    const FLOOR: &str = "pub struct Floor;\n";
+
+    /// One file per kind of standing evidence: a registered-kernel root, glue, a
+    /// fronting door, the plain reachable remainder, an unreachable interior, and a
+    /// registered-kernel UNREACHABLE floor (the case that separates KERNEL from
+    /// INTERIOR in the fronting relation).
+    fn demo(name: &str) -> (PathBuf, String) {
+        let manifest = tree(
+            name,
+            &[
+                ("src/lib.rs", LIB),
+                ("src/dom/mod.rs", GLUE),
+                ("src/dom/work.rs", WORK),
+                ("src/dom/door.rs", DOOR),
+                ("src/dom/law.rs", LAW),
+                ("src/dom/floor.rs", FLOOR),
+            ],
+        );
+        let census = oracle(&manifest, KERNEL);
+        (manifest, census)
+    }
+
+    /// Re-deriving a module from the SAME source is byte-identity — the stability
+    /// every verb commit relies on.
+    #[test]
+    fn no_op_maintenance_is_byte_identity() {
+        let (_, census) = demo("noop");
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            LAW,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert_eq!(fresh, census);
+    }
+
+    /// A shape-preserving edit moves exactly its own line, NEVER reads the tree
+    /// (the manifest here names no real directory — the standing census carries the
+    /// whole verdict), and agrees with the oracle over the real tree byte for byte.
+    #[test]
+    fn a_gained_fronting_reference_is_a_door_tree_free() {
+        let (manifest, census) = demo("front");
+        let grown = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n\
+                     pub fn peek() { crate::dom::work::helper() }\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh
+                .contains("- src/dom/law.rs: BOUNDARY (pub-reachable, fronts an interior sibling)"),
+            "{fresh}"
+        );
+        std::fs::write(manifest.join("src/dom/law.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// A gained production edge impl is the other door: BOUNDARY by edges, judged
+    /// from the offered source alone, oracle-agreed.
+    #[test]
+    fn a_gained_edge_impl_is_a_door() {
+        let (manifest, census) = demo("edge");
+        let grown = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\nimpl Morphism for Law {}\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh.contains("- src/dom/law.rs: BOUNDARY (pub-reachable, carries production edges)"),
+            "{fresh}"
+        );
+        std::fs::write(manifest.join("src/dom/law.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// KERNEL is a decision: however a registered file's content moves, its line
+    /// carries verbatim — tree-free — and the oracle says the same.
+    #[test]
+    fn a_kernel_line_never_moves_at_a_verb() {
+        let (manifest, census) = demo("kernel");
+        let grown = "pub struct Floor;\nimpl Morphism for Floor {}\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/floor.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert_eq!(fresh, census);
+        std::fs::write(manifest.join("src/dom/floor.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// The trusted floor is not a workshop: delegating into an unreachable KERNEL
+    /// sibling fronts nothing — the file stays ALGEBRA in the oracle and in the
+    /// maintained view, which reads the frontable set from the census's INTERIOR
+    /// rows alone.
+    #[test]
+    fn fronting_the_kernel_floor_is_not_a_door() {
+        let (manifest, census) = demo("floor");
+        let grown = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n\
+                     pub fn lean() -> crate::dom::floor::Floor { crate::dom::floor::Floor }\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh.contains(
+                "- src/dom/law.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)"
+            ),
+            "{fresh}"
+        );
+        std::fs::write(manifest.join("src/dom/law.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// A new module grows the roster as INTERIOR — unmounted is not pub-reachable,
+    /// exactly what the oracle says about a file no `pub mod` chain names yet.
+    #[test]
+    fn a_new_module_grows_the_roster_interior() {
+        let (manifest, census) = demo("fresh");
+        let fresh_src = "pub struct F;\npub fn id(x: F) -> F { x }\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/fresh.rs",
+            fresh_src,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh.contains("- src/dom/fresh.rs: INTERIOR (not pub-reachable)"),
+            "{fresh}"
+        );
+        assert!(fresh.contains("# 7 files:"), "{fresh}");
+        std::fs::write(manifest.join("src/dom/fresh.rs"), fresh_src).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// A MOUNT is structural: the glue's new `pub mod` disagrees with the standing
+    /// INTERIOR row, so the view falls back to the oracle's own derivation over the
+    /// tree — the mounted module's line moves without its own text moving, and the
+    /// bless ceremony is still not owed. The unmount walks the same road back.
+    #[test]
+    fn a_mount_and_unmount_fall_back_to_the_oracle() {
+        let (manifest, census) = demo("mount");
+        let fresh_src = "pub struct F;\npub fn id(x: F) -> F { x }\n";
+        std::fs::write(manifest.join("src/dom/fresh.rs"), fresh_src).unwrap();
+        let census = maintain_tiers(
+            &census,
+            "src/dom/fresh.rs",
+            fresh_src,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        let mounted_glue = "pub mod door;\npub mod fresh;\npub mod law;\nmod work;\n";
+        std::fs::write(manifest.join("src/dom/mod.rs"), mounted_glue).unwrap();
+        let mounted = maintain_tiers(
+            &census,
+            "src/dom/mod.rs",
+            mounted_glue,
+            &manifest,
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            mounted.contains(
+                "- src/dom/fresh.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)"
+            ),
+            "{mounted}"
+        );
+        assert_eq!(mounted, oracle(&manifest, KERNEL));
+        std::fs::write(manifest.join("src/dom/mod.rs"), GLUE).unwrap();
+        let unmounted =
+            maintain_tiers(&mounted, "src/dom/mod.rs", GLUE, &manifest, "BLESS_TIERS").unwrap();
+        assert!(
+            unmounted.contains("- src/dom/fresh.rs: INTERIOR (not pub-reachable)"),
+            "{unmounted}"
+        );
+        assert_eq!(unmounted, oracle(&manifest, KERNEL));
+    }
+
+    /// Editing the root glue is LOCAL when nothing moved: sibling roots are
+    /// reachable by definition (mounted by no one), so their rows raise no
+    /// structural question and the standing census carries — tree-free.
+    #[test]
+    fn a_root_edit_that_moves_nothing_is_local() {
+        let manifest = tree(
+            "root",
+            &[
+                ("src/lib.rs", "pub mod law;\n"),
+                ("src/main.rs", "fn main() {}\n"),
+                (
+                    "src/law.rs",
+                    "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n",
+                ),
+            ],
+        );
+        let census = oracle(&manifest, &[]);
+        let fresh = maintain_tiers(
+            &census,
+            "src/lib.rs",
+            "pub mod law;\n",
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert_eq!(fresh, census);
+    }
+
+    /// Maintenance never guesses: an unparseable source, a census line outside the
+    /// lock's grammar, and a duplicated row each refuse with no movement.
+    #[test]
+    fn refusals_are_named() {
+        let (_, census) = demo("refuse");
+        let bad_source = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            "not rust ((",
+            Path::new("no-tree"),
+            "E",
+        );
+        assert!(bad_source.unwrap_err().contains("src/dom/law.rs"));
+        let bad_census = maintain_tiers(
+            &format!("{census}- src/dom/law.rs mumbles\n"),
+            "src/dom/law.rs",
+            LAW,
+            Path::new("no-tree"),
+            "E",
+        );
+        assert!(bad_census
+            .unwrap_err()
+            .contains("unreadable tier census line"));
+        let duplicated = maintain_tiers(
+            &format!("{census}- src/dom/law.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)\n"),
+            "src/dom/law.rs",
+            LAW,
+            Path::new("no-tree"),
+            "E",
+        );
+        assert!(duplicated
+            .unwrap_err()
+            .contains("duplicate tier census lines"));
+    }
+}

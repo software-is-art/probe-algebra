@@ -1,0 +1,86 @@
+/// A value in the twin theory: a twin store or a duration (durations are shared
+/// with the primary — the swap is on the store sort alone).
+#[derive(Clone)]
+pub enum TwinVal {
+    Store(TwinStore),
+    Dur(Ttl),
+}
+
+fn twin_store(v: &TwinVal) -> TwinStore {
+    match v {
+        TwinVal::Store(s) => s.clone(),
+        TwinVal::Dur(_) => TwinStore::new(), // unreachable: the sorts keep arguments apart.
+    }
+}
+
+fn twin_dur(v: &TwinVal) -> Ttl {
+    match v {
+        TwinVal::Dur(d) => *d,
+        TwinVal::Store(_) => Ttl::zero(), // unreachable: the sorts keep arguments apart.
+    }
+}
+
+fn empty(_: &[TwinVal]) -> Option<TwinVal> {
+    Some(TwinVal::Store(TwinStore::new()))
+}
+
+fn merge(v: &[TwinVal]) -> Option<TwinVal> {
+    Some(TwinVal::Store(twin_store(&v[0]).merge(&twin_store(&v[1]))))
+}
+
+/// The doctored merge the fire drill swaps in: FIRST write wins. A behaviour
+/// change, not a representation change — the discovered bias law must move, or
+/// the swap drill is decoration.
+fn merge_first_wins(v: &[TwinVal]) -> Option<TwinVal> {
+    Some(TwinVal::Store(twin_store(&v[1]).merge(&twin_store(&v[0]))))
+}
+
+fn tick(v: &[TwinVal]) -> Option<TwinVal> {
+    Some(TwinVal::Store(twin_store(&v[0]).tick(twin_dur(&v[1]))))
+}
+
+fn zero(_: &[TwinVal]) -> Option<TwinVal> {
+    Some(TwinVal::Dur(Ttl::zero()))
+}
+
+fn plus(v: &[TwinVal]) -> Option<TwinVal> {
+    Some(TwinVal::Dur(twin_dur(&v[0]).plus(twin_dur(&v[1]))))
+}
+
+fn key(s: &str) -> Key {
+    Key::new(s).expect("a valid key")
+}
+
+fn val(n: i64) -> Val {
+    Val::new(n).expect("a valid value")
+}
+
+fn ttl(n: i64) -> Ttl {
+    Ttl::new(n).expect("a valid ttl")
+}
+
+/// The primary's inhabitant spread, rebuilt through the twin's own edges — the
+/// same conflicts and the same clock skew, so the grid refutes the same false
+/// laws for the same reasons.
+fn twin_stores() -> Vec<TwinVal> {
+    let e = TwinStore::new();
+    vec![
+        e.clone(),
+        e.put(key("a"), val(1), ttl(2)),
+        e.put(key("a"), val(2), ttl(5)),
+        e.put(key("b"), val(3), ttl(3)),
+        e.put(key("a"), val(4), ttl(4))
+            .put(key("b"), val(5), ttl(1)),
+        e.put(key("a"), val(6), ttl(1)).tick(ttl(2)),
+    ]
+    .into_iter()
+    .map(TwinVal::Store)
+    .collect()
+}
+
+fn twin_durs() -> Vec<TwinVal> {
+    [0i64, 1, 2, 5]
+        .into_iter()
+        .map(|n| TwinVal::Dur(ttl(n)))
+        .collect()
+}

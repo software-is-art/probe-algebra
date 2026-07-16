@@ -1,0 +1,72 @@
+weave-knee trial v2
+fanout: 5
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Kelpam moves as a single closed loop: Kelquen hands backpressure to Pamzin, Pamzin's missed heartbeats reach Pamtol, Pamtol's sweep verdicts reach Dorruv, Dorruv's sealed ledger reaches Grivar, and Grivar's overflow returns to Kelquen — five modules, one ring, no loose end.
+
+  Kelquen, the monitor, holds only digests of what passes through it, never the bodies, and will retry a failed handoff up to three times before parking it rather than losing it silently. It acts only once five of its peers countersign — the same five-peer bar that Pamzin, the archive, holds itself to. Pamzin evicts anything left unclaimed after nine ticks, and while its own sweep is running it refuses new writes; it is also the one that watches the ring for missed heartbeats and reports them onward. That report lands at Pamtol, the vault, which shares Pamzin's refusal to accept writes mid-sweep — so a sweep at either the archive or the vault can leave that stretch of the ring closed to new writes at once. Pamtol otherwise answers every read from its newest snapshot only, and needs just three countersigning peers to act, a lighter bar than the five guarding Kelquen and Pamzin. Its sweep verdicts pass to Dorruv, the beacon, which — like Kelquen — keeps digests rather than bodies, and which needs only two countersigns to act, the lightest threshold in the system. Dorruv also evicts the unclaimed fastest of all, after just seven ticks, tighter than Pamzin's nine or Grivar's ten, so whatever it hands onward as a sealed ledger must be claimed before that shortest window in the ring closes. That ledger reaches Grivar, the sampler, which — like Pamtol — reads only from its newest snapshot, evicts the unclaimed slowest of the five at ten ticks, and needs just two countersigns, matching Dorruv's floor. Grivar closes the ring by delegating its overflow back to Kelquen, so the loop's required countersigns swing from five at Kelquen and Pamzin down to two at Dorruv and Grivar, and its eviction windows tighten from ten and nine ticks down to Dorruv's seven: the whole system is only ever as forgiving as its narrowest window and only ever as strict as its lightest consensus bar.
+verdicts:
+  c2.2F NOT-ENTAILED
+  c1.2 ENTAILED
+  r0 ENTAILED
+  c2.0 ENTAILED
+  c0.2 ENTAILED
+  c2.1F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  c4.1F NOT-ENTAILED
+  c1.1 ENTAILED
+  c0.2F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  c2.2 ENTAILED
+  c0.0 ENTAILED
+  r4 ENTAILED
+  r4F NOT-ENTAILED
+  r3 ENTAILED
+  c4.0 ENTAILED
+  r1F NOT-ENTAILED
+  c1.0F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  c2.1 ENTAILED
+  c3.1 ENTAILED
+  c3.2 ENTAILED
+  r1 ENTAILED
+  c4.2 ENTAILED
+  c3.1F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c4.2F NOT-ENTAILED
+  c4.1 ENTAILED
+  r2 ENTAILED
+  c1.0 ENTAILED
+  c0.1 ENTAILED
+  c3.0 ENTAILED
+  c1.2F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  r2F NOT-ENTAILED
+stated:
+  er0.quorum STATED
+  e.ringF NOT-STATED
+  er2.quorum NOT-STATED
+  er3.quorum STATED
+  er3.dwellF NOT-STATED
+  er3.dwell NOT-STATED
+  er4.quorum NOT-STATED
+  er1.quorum NOT-STATED
+  er0.quorumF NOT-STATED
+  er2.quorumF NOT-STATED
+  er4.quorumF NOT-STATED
+  e.ring STATED
+  er1.quorumF NOT-STATED
+  er3.quorumF NOT-STATED
+edges:
+  Kelquen -> Pamzin
+  Pamzin -> Pamtol
+  Pamtol -> Dorruv
+  Dorruv -> Grivar
+  Grivar -> Kelquen

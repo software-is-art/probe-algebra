@@ -1,0 +1,33 @@
+weave-knee trial v2
+fanout: 2
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Grisax runs on a closed loop between exactly two modules, Pamzin and Felsax, each shaping the other's behavior. Felsax, the courier, attempts a handoff and retries at most twice before parking anything it cannot deliver; whatever it carries, and whatever Pamzin carries in turn, exists in each module only as a digest — neither ever holds the body of what it moves, a floor the two share identically, so at no point does the combined system retain a payload's actual contents. Felsax reports upward: its sweep verdicts publish to Pamzin, giving the scheduler visibility into what the courier has resolved, failed, or parked. Pamzin answers downward: it signals backpressure to Felsax, throttling the courier's handoffs in response to what it's carrying. That exchange — verdicts up, backpressure down — forms the system's only feedback loop. Pamzin itself acts only once five of its peers countersign, gating its own decisions behind a quorum that sits outside this loop entirely. And because both modules evict anything left unclaimed after the same 10 ticks, that number is not a local quirk but a shared floor across the whole system: any item surviving Felsax's parking and reaching Pamzin still faces the identical 10-tick clock before it is discarded.
+verdicts:
+  c0.0 ENTAILED
+  c0.1 ENTAILED
+  c0.2 ENTAILED
+  r0 ENTAILED
+  c1.0F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c1.0 ENTAILED
+  r1 ENTAILED
+  c1.1 ENTAILED
+  c1.2 ENTAILED
+  c1.2F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  r0F NOT-ENTAILED
+stated:
+  e.ringF NOT-STATED
+  e.ring STATED
+  er0.dwell NOT-STATED
+  er0.dwellF NOT-STATED
+edges:
+  Felsax -> Pamzin
+  Pamzin -> Felsax

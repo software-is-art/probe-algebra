@@ -1,0 +1,78 @@
+/// Render the knee spec from scored trials grouped by (weaver, judge).
+pub fn render(groups: &BTreeMap<(String, String), Vec<Scores>>) -> String {
+    let mut s = String::new();
+    s.push_str(
+        "# weave-knee v2 — the functor's three failure modes, derived (regenerate: \
+         `cargo run -p weave-knee --example knee -- freeze`)\n",
+    );
+    s.push_str(&format!(
+        "# identity: relation floor {RELATION_FLOOR} — a fanout is WOVEN while mean \
+         relation coverage holds this line\n"
+    ));
+    s.push_str(
+        "# composition: gain — planted emergent facts the narrative made explicit; \
+         concatenation scores zero\n# invertibility: topo — ring edges a fresh reader \
+         recovered from the narrative alone\n",
+    );
+    if groups.is_empty() {
+        s.push_str("\nno trials recorded — run the sweep, then freeze.\n");
+        return s;
+    }
+    for ((weaver, judge), scores) in groups {
+        s.push_str(&format!("\n## weaver: {weaver} — judge: {judge}\n"));
+        s.push_str(
+            "fanout  trials  mention  claims  relations  foil-rej  gain  e-foil  \
+             topo-rec  topo-prec  quality\n",
+        );
+        let c = curve(scores);
+        for p in &c {
+            s.push_str(&format!(
+                "{:>6}  {:>6}  {:>7.3}  {:>6.3}  {:>9.3}  {:>8.3}  {:>4.2}  {:>6.3}  \
+                 {:>8.3}  {:>9.3}  {:>7.1}\n",
+                p.fanout,
+                p.trials,
+                p.mention,
+                p.claim_cov,
+                p.relation_cov,
+                p.foil_rej,
+                p.gain,
+                p.e_foil_rej,
+                p.topo_recall,
+                p.topo_prec,
+                p.quality
+            ));
+        }
+        s.push_str(&match knee(&c) {
+            Knee::At(k) => format!(
+                "identity knee: {k} — the last fanout holding the floor; the next \
+                 measured fanout dropped it\n"
+            ),
+            Knee::NotReached(k) => format!(
+                "identity knee: >= {k} — the floor held through the whole sweep; a \
+                 lower bound, keep sweeping\n"
+            ),
+            Knee::BelowSweep => "identity knee: below the sweep — even the smallest \
+                                 fanout dropped the floor\n"
+                .to_string(),
+        });
+        s.push_str(&match gain_knee(&c) {
+            Knee::At(k) => format!(
+                "gain knee: {k} — the last fanout with positive gain; past it the \
+                 weave stops earning its bytes\n"
+            ),
+            Knee::NotReached(k) => format!(
+                "gain knee: >= {k} — gain stayed positive through the whole sweep; a \
+                 lower bound, keep sweeping\n"
+            ),
+            Knee::BelowSweep => "gain knee: below the sweep — no measured fanout \
+                                 showed positive gain; the weave never beat \
+                                 concatenation\n"
+                .to_string(),
+        });
+    }
+    s.push_str(
+        "\n# honest frame: a sweep is a sample and the judge is a model — the knees are \
+         evidence, never proof.\n",
+    );
+    s
+}

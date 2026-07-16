@@ -1,0 +1,39 @@
+/// What a gate READS — the projection of the tree its verdict is a fact about. A
+/// verdict keyed by a support fingerprint cannot be owed by an edit outside the
+/// support: the delta's image under the gate is zero BY DECLARATION, not by memory.
+/// Supports are conservative over-approximations — admitting too much only costs
+/// re-judgment; admitting too little would hold a stale green, the exact failure
+/// class the verdict store exists to kill — so narrowing carries the burden of proof.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Support {
+    /// Everything the verdict walk yields except declared-inert prose — `docs/` and
+    /// `README.md`, which nothing compiles, embeds, or reads (no `include_str!`
+    /// reaches them; no probe opens them; the agenda classifies their PATHS only).
+    /// For gates that compile or read arbitrarily: clippy/test/schemata embed
+    /// `spec/` via `include_str!`, ride `build.rs`, and read the registers.
+    Judged,
+    /// The Rust surface only: `*.rs` plus the manifests that discover workspace
+    /// members (`Cargo.toml`, `Cargo.lock`) and rustfmt config — `cargo fmt` parses
+    /// Rust and nothing else.
+    RustSurface,
+}
+
+#[crate::mutate]
+impl Support {
+    /// Does this support admit a root-relative path? The verdict walk asks this per
+    /// file; only admitted bytes reach a gate's key.
+    pub fn admits(&self, relative: &str) -> bool {
+        let inert = relative.starts_with("docs/") || relative == "README.md";
+        match self {
+            Support::Judged => !inert,
+            Support::RustSurface => {
+                let name = relative.rsplit('/').next().unwrap_or(relative);
+                relative.ends_with(".rs")
+                    || matches!(
+                        name,
+                        "Cargo.toml" | "Cargo.lock" | "rustfmt.toml" | ".rustfmt.toml"
+                    )
+            }
+        }
+    }
+}

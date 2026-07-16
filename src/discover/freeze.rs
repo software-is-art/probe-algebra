@@ -171,7 +171,8 @@ mod tests {
                     "ttl store",
                     "store protocol",
                     "doc flow",
-                    "fabric"
+                    "fabric",
+                    "zset kernel"
                 ]
             ),
             Err(stale) => panic!(

@@ -1,0 +1,31 @@
+fn perfect_record(t: &weave_knee::corpus::Trial) -> Record {
+    let narrative = t
+        .children
+        .iter()
+        .map(|c| c.lexeme.as_str())
+        .collect::<Vec<_>>()
+        .join(" weaves into ");
+    Record {
+        fanout: t.fanout,
+        seed: t.seed,
+        weaver: "synthetic".to_string(),
+        judge: "synthetic".to_string(),
+        quality: 5,
+        narrative,
+        verdicts: candidates(t).iter().map(|c| (c.id.clone(), c.truth)).collect(),
+        stated: emergent_candidates(t)
+            .iter()
+            .map(|c| (c.id.clone(), c.truth))
+            .collect(),
+        edges: t
+            .relations
+            .iter()
+            .map(|r| {
+                (
+                    t.children[r.from].lexeme.clone(),
+                    t.children[r.to].lexeme.clone(),
+                )
+            })
+            .collect(),
+    }
+}

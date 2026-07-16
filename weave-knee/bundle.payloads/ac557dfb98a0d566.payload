@@ -1,0 +1,83 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    fn sample() -> Record {
+        Record {
+            fanout: 3,
+            seed: 7,
+            weaver: "claude-sonnet-5".to_string(),
+            judge: "claude-sonnet-5".to_string(),
+            quality: 4,
+            narrative: "First line.\n\n  An indented line.\nLast line.".to_string(),
+            verdicts: vec![
+                ("c0.0".to_string(), true),
+                ("c0.0F".to_string(), false),
+                ("r0".to_string(), true),
+            ],
+            stated: vec![
+                ("e.ring".to_string(), true),
+                ("e.ringF".to_string(), false),
+            ],
+            edges: vec![
+                ("Pamzin".to_string(), "Felsax".to_string()),
+                ("Felsax".to_string(), "Pamzin".to_string()),
+            ],
+        }
+    }
+
+    #[test]
+    fn render_then_parse_is_identity() {
+        let r = sample();
+        assert_eq!(parse(&render(&r)).expect("round trip"), r);
+        let mut bare = sample();
+        bare.edges.clear();
+        assert_eq!(parse(&render(&bare)).expect("round trip"), bare);
+    }
+
+    #[test]
+    fn refusals_name_the_offence() {
+        assert!(parse("not a trial").unwrap_err().contains("first line"));
+        assert!(parse("weave-knee trial v1\n")
+            .unwrap_err()
+            .contains("first line"));
+        let mut doctored = render(&sample()).replace("ENTAILED", "MAYBE");
+        assert!(parse(&doctored).unwrap_err().contains("unknown verdict"));
+        doctored = render(&sample()).replace("quality: 4", "quality: 9");
+        assert!(parse(&doctored).unwrap_err().contains("outside 1-5"));
+        doctored = render(&sample()).replace(" STATED", " SORT-OF");
+        assert!(parse(&doctored).unwrap_err().contains("unknown stated word"));
+        doctored = render(&sample()).replace(" -> ", " => ");
+        assert!(parse(&doctored).unwrap_err().contains("unreadable edge line"));
+    }
+
+    #[test]
+    fn the_judge_parser_skips_preamble_and_demands_both_censuses_and_quality() {
+        let raw = "Sure, here are my verdicts:\n\nverdict c0.0 ENTAILED\nverdict c0.0F \
+                   NOT-ENTAILED\nstated e.ring STATED\nstated e.ringF NOT-STATED\n\
+                   quality 3\n";
+        let reading = read_judge(raw).expect("read the judge");
+        assert_eq!(reading.verdicts.len(), 2);
+        assert_eq!(reading.stated.len(), 2);
+        assert_eq!(reading.quality, 3);
+        assert!(read_judge("verdict c0.0 ENTAILED\nstated e.ring STATED\n")
+            .unwrap_err()
+            .contains("no quality line"));
+        assert!(read_judge("quality 3\n")
+            .unwrap_err()
+            .contains("no verdict lines"));
+        assert!(read_judge("verdict c0.0 ENTAILED\nquality 3\n")
+            .unwrap_err()
+            .contains("no stated lines"));
+    }
+
+    #[test]
+    fn the_edge_parser_reads_edges_and_tolerates_none() {
+        let edges = parse_edges("Here:\nedge Pamzin Felsax\nedge Felsax Pamzin\n")
+            .expect("parse edges");
+        assert_eq!(edges.len(), 2);
+        assert_eq!(edges[0], ("Pamzin".to_string(), "Felsax".to_string()));
+        assert!(parse_edges("no edges here\n").expect("empty is a reading").is_empty());
+        assert!(parse_edges("edge OnlyOne\n").is_err());
+    }
+}

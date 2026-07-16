@@ -1,0 +1,13 @@
+/// Render the qualify-REASON census by the wholesale walk: one line per file whose
+/// functions form no algebra, carrying the mechanical blocker classes they exhibit —
+/// the qualify census's complement, derived by the same walk (same `tests.rs` skip,
+/// same operator-shape rule, stated once). The classes are EVIDENCE, deliberately
+/// mechanical; reading them into value-object debt, missing vocabulary, or a
+/// principled refusal is a ratification, not a derivation. The format lives in
+/// [`render_reasons_from`], shared with the maintained update.
+fn render_reasons(src: &Path, manifest: &Path, bless_env: &str) -> String {
+    let mut scanned = 0usize;
+    let mut lines: Vec<String> = Vec::new();
+    collect_reasons(src, manifest, &mut scanned, &mut lines);
+    render_reasons_from(&lines, scanned, bless_env)
+}

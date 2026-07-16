@@ -1,0 +1,148 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+    use crate::corpus::trial;
+    use crate::prompt::emergent_candidates;
+    use crate::record::Record;
+
+    fn perfect_record(t: &Trial) -> Record {
+        let narrative = t
+            .children
+            .iter()
+            .map(|c| c.lexeme.as_str())
+            .collect::<Vec<_>>()
+            .join(" weaves into ");
+        Record {
+            fanout: t.fanout,
+            seed: t.seed,
+            weaver: "synthetic".to_string(),
+            judge: "synthetic".to_string(),
+            quality: 5,
+            narrative,
+            verdicts: candidates(t)
+                .iter()
+                .map(|c| (c.id.clone(), c.truth))
+                .collect(),
+            stated: emergent_candidates(t)
+                .iter()
+                .map(|c| (c.id.clone(), c.truth))
+                .collect(),
+            edges: t
+                .relations
+                .iter()
+                .map(|r| {
+                    (
+                        t.children[r.from].lexeme.clone(),
+                        t.children[r.to].lexeme.clone(),
+                    )
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn a_perfect_record_scores_ones_across_the_board() {
+        let t = trial(3, 1);
+        let s = score(&t, &perfect_record(&t)).expect("score");
+        assert_eq!(s.mention, 1.0);
+        assert_eq!(s.claim_cov, 1.0);
+        assert_eq!(s.relation_cov, 1.0);
+        assert_eq!(s.foil_rej, 1.0);
+        assert_eq!(s.gain, 1.0);
+        assert_eq!(s.e_foil_rej, 1.0);
+        assert_eq!(s.topo_recall, 1.0);
+        assert_eq!(s.topo_prec, 1.0);
+        assert!(s.within_budget);
+        assert!(s.prose_only);
+    }
+
+    #[test]
+    fn a_dropped_relation_moves_only_relation_coverage() {
+        let t = trial(3, 1);
+        let mut r = perfect_record(&t);
+        for v in &mut r.verdicts {
+            if v.0 == "r0" {
+                v.1 = false;
+            }
+        }
+        let s = score(&t, &r).expect("score");
+        assert_eq!(s.claim_cov, 1.0);
+        assert!((s.relation_cov - 2.0 / 3.0).abs() < 1e-9);
+        assert_eq!(s.foil_rej, 1.0);
+        assert_eq!(s.gain, 1.0);
+    }
+
+    #[test]
+    fn an_unstated_emergent_moves_only_gain_and_a_stated_foil_moves_only_its_rejection() {
+        let t = trial(3, 1);
+        let mut r = perfect_record(&t);
+        for s in &mut r.stated {
+            if s.0.starts_with('e') && !s.0.ends_with('F') {
+                s.1 = false;
+                break;
+            }
+        }
+        let scored = score(&t, &r).expect("score");
+        assert!(scored.gain < 1.0);
+        assert_eq!(scored.e_foil_rej, 1.0);
+        assert_eq!(scored.relation_cov, 1.0);
+
+        let mut r = perfect_record(&t);
+        for s in &mut r.stated {
+            if s.0.ends_with('F') {
+                s.1 = true;
+                break;
+            }
+        }
+        let scored = score(&t, &r).expect("score");
+        assert_eq!(scored.gain, 1.0);
+        assert!(scored.e_foil_rej < 1.0);
+    }
+
+    #[test]
+    fn topology_scores_split_recall_from_precision() {
+        let t = trial(4, 2);
+        let mut r = perfect_record(&t);
+        r.edges.pop();
+        let s = score(&t, &r).expect("score");
+        assert!((s.topo_recall - 0.75).abs() < 1e-9);
+        assert_eq!(s.topo_prec, 1.0);
+
+        let mut r = perfect_record(&t);
+        r.edges.push(("Nowhere".to_string(), "Nothing".to_string()));
+        let s = score(&t, &r).expect("score");
+        assert_eq!(s.topo_recall, 1.0);
+        assert!((s.topo_prec - 0.8).abs() < 1e-9);
+
+        let mut r = perfect_record(&t);
+        r.edges.clear();
+        let s = score(&t, &r).expect("score");
+        assert_eq!(s.topo_recall, 0.0);
+        assert_eq!(s.topo_prec, 0.0);
+    }
+
+    #[test]
+    fn a_missing_verdict_is_refused_not_shrugged() {
+        let t = trial(3, 1);
+        let mut r = perfect_record(&t);
+        r.verdicts.pop();
+        assert!(score(&t, &r)
+            .unwrap_err()
+            .contains("no verdict for candidate"));
+        let mut r = perfect_record(&t);
+        r.stated.pop();
+        assert!(score(&t, &r)
+            .unwrap_err()
+            .contains("no stated ruling for emergent"));
+    }
+
+    #[test]
+    fn listish_narratives_are_caught() {
+        assert!(is_listish("- a bullet"));
+        assert!(is_listish("  * another"));
+        assert!(is_listish("2. numbered"));
+        assert!(is_listish("# a heading"));
+        assert!(!is_listish("Plain prose, 2. is not how it starts."));
+        assert!(!is_listish("A sentence from 1876. And on."));
+    }
+}

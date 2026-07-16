@@ -82,7 +82,7 @@ impl Schemata {
     }
 
     /// COVERAGE recording: with `SCHEMATA_RECORD=<dir>` set, every site whose guard
-    /// executes is appended (once) to a per-process file headed by this process's
+    /// executes is appended (once) to a per-FILTER file headed by this process's
     /// test filter (nextest runs one test per process, so the file IS the site→test
     /// edge list). The map makes the sweep EXACT and selective: a mutant can only
     /// change behaviour where its guard executes, so running just the covering tests
@@ -95,16 +95,26 @@ impl Schemata {
         static RECORDER: OnceLock<Option<Recorder>> = OnceLock::new();
         let recorder = RECORDER.get_or_init(|| {
             let dir = std::env::var("SCHEMATA_RECORD").ok()?;
-            let path = PathBuf::from(dir).join(format!("{}.touch", std::process::id()));
-            let mut file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)
-                .ok()?;
             // the test names in this process's argv (nextest passes the exact
             // filter; test paths are the `::`-carrying arguments).
             let tests: Vec<String> = std::env::args().filter(|a| a.contains("::")).collect();
-            writeln!(file, "T {}", tests.join(" ")).ok()?;
+            // the file is keyed by the FILTER, never the pid: a recycled pid would
+            // append one test's edges under another test's header, and the last
+            // header wins — coverage sets flapped across identical trees (~90
+            // spurious re-judgments per incremental run), and the sharp direction
+            // of the same lie is a sole coverer clobbered into another test's
+            // file, whose site is then judged by a test that never reaches its
+            // guard: a false survivor. Same filter, same file, truncated —
+            // self-overwrites are idempotent, cross-test appends unrepresentable.
+            let joined = tests.join(" ");
+            let mut name: u64 = 0xcbf2_9ce4_8422_2325;
+            for byte in joined.bytes() {
+                name ^= u64::from(byte);
+                name = name.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            let path = PathBuf::from(dir).join(format!("{name:016x}.touch"));
+            let mut file = std::fs::File::create(path).ok()?;
+            writeln!(file, "T {joined}").ok()?;
             Some(Recorder {
                 file: Mutex::new((file, BTreeSet::new())),
             })

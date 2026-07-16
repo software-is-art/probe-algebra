@@ -1,0 +1,34 @@
+/// The tier a non-KERNEL file earns from its four facts — stated once, consumed by
+/// both the wholesale derivation and the maintained view, so what the oracle
+/// assigns and what maintenance asserts cannot diverge.
+fn assign_tier(
+    substance: bool,
+    reachable: bool,
+    carries_edges: bool,
+    fronts: bool,
+) -> (&'static str, String) {
+    if !substance {
+        let tier = if reachable { "ALGEBRA" } else { "INTERIOR" };
+        (
+            tier,
+            "glue — module declarations and re-exports only; tier by reachability".to_string(),
+        )
+    } else if !reachable {
+        ("INTERIOR", "not pub-reachable".to_string())
+    } else if carries_edges {
+        (
+            "BOUNDARY",
+            "pub-reachable, carries production edges".to_string(),
+        )
+    } else if fronts {
+        (
+            "BOUNDARY",
+            "pub-reachable, fronts an interior sibling".to_string(),
+        )
+    } else {
+        (
+            "ALGEBRA",
+            "pub-reachable, no production edges, fronts nothing".to_string(),
+        )
+    }
+}

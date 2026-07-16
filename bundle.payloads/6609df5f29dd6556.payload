@@ -1,0 +1,150 @@
+#[crate::mutate]
+impl<K: Ord + Clone> Circuit<K> {
+    /// An empty circuit: no nodes, no ticks, an empty warehouse.
+    pub fn new() -> Circuit<K> {
+        Circuit {
+            nodes: Vec::new(),
+            cells: Vec::new(),
+            warehouse: Warehouse::empty(),
+            ticks: 0,
+            judged: 0,
+        }
+    }
+
+    /// Declare a node; a refusal wires nothing. Refused: an input that names no
+    /// existing node, and any wiring after the stream has started — the DAG is
+    /// declared whole, then the stream runs, so no node ever has a gap in its
+    /// history that judgment would have to invent.
+    pub fn wire(&mut self, node: Node) -> Option<usize> {
+        let reaches = |input: usize| input < self.nodes.len();
+        let sound = match node {
+            Node::Source => true,
+            Node::Neg(a) | Node::Delay(a) | Node::Distinct(a) => reaches(a),
+            Node::Add(a, b) | Node::Join(a, b) => reaches(a) && reaches(b),
+        };
+        if !sound || self.ticks > 0 {
+            return None;
+        }
+        self.nodes.push(node);
+        self.cells.push(Cell::fresh());
+        Some(self.nodes.len() - 1)
+    }
+
+    /// Record one tick: each source's arriving delta (absent sources receive
+    /// zero, duplicate mentions sum). Nothing is computed — computation belongs
+    /// to eduction. A feed naming a non-source refuses the whole tick.
+    pub fn tick(&mut self, feed: &[(usize, ZSet<K>)]) -> Option<usize> {
+        if feed
+            .iter()
+            .any(|(id, _)| self.nodes.get(*id) != Some(&Node::Source))
+        {
+            return None;
+        }
+        for (id, node) in self.nodes.iter().enumerate() {
+            if *node != Node::Source {
+                continue;
+            }
+            let mut arrived = ZSet::zero();
+            for (fed, z) in feed {
+                if *fed == id {
+                    arrived = arrived.add(z);
+                }
+            }
+            self.cells[id].deltas.push(arrived);
+        }
+        self.ticks += 1;
+        Some(self.ticks - 1)
+    }
+
+    /// Eduction's read: demand the node, judging its cone through every recorded
+    /// tick, and return its integrated value NOW. A node that was never wired
+    /// refuses.
+    pub fn latest(&mut self, node: usize) -> Option<ZSet<K>> {
+        if node >= self.nodes.len() {
+            return None;
+        }
+        self.pull(node);
+        Some(self.cells[node].out.clone())
+    }
+
+    /// How many node-ticks judgment has actually run — the eduction probe's
+    /// evidence that demand computes the cone and only the cone.
+    pub fn judged(&self) -> u64 {
+        self.judged
+    }
+
+    /// The warehouse's ledger, (hits, misses): content-keyed reuse, observable.
+    pub fn recalled(&self) -> (u64, u64) {
+        (self.warehouse.hits, self.warehouse.misses)
+    }
+
+    /// Mark the demanded node's ancestor cone (one reverse fold over the declared
+    /// order — acyclicity makes this complete), then judge the marked nodes in
+    /// declaration order, each catching up through the recorded ticks.
+    fn pull(&mut self, node: usize) {
+        let mut wanted = vec![false; self.nodes.len()];
+        wanted[node] = true;
+        for id in (0..=node).rev() {
+            if !wanted[id] {
+                continue;
+            }
+            match self.nodes[id] {
+                Node::Source => {}
+                Node::Neg(a) | Node::Delay(a) | Node::Distinct(a) => wanted[a] = true,
+                Node::Add(a, b) | Node::Join(a, b) => {
+                    wanted[a] = true;
+                    wanted[b] = true;
+                }
+            }
+        }
+        for (id, marked) in wanted.iter().enumerate().take(node + 1) {
+            if !*marked {
+                continue;
+            }
+            for t in self.cells[id].done..self.ticks {
+                self.judge(id, t);
+            }
+        }
+    }
+
+    /// One node, one tick: compute the output delta by the operator's rule,
+    /// append it to the history, fold it into the integrated output.
+    fn judge(&mut self, id: usize, t: usize) {
+        let dout = match self.nodes[id] {
+            Node::Source => self.cells[id].deltas[t].clone(),
+            Node::Add(a, b) => self.cells[a].deltas[t].add(&self.cells[b].deltas[t]),
+            Node::Neg(a) => self.cells[a].deltas[t].neg(),
+            Node::Delay(a) => {
+                if t == 0 {
+                    ZSet::zero()
+                } else {
+                    self.cells[a].deltas[t - 1].clone()
+                }
+            }
+            Node::Join(a, b) => {
+                let da = self.cells[a].deltas[t].clone();
+                let db = self.cells[b].deltas[t].clone();
+                let right = self.cells[id].right.add(&db);
+                let dout = da.join(&right).add(&self.cells[id].left.join(&db));
+                self.cells[id].left = self.cells[id].left.add(&da);
+                self.cells[id].right = right;
+                dout
+            }
+            Node::Distinct(a) => {
+                let held = self.cells[id].left.add(&self.cells[a].deltas[t]);
+                let fresh = self
+                    .warehouse
+                    .recall("distinct", held.entries(), || held.distinct());
+                let dout = fresh.add(&self.cells[id].out.neg());
+                self.cells[id].left = held;
+                dout
+            }
+        };
+        if self.nodes[id] != Node::Source {
+            self.cells[id].deltas.push(dout.clone());
+        }
+        self.cells[id].out = self.cells[id].out.add(&dout);
+        self.cells[id].done = t + 1;
+        self.judged += 1;
+    }
+}

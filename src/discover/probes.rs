@@ -496,6 +496,7 @@ mod probes_tests {
                 command: &[],
                 cadence: crate::discover::gates::Cadence::DefaultBranch,
                 effect: crate::boundary::Capability::Pure,
+                support: crate::discover::gates::Support::Judged,
                 sharded: false,
             }],
         };

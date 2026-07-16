@@ -12,8 +12,9 @@ the code, never pin the report.
 - store protocol: settled — { empty, ++ } over nets { P }
 - doc flow: settled — { submit, revise, approve, edit } over nets { Draft, Published, Review }
 - fabric: settled — { mesh, join, grant, revoke, reach, within, true } over nets { Fabric, Route, Verdict }
+- zset kernel: settled — { zero, +, neg, join, distinct, delay, integrate, differentiate, impulse, latest } over nets { Window, Zset }
 
-verdict: 7 of 7 modules settled — the declared shape is a fixed point of the placer.
+verdict: 8 of 8 modules settled — the declared shape is a fixed point of the placer.
 
 seam candidates (cross-module net-NAME coincidences no declared seam covers — a
 suggestion: declare the seam, or leave the shared name standing as coincidence):

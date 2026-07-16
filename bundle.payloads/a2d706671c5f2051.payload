@@ -1,0 +1,99 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    const FIXTURE: &str =
+        "use std::fmt::Debug;\n\n/// Doubles.\npub fn double(x: i64) -> i64 {\n    x * 2\n}\n\nstruct Inner;\n";
+
+    /// The relation is the ADDRESSABLE projection: one row per addressed item at
+    /// weight 1, module column as given, and the `use` — which nothing addresses —
+    /// is not a row.
+    #[test]
+    fn the_relation_is_the_addressable_projection() {
+        let relation = ItemRelation::of_module("m.rs", FIXTURE).expect("derives");
+        let entries = relation.entries();
+        assert_eq!(entries.len(), 2);
+        assert!(entries.iter().all(|(_, w)| *w == 1));
+        let names: Vec<&str> = entries.iter().map(|(i, _)| i.name.as_str()).collect();
+        assert_eq!(names, ["Inner", "double"]);
+        assert!(entries.iter().all(|(i, _)| i.module == "m.rs"));
+    }
+
+    /// Every body is the exact segment `show` holds — rows and show cut with one
+    /// span rule, so the relation speaks the verbs' vocabulary, never a second one.
+    #[test]
+    fn a_body_is_the_exact_segment_show_holds() {
+        let relation = ItemRelation::of_module("m.rs", FIXTURE).expect("derives");
+        for (item, _) in relation.entries() {
+            assert_eq!(
+                Bundle::show(FIXTURE, &item.name).expect("shown"),
+                item.body,
+                "row body diverges from show at `{}`",
+                item.name
+            );
+        }
+    }
+
+    /// An edit is a TWO-ROW DELTA: retract the old body, assert the new — the
+    /// verbs are delta sources, which is what lets the kernel maintain views
+    /// instead of recomputing them.
+    #[test]
+    fn an_edit_is_a_two_row_delta() {
+        let before = ItemRelation::of_module("m.rs", FIXTURE).expect("derives");
+        let edited = FIXTURE.replace("x * 2", "x + x");
+        let after = ItemRelation::of_module("m.rs", &edited).expect("derives");
+        let delta = after.add(&before.neg());
+        let entries = delta.entries();
+        assert_eq!(entries.len(), 2);
+        let retracted = entries
+            .iter()
+            .find(|(_, w)| *w == -1)
+            .expect("a retraction");
+        let asserted = entries.iter().find(|(_, w)| *w == 1).expect("an assertion");
+        assert_eq!(retracted.0.name, "double");
+        assert_eq!(asserted.0.name, "double");
+        assert!(retracted.0.body.contains("x * 2"));
+        assert!(asserted.0.body.contains("x + x"));
+    }
+
+    /// The tree relation is the SUM of its modules — linearity, probed: deriving
+    /// two files together is the group add of deriving them apart, so an untouched
+    /// module contributes exactly zero to any delta.
+    #[test]
+    fn the_tree_relation_is_the_sum_of_its_modules() {
+        let other = "pub fn triple(x: i64) -> i64 {\n    x * 3\n}\n";
+        let files = vec![
+            ("a.rs".to_string(), FIXTURE.to_string()),
+            ("b.rs".to_string(), other.to_string()),
+        ];
+        let together = ItemRelation::of_files(&files).expect("derives");
+        let apart = ItemRelation::of_module("a.rs", FIXTURE)
+            .expect("derives")
+            .add(&ItemRelation::of_module("b.rs", other).expect("derives"));
+        assert_eq!(together.entries(), apart.entries());
+        assert!(together.add(&apart.neg()).entries().is_empty());
+    }
+
+    /// A refusal is named and derives nothing.
+    #[test]
+    fn an_unparseable_module_refuses_by_name() {
+        let refusal = ItemRelation::of_module("m.rs", "fn broken(").expect_err("refuses");
+        assert!(refusal.contains("bundle rows: module unparseable"));
+    }
+
+    /// The tree relation reads the committed tree through the gates' own walk —
+    /// and RECOGNIZES ITSELF: the module declaring the relation is a row in it.
+    /// Every row's module is a walked `.rs` path at weight 1; the count is the
+    /// honest scale of what brick 3's maintained views will carry.
+    #[test]
+    fn the_tree_relation_recognizes_its_own_declaration() {
+        let tree = ItemRelation::of_tree(std::path::Path::new(".")).expect("derives");
+        let entries = tree.entries();
+        assert!(!entries.is_empty());
+        assert!(entries.iter().all(|(i, _)| i.module.ends_with(".rs")));
+        assert!(entries.iter().all(|(_, w)| *w == 1));
+        assert!(entries
+            .iter()
+            .any(|(i, _)| i.module == "src/discover/items.rs" && i.name == "ItemRelation"));
+    }
+}

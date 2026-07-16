@@ -1,0 +1,129 @@
+weave-knee trial v2
+fanout: 10
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 3
+narrative:
+  Toldor is built as a single closed ring of ten modules, each handing its output to the next until the loop returns to where it began. At the head sits Zinhul, the gate, which evicts anything left unclaimed after 10 ticks, retries a failed handoff at most once before parking it, and will not act until four of its peers countersign. Zinhul hands its sealed ledger to Grihul, the warden, which is more patient with failure — two retries before parking — but needs only two countersigning peers to act, and unlike Zinhul it keeps digests of what it carries, never the bodies themselves. Grihul signals backpressure to Nexquen, the relay, which refuses new writes while its own sweep is running and answers every read from its newest snapshot only, tolerating up to four failed handoff retries before parking. Nexquen delegates its overflow to Tolzin, the cache, which mirrors Nexquen's caution — same snapshot-only reads, same write-refusal during sweep — while also keeping only digests, never bodies, like Grihul before it. Tolzin reports missed heartbeats to Felpam, the broker, a second channel into the ring running alongside the main handoff chain. Felpam evicts anything unclaimed after 10 ticks, the same floor Zinhul holds at the ring's start, needs only two countersigning peers like Grihul, and refuses writes during its sweep like Nexquen and Tolzin. Felpam streams its evictions to Osthul, the monitor, which reads only from its newest snapshot, evicts after just 9 ticks — tighter than Zinhul's or Felpam's 10 — and, like Zinhul, needs four countersigning peers before it acts. Osthul publishes its sweep verdicts to Zingri, the sampler, which needs only two countersigns, refuses writes mid-sweep, and holds the loosest eviction floor seen yet at 11 ticks. Zingri hands its own sealed ledger to Nexkel, the index, echoing the ledger-handoff Zinhul performed at the start; Nexkel reads from newest snapshots only, tolerates four retries before parking exactly as Nexquen does, and evicts unclaimed work after 12 ticks — the longest window anywhere in the ring. Nexkel signals backpressure to Hulost, the beacon, echoing Grihul's backpressure signal earlier in the loop; Hulost evicts after just 6 ticks and keeps only digests, never bodies. Hulost delegates its overflow to Ruvfel, the courier, which shares Hulost's 6-tick eviction floor and its digest-only retention, and additionally answers reads from its newest snapshot only. Ruvfel closes the ring by reporting missed heartbeats to Zinhul, mirroring Tolzin's heartbeat report to Felpam earlier, so the loop carries not just ledgers, backpressure, and overflow forward but two heartbeat-failure signals backward into its gating points.
+
+  Taken together, the ring's numbers stack into bounds no single module states. A handoff that fails at every stage where a retry limit is named — Zinhul's 1, Grihul's 2, Nexquen's 4, Nexkel's 4, Hulost's 3 — can be retried at most 14 times across the full circuit before parking somewhere; the other five modules carry no stated retry ceiling of their own, so that 14 is the floor the whole loop guarantees, not the total it permits. Eviction floors follow a similar pattern: Hulost and Ruvfel, adjacent at the ring's tail, each unclaim work after only 6 ticks, half of Zinhul's 10 and exactly half of Nexkel's 12 — so whatever reaches that pair is judged twice as fast as anything sitting at the ring's opening or at its longest-held point, Nexkel. Five of the ten modules — Nexquen, Tolzin, Osthul, Nexkel, and Ruvfel — answer reads only from their newest snapshot, so a majority of the ring never serves a read that reflects anything but its latest sweep. Four modules — Grihul, Tolzin, Hulost, and Ruvfel — keep digests and never bodies, meaning full payloads persist only at Zinhul, Nexquen, Felpam, Osthul, Zingri, and Nexkel, while the digest-only four form a lighter shadow path beside them. And the countersign thresholds — Zinhul and Osthul each requiring four peers, Grihul, Felpam, and Zingri each requiring two — mean the ring alternates between a stricter four-peer gate and a looser two-peer one twice over its full circuit, so no single countersign threshold governs the whole system: consensus tightens and loosens as the ledger moves around the loop.
+verdicts:
+  c8.2F NOT-ENTAILED
+  c4.1F NOT-ENTAILED
+  r9 ENTAILED
+  c8.2 ENTAILED
+  c0.2 ENTAILED
+  c0.1 ENTAILED
+  r0 ENTAILED
+  c3.0 ENTAILED
+  r3 ENTAILED
+  c4.1 ENTAILED
+  c2.1F NOT-ENTAILED
+  c7.2F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  c9.2 ENTAILED
+  c2.2F NOT-ENTAILED
+  r9F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  c6.2 ENTAILED
+  r7 ENTAILED
+  c3.1 ENTAILED
+  c5.0F NOT-ENTAILED
+  r1 ENTAILED
+  c7.1F NOT-ENTAILED
+  r4F NOT-ENTAILED
+  c9.0F NOT-ENTAILED
+  r6 ENTAILED
+  c1.2F NOT-ENTAILED
+  c5.0 ENTAILED
+  c4.0F NOT-ENTAILED
+  c5.2F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c5.2 ENTAILED
+  c0.2F NOT-ENTAILED
+  c3.2 ENTAILED
+  c5.1 ENTAILED
+  c5.1F NOT-ENTAILED
+  c2.1 ENTAILED
+  c7.2 ENTAILED
+  r6F NOT-ENTAILED
+  c2.2 ENTAILED
+  c4.0 ENTAILED
+  c6.2F NOT-ENTAILED
+  c9.1 ENTAILED
+  c1.1 ENTAILED
+  c8.1 ENTAILED
+  c0.0F NOT-ENTAILED
+  r4 ENTAILED
+  c6.0 ENTAILED
+  c8.0F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c7.0F NOT-ENTAILED
+  r2F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c9.0 ENTAILED
+  c1.2 ENTAILED
+  r5F NOT-ENTAILED
+  c3.2F NOT-ENTAILED
+  c2.0 ENTAILED
+  c6.1 ENTAILED
+  r2 ENTAILED
+  c1.0F NOT-ENTAILED
+  c1.0 ENTAILED
+  r8 ENTAILED
+  c8.1F NOT-ENTAILED
+  c0.0 ENTAILED
+  c9.2F NOT-ENTAILED
+  r8F NOT-ENTAILED
+  r7F NOT-ENTAILED
+  r5 ENTAILED
+  c6.1F NOT-ENTAILED
+  c7.1 ENTAILED
+  c9.1F NOT-ENTAILED
+  c4.2 ENTAILED
+  c3.1F NOT-ENTAILED
+  c8.0 ENTAILED
+  c6.0F NOT-ENTAILED
+  c7.0 ENTAILED
+  c4.2F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+stated:
+  er7.retryF NOT-STATED
+  er9.dwell NOT-STATED
+  e.ring STATED
+  er0.retryF NOT-STATED
+  er5.quorum NOT-STATED
+  er4.dwell NOT-STATED
+  er1.retryF NOT-STATED
+  er4.quorumF NOT-STATED
+  e.ringF NOT-STATED
+  er7.retry NOT-STATED
+  er8.dwellF NOT-STATED
+  er6.dwellF NOT-STATED
+  er4.dwellF NOT-STATED
+  er5.dwell NOT-STATED
+  er7.dwellF NOT-STATED
+  er0.retry NOT-STATED
+  er6.dwell NOT-STATED
+  er9.dwellF NOT-STATED
+  er1.retry NOT-STATED
+  er7.dwell NOT-STATED
+  er0.quorumF NOT-STATED
+  er5.quorumF NOT-STATED
+  er0.quorum NOT-STATED
+  er8.dwell NOT-STATED
+  er4.quorum NOT-STATED
+  er5.dwellF NOT-STATED
+edges:
+  Zinhul -> Grihul
+  Grihul -> Nexquen
+  Nexquen -> Tolzin
+  Tolzin -> Felpam
+  Felpam -> Osthul
+  Osthul -> Zingri
+  Zingri -> Nexkel
+  Nexkel -> Hulost
+  Hulost -> Ruvfel
+  Ruvfel -> Zinhul

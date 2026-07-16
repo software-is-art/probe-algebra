@@ -49,6 +49,30 @@ impl VerdictStore {
         let mut files = Vec::new();
         Self::walk(crate_root, crate_root, &mut files)?;
         files.sort();
+        Self::fingerprint(crate_root, &files)
+    }
+
+    /// A SUPPORT KEY: the same walk, filtered by the projection a gate DECLARES it
+    /// reads — an edit outside the support cannot move this key, so it cannot owe the
+    /// gate. The docs-only friction, closed: the delta's image under a gate whose
+    /// support excludes it is zero by declaration, never by memory.
+    ///
+    /// Capability: Effectful — reads the tree it fingerprints.
+    pub fn support_hash(
+        crate_root: &Path,
+        support: &crate::discover::gates::Support,
+    ) -> Result<String, String> {
+        let mut files = Vec::new();
+        Self::walk(crate_root, crate_root, &mut files)?;
+        files.sort();
+        files.retain(|relative| support.admits(relative));
+        Self::fingerprint(crate_root, &files)
+    }
+
+    /// FNV-64 over relative paths and bytes, in the caller's order — the one fold both
+    /// keys share, so the scope key and every support key are the same claim about
+    /// different projections.
+    fn fingerprint(crate_root: &Path, files: &[String]) -> Result<String, String> {
         let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
         let mut eat = |bytes: &[u8]| {
             for byte in bytes {
@@ -58,7 +82,7 @@ impl VerdictStore {
             hash ^= 0xff;
             hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
         };
-        for relative in &files {
+        for relative in files {
             eat(relative.as_bytes());
             let bytes = std::fs::read(crate_root.join(relative))
                 .map_err(|e| format!("verdict store: cannot read {relative} ({e})"))?;
@@ -87,13 +111,17 @@ impl VerdictStore {
         .map_err(|e| format!("verdict store: cannot record `{gate}` ({e})"))
     }
 
-    /// The every-change roster with each gate's standing at this key — the derived
-    /// to-do list: what this tree still OWES is exactly the gates without verdicts.
-    pub fn owed(&self, key: &str) -> Vec<(&'static str, bool)> {
+    /// The every-change roster with each gate's standing AT ITS OWN SUPPORT KEY — the
+    /// derived to-do list: what this tree still OWES is exactly the gates without
+    /// verdicts at the key of what they each read.
+    pub fn owed(&self, crate_root: &Path) -> Result<Vec<(&'static str, bool)>, String> {
         GateRegistry::declared()
             .iter()
             .filter(|gate| matches!(gate.cadence, Cadence::EveryChange))
-            .map(|gate| (gate.name, self.held(gate.name, key)))
+            .map(|gate| {
+                let key = Self::support_hash(crate_root, &gate.support)?;
+                Ok((gate.name, self.held(gate.name, &key)))
+            })
             .collect()
     }
 
@@ -132,10 +160,25 @@ impl VerdictStore {
     }
 }
 
+#[crate::mutate("verdict")]
+impl VerdictStore {
+    /// The verdict walk's PUBLIC FACE: every file both keys fingerprint, sorted,
+    /// relative — one walk, one opinion about what the tree is, now consumable by
+    /// derivations beyond the keys (the item relation is the first).
+    ///
+    /// Capability: Effectful — reads directory structure only, never file contents.
+    pub fn files(crate_root: &Path) -> Result<Vec<String>, String> {
+        let mut files = Vec::new();
+        Self::walk(crate_root, crate_root, &mut files)?;
+        files.sort();
+        Ok(files)
+    }
+}
+
 #[cfg(test)]
 mod probes {
     use super::VerdictStore;
-    use crate::discover::gates::{Cadence, GateRegistry};
+    use crate::discover::gates::{Cadence, GateRegistry, Support};
 
     fn scratch(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("probe-verdict-{}-{name}", std::process::id()));
@@ -193,13 +236,62 @@ mod probes {
         );
     }
 
+    /// THE SUPPORT PROJECTION: an edit OUTSIDE a gate's support cannot move its key —
+    /// docs are inert to every support, spec/ is inert to the rust surface — while an
+    /// admitted edit still re-opens the debt. The docs-only friction, closed and held
+    /// closed.
+    #[test]
+    fn an_inert_edit_cannot_owe() {
+        let root = scratch("support");
+        std::fs::create_dir_all(root.join("docs")).unwrap();
+        std::fs::create_dir_all(root.join("spec")).unwrap();
+        std::fs::write(root.join("a.rs"), "pub fn a() {}\n").unwrap();
+        std::fs::write(root.join("docs/roadmap.md"), "prose\n").unwrap();
+        std::fs::write(root.join("README.md"), "front door\n").unwrap();
+        std::fs::write(root.join("spec/x.spec"), "lock\n").unwrap();
+        let judged = VerdictStore::support_hash(&root, &Support::Judged).unwrap();
+        let rust = VerdictStore::support_hash(&root, &Support::RustSurface).unwrap();
+
+        std::fs::write(root.join("docs/roadmap.md"), "more prose\n").unwrap();
+        std::fs::write(root.join("README.md"), "wider front door\n").unwrap();
+        assert_eq!(
+            judged,
+            VerdictStore::support_hash(&root, &Support::Judged).unwrap(),
+            "prose is inert to the judged tree"
+        );
+        assert_eq!(
+            rust,
+            VerdictStore::support_hash(&root, &Support::RustSurface).unwrap(),
+            "prose is inert to the rust surface"
+        );
+
+        std::fs::write(root.join("spec/x.spec"), "moved\n").unwrap();
+        assert_ne!(
+            judged,
+            VerdictStore::support_hash(&root, &Support::Judged).unwrap(),
+            "a spec edit moves the judged key"
+        );
+        assert_eq!(
+            rust,
+            VerdictStore::support_hash(&root, &Support::RustSurface).unwrap(),
+            "a spec edit sits outside the rust surface"
+        );
+
+        std::fs::write(root.join("a.rs"), "pub fn a() { }\n").unwrap();
+        assert_ne!(
+            rust,
+            VerdictStore::support_hash(&root, &Support::RustSurface).unwrap(),
+            "an admitted edit re-opens the debt"
+        );
+    }
+
     /// The owed roster IS the registry's every-change set — derived, never restated:
     /// an empty store owes every one of them, and only them.
     #[test]
     fn the_owed_roster_is_the_registry() {
         let root = scratch("roster");
         let store = VerdictStore::beside(&root);
-        let owed = store.owed("0000000000000000");
+        let owed = store.owed(&root).unwrap();
         let declared = GateRegistry::declared()
             .iter()
             .filter(|g| matches!(g.cadence, Cadence::EveryChange))

@@ -1,0 +1,87 @@
+weave-knee trial v2
+fanout: 6
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Griost circulates a single item through six modules, each shaped by a distinct discipline, wired into one closed loop: Hulbra hands its sealed ledger to Tolsax, Tolsax publishes its sweep verdicts to Grinex, Grinex reports missed heartbeats to Brabra, Brabra delegates overflow to Felkel, Felkel streams its evictions to Mirdor, and Mirdor signals backpressure to Hulbra — closing the ring back on itself, so pressure anywhere in the system eventually returns to its own source.
+
+  Three modules — Tolsax, Grinex, and Mirdor — refuse or gate on their own sweep or eviction cycles, meaning the system as a whole spends part of its time in a non-writable state at three independent points, not one: a caller crossing all three has to clear three separate write-refusal windows, not a single shared one. Three modules also keep only digests, never bodies — Tolsax, Grinex, and Hulbra — so the courier, the broker, and the sampler, three consecutive stages of the loop, form a corridor across which no payload body ever travels intact, only its digest, until Hulbra's sealed ledger reaches Tolsax.
+
+  Timeouts compound directionally rather than uniformly: Tolsax evicts the unclaimed after 6 ticks and Mirdor after 10, and since Felkel's evictions stream onward to Mirdor while Tolsax's sweep verdicts feed Grinex before ever reaching Mirdor, the loop holds two different eviction floors rather than one — a fast 6-tick floor near the courier and a slower 10-tick floor near the throttle, so an item that survives Tolsax's window still faces a materially longer clock once it is Mirdor's problem.
+
+  Retries also step down unevenly along the ring: Tolsax allows 3 attempts, Brabra 2, and both Grinex and Hulbra allow only 1 — so the two narrowest retry budgets sit on either side of Mirdor's backpressure signal (Grinex upstream of Brabra, Hulbra downstream of Mirdor), meaning the segments most exposed to a stalled throttle are also the least tolerant of a failed handoff, parking on first failure rather than absorbing it.
+
+  Reads are answered only from the newest snapshot at two points, Brabra and Felkel, and since Brabra delegates its overflow directly to Felkel, the overflow path itself runs entirely through snapshot-only readers — nothing on that leg ever reads a stale or intermediate state.
+
+  Countersignature requirements rise sharply deeper into the loop: Felkel needs 2 peers, Hulbra needs 2, but Mirdor needs 5 — the single highest bar in the system — so action at the throttle is structurally the hardest-won consensus in Griost, gating the very backpressure signal that ultimately reaches back to Hulbra and restarts the cycle.
+verdicts:
+  c0.0F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c3.1F NOT-ENTAILED
+  c4.2 ENTAILED
+  c0.2 ENTAILED
+  c4.2F NOT-ENTAILED
+  c4.0 NOT-ENTAILED
+  c2.1 ENTAILED
+  c1.2F NOT-ENTAILED
+  c1.2 ENTAILED
+  c3.1 ENTAILED
+  c2.0 NOT-ENTAILED
+  r4F NOT-ENTAILED
+  r2F NOT-ENTAILED
+  c0.1 ENTAILED
+  c3.2 NOT-ENTAILED
+  c2.1F NOT-ENTAILED
+  c1.1 ENTAILED
+  r0 ENTAILED
+  c5.2 ENTAILED
+  r1F NOT-ENTAILED
+  c3.0 ENTAILED
+  c5.0 ENTAILED
+  c4.1F NOT-ENTAILED
+  r4 ENTAILED
+  c4.1 ENTAILED
+  c1.0 NOT-ENTAILED
+  r5F NOT-ENTAILED
+  c5.2F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  c5.1F NOT-ENTAILED
+  r5 ENTAILED
+  r3 ENTAILED
+  c1.1F NOT-ENTAILED
+  r1 ENTAILED
+  c5.1 ENTAILED
+  c0.0 ENTAILED
+  c2.2 ENTAILED
+  r2 ENTAILED
+  c3.2F NOT-ENTAILED
+  c1.0F NOT-ENTAILED
+  r3F NOT-ENTAILED
+  c5.0F NOT-ENTAILED
+  c2.2F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+stated:
+  er4.quorum NOT-STATED
+  er5.retryF NOT-STATED
+  er5.retry NOT-STATED
+  e.ringF NOT-STATED
+  er1.retryF NOT-STATED
+  e.ring STATED
+  er0.retryF NOT-STATED
+  er3.quorumF NOT-STATED
+  er0.retry NOT-STATED
+  er1.retry NOT-STATED
+  er3.quorum NOT-STATED
+  er4.quorumF NOT-STATED
+edges:
+  Hulbra -> Tolsax
+  Tolsax -> Grinex
+  Grinex -> Brabra
+  Brabra -> Felkel
+  Felkel -> Mirdor
+  Mirdor -> Hulbra

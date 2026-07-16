@@ -1,0 +1,39 @@
+/// The judge prompt: the narrative, the blinded candidates, and the exact output
+/// contract `record::parse_judge` reads. Two censuses under two criteria: claims
+/// and relations under strict ENTAILMENT, emergent facts under STATED — explicit
+/// in the text, where the judge deriving it herself does not count. The system is
+/// fictional, so outside knowledge cannot rescue a dropped thread.
+pub fn judge(t: &Trial, narrative: &str) -> String {
+    let mut s = String::new();
+    s.push_str(
+        "You are a strict entailment judge. Below is a narrative about a fictional \
+         system, then two lists of candidate statements. For each ENTAILMENT candidate, \
+         decide whether the narrative ENTAILS it — states it outright or necessarily \
+         implies it. For each SYNTHESIS candidate, decide whether the narrative STATES \
+         it — says it outright or in direct paraphrase; a statement you could derive \
+         yourself but the narrative never makes explicit is NOT-STATED. Judge only from \
+         the narrative text; the system is fictional, so outside knowledge cannot help. \
+         When in doubt, NOT-ENTAILED and NOT-STATED.\n\nNarrative:\n",
+    );
+    for line in narrative.lines() {
+        s.push_str("> ");
+        s.push_str(line);
+        s.push('\n');
+    }
+    s.push_str("\nEntailment candidates:\n");
+    for c in candidates(t) {
+        s.push_str(&format!("{}: {}\n", c.id, c.text));
+    }
+    s.push_str("\nSynthesis candidates:\n");
+    for c in emergent_candidates(t) {
+        s.push_str(&format!("{}: {}\n", c.id, c.text));
+    }
+    s.push_str(
+        "\nOutput exactly one line per entailment candidate, in the order given:\n\
+         verdict <id> ENTAILED\nor\nverdict <id> NOT-ENTAILED\nThen exactly one line \
+         per synthesis candidate, in the order given:\nstated <id> STATED\nor\nstated \
+         <id> NOT-STATED\nThen one final line scoring the narrative as prose (cohesion, \
+         one voice, not a stitched list of parts):\nquality <1-5>\nNo other text.\n",
+    );
+    s
+}

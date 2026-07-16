@@ -1,0 +1,159 @@
+use crate::corpus::{word_budget, Rng, Trial};
+
+/// One judge candidate: a claim or a foil, blinded — the judge sees ids and texts,
+/// never which is which.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Candidate {
+    pub id: String,
+    pub text: String,
+    pub truth: bool,
+}
+
+/// The weave prompt: frame, rules, and the child exteriors. The weaver sees
+/// exteriors only — never the candidate list, never a foil.
+pub fn weave(t: &Trial) -> String {
+    let budget = word_budget(t.fanout);
+    let mut s = String::new();
+    s.push_str(&format!(
+        "You are writing the exterior narrative of a fictional system called {} for a \
+         technical stakeholder. Below are the exteriors of its {} modules. Weave them \
+         into ONE cohesive narrative — a single flowing account of how the system works \
+         as a whole.\n\nRules:\n- At most {budget} words.\n- Flowing prose only: no \
+         bullet lists, no headings, no numbered items.\n- Mention every module by its \
+         exact name.\n- State only what the exteriors below state; invent nothing.\n- \
+         Express every relation between modules; the relations are the story.\n- Output \
+         only the narrative.\n\nModule exteriors:\n",
+        t.system, t.fanout
+    ));
+    for (i, c) in t.children.iter().enumerate() {
+        s.push_str(&format!("\n{} — the {}\n", c.lexeme, c.role));
+        for cl in &c.claims {
+            s.push_str(&format!("- {}\n", cl.text));
+        }
+        for r in &t.relations {
+            if r.from == i {
+                s.push_str(&format!("- relation: {}\n", r.text));
+            } else if r.to == i {
+                s.push_str(&format!("- relation (incoming): {}\n", r.text));
+            }
+        }
+    }
+    s
+}
+
+/// Every claim and every foil, blinded and deterministically shuffled so the judge's
+/// list carries no positional hint of which statements are true.
+pub fn candidates(t: &Trial) -> Vec<Candidate> {
+    let mut v = Vec::new();
+    for c in &t.children {
+        for cl in &c.claims {
+            v.push(Candidate {
+                id: cl.id.clone(),
+                text: cl.text.clone(),
+                truth: true,
+            });
+            v.push(Candidate {
+                id: format!("{}F", cl.id),
+                text: cl.foil.clone(),
+                truth: false,
+            });
+        }
+    }
+    for r in &t.relations {
+        v.push(Candidate {
+            id: r.id.clone(),
+            text: r.text.clone(),
+            truth: true,
+        });
+        v.push(Candidate {
+            id: format!("{}F", r.id),
+            text: r.foil.clone(),
+            truth: false,
+        });
+    }
+    let mut rng = Rng::new(t.seed ^ 0x00C0_FFEE ^ ((t.fanout as u64) << 32));
+    for i in (1..v.len()).rev() {
+        v.swap(i, rng.pick(i + 1));
+    }
+    v
+}
+
+/// The judge prompt: the narrative, the blinded candidates, and the exact output
+/// contract `record::parse_judge` reads. The system is fictional, so outside
+/// knowledge cannot rescue a dropped thread.
+pub fn judge(t: &Trial, narrative: &str) -> String {
+    let mut s = String::new();
+    s.push_str(
+        "You are a strict entailment judge. Below is a narrative about a fictional \
+         system, then a list of candidate statements. For each candidate, decide \
+         whether the narrative ENTAILS it — states it outright or necessarily implies \
+         it. Judge only from the narrative text; the system is fictional, so outside \
+         knowledge cannot help. When in doubt, NOT-ENTAILED.\n\nNarrative:\n",
+    );
+    for line in narrative.lines() {
+        s.push_str("> ");
+        s.push_str(line);
+        s.push('\n');
+    }
+    s.push_str("\nCandidates:\n");
+    for c in candidates(t) {
+        s.push_str(&format!("{}: {}\n", c.id, c.text));
+    }
+    s.push_str(
+        "\nOutput exactly one line per candidate, in the order given:\nverdict <id> \
+         ENTAILED\nor\nverdict <id> NOT-ENTAILED\nThen one final line scoring the \
+         narrative as prose (cohesion, one voice, not a stitched list of parts):\n\
+         quality <1-5>\nNo other text.\n",
+    );
+    s
+}
+
+#[cfg(test)]
+mod probes {
+    use super::*;
+    use crate::corpus::trial;
+
+    #[test]
+    fn the_weaver_sees_every_claim_and_relation_and_no_foil() {
+        let t = trial(4, 9);
+        let w = weave(&t);
+        for c in &t.children {
+            assert!(w.contains(&c.lexeme));
+            for cl in &c.claims {
+                assert!(w.contains(&cl.text));
+                assert!(!w.contains(&cl.foil));
+            }
+        }
+        for r in &t.relations {
+            assert!(w.contains(&r.text));
+            assert!(!w.contains(&r.foil));
+        }
+    }
+
+    #[test]
+    fn candidates_pair_every_claim_with_its_foil_and_shuffle_deterministically() {
+        let t = trial(5, 3);
+        let cands = candidates(&t);
+        assert_eq!(cands.len(), 2 * (3 * 5 + 5));
+        assert_eq!(cands, candidates(&t));
+        let truths = cands.iter().filter(|c| c.truth).count();
+        assert_eq!(truths, cands.len() / 2);
+        for c in &cands {
+            if !c.truth {
+                assert!(c.id.ends_with('F'));
+            }
+        }
+    }
+
+    #[test]
+    fn the_judge_sees_the_narrative_and_every_candidate() {
+        let t = trial(3, 5);
+        let j = judge(&t, "A line.\n\nAnother line.");
+        assert!(j.contains("> A line."));
+        assert!(j.contains("> Another line."));
+        for c in candidates(&t) {
+            assert!(j.contains(&format!("{}: {}", c.id, c.text)));
+        }
+        assert!(j.contains("quality <1-5>"));
+    }
+}

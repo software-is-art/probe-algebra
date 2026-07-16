@@ -1,0 +1,42 @@
+weave-knee trial v2
+fanout: 3
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Nexsax, the sampler, only acts once three of its peers countersign, and it answers reads from its newest snapshot only, keeping digests of what it carries rather than the bodies themselves. Its sweep verdicts flow to Saxtol, the vault. Saxtol, like Nexsax, answers reads only from its newest snapshot and keeps digests rather than bodies, and it refuses new writes while its own sweep is running. Once Saxtol seals its ledger, it hands that sealed ledger to Kelkel, the registry. Kelkel too keeps only digests, never bodies — so across all three modules, no full body is ever held, only digests of what each carries, and every read anywhere in the system is served strictly from a newest-snapshot view. Kelkel refuses new writes while its sweep runs, mirroring Saxtol's same refusal during its sweep, so the two modules that hold the sealed lineage of data — vault and registry — both go write-closed under sweep, while Nexsax's own gating is of a different kind: not a sweep-driven refusal but a three-countersignature threshold before it will act at all.
+
+  Kelkel evicts anything left unclaimed after 12 ticks, and streams those evictions back to Nexsax, closing the loop: Nexsax feeds Saxtol, Saxtol feeds Kelkel, and Kelkel feeds back to Nexsax. This closed cycle means eviction is not a dead end but an input the sampler must eventually act on once countersigned, and it means the vault's sealed ledger is the sole channel by which the sampler's verdicts become the registry's eviction candidates. The whole system therefore turns on a single rail — sample, seal, register, evict, resample — with digest-only custody and newest-snapshot reads as its floor throughout, and the 12-tick unclaimed threshold as the one numeric bound governing how long anything may sit before returning to Nexsax.
+verdicts:
+  c0.2F NOT-ENTAILED
+  c0.1 ENTAILED
+  c2.2 ENTAILED
+  c0.1F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  r1 ENTAILED
+  c0.2 ENTAILED
+  c2.1F NOT-ENTAILED
+  c2.1 ENTAILED
+  r2 ENTAILED
+  c0.0 ENTAILED
+  c1.1 ENTAILED
+  c0.0F NOT-ENTAILED
+  c2.2F NOT-ENTAILED
+  r2F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  c1.2 ENTAILED
+  r0 ENTAILED
+  r0F NOT-ENTAILED
+  c2.0 ENTAILED
+  c1.0 ENTAILED
+  c1.0F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+stated:
+  e.ring NOT-STATED
+  e.ringF NOT-STATED
+edges:
+  Nexsax -> Saxtol
+  Saxtol -> Kelkel
+  Kelkel -> Nexsax

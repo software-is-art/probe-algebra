@@ -1,0 +1,14 @@
+/// The Z-set spread: zero, singletons, negatives, and overlapping multi-key sets,
+/// so the grid can refute a false law (a distinct that pretended linearity, an
+/// inverse that only held on positives).
+#[crate::mutate]
+fn zsets() -> Vec<Flow> {
+    vec![
+        Flow::Zset(ZSet::zero()),
+        Flow::Zset(ZSet::from_pairs(&[(0, 1)])),
+        Flow::Zset(ZSet::from_pairs(&[(0, -1)])),
+        Flow::Zset(ZSet::from_pairs(&[(1, 2)])),
+        Flow::Zset(ZSet::from_pairs(&[(0, 1), (1, -2)])),
+        Flow::Zset(ZSet::from_pairs(&[(1, 1), (2, 3)])),
+    ]
+}

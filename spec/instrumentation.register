@@ -23,6 +23,7 @@ src/kvstore/probes.rs: probe suite for the worked example — probes are not pro
 src/kvstore/theory.rs: theory operators — mutated in-process on every test (spec/*.mutation.spec)
 src/kvstore/internal.rs: worked example — guarded by the ttl-store theory's in-process mutation and the layer probes; next widening target
 src/kvstore/store.rs: worked example — same guard as kvstore/internal.rs; next widening target
+src/kvstore/twin.rs: swap-drill fixture — the twin carrier exists to be COMPARED against the primary (byte-identical law lists under carrier swap); a flip here reddens the drill itself, so instrumenting it would double-count the primary's guard
 src/select/boundary.rs: audit tooling — consumes cargo-mutants outcomes.json; retires with the source sweeps
 src/select/internal.rs: audit tooling — same as select/boundary.rs
 src/discover/mod.rs: theory declarations and spec tables — data mutated in-process, plus the theory!/system! macros

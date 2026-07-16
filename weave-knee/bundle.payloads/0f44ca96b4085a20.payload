@@ -1,0 +1,21 @@
+/// The gain knee: the longest ascending prefix of fanouts whose mean gain stays
+/// STRICTLY positive — the weave still states composites concatenation would not.
+/// Where gain touches zero, the parent exterior has stopped earning its bytes;
+/// that fanout, not the relation floor, is where the functor dies under load.
+pub fn gain_knee(curve: &[CurvePoint]) -> Knee {
+    let mut held = None;
+    for point in curve {
+        if point.gain > 0.0 {
+            held = Some(point.fanout);
+        } else {
+            return match held {
+                Some(k) => Knee::At(k),
+                None => Knee::BelowSweep,
+            };
+        }
+    }
+    match held {
+        Some(k) => Knee::NotReached(k),
+        None => Knee::BelowSweep,
+    }
+}

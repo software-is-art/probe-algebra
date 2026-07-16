@@ -2,7 +2,7 @@
 # operator-shaped (every argument and the return a bare named value type, no primitives, no
 # I/O). Boundary-hood is a COMPUTED property here, not the `boundary.rs` file convention — a
 # module qualifies wherever it lives. Regenerate with `BLESS_QUALIFY=1 cargo build`.
-# 62 files scanned, 17 qualify.
+# 67 files scanned, 18 qualify.
 
 src/boundary.rs: QUALIFIES — operators [Capability::combine, Capability::join, Provenance::combine] over sorts {Capability, Provenance}
 src/capability.rs: QUALIFIES — operators [Audit::declared, Audit::observed, cap_of] over sorts {Audit, Capability, Source}
@@ -20,4 +20,5 @@ src/discover/verbs.rs: QUALIFIES — operators [add_a, add_b, collect_a, collect
 src/discover/world.rs: QUALIFIES — operators [FakeRemoteStore::snapshot, WorldReport::lock] over sorts {FakeRemoteStore, Lock, State, WorldReport}
 src/interp/boundary.rs: QUALIFIES — operators [Bound::new, Env::bind, Expr::bin, Expr::bind, Expr::cond, Expr::var, Int::plus, Int::times, Pos::next] over sorts {Bound, Env, Expr, Ident, Int, Op, Pos}
 src/kvstore/store.rs: QUALIFIES — operators [Advance::by, Advance::new, Clock::advanced, Clock::until, Entry::expires_at, Entry::new, Entry::remaining_at, Entry::ttl, Entry::val, Lookup::new, Store::clock, Store::put, Store::tick, Store::view, Ttl::plus, Write::new, Write::ttl, Write::val] over sorts {Advance, Clock, Entry, Key, Lookup, Snapshot, Store, Ttl, Val, Write}
+src/kvstore/twin.rs: QUALIFIES — operators [TwinStore::put, TwinStore::tick, TwinStore::view] over sorts {Key, Snapshot, Ttl, TwinStore, Val}
 src/select/boundary.rs: QUALIFIES — operators [KillMatrix::select, KillMatrix::uncoverable] over sorts {Cover, KillMatrix}

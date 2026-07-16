@@ -1,0 +1,13 @@
+/// A verb payload: a file path, or `-` for stdin.
+fn read_payload(verb: &str, source: &str) -> Result<String, String> {
+    if source == "-" {
+        let mut buf = String::new();
+        std::io::stdin()
+            .read_to_string(&mut buf)
+            .map_err(|e| format!("bundle {verb}: stdin unreadable: {e}"))?;
+        Ok(buf)
+    } else {
+        std::fs::read_to_string(source)
+            .map_err(|e| format!("bundle {verb}: payload unreadable: {e}"))
+    }
+}

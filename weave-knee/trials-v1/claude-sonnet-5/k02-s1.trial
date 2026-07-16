@@ -1,0 +1,25 @@
+weave-knee trial v1
+fanout: 2
+seed: 1
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Grisax is built around two peers, Pamzin the scheduler and Felsax the courier, each holding only digests of what passes through them and never the bodies themselves. Pamzin acts only once five of its peers countersign, and anything left unclaimed in its care for ten ticks is evicted. Felsax, for its part, attempts a failed handoff at most twice before parking it, and it too evicts anything left unclaimed after ten ticks. The two are bound by a pair of relations that run in opposite directions: Pamzin signals backpressure to Felsax, tempering how much the courier hands off, while Felsax in turn publishes its sweep verdicts back to Pamzin, feeding the scheduler the results of its own passes. In this way Pamzin governs pace and Felsax governs delivery, each watching the other — Pamzin throttling Felsax's flow, Felsax reporting to Pamzin what that flow turned up — while both independently enforce the same discipline of digest-only custody and a ten-tick claim window, so that nothing lingers unclaimed and nothing is held in full past its purpose.
+verdicts:
+  c0.0 ENTAILED
+  c0.1 ENTAILED
+  c0.2 ENTAILED
+  r0 ENTAILED
+  c1.0F NOT-ENTAILED
+  r1F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c1.0 ENTAILED
+  r1 ENTAILED
+  c1.1 ENTAILED
+  c1.2 ENTAILED
+  c1.2F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  r0F NOT-ENTAILED

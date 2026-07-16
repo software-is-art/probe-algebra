@@ -1,0 +1,178 @@
+#[cfg(test)]
+mod probes {
+    use super::{Evidence, SiteVerdict, Transcript};
+
+    fn transcript() -> Transcript {
+        Transcript {
+            tree: "00aa11bb22cc33dd".to_string(),
+            toolchain: "1.94.1".to_string(),
+            baseline_secs: 7,
+            sites: vec![
+                SiteVerdict {
+                    site: "a::b::f:0: == -> !=".to_string(),
+                    verdict: "killed".to_string(),
+                    tests: vec!["a::probes::one".to_string(), "a::probes::two".to_string()],
+                    evidence: "1111aaaa2222bbbb".to_string(),
+                },
+                SiteVerdict {
+                    site: "a::b::g:deaf -> None".to_string(),
+                    verdict: "SURVIVED".to_string(),
+                    tests: vec![],
+                    evidence: String::new(),
+                },
+                SiteVerdict {
+                    site: "a::b::h:1: && -> ||".to_string(),
+                    verdict: "killed".to_string(),
+                    tests: vec!["a::probes::three".to_string()],
+                    evidence: "3333cccc4444dddd".to_string(),
+                },
+            ],
+        }
+    }
+
+    /// THE HEADLINE: the transcript round-trips byte-losslessly — what the sweep
+    /// attests is exactly what the countersign audits, spaces-and-colons site names,
+    /// empty covering sets, and all.
+    #[test]
+    fn the_transcript_round_trips() {
+        let t = transcript();
+        let parsed = Transcript::parse(&t.render()).expect("parses");
+        assert_eq!(parsed.tree, t.tree);
+        assert_eq!(parsed.toolchain, t.toolchain);
+        assert_eq!(parsed.baseline_secs, t.baseline_secs);
+        assert_eq!(parsed.sites.len(), t.sites.len());
+        for (a, b) in parsed.sites.iter().zip(t.sites.iter()) {
+            assert_eq!(a.site, b.site);
+            assert_eq!(a.verdict, b.verdict);
+            assert_eq!(a.tests, b.tests);
+            assert_eq!(a.evidence, b.evidence);
+        }
+        assert_eq!(parsed.render(), t.render(), "render is a fixed point");
+        // a transcript from before evidence keys still parses — its sites carry the
+        // empty key, so nothing is reusable and the one honest transition is a sweep.
+        let elder = Transcript::parse("tree x\ntoolchain y\nbaseline 3\nkilled\ts:0: == -> !=\ta::t\n")
+            .expect("the elder format parses");
+        assert_eq!(elder.sites[0].evidence, "");
+    }
+
+    /// Refusals are named: a hand-touched line and a headless transcript both refuse —
+    /// an attestation that cannot be read is re-derived, never audited.
+    #[test]
+    fn a_hand_touched_transcript_refuses() {
+        let refusal =
+            Transcript::parse("tree x\ntoolchain y\nbaseline 3\nnot a line\n").unwrap_err();
+        assert!(refusal.contains("line 4"), "{refusal}");
+        let headless = Transcript::parse("killed\tsite\ttests\n").unwrap_err();
+        assert!(headless.contains("header"), "{headless}");
+    }
+
+    /// The seed-to-sample walk is a pure function: same seed, same sample; distinct
+    /// entries; bounded by the roster; and the whole roster arrives when K exceeds it.
+    #[test]
+    fn the_sample_is_deterministic_distinct_and_bounded() {
+        let t = transcript();
+        let one: Vec<&str> = t.sample(2, 42).iter().map(|s| s.site.as_str()).collect();
+        let two: Vec<&str> = t.sample(2, 42).iter().map(|s| s.site.as_str()).collect();
+        assert_eq!(one, two, "same seed, same sample");
+        assert_eq!(one.len(), 2);
+        let all = t.sample(50, 7);
+        assert_eq!(all.len(), 3, "K clamps to the roster");
+        let different: Vec<&str> = t.sample(2, 43).iter().map(|s| s.site.as_str()).collect();
+        let _ = different; // seeds may collide on a 3-site roster; determinism is the pin
+    }
+
+    /// The evidence discipline, pinned: the key derives from the site's module and
+    /// its covering tests' modules — moving any of those bytes moves the key, the
+    /// suffix and the test order are not evidence, an unresolvable name yields the
+    /// empty key — and carry honours exactly a matching non-empty key, never a
+    /// timeout (load-sensitive detections are re-judged, not inherited).
+    #[test]
+    fn evidence_keys_move_with_their_modules_and_timeouts_never_carry() {
+        let root = std::env::temp_dir().join(format!("attest-evidence-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("temp src");
+        std::fs::write(
+            root.join("src/foo.rs"),
+            "fn bar() {}\nmod probes { fn t1() {} }\n",
+        )
+        .expect("foo.rs");
+        let covering = vec!["foo::probes::t1".to_string()];
+        let one = Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering);
+        assert_eq!(one.len(), 16, "a key is minted: `{one}`");
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering),
+            one,
+            "same bytes, same key"
+        );
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::foo::bar:deaf -> None", &covering),
+            one,
+            "the mutant suffix is not evidence"
+        );
+        std::fs::write(
+            root.join("src/foo.rs"),
+            "fn bar() { let _ = 1; }\nmod probes { fn t1() {} }\n",
+        )
+        .expect("foo.rs moves");
+        let mut moved = Evidence::under(&root);
+        let two = moved.of("crate_x::foo::bar:0: == -> !=", &covering);
+        assert_ne!(two, one, "the module moved, the key moves");
+        assert_ne!(
+            moved.of("crate_x::foo::bar:0: == -> !=", &[]),
+            two,
+            "the covering set is evidence too"
+        );
+        assert_eq!(moved.of("crate_x::nowhere::bar:0: == -> !=", &[]), "");
+        assert_eq!(moved.of("crate_x::foo::bar", &[]), "", "no suffix, no site");
+        assert_eq!(
+            moved.of("crate_x::foo:0: == -> !=", &[]),
+            "",
+            "a file with no item chain is not a site"
+        );
+        let prior = Transcript {
+            tree: "t".to_string(),
+            toolchain: "tc".to_string(),
+            baseline_secs: 1,
+            sites: vec![
+                SiteVerdict {
+                    site: "s1".to_string(),
+                    verdict: "killed".to_string(),
+                    tests: vec![],
+                    evidence: "aaaaaaaaaaaaaaaa".to_string(),
+                },
+                SiteVerdict {
+                    site: "s2".to_string(),
+                    verdict: "timeout".to_string(),
+                    tests: vec![],
+                    evidence: "bbbbbbbbbbbbbbbb".to_string(),
+                },
+                SiteVerdict {
+                    site: "s3".to_string(),
+                    verdict: "SURVIVED".to_string(),
+                    tests: vec![],
+                    evidence: String::new(),
+                },
+            ],
+        };
+        assert_eq!(
+            Evidence::carry(&prior, "s1", "aaaaaaaaaaaaaaaa"),
+            Some("killed")
+        );
+        assert_eq!(
+            Evidence::carry(&prior, "s1", "cccccccccccccccc"),
+            None,
+            "a moved key is judged, not carried"
+        );
+        assert_eq!(
+            Evidence::carry(&prior, "s2", "bbbbbbbbbbbbbbbb"),
+            None,
+            "a timeout is load-sensitive: re-judge"
+        );
+        assert_eq!(
+            Evidence::carry(&prior, "s3", ""),
+            None,
+            "an empty key earns nothing"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

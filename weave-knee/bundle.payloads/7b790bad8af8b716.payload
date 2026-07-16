@@ -1,0 +1,80 @@
+/// Everything the judge's one reply must contain: both censuses and the felicity
+/// score. Parsed whole so an absent census refuses before anything is written.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JudgeReading {
+    pub verdicts: Vec<(String, bool)>,
+    pub stated: Vec<(String, bool)>,
+    pub quality: u8,
+}
+
+fn stated_word(word: &str, id: &str) -> Result<bool, String> {
+    match word {
+        "STATED" => Ok(true),
+        "NOT-STATED" => Ok(false),
+        other => Err(format!("unknown stated word `{other}` for `{id}`")),
+    }
+}
+
+/// Read the judge's raw output: `verdict <id> ENTAILED|NOT-ENTAILED` lines, `stated
+/// <id> STATED|NOT-STATED` lines, and one `quality <1-5>` line. Surrounding prose is
+/// ignored (models preamble); a malformed word refuses, and an absent census —
+/// either one — refuses rather than scoring around the hole.
+pub fn read_judge(raw: &str) -> Result<JudgeReading, String> {
+    let mut verdicts = Vec::new();
+    let mut stated = Vec::new();
+    let mut quality = None;
+    for line in raw.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("verdict ") {
+            let (id, word) = rest
+                .split_once(' ')
+                .ok_or_else(|| format!("unreadable verdict line: `{line}`"))?;
+            verdicts.push((id.to_string(), verdict_word(word.trim(), id)?));
+        } else if let Some(rest) = line.strip_prefix("stated ") {
+            let (id, word) = rest
+                .split_once(' ')
+                .ok_or_else(|| format!("unreadable stated line: `{line}`"))?;
+            stated.push((id.to_string(), stated_word(word.trim(), id)?));
+        } else if let Some(rest) = line.strip_prefix("quality ") {
+            let q: u8 = rest
+                .trim()
+                .parse()
+                .map_err(|_| format!("unreadable quality line: `{line}`"))?;
+            if !(1..=5).contains(&q) {
+                return Err(format!("quality {q} outside 1-5"));
+            }
+            quality = Some(q);
+        }
+    }
+    if verdicts.is_empty() {
+        return Err("the judge produced no verdict lines".to_string());
+    }
+    if stated.is_empty() {
+        return Err("the judge produced no stated lines".to_string());
+    }
+    match quality {
+        Some(q) => Ok(JudgeReading {
+            verdicts,
+            stated,
+            quality: q,
+        }),
+        None => Err("the judge produced no quality line".to_string()),
+    }
+}
+
+/// Read the reconstructor's raw output: `edge <from> <to>` lines, exact module
+/// names. An empty answer is a measurement (topology recall zero), not a refusal —
+/// but a malformed edge line refuses.
+pub fn parse_edges(raw: &str) -> Result<Vec<(String, String)>, String> {
+    let mut edges = Vec::new();
+    for line in raw.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("edge ") {
+            let (from, to) = rest
+                .split_once(' ')
+                .ok_or_else(|| format!("unreadable edge line: `{line}`"))?;
+            edges.push((from.trim().to_string(), to.trim().to_string()));
+        }
+    }
+    Ok(edges)
+}

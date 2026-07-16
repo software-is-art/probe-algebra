@@ -1,0 +1,15 @@
+/// A delta entering the stream: zero everywhere except NOW (the window's last
+/// tick) — how a transaction's change arrives in the kernel.
+#[crate::mutate]
+fn impulse(v: &[Flow]) -> Option<Flow> {
+    let mut out = vec![ZSet::zero(); TICKS];
+    out[TICKS - 1] = zpart(&v[0]);
+    Some(Flow::T(out))
+}
+
+/// The stream's current value: the window's last tick — how eduction reads a
+/// maintained view out of the kernel.
+#[crate::mutate]
+fn latest(v: &[Flow]) -> Option<Flow> {
+    Some(Flow::Z(tpart(&v[0]).last().cloned().unwrap_or_else(ZSet::zero)))
+}

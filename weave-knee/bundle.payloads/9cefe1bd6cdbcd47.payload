@@ -1,0 +1,56 @@
+/// Every emergent fact and its foil, blinded and deterministically shuffled — the
+/// gain census the judge scores under the STATED criterion, kept separate from the
+/// entailment candidates because the two criteria must never blur.
+pub fn emergent_candidates(t: &Trial) -> Vec<Candidate> {
+    let mut v = Vec::new();
+    for e in crate::corpus::emergents(t) {
+        v.push(Candidate {
+            id: e.id.clone(),
+            text: e.text.clone(),
+            truth: true,
+        });
+        v.push(Candidate {
+            id: format!("{}F", e.id),
+            text: e.foil.clone(),
+            truth: false,
+        });
+    }
+    let mut rng = Rng::new(t.seed ^ 0x00FA_CADE ^ ((t.fanout as u64) << 32));
+    for i in (1..v.len()).rev() {
+        v.swap(i, rng.pick(i + 1));
+    }
+    v
+}
+
+/// The reconstruction prompt — the functor's return leg. A fresh reader, given ONLY
+/// the narrative and the module names in scrambled order, lists every directed
+/// relation it can recover; `record::parse_edges` reads the answer.
+pub fn reconstruct(t: &Trial, narrative: &str) -> String {
+    let mut names: Vec<&str> = t.children.iter().map(|c| c.lexeme.as_str()).collect();
+    let mut rng = Rng::new(t.seed ^ 0x0000_D00D ^ ((t.fanout as u64) << 32));
+    for i in (1..names.len()).rev() {
+        names.swap(i, rng.pick(i + 1));
+    }
+    let mut s = String::new();
+    s.push_str(
+        "You are reconstructing the topology of a fictional system from its narrative \
+         alone. Below is the narrative, then the names of its modules in scrambled \
+         order. Modules are connected by DIRECTED relations (one module hands off to, \
+         signals, or reports to another). From the narrative text alone, list every \
+         directed relation you can identify.\n\nNarrative:\n",
+    );
+    for line in narrative.lines() {
+        s.push_str("> ");
+        s.push_str(line);
+        s.push('\n');
+    }
+    s.push_str("\nModules (scrambled order):\n");
+    for n in &names {
+        s.push_str(&format!("- {n}\n"));
+    }
+    s.push_str(
+        "\nOutput exactly one line per relation you find, direction preserved:\n\
+         edge <from-module> <to-module>\nUse exact module names. No other text.\n",
+    );
+    s
+}

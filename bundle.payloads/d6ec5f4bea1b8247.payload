@@ -1,0 +1,72 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+    use crate::discover::engine::{DiscoveredLaw, Engine, Theory};
+    use crate::kvstore::theory::TtlStore;
+
+    fn laws<T: Theory>() -> Vec<DiscoveredLaw> {
+        Engine::<T>::new().discover().laws
+    }
+
+    fn rendered(laws: &[DiscoveredLaw]) -> Vec<String> {
+        laws.iter()
+            .map(|l| format!("{}\n{}", l.prose, l.equation))
+            .collect()
+    }
+
+    /// THE SWAP DRILL: the twin carrier — a different representation under the
+    /// same operations, variables, and observation — must discover the
+    /// byte-identical law list. A differing line is a representation leak in the
+    /// spec language itself: the theory failed to name an equivalence class.
+    #[test]
+    fn the_twin_carrier_discovers_the_byte_identical_spec() {
+        assert_eq!(TtlStoreTwin::name(), "ttl store twin");
+        let primary = rendered(&laws::<TtlStore>());
+        let twin = rendered(&laws::<TtlStoreTwin>());
+        assert_eq!(
+            primary, twin,
+            "the spec language leaked representation: a law list moved under carrier swap"
+        );
+    }
+
+    /// The drill can FIRE: a behaviour change (first write wins) must move the
+    /// law list — the bias law names which side wins, so it cannot survive the
+    /// flip. A swap drill that greens under a behaviour change is decoration.
+    #[test]
+    fn the_swap_drill_fires_on_a_behaviour_change() {
+        let primary = rendered(&laws::<TtlStore>());
+        let doctored = rendered(&laws::<FirstWinsTwin>());
+        assert_ne!(
+            primary, doctored,
+            "the drill went vacuous: a first-write-wins merge left the law list fixed"
+        );
+        let bias = "the later operand wins";
+        assert!(
+            primary.iter().any(|l| l.contains(bias)),
+            "the primary lost its bias law — the drill's teeth depend on it"
+        );
+        assert!(
+            !doctored.iter().any(|l| l.contains(bias)),
+            "first-write-wins still discovers a later-operand-wins bias — the flip did nothing"
+        );
+    }
+
+    /// Equivalence at the observation level, spot-checked: the same edge
+    /// sequence through both carriers yields the same snapshot. The law drill
+    /// samples the theory's grid; this pins one concrete trace end to end.
+    #[test]
+    fn one_trace_agrees_end_to_end() {
+        let p = crate::kvstore::store::Store::new()
+            .put(key("a"), val(1), ttl(3))
+            .put(key("b"), val(2), ttl(1))
+            .tick(ttl(1))
+            .put(key("a"), val(4), ttl(2));
+        let t = TwinStore::new()
+            .put(key("a"), val(1), ttl(3))
+            .put(key("b"), val(2), ttl(1))
+            .tick(ttl(1))
+            .put(key("a"), val(4), ttl(2));
+        assert_eq!(p.view(), t.view());
+        assert_eq!(p.merge(&p).view(), t.merge(&t).view());
+    }
+}

@@ -38,3 +38,134 @@ edit src/discover/gates.rs — impl GateRegistry @f7b614c66c075055
 edit src/discover/gates.rs — impl GateRegistry @c69eb51034ea997f
 edit src/discover/attest.rs — SiteVerdict @cb54ee91a589ad92
 edit src/discover/attest.rs — Transcript @3a1cdf0ecbebb6ba
+add src/kvstore/twin.rs — struct TwinStore @126a991b8aff8960
+add src/kvstore/mod.rs — mod twin @e34a8a55968c2043
+edit src/kvstore/mod.rs — twin @5dc88d4cae768bb2
+add src/kvstore/twin.rs — enum TwinVal, fn twin_store, fn twin_dur, fn empty, fn merge, fn merge_first_wins, fn tick, fn zero, fn plus, fn key, fn val, fn ttl, fn twin_stores, fn twin_durs @1414e856492fd69d
+add src/kvstore/twin.rs —  @09ac48bfcede9edc
+add src/kvstore/twin.rs — mod probes @66b00752ffaee473
+edit src/kvstore/twin.rs — probes @d6ec5f4bea1b8247
+edit src/kvstore/twin.rs — probes @fda552fa4b019b36
+add src/kvstore/twin.rs — struct TtlStoreTwin, struct FirstWinsTwin @4a3a7aba31c12bd7
+edit src/kvstore/mod.rs — twin @83d3a5ac31ec3bbc
+add src/discover/gates.rs — enum Support @86cf64bf20e32dc7
+edit src/discover/gates.rs — Gate @583604492f8aa461
+edit src/discover/gates.rs — impl GateRegistry @2098e71ab61378ae
+edit src/discover/gates.rs — impl Pipeline @8e2005cd6ea85bd1
+edit src/discover/probes.rs — probes_tests @49dc787e34089fe6
+edit src/discover/verdict.rs — probes @8e3f1fd350716d38
+edit examples/bundle.rs — run @79794503d2f6b394
+edit examples/schemata.rs — verify @4d163d32daef5bc4
+edit examples/schemata.rs — sweep @27f4f21739f7854c
+edit src/discover/gates.rs — tests @0cb140ce67a7fab6
+edit examples/schemata.rs — sweep @deab97bef3a1ae8b
+edit examples/schemata.rs — survives @9d106ed974a104e4
+add src/discover/cli.rs — enum Sort, enum Mode, struct Slot, struct VerbSpec, struct CliSpec, struct Invocation, fn bundle_cli, mod probes @0f94035bed5d17e6
+add src/discover/mod.rs — mod cli @2287731756609363
+edit examples/bundle.rs — run @8e32e1fb5adb2db1
+edit src/discover/attest.rs — SiteVerdict @4b67fceef7a30074
+edit src/discover/attest.rs — impl Transcript @c05f6981796caaee
+add src/discover/attest.rs — struct Evidence @61d767a42dca582a
+edit src/discover/attest.rs — probes @f600269e14bcc18c
+add examples/schemata.rs — fn outcome @f63f16a7d242a3c9
+add examples/schemata.rs — fn sweep_with @1a8b2cc981b289de
+edit examples/schemata.rs — sweep @1a0a88f43ca1a6a1
+edit examples/schemata.rs — sweep_with @6170e37ff53e265a
+edit examples/schemata.rs — countersign @c073ad1cdbab56cf
+edit examples/schemata.rs — verify @a23f4bf3c751674a
+edit examples/schemata.rs — outcome @79f22c82e62096cf
+edit examples/schemata.rs — countersign @dd6b6ea895aabfb9
+edit examples/schemata.rs — probes @393f99dd6a9aa3b7
+collect examples/schemata.rs — survives
+edit src/discover/gates.rs — impl GateRegistry @6152b004e1af3977
+add examples/schemata.rs —  @7361fd030e8db76f
+edit examples/schemata.rs — sweep_with @c24863530467c828
+edit examples/schemata.rs — sweep_with @c4ba83a575d01f9b
+edit examples/schemata.rs — sweep_with @e65447ddc811f1fe
+edit src/discover/schemata.rs — impl Schemata @79331796ca857942
+add examples/schemata.rs — fn physical_memory_gb @58e2b118fbb53d23
+edit examples/schemata.rs — sweep_with @0fc4e130756d5f06
+edit examples/schemata.rs — sweep_with @0fc4e130756d5f06
+edit examples/schemata.rs — sweep_with @f55084ed700a994a
+edit src/discover/attest.rs — impl Evidence @6ec72ee39c55172b
+edit src/discover/attest.rs — probes @6392227d07dad1de
+edit src/discover/attest.rs — impl Evidence @68eaccd5479f8704
+edit src/discover/attest.rs — impl Evidence @5a2f02c6332db099
+edit src/discover/attest.rs — probes @f3a3636a77b7f907
+add src/discover/zset.rs — struct ZSet, enum Flow, struct ZKernel, enum Sort, fn zpart, fn tpart, fn zero, fn add, fn neg, fn join, fn distinct, fn delay, fn integrate, fn differentiate, fn zsets, fn traces @a449b4476cf50f13
+add src/discover/mod.rs — mod zset @83a491615877dad7
+add src/discover/zset.rs — fn impulse, fn latest @aaf4dba278de911a
+edit examples/freeze_spec.rs — main @5f5a727dc1c907fe
+edit src/discover/depend.rs — EMBEDDED @f37e1cdbdd5781cb
+edit src/discover/depend.rs — EMBEDDED @aa9f785d94dc6e0b
+edit src/discover/freeze.rs — tests @4a33d09be072406a
+edit src/discover/system.rs — tests @40f212e9413c0200
+edit src/discover/shape.rs — probes @001d95815c16b6a1
+edit src/discover/freeze.rs — tests @16b4ecfc929aceaf
+edit src/discover/system.rs — tests @2d0f087d018123f3
+edit src/discover/shape.rs — probes @01c01d3f553a9385
+edit src/discover/system.rs — tests @328cc5d984ee16cc
+edit src/discover/system.rs — tests @b7e5e073dc94dcd3
+edit src/discover/system.rs — tests @0b398cfe6299d6ed
+add src/discover/zset.rs — mod probes @4ab91dc66b7e9acd
+edit src/discover/zset.rs — Flow @b63a46bdfc8388be
+edit src/discover/zset.rs — Sort @5623675f5a71f4a5
+edit src/discover/zset.rs — zpart @8f571ca87e1f83dd
+edit src/discover/zset.rs — tpart @a6848a4fcb8aa6d6
+edit src/discover/zset.rs — zero @c5b6d86c79c9dcd4
+edit src/discover/zset.rs — add @c9d847bdc5525568
+edit src/discover/zset.rs — neg @95fc72daea7dc31d
+edit src/discover/zset.rs — join @4224aee8bfc2518e
+edit src/discover/zset.rs — distinct @85e81de94a1ffc5d
+edit src/discover/zset.rs — delay @d21808b6e6755017
+edit src/discover/zset.rs — integrate @09dc599b50f1cc1c
+edit src/discover/zset.rs — differentiate @90218714e2caa348
+edit src/discover/zset.rs — impulse @932c26278bad441f
+edit src/discover/zset.rs — latest @c3f8753e56d31b94
+edit src/discover/zset.rs — zsets @c128651a7467dc61
+edit src/discover/zset.rs — traces @d6b60e5b41edf74c
+edit src/discover/zset.rs — probes @ac4ffb6e0cddb53d
+edit src/discover/shape.rs — probes @b1706ec8bbb49dcd
+edit src/discover/system.rs — tests @91ad49a2bea7172f
+edit examples/schemata.rs — outcome @52a9e6a0178f1595
+add src/discover/eduction.rs — enum Node, struct Cell, struct Warehouse, struct Circuit @07ad126c1c93a9d5
+add src/discover/mod.rs — mod eduction @e964d80b5ea8a512
+add src/discover/eduction.rs — mod probes @c3f7793445380e4a
+add src/discover/eduction.rs —  @aff34b0eaa540325
+edit src/discover/eduction.rs — Warehouse @43538c44f19a8c34
+edit src/discover/eduction.rs — impl Circuit<K> @6609df5f29dd6556
+edit src/discover/eduction.rs — probes @07f6d9fb9b4c22bf
+edit examples/bundle.rs — run @c1b40df7b8c08fa5
+add src/discover/items.rs — struct Item, struct ItemRelation, mod probes @6964d79e45f92168
+add src/discover/mod.rs — mod items @b9f9061c27e6e1a5
+add src/discover/verdict.rs —  @cfd08b34391cbc11
+add src/discover/items.rs —  @ef31fc2b7e1cb8a1
+edit src/discover/items.rs — probes @a2d706671c5f2051
+add examples/bundle.rs — fn maintain_census @1dfaec3351838960
+edit examples/bundle.rs — commit @acdb78005004d67e
+edit src/discover/items.rs — probes @a2d706671c5f2051
+edit src/discover/eduction.rs — Node @87c715c0d077c0bb
+add src/discover/eduction.rs — struct Tenant @853176573a491ef4
+edit src/discover/eduction.rs — Circuit @24db62d3f8b2eba9
+edit src/discover/eduction.rs — impl Circuit<K> @6b1e094fe885831f
+add src/discover/eduction.rs —  @7e9ea5e646345426
+edit src/discover/eduction.rs — probes @df85faec29355138
+edit src/discover/eduction.rs — probes @32de32cc82a44430
+edit src/discover/attest.rs — Transcript @0502e106d305ca43
+edit src/discover/attest.rs — impl Transcript @1ed97ae45a13774e
+edit src/discover/attest.rs — probes @240df1b21e88bc8b
+add examples/schemata.rs — fn lib_cone, fn cone_fp, fn verdict_row, fn one_row, fn verdict_body @79da456a45991307
+edit examples/schemata.rs — sweep_with @60683eaafcb69dd2
+edit examples/schemata.rs — probes @03e4d25e23206712
+edit examples/schemata.rs — sweep_with @06c148a31ac0844e
+edit examples/schemata.rs — probes @a365f4cf95220622
+edit src/discover/eduction.rs — probes @36dab8182c13be10
+add src/discover/eduction.rs —  @8a1104cc149b4596
+edit src/discover/eduction.rs — Tenant @2924b526416b7044
+edit src/discover/eduction.rs — probes @60be43189f9206e4
+edit examples/schemata.rs — lib_cone @1c7b1d617ab2f72f
+edit examples/schemata.rs — probes @ab4a4373bfa903cd
+edit examples/bundle.rs — read_payload @2c4a1bb5dc237042
+edit examples/bundle.rs — read_payload @7364ae3073ddd7db
+edit examples/bundle.rs — maintain_census @e5508faceaed2bfe
+edit src/discover/items.rs — Item @5a2473da55d9a068

@@ -1,0 +1,13 @@
+/// D — the difference: each tick minus the tick before it (the delayed window),
+/// which is the group form of "what changed".
+#[crate::mutate]
+fn differentiate(v: &[Flow]) -> Option<Flow> {
+    let t = tpart(&v[0]);
+    let mut prev = ZSet::zero();
+    let mut out = Vec::with_capacity(TICKS);
+    for z in &t {
+        out.push(z.add(&prev.neg()));
+        prev = z.clone();
+    }
+    Some(Flow::Window(out))
+}

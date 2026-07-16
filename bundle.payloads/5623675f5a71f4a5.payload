@@ -1,0 +1,6 @@
+/// Two sorts: Z-sets and traces of Z-sets.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Sort {
+    Zset,
+    Window,
+}

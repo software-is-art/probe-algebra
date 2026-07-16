@@ -1,0 +1,452 @@
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::discover::coherence::{FirstMerge, GcdMerge, MaxMerge};
+
+    /// The `seams` probe's individual sensitivity drill, exposed for the unified probe
+    /// census's rung-3 reconciliation (`discover::probes`): a non-homomorphic conversion must
+    /// leave the transform seam UNEARNED. Fires (returns `true`) when the seam is NOT met —
+    /// the same fixture `a_broken_conversion_leaves_the_transform_seam_unearned` pins.
+    pub(crate) fn seam_sensitivity_drill_fires() -> bool {
+        !SeamReport::transform::<SourceStage, TargetStage, BrokenSpan>("Magnitude", "hBC")
+            .status
+            .is_met()
+    }
+    use crate::discover::{all_specs, BoundarySpec};
+
+    /// THIS REPO'S graph is the registry: the compiled `BoundarySpec` declaration carries
+    /// exactly the four theories `all_specs` used to hand-list (same names, same order), the
+    /// module-override arm threads the interpreter's RICHER spec (the structural `U` law is
+    /// present, so the override was not silently replaced by `Spec::of`), and with no seams
+    /// declared the graph is trivially met.
+    #[test]
+    fn the_repo_graph_is_the_registry() {
+        let report = SystemReport::of::<BoundarySpec>();
+        assert_eq!(report.system, "boundary-spec");
+        assert_eq!(
+            report.modules,
+            vec![
+                "interpreter arithmetic",
+                "router",
+                "date calculus",
+                "ttl store",
+                "store protocol",
+                "doc flow",
+                "fabric",
+                "zset kernel"
+            ]
+        );
+        assert!(report.seams.is_empty());
+        assert!(report.is_met());
+        let interpreter = &all_specs()[0];
+        assert!(
+            interpreter
+                .laws
+                .iter()
+                .any(|law| law.equation.contains("U(p) = U(q)")),
+            "the override arm must carry interpreter_spec()'s U law into the registry"
+        );
+    }
+
+    /// THE SYSTEM-LEVEL DISTANCE over this repo's own graph — and the report earns its
+    /// keep twice over. Two of the five declared modules are SECRETLY SEVERAL,
+    /// byte-pinned: the interpreter splits arithmetic from comparison, the calendar
+    /// splits duration arithmetic from epoch conversion — real architectural
+    /// observations, each with its suggested seam kind, held here as a deliberate
+    /// keep-whole decision (this repo's modules are demonstration substrates; splitting
+    /// them is the downstream lesson, not ours).
+    ///
+    /// The TTL store USED to be the third split (merge monoid vs clock action) — until
+    /// the action-law stanzas landed and discovery found `tick(empty, p) = empty`: the
+    /// clock action FIXES the merge monoid's identity, a law that bridges the two
+    /// clusters. The split dissolved because the law language grew, not because any
+    /// code moved — cohesion is a verdict about what the vocabulary can SEE, and this
+    /// pin records the day that stopped being a hypothetical.
+    #[test]
+    fn the_repo_distance_names_the_latent_splits() {
+        let distance = SystemDistance::of::<BoundarySpec>();
+        assert_eq!(distance.latent().len(), 4);
+        // `doc flow` is the instructive third split: a PROTOCOL reads as decomposable
+        // to the cohesion instrument BY NATURE — one-way doors (approve) and endo
+        // loops (edit) look like split points in the operator-interaction graph, but a
+        // protocol's "latent seams" are its states, and carving them apart would
+        // destroy exactly the unrepresentability it exists for. Keep-whole, ratified
+        // here: the suggestion stands recorded, deliberately declined.
+        //
+        // All three keep-wholes are now also DERIVED, not merely ratified: the placer
+        // (`discover::shape`) partitions by net connectivity — nets connect what laws
+        // do not — and places every one of these modules as a single component (see
+        // `shape::probes::nets_place_what_laws_cannot_see`). Cohesion keeps naming the
+        // sparse wiring (this pin); placement settles the boundary.
+        let expected = "\
+boundary-spec: 4 of 8 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
+  module `interpreter arithmetic`: decomposes into 2 latent modules — consider splitting:
+    module 0: { 0, 1, +, * }
+    module 1: { false, < }
+    seam 0↔1 on Int — transport (algebra stays — check coherence)
+  module `date calculus`: decomposes into 2 latent modules — consider splitting:
+    module 0: { zero, +, add, diff }
+    module 1: { since, at }
+    seam 0↔1 on Date, Duration — transform (algebra changes — check the homomorphism)
+  module `doc flow`: decomposes into 3 latent modules — consider splitting:
+    module 0: { submit, revise }
+    module 1: { approve }
+    module 2: { edit }
+    seam 0↔1 on Review — transform (algebra changes — check the homomorphism)
+    seam 0↔2 on Draft — transform (algebra changes — check the homomorphism)
+  module `zset kernel`: decomposes into 3 latent modules — consider splitting:
+    module 0: { zero, +, neg, join, distinct }
+    module 1: { delay, integrate, differentiate }
+    module 2: { impulse, latest }
+    seam 0↔2 on Z — transform (algebra changes — check the homomorphism)
+    seam 1↔2 on T — transform (algebra changes — check the homomorphism)
+";
+        // The kernel is the fourth keep-whole, ratified: cohesion sees three
+        // clusters (the group with its ring face, the stream calculus, the
+        // injection/observation pair that bridges them) because laws rarely mix
+        // the vocabularies — but integrate and differentiate ARE statements about
+        // the group (the running sum needs `+`, the difference needs `neg`), and
+        // impulse/latest are the seam the placer already accepted as interior.
+        // Splitting would sever the calculus from the algebra it computes with.
+        assert_eq!(distance.render(), expected);
+    }
+
+    /// A system whose modules are all single algebras reports flat, in one line — and the
+    /// macro generated `cohesions()` for every module (the count pins the plumbing).
+    #[test]
+    fn a_cohesive_system_reports_no_latent_splits() {
+        let distance = SystemDistance::of::<MergeSuite>();
+        assert_eq!(
+            distance.cohesions.len(),
+            3,
+            "one analysis per registry module"
+        );
+        assert!(distance.latent().is_empty());
+        assert_eq!(
+            distance.render(),
+            "merge suite: 3 of 3 declared modules are cohesive; no latent splits\n"
+        );
+    }
+
+    /// The committed SYSTEM lock is FRESH: the live graph render matches what was ratified.
+    /// A drift (a module added or renamed, a seam re-drawn or its verdict flipped) fails here —
+    /// regenerate with `cargo run --example freeze_spec` and ratify the diff.
+    #[test]
+    fn the_committed_system_spec_is_fresh() {
+        let lock = SystemReport::of::<BoundarySpec>().lock();
+        if let Err(stale) = spec_lock::check(std::slice::from_ref(&lock)) {
+            panic!(
+                "the system graph drifted from the committed lock for: {}. \
+                 Run `cargo run --example freeze_spec` and ratify the diff.",
+                stale.join(", ")
+            );
+        }
+    }
+
+    // ===== a compiled system with all three transport verdicts ================================
+    //
+    // The merge theories from `coherence` (same signature, different semantics) joined into one
+    // declared graph: max/gcd agree (coherent), max/first-match disagree (incoherent), and the
+    // by-construction arm is exercised on the shared raw type. A deliberately mixed fixture:
+    // one lock render shows every transport verdict at once.
+
+    type Key = i64;
+
+    struct MergeSuite;
+    crate::system! {
+        MergeSuite : "merge suite",
+        modules {
+            MaxMerge;
+            GcdMerge;
+            FirstMerge;
+        }
+        seams {
+            MaxMerge -- GcdMerge : transport on Key;
+            MaxMerge -- FirstMerge : transport on Key;
+            GcdMerge -- FirstMerge : transport on Key by construction;
+        }
+    }
+
+    /// The three transport verdicts, computed (never transcribed) by the compiled seams:
+    /// max/gcd share every law (coherent); max/first-match disagree about commutativity
+    /// (incoherent, with the violation carried); the by-construction seam is met by the
+    /// macro's compile-time witness.
+    #[test]
+    fn transport_seams_are_put_to_the_coherence_checker() {
+        let report = SystemReport::of::<MergeSuite>();
+        assert_eq!(
+            report.modules,
+            vec!["max-merge", "gcd-merge", "first-merge"]
+        );
+        assert!(
+            !report.is_met(),
+            "the incoherent seam must leave the graph red"
+        );
+
+        let [agree, disagree, constructed] = report.seams.as_slice() else {
+            panic!("three declared seams, got {}", report.seams.len());
+        };
+        assert_eq!(
+            (agree.left, agree.right, agree.on),
+            ("max-merge", "gcd-merge", "Key")
+        );
+        assert_eq!(agree.kind, SeamKind::Transport);
+        assert!(matches!(agree.status, SeamStatus::Coherent));
+
+        let SeamStatus::Incoherent(violations) = &disagree.status else {
+            panic!("max/first-match must be incoherent: {:?}", disagree.status);
+        };
+        assert!(
+            violations.iter().any(|v| v.contains("either order")),
+            "the commutativity disagreement must be carried: {violations:?}"
+        );
+        assert!(!disagree.status.is_met());
+
+        assert!(matches!(constructed.status, SeamStatus::ByConstruction));
+        assert!(constructed.status.is_met());
+    }
+
+    /// The system lock renders the WHOLE graph — registry, seam lines, obligations, verdicts —
+    /// pinned byte-for-byte: this text is what a reviewer ratifies, so its exact shape is the
+    /// product. (Deterministic: discovery is a pure function of the theories.)
+    #[test]
+    fn the_graph_renders_exactly() {
+        let expected = "\
+# system spec: merge suite — the seam graph (modules + seam obligations); regenerate via this repo's freeze path and ratify the diff.
+
+modules (the ratified registry — one committed module lock each):
+- max-merge
+- gcd-merge
+- first-merge
+
+seams (each edge: its obligation, then the verdict its checker returned):
+- max-merge -- gcd-merge : transport on Key
+      obligation: the modules share this value and must agree on its laws
+      status: coherent — every law either module discovers holds under the other's operators
+- max-merge -- first-merge : transport on Key
+      obligation: the modules share this value and must agree on its laws
+      status: INCOHERENT — the modules disagree about the shared algebra:
+        * \"Merge gives the same result in either order.\" holds in max-merge but not first-merge
+- gcd-merge -- first-merge : transport on Key
+      obligation: the modules share this value and must agree on its laws
+      status: discharged by construction — the shared value is one type on both sides (the declaration carries the compile-time witness)
+";
+        assert_eq!(SystemReport::of::<MergeSuite>().render(), expected);
+    }
+
+    /// The lock lands at `<spec_dir>/<slug>.system.spec` — spaces slugified, the `.system.`
+    /// infix keeping it apart from the module locks in the same directory.
+    #[test]
+    fn the_system_lock_has_its_own_namespace() {
+        let lock = SystemReport::of::<MergeSuite>().lock_in(Path::new("spec"));
+        assert_eq!(lock.name, "merge suite system");
+        assert_eq!(lock.path, Path::new("spec").join("merge-suite.system.spec"));
+        assert_eq!(lock.live, SystemReport::of::<MergeSuite>().render());
+    }
+
+    /// A misaligned transport seam (operator tables in different orders) is ILL-POSED — the
+    /// verdict names the misalignment instead of judging the wrong operators, and it does not
+    /// count as met.
+    #[test]
+    fn a_misaligned_transport_seam_is_ill_posed_not_judged() {
+        pub struct SwappedMerge;
+        crate::theory! {
+            SwappedMerge : "swapped-merge", Value = i64, Obs = i64, Sort = crate::discover::coherence::Sort,
+            sort_of = |_: &i64| crate::discover::coherence::Sort::Key,
+            observe = |v: &i64| *v,
+            vars { crate::discover::coherence::Sort::Key => &["a", "b", "c"], }
+            inhabit { crate::discover::coherence::Sort::Key => vec![0, 1, 2, 3, 4, 6, 12], }
+            ops {
+                Infix   "Merge" "merge" (crate::discover::coherence::Sort::Key, crate::discover::coherence::Sort::Key) -> crate::discover::coherence::Sort::Key = |v: &[i64]| Some(v[0].max(v[1]));
+                Nullary "Empty" "empty" () -> crate::discover::coherence::Sort::Key = |_: &[i64]| Some(0);
+            }
+        }
+        let seam = SeamReport::transport::<MaxMerge, SwappedMerge>("Key");
+        let SeamStatus::IllPosed(why) = &seam.status else {
+            panic!("misaligned tables must be ill-posed: {:?}", seam.status);
+        };
+        assert!(
+            why.contains("misaligned"),
+            "the verdict names the fault: {why}"
+        );
+        assert!(!seam.status.is_met());
+        // and it renders as a loud, named verdict.
+        let text = SystemReport {
+            system: "swapped",
+            modules: vec!["max-merge", "swapped-merge"],
+            seams: vec![seam],
+        }
+        .render();
+        assert!(text.contains("status: ILL-POSED — operator tables misaligned"));
+    }
+
+    // ===== a compiled system with a transform seam =============================================
+    //
+    // Two stage modules and a conversion crossing between them. The seam is discharged inside
+    // the SPANNING theory `Span` (both stages' operators plus the conversions): discovery must
+    // find the homomorphism laws, and the A→C composite is verified by running (PipelineLaw).
+    // `BrokenSpan` negates the second conversion — not a homomorphism over max — so the same
+    // declaration shape lands UNEARNED.
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    struct One;
+    struct SourceStage;
+    struct TargetStage;
+    fn maxi(v: &[i64]) -> Option<i64> {
+        Some(v[0].max(v[1]))
+    }
+    crate::theory! {
+        SourceStage : "source stage", Value = i64, Obs = i64, Sort = One,
+        sort_of = |_: &i64| One,
+        observe = |v: &i64| *v,
+        vars { One => &["a", "b", "c"], }
+        inhabit { One => vec![0, 1, 2], }
+        ops { Infix "max" "max" (One, One) -> One = maxi; }
+    }
+    crate::theory! {
+        TargetStage : "target stage", Value = i64, Obs = i64, Sort = One,
+        sort_of = |_: &i64| One,
+        observe = |v: &i64| *v,
+        vars { One => &["a", "b", "c"], }
+        inhabit { One => vec![0, 1, 2], }
+        ops { Infix "max" "max" (One, One) -> One = maxi; }
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum S3 {
+        A,
+        B,
+        C,
+    }
+    struct Span;
+    struct BrokenSpan;
+    fn maxa(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((0, v[0].1.max(v[1].1)))
+    }
+    fn maxb(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1.max(v[1].1)))
+    }
+    fn maxc(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((2, v[0].1.max(v[1].1)))
+    }
+    fn hab(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((1, v[0].1))
+    }
+    fn hbc(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((2, v[0].1))
+    }
+    fn hbc_broken(v: &[(u8, i64)]) -> Option<(u8, i64)> {
+        Some((2, -v[0].1))
+    }
+    macro_rules! span_theory {
+        ($thy:ty, $name:literal, $hbc:expr) => {
+            crate::theory! {
+                $thy : $name, Value = (u8, i64), Obs = (u8, i64), Sort = S3,
+                sort_of = |v: &(u8, i64)| match v.0 { 0 => S3::A, 1 => S3::B, _ => S3::C },
+                observe = |v: &(u8, i64)| *v,
+                vars { S3::A => &["a"], S3::B => &["b"], S3::C => &["c"], }
+                inhabit {
+                    S3::A => vec![(0, 0), (0, 1), (0, 2)],
+                    S3::B => vec![(1, 0), (1, 1), (1, 2)],
+                    S3::C => vec![(2, 0), (2, 1), (2, 2)],
+                }
+                ops {
+                    Infix  "maxA" "maxA" (S3::A, S3::A) -> S3::A = maxa;
+                    Infix  "maxB" "maxB" (S3::B, S3::B) -> S3::B = maxb;
+                    Infix  "maxC" "maxC" (S3::C, S3::C) -> S3::C = maxc;
+                    Prefix "hAB"  "hAB"  (S3::A) -> S3::B = hab;
+                    Prefix "hBC"  "hBC"  (S3::B) -> S3::C = $hbc;
+                }
+            }
+        };
+    }
+    span_theory!(Span, "span", hbc);
+    span_theory!(BrokenSpan, "broken span", hbc_broken);
+
+    struct StagedApp;
+    crate::system! {
+        StagedApp : "staged app",
+        modules {
+            SourceStage;
+            TargetStage;
+        }
+        seams {
+            SourceStage -- TargetStage : transform on Magnitude via hAB in Span;
+        }
+    }
+
+    /// The transform seam is discharged by DISCOVERY in the spanning theory: the named
+    /// conversion is found to be a homomorphism, and the A→C composite THROUGH it is a
+    /// pipeline law checked by running — all carried into the verdict, so the lock states
+    /// them.
+    #[test]
+    fn a_transform_seam_is_discharged_inside_the_spanning_theory() {
+        let report = SystemReport::of::<StagedApp>();
+        assert!(report.is_met());
+        let [seam] = report.seams.as_slice() else {
+            panic!("one declared seam");
+        };
+        assert_eq!(seam.kind, SeamKind::Transform);
+        let SeamStatus::Preserved {
+            conversion,
+            via,
+            homomorphisms,
+            composites,
+        } = &seam.status
+        else {
+            panic!("hAB is a homomorphism: {:?}", seam.status);
+        };
+        assert_eq!((*conversion, *via), ("hAB", "span"));
+        assert!(
+            homomorphisms.iter().any(|l| l.contains("hAB")),
+            "the named conversion's law must be found: {homomorphisms:?}"
+        );
+        assert!(
+            composites.iter().any(|l| l.contains("hBC∘hAB")),
+            "the composite through it must be checked by running: {composites:?}"
+        );
+        let text = report.render();
+        assert!(text.contains("status: preserved — the conversion `hAB`"));
+        assert!(text.contains("composites (checked by running, never assumed):"));
+    }
+
+    /// A broken conversion (negation does not commute with max) lands UNEARNED — even though
+    /// ANOTHER conversion in the same spanning theory (`hAB`) is a perfectly good
+    /// homomorphism: the verdict is tied to the seam's NAMED conversion, so a healthy
+    /// neighbour cannot discharge a broken seam.
+    #[test]
+    fn a_broken_conversion_leaves_the_transform_seam_unearned() {
+        let seam =
+            SeamReport::transform::<SourceStage, TargetStage, BrokenSpan>("Magnitude", "hBC");
+        let SeamStatus::Unearned { conversion, via } = seam.status else {
+            panic!(
+                "a non-homomorphic conversion must be unearned: {:?}",
+                seam.status
+            );
+        };
+        assert_eq!((conversion, via), ("hBC", "broken span"));
+        assert!(!seam.status.is_met());
+        let text = SystemReport {
+            system: "broken staged app",
+            modules: vec!["source stage", "target stage"],
+            seams: vec![seam],
+        }
+        .render();
+        assert!(text.contains("status: UNEARNED — no homomorphism law for `hBC`"));
+        assert!(text.contains("(broken span)"));
+    }
+
+    /// A conversion the spanning theory does not declare is ILL-POSED, not unearned — a
+    /// misspelling must never sit in the lock looking like unfinished work.
+    #[test]
+    fn a_conversion_the_span_lacks_is_ill_posed() {
+        let seam = SeamReport::transform::<SourceStage, TargetStage, Span>("Magnitude", "hXY");
+        let SeamStatus::IllPosed(why) = &seam.status else {
+            panic!("an unknown conversion must be ill-posed: {:?}", seam.status);
+        };
+        assert!(
+            why.contains("`hXY` is not an operator"),
+            "the verdict names the fault: {why}"
+        );
+    }
+}

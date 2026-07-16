@@ -91,8 +91,6 @@ pub enum Cadence {
     OnCertify,
 }
 
-/// One declared gate of the pipeline.
-#[derive(Clone, Copy, Debug)]
 pub struct Gate {
     /// The gate's name (also its step name where the workflow needs one).
     pub name: &'static str,
@@ -106,6 +104,9 @@ pub struct Gate {
     /// `Pure` = a deterministic function of the tree (cacheable, countersignable,
     /// executable anywhere). An eventual deploy / live-replay gate would be `Effectful`.
     pub effect: Capability,
+    /// The projection of the tree this gate reads — its verdict is keyed by the
+    /// support's content fingerprint, so an edit outside the support cannot owe it.
+    pub support: Support,
     /// Weekly gates only: split across the `FULL_SWEEP_SHARDS` matrix (the whole-tree
     /// sweep's economics). An unsharded weekly gate renders as one plain job.
     pub sharded: bool,
@@ -232,6 +233,7 @@ impl Pipeline {
                     command: &["cargo", "fmt", "--all", "--check"],
                     cadence: Cadence::EveryChange,
                     effect: Capability::Pure,
+                    support: Support::RustSurface,
                     sharded: false,
                 },
                 Gate {
@@ -250,6 +252,7 @@ impl Pipeline {
                     ],
                     cadence: Cadence::EveryChange,
                     effect: Capability::Pure,
+                    support: Support::Judged,
                     sharded: false,
                 },
                 Gate {
@@ -259,6 +262,7 @@ impl Pipeline {
                     command: &["cargo", "test", "--workspace", "--all-targets"],
                     cadence: Cadence::EveryChange,
                     effect: Capability::Pure,
+                    support: Support::Judged,
                     sharded: false,
                 },
             ],
@@ -508,6 +512,7 @@ impl GateRegistry {
                 command: &["cargo", "fmt", "--all", "--check"],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
+                support: Support::RustSurface,
                 sharded: false,
             },
             Gate {
@@ -526,6 +531,7 @@ impl GateRegistry {
                 ],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -537,6 +543,7 @@ impl GateRegistry {
                 command: &["cargo", "test", "--workspace", "--all-targets"],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -550,6 +557,7 @@ impl GateRegistry {
                 command: &["git", "tag", "-f", "mutants-green"],
                 cadence: Cadence::DefaultBranch,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -561,6 +569,7 @@ impl GateRegistry {
                 command: &[".github/mutants-gate.sh"],
                 cadence: Cadence::Weekly,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: true,
             },
             Gate {
@@ -581,6 +590,7 @@ impl GateRegistry {
                 ],
                 cadence: Cadence::Weekly,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -595,6 +605,7 @@ impl GateRegistry {
                 command: &[".github/statement-bite.sh"],
                 cadence: Cadence::Weekly,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -613,6 +624,7 @@ impl GateRegistry {
                 ],
                 cadence: Cadence::Weekly,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -632,6 +644,7 @@ impl GateRegistry {
                 ],
                 cadence: Cadence::Weekly,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -645,6 +658,7 @@ impl GateRegistry {
                 command: &[".github/release.sh"],
                 cadence: Cadence::OnCertify,
                 effect: Capability::Effectful,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -659,6 +673,7 @@ impl GateRegistry {
                 command: &[".github/perimeter.sh"],
                 cadence: Cadence::Weekly,
                 effect: Capability::Effectful,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -668,14 +683,19 @@ impl GateRegistry {
                            router's classifier, the reliance judge) ships in ONE build \
                            behind the PROBE_MUTANT selector — a green run with a flip \
                            active is a survivor, ratified by key in \
-                           spec/schemata.register or killed with a probe. `verify` is \
-                           the sampled countersign: a committed attestation \
-                           (attest/sweep.transcript) matching this tree and toolchain \
-                           is audited by re-judging a random sample of its sites — \
-                           derivation local, signature cold — and a missing, foreign, \
-                           or disagreeing attestation falls back to the full sweep, \
-                           which re-attests. The weekly shards stay the from-scratch \
-                           backstop",
+                           spec/schemata.register or killed with a probe. `verify` \
+                           holds three honesty tiers by what the record affords: a \
+                           committed attestation (attest/sweep.transcript) matching \
+                           this tree and toolchain is COUNTERSIGNED by re-judging a \
+                           random sample of its sites — derivation local, signature \
+                           cold; a same-toolchain attestation from another tree feeds \
+                           INCREMENTAL re-judgment — each site's verdict carries \
+                           exactly when its evidence key (its module plus its covering \
+                           tests' modules, by content) still stands, timeouts never \
+                           carry, and only the moved sites are judged; anything else, \
+                           or any disagreement, earns the FULL sweep, which \
+                           re-attests. The weekly shards stay the from-scratch \
+                           backstop for what content keys cannot see",
                 command: &[
                     "cargo",
                     "run",
@@ -688,6 +708,7 @@ impl GateRegistry {
                 ],
                 cadence: Cadence::EveryChange,
                 effect: Capability::Pure,
+                support: Support::Judged,
                 sharded: false,
             },
             Gate {
@@ -705,6 +726,7 @@ impl GateRegistry {
                 command: &[".github/substrate.sh"],
                 cadence: Cadence::Weekly,
                 effect: Capability::Effectful,
+                support: Support::Judged,
                 sharded: false,
             },
         ]
@@ -1076,6 +1098,46 @@ impl GateRegistry {
     }
 }
 
+/// What a gate READS — the projection of the tree its verdict is a fact about. A
+/// verdict keyed by a support fingerprint cannot be owed by an edit outside the
+/// support: the delta's image under the gate is zero BY DECLARATION, not by memory.
+/// Supports are conservative over-approximations — admitting too much only costs
+/// re-judgment; admitting too little would hold a stale green, the exact failure
+/// class the verdict store exists to kill — so narrowing carries the burden of proof.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Support {
+    /// Everything the verdict walk yields except declared-inert prose — `docs/` and
+    /// `README.md`, which nothing compiles, embeds, or reads (no `include_str!`
+    /// reaches them; no probe opens them; the agenda classifies their PATHS only).
+    /// For gates that compile or read arbitrarily: clippy/test/schemata embed
+    /// `spec/` via `include_str!`, ride `build.rs`, and read the registers.
+    Judged,
+    /// The Rust surface only: `*.rs` plus the manifests that discover workspace
+    /// members (`Cargo.toml`, `Cargo.lock`) and rustfmt config — `cargo fmt` parses
+    /// Rust and nothing else.
+    RustSurface,
+}
+
+#[crate::mutate]
+impl Support {
+    /// Does this support admit a root-relative path? The verdict walk asks this per
+    /// file; only admitted bytes reach a gate's key.
+    pub fn admits(&self, relative: &str) -> bool {
+        let inert = relative.starts_with("docs/") || relative == "README.md";
+        match self {
+            Support::Judged => !inert,
+            Support::RustSurface => {
+                let name = relative.rsplit('/').next().unwrap_or(relative);
+                relative.ends_with(".rs")
+                    || matches!(
+                        name,
+                        "Cargo.toml" | "Cargo.lock" | "rustfmt.toml" | ".rustfmt.toml"
+                    )
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1091,6 +1153,7 @@ mod tests {
             command: &[],
             cadence: Cadence::PerDiff,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         };
         assert_eq!(check_context(&mutation), "dogfood (changed lines)");
@@ -1100,6 +1163,7 @@ mod tests {
             command: &[],
             cadence: Cadence::PerDiff,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         };
         assert_eq!(check_context(&plain), "dogfood (audit)");
@@ -1394,6 +1458,7 @@ mod tests {
             command: &["cargo", "mutants", "--in-diff", "pr.diff"],
             cadence: Cadence::PerDiff,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         });
         pipeline.gates.push(Gate {
@@ -1402,6 +1467,7 @@ mod tests {
             command: &["cargo", "mutants"],
             cadence: Cadence::Weekly,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         });
         let workflow = pipeline.render_workflow().expect("all tiers supported");
@@ -1437,6 +1503,7 @@ mod tests {
             command: &["cargo", "mutants"],
             cadence: Cadence::DefaultBranch,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         });
         let refusal = incremental.render_workflow().unwrap_err();
@@ -1455,6 +1522,7 @@ mod tests {
             command: &["cargo", "mutants"],
             cadence: Cadence::Weekly,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: true,
         });
         assert!(sharded
@@ -1468,6 +1536,7 @@ mod tests {
             command: &[".github/release.sh"],
             cadence: Cadence::OnCertify,
             effect: Capability::Effectful,
+            support: Support::Judged,
             sharded: false,
         });
         assert!(certify
@@ -1481,6 +1550,7 @@ mod tests {
             command: &["cargo", "audit"],
             cadence: Cadence::Weekly,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         });
         assert!(unscheduled
@@ -1494,6 +1564,7 @@ mod tests {
             command: &["cargo", "audit"],
             cadence: Cadence::Weekly,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         });
         colliding.cron = Some("0 4 * * 1");
@@ -1503,6 +1574,7 @@ mod tests {
             command: &["cargo", "audit"],
             cadence: Cadence::Weekly,
             effect: Capability::Pure,
+            support: Support::Judged,
             sharded: false,
         });
         assert!(colliding

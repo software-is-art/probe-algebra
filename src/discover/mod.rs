@@ -528,6 +528,7 @@ crate::system! {
         world::StoreProtocol;
         protocol::DocFlow;
         fabric::Fabric;
+        zset::ZKernel;
     }
 }
 
@@ -591,6 +592,14 @@ pub mod store;
 pub mod verdict;
 
 pub mod attest;
+
+pub mod cli;
+
+pub mod zset;
+
+pub mod eduction;
+
+pub mod items;
 
 #[cfg(test)]
 mod tests {

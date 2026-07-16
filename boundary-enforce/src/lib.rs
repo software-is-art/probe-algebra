@@ -471,10 +471,13 @@ fn derive_partition(
     // INTERIOR is not merely unreachable, it is fronted, and the front is the file that
     // delegates into it. A pub-reachable file that references an interior sibling (a
     // non-pub-reachable module in its own directory) by path is a door. Doors are
-    // boundaries.
+    // boundaries. KERNEL files front nothing: the trusted floor is a ratified privilege,
+    // not a workshop — which also keeps the committed census self-describing (its
+    // INTERIOR rows ARE this set, the standing evidence `maintain_tiers` reads).
     let interior_stems: Vec<(PathBuf, String)> = rows
         .iter()
         .filter(|(p, _)| !reachable.contains(p))
+        .filter(|(_, row)| !kernel_allowlist.iter().any(|k| k == &row.loc))
         .filter_map(|(p, _)| {
             Some((
                 p.parent()?.to_path_buf(),
@@ -498,31 +501,7 @@ fn derive_partition(
             let fronts = interior_stems.iter().any(|(dir, stem)| {
                 Some(dir.as_path()) == path.parent() && row.source.contains(&format!("{stem}::"))
             });
-            let (tier, evidence): (&'static str, String) = if !row.substance {
-                let t = if is_reachable { "ALGEBRA" } else { "INTERIOR" };
-                (
-                    t,
-                    "glue — module declarations and re-exports only; tier by reachability"
-                        .to_string(),
-                )
-            } else if !is_reachable {
-                ("INTERIOR", "not pub-reachable".to_string())
-            } else if carries_edges {
-                (
-                    "BOUNDARY",
-                    "pub-reachable, carries production edges".to_string(),
-                )
-            } else if fronts {
-                (
-                    "BOUNDARY",
-                    "pub-reachable, fronts an interior sibling".to_string(),
-                )
-            } else {
-                (
-                    "ALGEBRA",
-                    "pub-reachable, no production edges, fronts nothing".to_string(),
-                )
-            };
+            let (tier, evidence) = assign_tier(row.substance, is_reachable, carries_edges, fronts);
             (path, row.loc, tier, evidence)
         })
         .collect()
@@ -614,29 +593,6 @@ fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierR
             continue;
         };
         let Ok(file) = parse(&path) else { continue };
-        let substance = file
-            .items
-            .iter()
-            .any(|it| !matches!(it, Item::Mod(_) | Item::Use(_)));
-        let mods = file
-            .items
-            .iter()
-            .filter_map(|it| match it {
-                Item::Mod(m) if m.content.is_none() => Some((
-                    m.ident.to_string(),
-                    matches!(m.vis, syn::Visibility::Public(_)),
-                )),
-                _ => None,
-            })
-            .collect();
-        // lib.rs / main.rs / mod.rs resolve children in their own directory; a plain
-        // `foo.rs` resolves them under `foo/`.
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        let child_dir = if matches!(name, "lib.rs" | "main.rs" | "mod.rs") {
-            path.parent().unwrap_or(dir).to_path_buf()
-        } else {
-            path.with_extension("")
-        };
         rows.push((
             path.clone(),
             TierRow {
@@ -645,37 +601,23 @@ fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierR
                     .unwrap_or(&path)
                     .display()
                     .to_string(),
-                substance,
-                mods,
-                child_dir,
+                substance: has_substance(&file),
+                mods: child_mods(&file),
+                child_dir: child_dir_of(&path),
                 source,
             },
         ));
     }
 }
 
+/// Render the qualify census by the wholesale walk — the collector gathers, the
+/// from-parts renderer ([`render_census_from`]) owns the format, stated once for
+/// this walk and for the maintained update alike.
 fn render_census(src: &Path, manifest: &Path, bless_env: &str) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut scanned = 0usize;
     collect_qualifications(src, manifest, &mut scanned, &mut lines);
-    lines.sort();
-
-    let mut report = format!(
-        "# qualify census — modules that meet the algebra spec by STRUCTURE: their functions are\n\
-         # operator-shaped (every argument and the return a bare named value type, no primitives, no\n\
-         # I/O). Boundary-hood is a COMPUTED property here, not the `boundary.rs` file convention — a\n\
-         # module qualifies wherever it lives. Regenerate with `{bless_env}=1 cargo build`.\n",
-    );
-    report.push_str(&format!(
-        "# {} files scanned, {} qualify.\n\n",
-        scanned,
-        lines.len()
-    ));
-    for l in &lines {
-        report.push_str(l);
-        report.push('\n');
-    }
-    report
+    render_census_from(&lines, scanned, bless_env)
 }
 
 /// Walk `dir`, parsing each `.rs` file, and push a `QUALIFIES` line for every file whose functions
@@ -770,37 +712,18 @@ pub fn qualify_census_lines(src: &Path, manifest: &Path) -> Vec<String> {
 
 // ===== the REASON census: why each non-qualifying module refuses =====
 
-/// Render the qualify-REASON census: one line per file whose functions form no algebra,
-/// carrying the mechanical blocker classes they exhibit — the qualify census's complement,
-/// derived by the same walk (same `tests.rs` skip, same operator-shape rule, stated once).
-/// The classes are EVIDENCE, deliberately mechanical; reading them into value-object debt,
-/// missing vocabulary, or a principled refusal is a ratification, not a derivation.
+/// Render the qualify-REASON census by the wholesale walk: one line per file whose
+/// functions form no algebra, carrying the mechanical blocker classes they exhibit —
+/// the qualify census's complement, derived by the same walk (same `tests.rs` skip,
+/// same operator-shape rule, stated once). The classes are EVIDENCE, deliberately
+/// mechanical; reading them into value-object debt, missing vocabulary, or a
+/// principled refusal is a ratification, not a derivation. The format lives in
+/// [`render_reasons_from`], shared with the maintained update.
 fn render_reasons(src: &Path, manifest: &Path, bless_env: &str) -> String {
     let mut scanned = 0usize;
     let mut lines: Vec<String> = Vec::new();
     collect_reasons(src, manifest, &mut scanned, &mut lines);
-    lines.sort();
-    let mut report = format!(
-        "# qualify reasons — WHY each module refuses the algebra census: the mechanical blockers,\n\
-         # per file, derived by the same walk as the qualify census (one rule, two renders; free\n\
-         # functions AND impl methods, the receiver resolved to the typestate). Classes:\n\
-         # no functions | unit returns | primitive signatures | borrowed types | parameterised\n\
-         # types | unshaped types | zero-argument constants | effectful bodies | mutating\n\
-         # receivers. The classes are evidence; reading them into value-object debt, missing\n\
-         # vocabulary, or a principled refusal is the ratification's job. Regenerate with\n\
-         # `{bless_env}=1 cargo build`.\n",
-    );
-    report.push_str(&format!(
-        "# {} files scanned, {} qualify, {} refuse.\n\n",
-        scanned,
-        scanned - lines.len(),
-        lines.len()
-    ));
-    for l in &lines {
-        report.push_str(l);
-        report.push('\n');
-    }
-    report
+    render_reasons_from(&lines, scanned, bless_env)
 }
 
 /// Walk `dir` and push a `REFUSES` line for every parsed file whose functions form no
@@ -1914,6 +1837,795 @@ impl<'ast> Visit<'ast> for PurityVisitor {
             ));
         }
         visit::visit_path(self, node);
+    }
+}
+
+/// The reasons census line a file's SOURCE TEXT would contribute — [`qualify_line`]'s
+/// complement, the same rule reached from text (one walk, two renders, stated once).
+/// `Ok(Some(line))` refuses with its blocker classes, `Ok(None)` qualifies (no
+/// classes), and `Err` is an unparseable file — no signal yet, never a movement.
+pub fn reasons_line(source: &str, loc: &str) -> Result<Option<String>, String> {
+    let file = syn::parse_file(source).map_err(|e| format!("unparseable: {e}"))?;
+    let classes = refusal_classes_from_items(&file.items);
+    Ok((!classes.is_empty()).then(|| format!("{loc}: REFUSES — {}", classes.join(", "))))
+}
+
+/// The qualify census REPORT from its parts — the one place the census format lives,
+/// whether the lines arrive from the wholesale walk ([`render_census`]) or from a
+/// maintained update ([`maintain_qualify`]). Lines are sorted here so every caller
+/// renders the same bytes for the same set.
+pub fn render_census_from(lines: &[String], scanned: usize, bless_env: &str) -> String {
+    let mut lines: Vec<String> = lines.to_vec();
+    lines.sort();
+    let mut report = format!(
+        "# qualify census — modules that meet the algebra spec by STRUCTURE: their functions are\n\
+         # operator-shaped (every argument and the return a bare named value type, no primitives, no\n\
+         # I/O). Boundary-hood is a COMPUTED property here, not the `boundary.rs` file convention — a\n\
+         # module qualifies wherever it lives. Regenerate with `{bless_env}=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files scanned, {} qualify.\n\n",
+        scanned,
+        lines.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+    report
+}
+
+/// The reasons census REPORT from its parts — [`render_census_from`]'s complement,
+/// the format stated once for both the wholesale walk and the maintained update.
+pub fn render_reasons_from(lines: &[String], scanned: usize, bless_env: &str) -> String {
+    let mut lines: Vec<String> = lines.to_vec();
+    lines.sort();
+    let mut report = format!(
+        "# qualify reasons — WHY each module refuses the algebra census: the mechanical blockers,\n\
+         # per file, derived by the same walk as the qualify census (one rule, two renders; free\n\
+         # functions AND impl methods, the receiver resolved to the typestate). Classes:\n\
+         # no functions | unit returns | primitive signatures | borrowed types | parameterised\n\
+         # types | unshaped types | zero-argument constants | effectful bodies | mutating\n\
+         # receivers. The classes are evidence; reading them into value-object debt, missing\n\
+         # vocabulary, or a principled refusal is the ratification's job. Regenerate with\n\
+         # `{bless_env}=1 cargo build`.\n",
+    );
+    report.push_str(&format!(
+        "# {} files scanned, {} qualify, {} refuse.\n\n",
+        scanned,
+        scanned - lines.len(),
+        lines.len()
+    ));
+    for l in &lines {
+        report.push_str(l);
+        report.push('\n');
+    }
+    report
+}
+
+/// THE MAINTAINED VIEW: apply ONE module's movement to the committed qualify census
+/// pair without the wholesale walk. The caller's verbs are the delta source, this is
+/// the view update, and the build gate that re-derives both files from the tree stays
+/// the ORACLE — maintenance never replaces the wholesale scan, it makes the scan's
+/// drift gate unable to fire for verb-carried changes. Body lines are recognized
+/// (non-`#`, non-blank), the edited `loc`'s line is retracted from BOTH files, the
+/// fresh line is asserted on the side the rule assigns (a parsed file lands in
+/// exactly one census — the partition), and both headers re-derive from the line
+/// sets. An unparseable source refuses with no movement; a `tests.rs` loc is the
+/// walk's own skip, identity by declaration.
+pub fn maintain_qualify(
+    census: &str,
+    reasons: &str,
+    loc: &str,
+    source: &str,
+    census_env: &str,
+    reasons_env: &str,
+) -> Result<(String, String), String> {
+    if loc.ends_with("tests.rs") {
+        return Ok((census.to_string(), reasons.to_string()));
+    }
+    let body = |text: &str| -> Vec<String> {
+        text.lines()
+            .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+            .filter(|l| !l.starts_with(&format!("{loc}: ")))
+            .map(str::to_string)
+            .collect()
+    };
+    let mut census_lines = body(census);
+    let mut reasons_lines = body(reasons);
+    if let Some(line) = qualify_line(source, loc)? {
+        census_lines.push(line);
+    } else if let Some(line) = reasons_line(source, loc)? {
+        reasons_lines.push(line);
+    }
+    let scanned = census_lines.len() + reasons_lines.len();
+    Ok((
+        render_census_from(&census_lines, scanned, census_env),
+        render_reasons_from(&reasons_lines, scanned, reasons_env),
+    ))
+}
+
+/// Does a parsed file carry anything beyond module declarations and re-exports?
+/// Pure glue gives the rules nothing to judge, so its tier follows reachability.
+fn has_substance(file: &syn::File) -> bool {
+    file.items
+        .iter()
+        .any(|it| !matches!(it, Item::Mod(_) | Item::Use(_)))
+}
+
+/// The child-module declarations a parsed file makes: `(name, is_pub)` for each
+/// out-of-line `mod name;` (an inline module resolves to no file).
+fn child_mods(file: &syn::File) -> Vec<(String, bool)> {
+    file.items
+        .iter()
+        .filter_map(|it| match it {
+            Item::Mod(m) if m.content.is_none() => Some((
+                m.ident.to_string(),
+                matches!(m.vis, syn::Visibility::Public(_)),
+            )),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The directory a file's child modules resolve under: `lib.rs` / `main.rs` /
+/// `mod.rs` resolve children beside themselves, a plain `foo.rs` under `foo/`.
+fn child_dir_of(path: &Path) -> PathBuf {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if matches!(name, "lib.rs" | "main.rs" | "mod.rs") {
+        path.parent().unwrap_or(Path::new("")).to_path_buf()
+    } else {
+        path.with_extension("")
+    }
+}
+
+/// The tier a non-KERNEL file earns from its four facts — stated once, consumed by
+/// both the wholesale derivation and the maintained view, so what the oracle
+/// assigns and what maintenance asserts cannot diverge.
+fn assign_tier(
+    substance: bool,
+    reachable: bool,
+    carries_edges: bool,
+    fronts: bool,
+) -> (&'static str, String) {
+    if !substance {
+        let tier = if reachable { "ALGEBRA" } else { "INTERIOR" };
+        (
+            tier,
+            "glue — module declarations and re-exports only; tier by reachability".to_string(),
+        )
+    } else if !reachable {
+        ("INTERIOR", "not pub-reachable".to_string())
+    } else if carries_edges {
+        (
+            "BOUNDARY",
+            "pub-reachable, carries production edges".to_string(),
+        )
+    } else if fronts {
+        (
+            "BOUNDARY",
+            "pub-reachable, fronts an interior sibling".to_string(),
+        )
+    } else {
+        (
+            "ALGEBRA",
+            "pub-reachable, no production edges, fronts nothing".to_string(),
+        )
+    }
+}
+
+/// A tier name from the committed vocabulary, as the `'static` string the renderer
+/// holds — an unknown tier is a census this build does not speak.
+fn tier_static(tier: &str) -> Option<&'static str> {
+    ["KERNEL", "BOUNDARY", "INTERIOR", "ALGEBRA"]
+        .into_iter()
+        .find(|t| *t == tier)
+}
+
+/// The committed tier census parsed back into rows — the standing evidence the
+/// maintained view consumes. A line that does not speak the lock's own grammar
+/// (`- <loc>: <TIER> (<evidence>)`) refuses: maintenance never guesses.
+fn parse_tier_lines(census: &str) -> Result<Vec<(String, &'static str, String)>, String> {
+    census
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+        .map(|line| {
+            let err = || format!("unreadable tier census line `{line}`");
+            let rest = line.strip_prefix("- ").ok_or_else(err)?;
+            let (loc, rest) = rest.split_once(": ").ok_or_else(err)?;
+            let (tier, evidence) = rest.split_once(" (").ok_or_else(err)?;
+            let evidence = evidence.strip_suffix(')').ok_or_else(err)?;
+            let tier = tier_static(tier).ok_or_else(err)?;
+            Ok((loc.to_string(), tier, evidence.to_string()))
+        })
+        .collect()
+}
+
+/// The reachability a committed row states. The crate roots are reachable by
+/// definition; an INTERIOR row is exactly a non-kernel unreachable file; BOUNDARY
+/// and ALGEBRA rows are reachable. A KERNEL row masks reachability — `None`, and
+/// the caller treats the unknown as a structural question for the oracle.
+fn row_reachable(loc: &str, tier: &str) -> Option<bool> {
+    if loc == "src/lib.rs" || loc == "src/main.rs" {
+        return Some(true);
+    }
+    match tier {
+        "INTERIOR" => Some(false),
+        "BOUNDARY" | "ALGEBRA" => Some(true),
+        _ => None,
+    }
+}
+
+/// If `path` is a file that a `mod <stem>;` resolving under `child_dir` would name
+/// (`<child_dir>/<stem>.rs` or `<child_dir>/<stem>/mod.rs`), the stem.
+fn direct_child_stem(child_dir: &Path, path: &Path) -> Option<String> {
+    let name = path.file_name()?.to_str()?;
+    if name == "mod.rs" {
+        let dir = path.parent()?;
+        if dir.parent() == Some(child_dir) {
+            return Some(dir.file_name()?.to_str()?.to_string());
+        }
+        None
+    } else if path.parent() == Some(child_dir) {
+        Some(path.file_stem()?.to_str()?.to_string())
+    } else {
+        None
+    }
+}
+
+/// THE MAINTAINED VIEW for the tier census: apply ONE module's movement to the
+/// committed partition so the `BLESS_TIERS` ceremony stops being owed at the verb.
+/// A tier is not a local judgment — it reads the reachability fixpoint and the
+/// fronting relation — but the committed census IS standing evidence for both:
+/// a non-KERNEL row states its own reachability, and the INTERIOR rows are exactly
+/// the frontable set. So a delta that leaves the module tree's shape alone (every
+/// direct child the census knows still carries the reachability this source
+/// implies for it) moves AT MOST ITS OWN LINE, re-derived tree-free from the same
+/// four facts the oracle reads; a structural delta — a mount, an unmount, a parent
+/// whose reachability the census masks — falls back to the oracle's own derivation
+/// over the tree, with the kernel set read from the census's standing KERNEL rows
+/// (kernel-hood is a decision: a verb never moves it, and a register edit keeps
+/// its ceremony). An unparseable source or census refuses with no movement. The
+/// build gate that re-derives the partition wholesale stays the ORACLE.
+pub fn maintain_tiers(
+    census: &str,
+    loc: &str,
+    source: &str,
+    manifest: &Path,
+    bless_env: &str,
+) -> Result<String, String> {
+    let rows = parse_tier_lines(census)?;
+    if rows.iter().filter(|(l, _, _)| l == loc).count() > 1 {
+        return Err(format!("{loc}: duplicate tier census lines"));
+    }
+    let file =
+        syn::parse_file(source).map_err(|e| format!("{loc}: source does not parse ({e})"))?;
+    let own = rows.iter().find(|(l, _, _)| l == loc);
+    let own_reachable = match own {
+        Some((l, t, _)) => row_reachable(l, t),
+        None => Some(false),
+    };
+
+    // the STRUCTURE CHECK: every census row that a `mod` declaration of this file
+    // could have mounted must still carry the reachability this source implies for
+    // it. Any disagreement — or a masked verdict on either side — means the module
+    // tree's shape moved (or the standing evidence cannot say), and the oracle
+    // recomputes. Crate roots are reachable by definition, mounted by no one.
+    let path = manifest.join(loc);
+    let child_dir = child_dir_of(&path);
+    let declared = child_mods(&file);
+    let structural = rows.iter().any(|(child_loc, child_tier, _)| {
+        if child_loc == loc || child_loc == "src/lib.rs" || child_loc == "src/main.rs" {
+            return false;
+        }
+        let Some(stem) = direct_child_stem(&child_dir, &manifest.join(child_loc)) else {
+            return false;
+        };
+        let implied = match declared.iter().find(|(name, _)| *name == stem) {
+            Some((_, is_pub)) => own_reachable.map(|r| r && *is_pub),
+            None => Some(false),
+        };
+        let standing = row_reachable(child_loc, child_tier);
+        implied.is_none() || standing.is_none() || implied != standing
+    });
+    if structural {
+        let kernel: Vec<String> = rows
+            .iter()
+            .filter(|(_, tier, _)| *tier == "KERNEL")
+            .map(|(l, _, _)| l.clone())
+            .collect();
+        let partition = derive_partition(&manifest.join("src"), manifest, &kernel);
+        return Ok(render_tiers(&partition, bless_env));
+    }
+
+    // the LOCAL path: only this file's line can move. KERNEL is a decision — the
+    // standing line carries; everything else re-derives from the same four facts
+    // the oracle reads, with reachability from the standing row and the frontable
+    // set from the census's own INTERIOR rows.
+    let fresh = match own {
+        Some((_, tier, evidence)) if *tier == "KERNEL" => (*tier, evidence.clone()),
+        _ => {
+            let mut edges: Vec<EdgeImpl> = Vec::new();
+            let mut probed: HashSet<String> = HashSet::new();
+            collect_items(&file.items, loc, &mut edges, &mut probed);
+            let fronts = rows.iter().any(|(l, tier, _)| {
+                *tier == "INTERIOR"
+                    && manifest.join(l).parent() == path.parent()
+                    && manifest
+                        .join(l)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(|stem| source.contains(&format!("{stem}::")))
+            });
+            assign_tier(
+                has_substance(&file),
+                own_reachable.unwrap_or(false),
+                !edges.is_empty(),
+                fronts,
+            )
+        }
+    };
+    let mut partition: Vec<(PathBuf, String, &'static str, String)> = rows
+        .iter()
+        .filter(|(l, _, _)| l != loc)
+        .map(|(l, tier, evidence)| (manifest.join(l), l.clone(), *tier, evidence.clone()))
+        .collect();
+    partition.push((path, loc.to_string(), fresh.0, fresh.1));
+    Ok(render_tiers(&partition, bless_env))
+}
+
+#[cfg(test)]
+mod maintain_tiers_tests {
+    use super::*;
+
+    /// Materialize a source tree under `temp_dir` and return its manifest root.
+    fn tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
+        let root =
+            std::env::temp_dir().join(format!("maintain-tiers-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for (rel, content) in files {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, content).unwrap();
+        }
+        root
+    }
+
+    /// The naive recompute every maintained answer is judged against.
+    fn oracle(manifest: &Path, kernel: &[&str]) -> String {
+        let kernel: Vec<String> = kernel.iter().map(|s| s.to_string()).collect();
+        render_tiers(
+            &derive_partition(&manifest.join("src"), manifest, &kernel),
+            "BLESS_TIERS",
+        )
+    }
+
+    const KERNEL: &[&str] = &["src/lib.rs", "src/dom/floor.rs"];
+    const LIB: &str = "pub mod dom;\n";
+    const GLUE: &str = "pub mod door;\npub mod law;\nmod work;\n";
+    const WORK: &str = "pub(crate) fn helper() {}\n";
+    const DOOR: &str =
+        "pub struct Door;\nimpl Door { pub fn go(&self) { crate::dom::work::helper() } }\n";
+    const LAW: &str = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n";
+    const FLOOR: &str = "pub struct Floor;\n";
+
+    /// One file per kind of standing evidence: a registered-kernel root, glue, a
+    /// fronting door, the plain reachable remainder, an unreachable interior, and a
+    /// registered-kernel UNREACHABLE floor (the case that separates KERNEL from
+    /// INTERIOR in the fronting relation).
+    fn demo(name: &str) -> (PathBuf, String) {
+        let manifest = tree(
+            name,
+            &[
+                ("src/lib.rs", LIB),
+                ("src/dom/mod.rs", GLUE),
+                ("src/dom/work.rs", WORK),
+                ("src/dom/door.rs", DOOR),
+                ("src/dom/law.rs", LAW),
+                ("src/dom/floor.rs", FLOOR),
+            ],
+        );
+        let census = oracle(&manifest, KERNEL);
+        (manifest, census)
+    }
+
+    /// Re-deriving a module from the SAME source is byte-identity — the stability
+    /// every verb commit relies on.
+    #[test]
+    fn no_op_maintenance_is_byte_identity() {
+        let (_, census) = demo("noop");
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            LAW,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert_eq!(fresh, census);
+    }
+
+    /// A shape-preserving edit moves exactly its own line, NEVER reads the tree
+    /// (the manifest here names no real directory — the standing census carries the
+    /// whole verdict), and agrees with the oracle over the real tree byte for byte.
+    #[test]
+    fn a_gained_fronting_reference_is_a_door_tree_free() {
+        let (manifest, census) = demo("front");
+        let grown = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n\
+                     pub fn peek() { crate::dom::work::helper() }\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh
+                .contains("- src/dom/law.rs: BOUNDARY (pub-reachable, fronts an interior sibling)"),
+            "{fresh}"
+        );
+        std::fs::write(manifest.join("src/dom/law.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// A gained production edge impl is the other door: BOUNDARY by edges, judged
+    /// from the offered source alone, oracle-agreed.
+    #[test]
+    fn a_gained_edge_impl_is_a_door() {
+        let (manifest, census) = demo("edge");
+        let grown = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\nimpl Morphism for Law {}\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh.contains("- src/dom/law.rs: BOUNDARY (pub-reachable, carries production edges)"),
+            "{fresh}"
+        );
+        std::fs::write(manifest.join("src/dom/law.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// KERNEL is a decision: however a registered file's content moves, its line
+    /// carries verbatim — tree-free — and the oracle says the same.
+    #[test]
+    fn a_kernel_line_never_moves_at_a_verb() {
+        let (manifest, census) = demo("kernel");
+        let grown = "pub struct Floor;\nimpl Morphism for Floor {}\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/floor.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert_eq!(fresh, census);
+        std::fs::write(manifest.join("src/dom/floor.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// The trusted floor is not a workshop: delegating into an unreachable KERNEL
+    /// sibling fronts nothing — the file stays ALGEBRA in the oracle and in the
+    /// maintained view, which reads the frontable set from the census's INTERIOR
+    /// rows alone.
+    #[test]
+    fn fronting_the_kernel_floor_is_not_a_door() {
+        let (manifest, census) = demo("floor");
+        let grown = "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n\
+                     pub fn lean() -> crate::dom::floor::Floor { crate::dom::floor::Floor }\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            grown,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh.contains(
+                "- src/dom/law.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)"
+            ),
+            "{fresh}"
+        );
+        std::fs::write(manifest.join("src/dom/law.rs"), grown).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// A new module grows the roster as INTERIOR — unmounted is not pub-reachable,
+    /// exactly what the oracle says about a file no `pub mod` chain names yet.
+    #[test]
+    fn a_new_module_grows_the_roster_interior() {
+        let (manifest, census) = demo("fresh");
+        let fresh_src = "pub struct F;\npub fn id(x: F) -> F { x }\n";
+        let fresh = maintain_tiers(
+            &census,
+            "src/dom/fresh.rs",
+            fresh_src,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            fresh.contains("- src/dom/fresh.rs: INTERIOR (not pub-reachable)"),
+            "{fresh}"
+        );
+        assert!(fresh.contains("# 7 files:"), "{fresh}");
+        std::fs::write(manifest.join("src/dom/fresh.rs"), fresh_src).unwrap();
+        assert_eq!(fresh, oracle(&manifest, KERNEL));
+    }
+
+    /// A MOUNT is structural: the glue's new `pub mod` disagrees with the standing
+    /// INTERIOR row, so the view falls back to the oracle's own derivation over the
+    /// tree — the mounted module's line moves without its own text moving, and the
+    /// bless ceremony is still not owed. The unmount walks the same road back.
+    #[test]
+    fn a_mount_and_unmount_fall_back_to_the_oracle() {
+        let (manifest, census) = demo("mount");
+        let fresh_src = "pub struct F;\npub fn id(x: F) -> F { x }\n";
+        std::fs::write(manifest.join("src/dom/fresh.rs"), fresh_src).unwrap();
+        let census = maintain_tiers(
+            &census,
+            "src/dom/fresh.rs",
+            fresh_src,
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        let mounted_glue = "pub mod door;\npub mod fresh;\npub mod law;\nmod work;\n";
+        std::fs::write(manifest.join("src/dom/mod.rs"), mounted_glue).unwrap();
+        let mounted = maintain_tiers(
+            &census,
+            "src/dom/mod.rs",
+            mounted_glue,
+            &manifest,
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert!(
+            mounted.contains(
+                "- src/dom/fresh.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)"
+            ),
+            "{mounted}"
+        );
+        assert_eq!(mounted, oracle(&manifest, KERNEL));
+        std::fs::write(manifest.join("src/dom/mod.rs"), GLUE).unwrap();
+        let unmounted =
+            maintain_tiers(&mounted, "src/dom/mod.rs", GLUE, &manifest, "BLESS_TIERS").unwrap();
+        assert!(
+            unmounted.contains("- src/dom/fresh.rs: INTERIOR (not pub-reachable)"),
+            "{unmounted}"
+        );
+        assert_eq!(unmounted, oracle(&manifest, KERNEL));
+    }
+
+    /// Editing the root glue is LOCAL when nothing moved: sibling roots are
+    /// reachable by definition (mounted by no one), so their rows raise no
+    /// structural question and the standing census carries — tree-free.
+    #[test]
+    fn a_root_edit_that_moves_nothing_is_local() {
+        let manifest = tree(
+            "root",
+            &[
+                ("src/lib.rs", "pub mod law;\n"),
+                ("src/main.rs", "fn main() {}\n"),
+                (
+                    "src/law.rs",
+                    "pub struct Law;\npub fn hold(x: Law) -> Law { x }\n",
+                ),
+            ],
+        );
+        let census = oracle(&manifest, &[]);
+        let fresh = maintain_tiers(
+            &census,
+            "src/lib.rs",
+            "pub mod law;\n",
+            Path::new("no-tree"),
+            "BLESS_TIERS",
+        )
+        .unwrap();
+        assert_eq!(fresh, census);
+    }
+
+    /// Maintenance never guesses: an unparseable source, a census line outside the
+    /// lock's grammar, and a duplicated row each refuse with no movement.
+    #[test]
+    fn refusals_are_named() {
+        let (_, census) = demo("refuse");
+        let bad_source = maintain_tiers(
+            &census,
+            "src/dom/law.rs",
+            "not rust ((",
+            Path::new("no-tree"),
+            "E",
+        );
+        assert!(bad_source.unwrap_err().contains("src/dom/law.rs"));
+        let bad_census = maintain_tiers(
+            &format!("{census}- src/dom/law.rs mumbles\n"),
+            "src/dom/law.rs",
+            LAW,
+            Path::new("no-tree"),
+            "E",
+        );
+        assert!(bad_census
+            .unwrap_err()
+            .contains("unreadable tier census line"));
+        let duplicated = maintain_tiers(
+            &format!("{census}- src/dom/law.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)\n"),
+            "src/dom/law.rs",
+            LAW,
+            Path::new("no-tree"),
+            "E",
+        );
+        assert!(duplicated
+            .unwrap_err()
+            .contains("duplicate tier census lines"));
+    }
+}
+
+#[cfg(test)]
+mod maintain_tests {
+    use super::*;
+
+    const QUALIFIES: &str = "pub struct A;\npub fn f(x: A) -> A { todo!() }\n";
+    const REFUSES: &str = "pub struct A;\n";
+
+    fn pair() -> (String, String) {
+        let q = qualify_line(QUALIFIES, "src/a.rs").unwrap().unwrap();
+        let r = reasons_line(REFUSES, "src/b.rs").unwrap().unwrap();
+        (
+            render_census_from(&[q], 2, "BLESS_QUALIFY"),
+            render_reasons_from(&[r], 2, "BLESS_REASONS"),
+        )
+    }
+
+    /// Re-deriving a module from the SAME source is byte-identity on both files —
+    /// the stability every verb commit relies on, and the partition in miniature
+    /// (a qualifying source contributes no reasons line, a refusing one no census
+    /// line).
+    #[test]
+    fn no_op_maintenance_is_byte_identity() {
+        let (census, reasons) = pair();
+        assert!(reasons_line(QUALIFIES, "src/a.rs").unwrap().is_none());
+        assert!(qualify_line(REFUSES, "src/b.rs").unwrap().is_none());
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            QUALIFIES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(c2, census);
+        assert_eq!(r2, reasons);
+    }
+
+    /// An edit replaces exactly its own line: the moved module's line is fresh, the
+    /// untouched module's line and both headers carry — the delta's image outside
+    /// its support is zero.
+    #[test]
+    fn maintenance_replaces_exactly_its_own_line() {
+        let (census, reasons) = pair();
+        let grown = "pub struct A;\npub struct B;\npub fn f(x: A) -> B { todo!() }\n";
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            grown,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        let fresh = qualify_line(grown, "src/a.rs").unwrap().unwrap();
+        assert_eq!(c2, render_census_from(&[fresh], 2, "BLESS_QUALIFY"));
+        assert_eq!(r2, reasons);
+    }
+
+    /// A module crossing the partition MOVES between the files, and both headers
+    /// re-derive: retracted from the census, asserted in the reasons, scanned
+    /// constant.
+    #[test]
+    fn a_crossing_moves_between_the_files() {
+        let (census, reasons) = pair();
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            REFUSES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(c2, render_census_from(&[], 2, "BLESS_QUALIFY"));
+        let b = reasons_line(REFUSES, "src/b.rs").unwrap().unwrap();
+        let a = reasons_line(REFUSES, "src/a.rs").unwrap().unwrap();
+        assert_eq!(r2, render_reasons_from(&[a, b], 2, "BLESS_REASONS"));
+    }
+
+    /// A loc neither file has ever seen grows the roster: scanned rises by one on
+    /// both headers — `add` founding a module is ordinary maintenance, not a
+    /// special case.
+    #[test]
+    fn a_new_module_grows_the_roster() {
+        let (census, reasons) = pair();
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/c.rs",
+            QUALIFIES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert!(c2.contains("# 3 files scanned, 2 qualify.\n"));
+        assert!(r2.contains("# 3 files scanned, 2 qualify, 1 refuse.\n"));
+    }
+
+    /// Maintenance is idempotent: the same delta applied twice is the same view.
+    #[test]
+    fn maintenance_is_idempotent() {
+        let (census, reasons) = pair();
+        let once = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            REFUSES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        let twice = maintain_qualify(
+            &once.0,
+            &once.1,
+            "src/a.rs",
+            REFUSES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(once, twice);
+    }
+
+    /// An unparseable source is NO SIGNAL: the refusal names it and nothing moves —
+    /// a half-written edit must never read as a qualification change.
+    #[test]
+    fn an_unparseable_source_refuses_with_no_movement() {
+        let (census, reasons) = pair();
+        let refusal = maintain_qualify(
+            &census,
+            &reasons,
+            "src/a.rs",
+            "fn broken(",
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .expect_err("refuses");
+        assert!(refusal.contains("unparseable"));
+    }
+
+    /// A `tests.rs` loc is the walk's own skip: identity by declaration, so the
+    /// maintained view and the wholesale scan agree about what a file even is.
+    #[test]
+    fn a_tests_rs_loc_is_the_walks_own_skip() {
+        let (census, reasons) = pair();
+        let (c2, r2) = maintain_qualify(
+            &census,
+            &reasons,
+            "src/tests.rs",
+            QUALIFIES,
+            "BLESS_QUALIFY",
+            "BLESS_REASONS",
+        )
+        .unwrap();
+        assert_eq!(c2, census);
+        assert_eq!(r2, reasons);
     }
 }
 

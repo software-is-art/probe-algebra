@@ -1,0 +1,36 @@
+/// Walk `dir` collecting each file's declared tier, qualify evidence, and child-module
+/// declarations (for the reachability pass).
+fn collect_tier_rows(dir: &Path, manifest: &Path, rows: &mut Vec<(PathBuf, TierRow)>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_tier_rows(&path, manifest, rows);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        let Ok(source) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(file) = parse(&path) else { continue };
+        rows.push((
+            path.clone(),
+            TierRow {
+                loc: path
+                    .strip_prefix(manifest)
+                    .unwrap_or(&path)
+                    .display()
+                    .to_string(),
+                substance: has_substance(&file),
+                mods: child_mods(&file),
+                child_dir: child_dir_of(&path),
+                source,
+            },
+        ));
+    }
+}

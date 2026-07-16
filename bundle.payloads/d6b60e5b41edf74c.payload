@@ -1,0 +1,15 @@
+/// The trace spread: built from the same Z-sets — constant, impulse, alternating —
+/// so the stream laws are judged over windows with real interior differences.
+#[crate::mutate]
+fn traces() -> Vec<Flow> {
+    let a = ZSet::from_pairs(&[(0, 1)]);
+    let b = ZSet::from_pairs(&[(1, 2)]);
+    let c = ZSet::from_pairs(&[(0, -1), (2, 1)]);
+    vec![
+        Flow::Window(vec![ZSet::zero(); TICKS]),
+        Flow::Window(vec![a.clone(), ZSet::zero(), ZSet::zero()]),
+        Flow::Window(vec![ZSet::zero(), b.clone(), ZSet::zero()]),
+        Flow::Window(vec![a.clone(), b.clone(), c.clone()]),
+        Flow::Window(vec![c, a, b]),
+    ]
+}

@@ -1,0 +1,25 @@
+/// A node in the operator DAG. Every input names an EARLIER node, so the graph is
+/// acyclic by construction and one forward fold is a complete schedule — order in
+/// the executor comes only from real dependencies, never from a program counter.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Node {
+    /// A stream entering from outside; its deltas are fed at `tick`, never computed.
+    Source,
+    /// Group addition — linear, so the delta passes straight through.
+    Add(usize, usize),
+    /// Group inverse — linear.
+    Neg(usize),
+    /// z⁻¹ — linear: the delta stream itself is delayed one tick.
+    Delay(usize),
+    /// The bilinear operator: its delta obeys the product rule
+    /// Δ(a⋈b) = Δa⋈b + a⋈Δb + Δa⋈Δb, paid for by integrating both inputs.
+    Join(usize, usize),
+    /// The nonlinear operator: D∘distinct∘I — recompute over the integrated
+    /// input, memoized in the warehouse by that input's CONTENT.
+    Distinct(usize),
+    /// The UNINTERPRETED operator: D∘f∘I with the recompute handed to an admitted
+    /// tenant the executor never looks inside — `distinct`'s rule generalized,
+    /// verdicts warehoused by the integrated input's CONTENT. The second field
+    /// names the tenant `admit` returned.
+    Opaque(usize, usize),
+}

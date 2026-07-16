@@ -5,7 +5,7 @@
 # reachability's tier. KERNEL is a decision, never derived: it is ratified in the
 # consumer's own tree (the build.rs allowlist, or a register it parses).
 # Regenerate with `BLESS_TIERS=1 cargo build`.
-# 63 files: 3 boundary, 4 interior, 46 algebra, 10 kernel.
+# 68 files: 3 boundary, 5 interior, 50 algebra, 10 kernel.
 # rule KERNEL: the trusted floor — exempt from the structural rules; a ratified privilege
 # rule BOUNDARY: tier 1 — a domain's strict value-object surface; no loose `pub fn`
 # rule INTERIOR: tier 2 — the workshop; mutation and raw collections allowed; no loose `pub fn`
@@ -20,12 +20,14 @@
 - src/discover/bite.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/bridge.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/bundle.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
+- src/discover/cli.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/coherence.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/cohesion.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/composition.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/date.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/depend.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/derived.rs: ALGEBRA (glue — module declarations and re-exports only; tier by reachability)
+- src/discover/eduction.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/engine.rs: KERNEL (registered — a decision, never derived)
 - src/discover/expect.rs: KERNEL (registered — a decision, never derived)
 - src/discover/fabric.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
@@ -34,6 +36,7 @@
 - src/discover/gates.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/genesis.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/infra.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
+- src/discover/items.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/judgment.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/layering.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/lift.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
@@ -58,6 +61,7 @@
 - src/discover/verdict.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/watch.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/world.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
+- src/discover/zset.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/gdp.rs: KERNEL (registered — a decision, never derived)
 - src/harness.rs: KERNEL (registered — a decision, never derived)
 - src/interp/boundary.rs: BOUNDARY (pub-reachable, carries production edges)
@@ -68,6 +72,7 @@
 - src/kvstore/probes.rs: INTERIOR (not pub-reachable)
 - src/kvstore/store.rs: BOUNDARY (pub-reachable, carries production edges)
 - src/kvstore/theory.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
+- src/kvstore/twin.rs: INTERIOR (not pub-reachable)
 - src/lib.rs: KERNEL (registered — a decision, never derived)
 - src/main.rs: KERNEL (registered — a decision, never derived)
 - src/select/boundary.rs: BOUNDARY (pub-reachable, fronts an interior sibling)

@@ -24,6 +24,7 @@ members = [
     "layout-probe",
     "downstream-fixture",
     "fire-drill",
+    "weave-knee",
     "genesis-demo",
     "probe-hook",
     "relay-demo",
@@ -69,6 +70,10 @@ paste = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 
 [dev-dependencies]
+# the bundle example maintains the qualify census pair at each verb commit — the same
+# rule the build gate re-derives wholesale (the oracle); examples only, not a library
+# dependency.
+boundary-enforce = { path = "boundary-enforce", version = "0.2.0" }
 # the repo's own fire-drill battery (tests/fire_drill.rs): known-bad fixtures proving the
 # discipline's gates can still fire.
 fire-drill = { path = "fire-drill" }

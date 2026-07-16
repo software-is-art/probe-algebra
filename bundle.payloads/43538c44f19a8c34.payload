@@ -1,0 +1,9 @@
+/// The nonlinear rule's memo: values keyed by the CONTENT of the integrated input
+/// they were computed from, never by when or where they were computed. The
+/// owes/gates verdict warehouse is this same table in the degenerate case — rustc
+/// and the test suite as uninterpreted operators, the tree as the integrated input.
+struct Warehouse<K: Ord> {
+    memo: std::collections::BTreeMap<Evidence<K>, ZSet<K>>,
+    hits: u64,
+    misses: u64,
+}

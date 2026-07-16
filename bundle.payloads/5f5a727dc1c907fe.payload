@@ -1,0 +1,113 @@
+fn main() {
+    let specs = all_specs();
+    let mut locks: Vec<spec_lock::Lock> = specs.iter().map(Spec::lock).collect();
+    locks.push(SystemReport::of::<BoundarySpec>().lock());
+    // the SHAPE lock: the DERIVED module boundaries — operators placed by net
+    // connectivity, held against the declared graph continuously (see `discover::shape`).
+    locks.push(ShapeReport::of::<BoundarySpec>().lock());
+    // the WORLD lock: the model's ratified beliefs about the demonstration dependency
+    // (see `discover::world` — the freeze discipline pointed outward).
+    locks.push(StoreModel::beliefs().lock());
+    // the ALGEBRA-MUTATION locks: the spec's kill power per theory, survivors ratified.
+    locks.push(MutationReport::of::<Arithmetic>().lock());
+    locks.push(MutationReport::of::<Router>().lock());
+    locks.push(MutationReport::of::<Calendar>().lock());
+    locks.push(MutationReport::of::<TtlStore>().lock());
+    locks.push(MutationReport::of::<StoreProtocol>().lock());
+    locks.push(MutationReport::of::<boundary_spec::discover::protocol::DocFlow>().lock());
+    locks.push(MutationReport::of::<boundary_spec::discover::zset::ZKernel>().lock());
+    locks.push(MutationReport::of::<boundary_spec::discover::fabric::Fabric>().lock());
+    // the BRIDGED theory: a prover's exported tables (`spec/bridged-bool.export` is the
+    // committed INPUT), mounted and judged like any theory — its spec, its mutation
+    // verdict, and the triage (agreements / conjectures; a disagreement refuses to
+    // freeze at all: it is a defect to fix upstream, never an artifact to ratify).
+    let spec_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("spec");
+    let export_text = std::fs::read_to_string(spec_dir.join("bridged-bool.export"))
+        .expect("the committed export fixture");
+    Export::parse(&export_text)
+        .expect("the committed export parses")
+        .install::<0>()
+        .expect("slot 0 is the committed fixture's");
+    let triage = Triage::of::<Bridged<0>>();
+    triage
+        .certify()
+        .expect("a disagreement is fixed upstream, never frozen");
+    locks.push(Spec::of::<Bridged<0>>().lock_in(&spec_dir));
+    // the VERB ALGEBRA: the change-history as a theory — its discovered commuting-maps
+    // laws ARE the fork/join rules, its refusals the conflict classes (discover::verbs).
+    locks.push(Spec::of::<boundary_spec::discover::verbs::state::VerbAlgebra>().lock_in(&spec_dir));
+    locks.push(
+        MutationReport::of::<boundary_spec::discover::verbs::state::VerbAlgebra>()
+            .lock_in(&spec_dir),
+    );
+    locks.push(MutationReport::of::<Bridged<0>>().lock_in(&spec_dir));
+    locks.push(triage.lock_in(&spec_dir));
+    // the PROBE CENSUS: every probe lock this crate upholds, with the mechanism that proves
+    // it sensitive — the unified roster (see `discover::probes`).
+    locks.push(ProbeCensus::of().lock());
+    // NARRATE THE MOVEMENT before blessing: `spec_lock::deltas` holds each lock's committed
+    // text against the live text this run derived — the diff the drift gate would collapse to
+    // a bool. For a lock whose lines are recommendations (the shape's placement verdict and
+    // seam candidates, the tier assignments), this is the updated recommendation, produced by
+    // the same run that emits the lock. Captured now because `bless` is about to overwrite the
+    // committed side.
+    let moved = spec_lock::deltas(&locks);
+    spec_lock::bless(&locks).expect("write spec locks");
+    for (lock, spec) in locks.iter().zip(&specs) {
+        println!("froze {} ({} laws)", lock.path.display(), spec.laws.len());
+    }
+    for (lock, label) in locks.iter().skip(specs.len()).zip([
+        "the seam graph",
+        "the derived shape (placement)",
+        "the world lock",
+        "algebra mutation: interpreter arithmetic",
+        "algebra mutation: router",
+        "algebra mutation: date calculus",
+        "algebra mutation: ttl store",
+        "algebra mutation: store protocol",
+        "algebra mutation: doc flow",
+        "algebra mutation: zset kernel",
+        "algebra mutation: fabric",
+        "the bridged theory's spec",
+        "the verb algebra (fork/join rules)",
+        "algebra mutation: verb algebra",
+        "algebra mutation: bridged-bool",
+        "the bridge triage (obligations)",
+        "the probe census",
+    ]) {
+        println!("froze {} ({label})", lock.path.display());
+    }
+
+    // The emitter narrating its own movement: each lock whose recommendation changed, rendered
+    // from the two sides `delta()` held. Printed for whoever ran the freeze, and persisted for
+    // probe-hook to courier into a later context window (the hook only inserts; the mechanism is
+    // `delta()`, run here, at the build that produced the change). A build with no movement
+    // clears the courier, so a stale delta never lingers.
+    let narration: String = moved
+        .iter()
+        .map(|(name, delta)| delta.render(name))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if moved.is_empty() {
+        println!("\nno recommendation moved — every lock reproduces its ratified baseline.");
+    } else {
+        println!("\n{narration}");
+    }
+    let courier = spec_dir
+        .parent()
+        .unwrap_or(&spec_dir)
+        .join("target/probe-hook/freeze-delta");
+    if let Some(parent) = courier.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    // best-effort: an unwritable target never fails a freeze (the narration above already
+    // reached whoever ran it). Empty movement writes an empty file, clearing any prior delta.
+    let _ = std::fs::write(
+        &courier,
+        if narration.is_empty() {
+            String::new()
+        } else {
+            format!("{narration}\n")
+        },
+    );
+}

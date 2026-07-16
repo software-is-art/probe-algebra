@@ -1,0 +1,26 @@
+/// Average the scored trials per fanout, ascending.
+pub fn curve(scores: &[Scores]) -> Vec<CurvePoint> {
+    let mut by_fanout: BTreeMap<usize, Vec<&Scores>> = BTreeMap::new();
+    for s in scores {
+        by_fanout.entry(s.fanout).or_default().push(s);
+    }
+    by_fanout
+        .into_iter()
+        .map(|(fanout, group)| {
+            let n = group.len() as f64;
+            CurvePoint {
+                fanout,
+                trials: group.len(),
+                mention: group.iter().map(|s| s.mention).sum::<f64>() / n,
+                claim_cov: group.iter().map(|s| s.claim_cov).sum::<f64>() / n,
+                relation_cov: group.iter().map(|s| s.relation_cov).sum::<f64>() / n,
+                foil_rej: group.iter().map(|s| s.foil_rej).sum::<f64>() / n,
+                gain: group.iter().map(|s| s.gain).sum::<f64>() / n,
+                e_foil_rej: group.iter().map(|s| s.e_foil_rej).sum::<f64>() / n,
+                topo_recall: group.iter().map(|s| s.topo_recall).sum::<f64>() / n,
+                topo_prec: group.iter().map(|s| s.topo_prec).sum::<f64>() / n,
+                quality: group.iter().map(|s| f64::from(s.quality)).sum::<f64>() / n,
+            }
+        })
+        .collect()
+}

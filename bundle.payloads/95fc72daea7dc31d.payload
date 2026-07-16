@@ -1,0 +1,4 @@
+#[crate::mutate]
+fn neg(v: &[Flow]) -> Option<Flow> {
+    Some(Flow::Zset(zpart(&v[0]).neg()))
+}

@@ -1,0 +1,82 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+    use crate::corpus::{emergents, trial};
+
+    #[test]
+    fn the_weaver_sees_every_claim_and_relation_and_no_foil_and_no_emergent() {
+        let t = trial(4, 9);
+        let w = weave(&t);
+        for c in &t.children {
+            assert!(w.contains(&c.lexeme));
+            for cl in &c.claims {
+                assert!(w.contains(&cl.text));
+                assert!(!w.contains(&cl.foil));
+            }
+        }
+        for r in &t.relations {
+            assert!(w.contains(&r.text));
+            assert!(!w.contains(&r.foil));
+        }
+        for e in emergents(&t) {
+            assert!(!w.contains(&e.text), "{} leaked to the weaver", e.id);
+            assert!(!w.contains(&e.foil), "{}F leaked to the weaver", e.id);
+        }
+    }
+
+    #[test]
+    fn candidates_pair_every_claim_with_its_foil_and_shuffle_deterministically() {
+        let t = trial(5, 3);
+        let cands = candidates(&t);
+        assert_eq!(cands.len(), 2 * (3 * 5 + 5));
+        assert_eq!(cands, candidates(&t));
+        let truths = cands.iter().filter(|c| c.truth).count();
+        assert_eq!(truths, cands.len() / 2);
+        for c in &cands {
+            if !c.truth {
+                assert!(c.id.ends_with('F'));
+            }
+        }
+    }
+
+    #[test]
+    fn emergent_candidates_pair_and_shuffle_the_gain_census() {
+        let t = trial(5, 3);
+        let cands = emergent_candidates(&t);
+        assert_eq!(cands.len(), 2 * emergents(&t).len());
+        assert_eq!(cands, emergent_candidates(&t));
+        for c in &cands {
+            assert!(c.id.starts_with('e'));
+            assert_eq!(!c.truth, c.id.ends_with('F'));
+        }
+    }
+
+    #[test]
+    fn the_judge_sees_the_narrative_and_both_censuses() {
+        let t = trial(3, 5);
+        let j = judge(&t, "A line.\n\nAnother line.");
+        assert!(j.contains("> A line."));
+        assert!(j.contains("> Another line."));
+        for c in candidates(&t) {
+            assert!(j.contains(&format!("{}: {}", c.id, c.text)));
+        }
+        for c in emergent_candidates(&t) {
+            assert!(j.contains(&format!("{}: {}", c.id, c.text)));
+        }
+        assert!(j.contains("stated <id> STATED"));
+        assert!(j.contains("quality <1-5>"));
+    }
+
+    #[test]
+    fn the_reconstructor_sees_every_module_but_no_relation_text() {
+        let t = trial(6, 4);
+        let p = reconstruct(&t, "A narrative that names nothing.");
+        for c in &t.children {
+            assert!(p.contains(&c.lexeme));
+        }
+        for r in &t.relations {
+            assert!(!p.contains(&r.text), "{} leaked to the reconstructor", r.id);
+        }
+        assert!(p.contains("edge <from-module> <to-module>"));
+    }
+}

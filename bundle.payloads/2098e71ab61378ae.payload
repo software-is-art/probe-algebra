@@ -1,0 +1,592 @@
+#[crate::mutate]
+impl GateRegistry {
+    /// Every declared gate, in execution order.
+    pub fn declared() -> Vec<Gate> {
+        vec![
+            Gate {
+                name: "format",
+                verifies: "the whole workspace is rustfmt-canonical (generated members \
+                           included)",
+                command: &["cargo", "fmt", "--all", "--check"],
+                cadence: Cadence::EveryChange,
+                effect: Capability::Pure,
+                support: Support::RustSurface,
+                sharded: false,
+            },
+            Gate {
+                name: "lint",
+                verifies: "clippy holds every workspace member, all targets and features, \
+                           to deny-warnings",
+                command: &[
+                    "cargo",
+                    "clippy",
+                    "--workspace",
+                    "--all-targets",
+                    "--all-features",
+                    "--",
+                    "-D",
+                    "warnings",
+                ],
+                cadence: Cadence::EveryChange,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "test",
+                verifies: "every workspace member's suites: the enforcement passes and \
+                           qualify censuses (ride the builds), the drift gates (module, \
+                           system, shapes, and world locks), the distance gates, the \
+                           probes, and the consumer fixtures",
+                command: &["cargo", "test", "--workspace", "--all-targets"],
+                cadence: Cadence::EveryChange,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "certify (mutants-green)",
+                verifies: "the default branch marks itself certified: once the \
+                           every-change gates — which carry the WHOLE compiled-mutant \
+                           population — pass on a push, the mutants-green tag advances \
+                           to HEAD and the release mints. The per-merge cargo-mutants \
+                           run is retired; the weekly sweeps keep the exempted \
+                           remainder",
+                command: &["git", "tag", "-f", "mutants-green"],
+                cadence: Cadence::DefaultBranch,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "mutation (full sweep)",
+                verifies: "no mutant of the whole crate survives — the method's own \"the \
+                           real test\", re-certifying the tree from scratch on a weekly \
+                           clock (backstops incrementality's one gap: a test edit \
+                           weakening kills for unchanged code)",
+                command: &[".github/mutants-gate.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: true,
+            },
+            Gate {
+                name: "mutation (delta-render plumbing)",
+                verifies: "no mutant of delta-render's plumbing (the license parser, the \
+                           circuit validity rule, the render, the stream calculus) \
+                           survives its lib probes — the workspace sweeps scope to the \
+                           root crate, so the member that turns specs into generated \
+                           code carries its own weekly verdict (config: \
+                           .github/delta-render-mutants.toml; the drift-gate twins live \
+                           in the lib precisely so this sweep can see them)",
+                command: &[
+                    ".github/mutants-gate.sh",
+                    "--package",
+                    "delta-render",
+                    "--config",
+                    ".github/delta-render-mutants.toml",
+                ],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "statement bites (lean corpus)",
+                verifies: "no definition mutant of lean/ProbeBool.lean re-checks past its \
+                           theorems, except the survivors ratified by key in \
+                           lean/bites.register — mutation testing FOR the proof corpus: \
+                           the kernel judges the mutants (the gate installs elan; the \
+                           corpus is core-only), while the expected survivor set is \
+                           pinned toolchain-free by discover::bite's mirror probe in \
+                           every cargo test",
+                command: &[".github/statement-bite.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "mutation (fire-drill plumbing)",
+                verifies: "no mutant of fire-drill (the battery verdicts, the census \
+                           refusals, both lockable renders) survives its lib probes — \
+                           the workspace sweeps scope to the root crate, so the crate \
+                           that proves gates can fire carries its own weekly verdict \
+                           (config: .github/fire-drill-mutants.toml)",
+                command: &[
+                    ".github/mutants-gate.sh",
+                    "--package",
+                    "fire-drill",
+                    "--config",
+                    ".github/fire-drill-mutants.toml",
+                ],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "mutation (layout-probe plumbing)",
+                verifies: "no mutant of layout-probe (the two engines, the diagram \
+                           edits, the visual census and its locality witness) survives \
+                           its lib probes — the workspace sweeps scope to the root \
+                           crate, so the second-domain miniature carries its own weekly \
+                           verdict (config: .github/layout-probe-mutants.toml; the \
+                           drift-gate twins live in the lib so this sweep can see them)",
+                command: &[
+                    ".github/mutants-gate.sh",
+                    "--package",
+                    "layout-probe",
+                    "--config",
+                    ".github/layout-probe-mutants.toml",
+                ],
+                cadence: Cadence::Weekly,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "release (certified tree)",
+                verifies: "every certified default-branch tree publishes itself: the \
+                           countersign's tag advance IS the release event, the version \
+                           is CalVer (a date claims nothing about compatibility, which \
+                           is honest), and the notes are DERIVED — commit subjects plus \
+                           the ratified spec-lock diff, the uncompressed truth a semver \
+                           integer would compress into an unchecked claim",
+                command: &[".github/release.sh"],
+                cadence: Cadence::OnCertify,
+                effect: Capability::Effectful,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "perimeter (settings drift)",
+                verifies: "the LIVE repository perimeter — branch rules on the default \
+                           branch, merge methods, private vulnerability reporting — still \
+                           satisfies the declared floor (spec/perimeter.spec). Settings \
+                           are configuration that drifts silently and that no one \
+                           re-audits; this gate reads them back on the weekly clock and \
+                           refuses by name. READ-ONLY: the write stays human — a \
+                           privilege is ratified, never self-served",
+                command: &[".github/perimeter.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Effectful,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "mutation (schemata)",
+                verifies: "no compiled expression-flip mutant survives the lib suite: \
+                           every `#[mutate]` site (spec/schemata.spec — the judges, the \
+                           router's classifier, the reliance judge) ships in ONE build \
+                           behind the PROBE_MUTANT selector — a green run with a flip \
+                           active is a survivor, ratified by key in \
+                           spec/schemata.register or killed with a probe. `verify` is \
+                           the sampled countersign: a committed attestation \
+                           (attest/sweep.transcript) matching this tree and toolchain \
+                           is audited by re-judging a random sample of its sites — \
+                           derivation local, signature cold — and a missing, foreign, \
+                           or disagreeing attestation falls back to the full sweep, \
+                           which re-attests. The weekly shards stay the from-scratch \
+                           backstop",
+                command: &[
+                    "cargo",
+                    "run",
+                    "--features",
+                    "schemata",
+                    "--example",
+                    "schemata",
+                    "--",
+                    "verify",
+                ],
+                cadence: Cadence::EveryChange,
+                effect: Capability::Pure,
+                support: Support::Judged,
+                sharded: false,
+            },
+            Gate {
+                name: "substrate (git drift)",
+                verifies: "the LIVE repository's tags and history still satisfy the \
+                           declared git substrate (spec/substrate.spec): the tags the \
+                           machinery leans on exist and sit on the certified line, \
+                           every published root-crate version carries its v<version> \
+                           marker (instances DERIVED from the crates.io index, never \
+                           named in the declaration), and the default branch stays \
+                           linear after the declared epoch — the perimeter's \
+                           squash-only rule, judged backward. READ-ONLY and \
+                           credential-free: git plumbing against the checkout's own \
+                           origin plus one anonymous sparse-index read",
+                command: &[".github/substrate.sh"],
+                cadence: Cadence::Weekly,
+                effect: Capability::Effectful,
+                support: Support::Judged,
+                sharded: false,
+            },
+        ]
+    }
+
+    /// The status-check contexts a PR must pass before merging — the every-change job
+    /// plus each per-diff gate, by their RENDERED job names. The perimeter declaration
+    /// consumes this, which is the point of deriving it: a gate added, renamed, or
+    /// re-cadenced here moves `spec/perimeter.spec` in the same diff, and the weekly
+    /// read-back then holds the live branch rules to it.
+    pub fn pr_checks() -> Vec<String> {
+        let mut checks = vec![CHECK_JOB.to_string()];
+        checks.extend(
+            Self::declared()
+                .iter()
+                .filter(|g| g.cadence == Cadence::PerDiff)
+                .map(check_context),
+        );
+        checks
+    }
+
+    /// The human-readable inventory — what `spec/gates.spec` locks: one stanza per gate
+    /// (name, cadence, capability, command, promise). The pipeline's CLAIMS, as ratified
+    /// text.
+    pub fn render_registry() -> String {
+        let mut out = String::from(
+            "# gate registry: the pipeline as a declaration — regenerate via `cargo run --example freeze_gates`; ratify the diff.\n\
+             #\n\
+             # Every gate below is a deterministic function of the tree (Pure): executable on\n\
+             # any machine (`cargo run --example gate`), re-executed by CI from the DERIVED\n\
+             # workflow (.github/workflows/ci.yml — itself a lock rendered from this registry),\n\
+             # and therefore countersignable. CI keeps only what cannot shift left:\n\
+             # countersigning, effects, and the economics of the expensive sweeps — all three\n\
+             # visible here as cadence and capability instead of implicit in YAML.\n",
+        );
+        out.push_str(&registry_stanzas(&Self::declared()));
+        out
+    }
+
+    /// The GitHub Actions workflow — `.github/workflows/ci.yml` IS this render, drift-gated:
+    /// the execution steps come from the registry (commands, cadences, the toolchain pin,
+    /// the sweep schedule); the scaffolding (checkout, cache, tool install) is the template
+    /// around them. Never edit the YAML by hand — regenerate and ratify.
+    pub fn render_workflow() -> String {
+        let gates = Self::declared();
+        let every_change: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::EveryChange)
+            .collect();
+        let per_diff: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::PerDiff)
+            .collect();
+        let default_branch: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::DefaultBranch)
+            .collect();
+        let weekly: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::Weekly)
+            .collect();
+        let on_certify: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.cadence == Cadence::OnCertify)
+            .collect();
+        // the release steps render after BOTH tag-advance sites — the countersign IS
+        // the release event, so wherever the tag moves, the certified tree publishes.
+        let release_steps = |out: &mut String| {
+            for gate in &on_certify {
+                out.push_str(&format!(
+                    "      - name: release — the certified tree publishes itself\n\
+                     \x20       env:\n\
+                     \x20         GH_TOKEN: ${{{{ github.token }}}}\n\
+                     \x20         CARGO_REGISTRY_TOKEN: ${{{{ secrets.CARGO_REGISTRY_TOKEN }}}}\n\
+                     \x20       run: {}\n",
+                    gate.command_line()
+                ));
+            }
+        };
+
+        let mut out = format!(
+            "# GENERATED from the gate registry (`discover::gates`) — THE PIPELINE IS A LOCK.\n\
+             # Never edit by hand: regenerate with `cargo run --example freeze_gates` and ratify\n\
+             # the diff. The registry is the single source for the commands, cadences, the\n\
+             # toolchain pin, and the sweep schedule; `spec/gates.spec` carries the promises.\n\
+             name: ci\n\
+             \n\
+             # Default-deny at the top; the two tag-advance/release jobs elevate to\n\
+             # `contents: write` explicitly. (Scorecard's token-permissions criterion,\n\
+             # and simply the capability-honesty rule applied to CI itself.)\n\
+             permissions:\n\
+             {sp2}contents: read\n\
+             \n\
+             # Dogfood everywhere, all the time. The fast gates run on every push and PR; the\n\
+             # mutation gate — the method's own \"the real test\" — runs per-change on PRs (only\n\
+             # the changed lines), incrementally on the default branch (only the diff since the\n\
+             # last fully-certified tree, marked by the `mutants-green` tag, advanced on green),\n\
+             # and as a sharded whole-crate sweep on the weekly clock.\n\
+             #\n\
+             # The Rust toolchain is PINNED (not `@stable`): the `tests/compile_fail` trybuild\n\
+             # suites match saved `.stderr` files, and rustc's diagnostic rendering changes\n\
+             # between versions. Bump the pin in `discover::gates::TOOLCHAIN` in lockstep with\n\
+             # regenerating the `.stderr` files (TRYBUILD=overwrite), then re-freeze.\n\
+             \n\
+             on:\n\
+             {sp2}push:\n\
+             {sp4}branches: [main]\n\
+             {sp2}pull_request:\n\
+             {sp2}schedule:\n\
+             {sp4}- cron: \"{cron}\" # the periodic whole-crate guarantee\n\
+             {sp2}workflow_dispatch:\n\
+             \n\
+             env:\n\
+             {sp2}CARGO_TERM_COLOR: always\n\
+             {sp2}RUSTFLAGS: \"-D warnings\"\n\
+             \n\
+             jobs:\n\
+             {sp2}check:\n\
+             {sp4}name: fmt + clippy + test\n\
+             {sp4}runs-on: ubuntu-latest\n\
+             {sp4}steps:\n\
+             {sp6}- uses: actions/checkout@v4\n\
+             {sp6}- uses: dtolnay/rust-toolchain@{toolchain}\n\
+             {sp8}with:\n\
+             {sp10}components: rustfmt, clippy\n\
+             {sp6}- uses: Swatinem/rust-cache@v2\n",
+            cron = FULL_SWEEP_CRON,
+            toolchain = TOOLCHAIN,
+            sp2 = "  ",
+            sp4 = "    ",
+            sp6 = "      ",
+            sp8 = "        ",
+            sp10 = "          ",
+        );
+        // the schemata sweep runs INSIDE this job; its fail-fast economics need
+        // nextest, so the install step derives from the declaration.
+        if every_change
+            .iter()
+            .any(|g| g.command.iter().any(|c| c.contains("schemata")))
+        {
+            out.push_str(
+                "      # nextest: the schemata sweep's fail-fast runner — a killed mutant\n\
+                 \x20     # stops at its first failing probe instead of running out the suite.\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-nextest\n",
+            );
+        }
+        for gate in &every_change {
+            out.push_str(&format!("      - run: {}\n", gate.command_line()));
+        }
+        for gate in &per_diff {
+            out.push_str(&format!(
+                "\n  # Per-change dogfood: mutate only the lines this PR touches. New code that a\n\
+                 \x20 # probe cannot kill fails the gate; pre-existing documented equivalents are\n\
+                 \x20 # not in the diff, so they never re-trip it.\n\
+                 \x20 mutants-diff:\n\
+                 \x20   name: {context}\n\
+                 \x20   if: github.event_name == 'pull_request'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20       with:\n\
+                 \x20         fetch-depth: 0\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - name: mutate the diff\n\
+                 \x20       run: |\n\
+                 \x20         git diff \"origin/${{{{ github.base_ref }}}}...HEAD\" > pr.diff\n\
+                 \x20         {}\n",
+                gate.command_line(),
+                context = check_context(gate)
+            ));
+        }
+        for gate in &default_branch {
+            out.push_str(&format!(
+                "\n  # Incremental dogfood on the default branch: a green sweep is a lock over the\n\
+                 \x20 # tree at that sha (the `{GREEN_TAG}` tag), so a merge mutates only the diff\n\
+                 \x20 # since it. On green the tag advances — CI's countersignature, the pipeline's\n\
+                 \x20 # one effect. A red gate leaves the tag put, so the next merge re-verifies the\n\
+                 \x20 # accumulated drift. The weekly sharded sweep re-certifies from scratch.\n\
+                 \x20 mutants-incremental:\n\
+                 \x20   name: certify (mutants-green)\n\
+                 \x20   if: github.event_name == 'push'\n\
+                 \x20   needs: check\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   permissions:\n\
+                 \x20     contents: write\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20       with:\n\
+                 \x20         fetch-depth: 0\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - name: countersign — the fully-gated tree marks itself certified\n\
+                 \x20       run: |\n\
+                 \x20         {}\n\
+                 \x20         git push -f origin {GREEN_TAG}\n",
+                gate.command_line()
+            ));
+            release_steps(&mut out);
+        }
+        // weekly certification: the sharded whole-tree sweep, any unsharded weekly
+        // companions (each a plain job), and ONE countersign that needs them all — the
+        // tag is the whole weekly verdict, not one job's.
+        // a companion's display label: the `mutation (...)` sugar unwrapped when present,
+        // the full gate name otherwise (a non-mutation weekly gate keeps its own words).
+        let companion_label = |gate: &Gate| -> &str {
+            gate.name
+                .strip_prefix("mutation (")
+                .and_then(|s| s.strip_suffix(')'))
+                .unwrap_or(gate.name)
+        };
+        let weekly_job_id = |gate: &Gate| -> String {
+            match gate.sharded {
+                true => "mutants-full".to_string(),
+                false => {
+                    // job ids allow only alphanumerics and dashes: slug the label.
+                    let mut id = String::from("mutants-");
+                    for c in companion_label(gate).chars() {
+                        match c {
+                            c if c.is_ascii_alphanumeric() => id.push(c),
+                            _ if id.ends_with('-') => {}
+                            _ => id.push('-'),
+                        }
+                    }
+                    id.trim_end_matches('-').to_string()
+                }
+            }
+        };
+        for gate in weekly
+            .iter()
+            .filter(|g| !g.sharded && g.effect != Capability::Effectful)
+        {
+            out.push_str(&format!(
+                "\n  # Weekly companion gate: one plain job on the weekly clock, feeding the\n\
+                 \x20 # same countersign — see the gate registry for what it verifies.\n\
+                 \x20 {job_id}:\n\
+                 \x20   name: dogfood ({label})\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - run: {}\n",
+                gate.command_line(),
+                job_id = weekly_job_id(gate),
+                label = companion_label(gate),
+            ));
+        }
+        // WORLD gates: weekly Effectful reads of state the tree cannot contain (the
+        // repository perimeter). They ride the weekly clock but never feed the
+        // countersign — a world fact is not evidence about the TREE, and the certified
+        // tag must never wait on someone's settings page. GH_TOKEN is the workflow's
+        // ordinary read token; the world gates only ever read.
+        for gate in weekly
+            .iter()
+            .filter(|g| !g.sharded && g.effect == Capability::Effectful)
+        {
+            out.push_str(&format!(
+                "\n  # World gate: read state the tree cannot contain, hold it to the declared\n\
+                 \x20 # floor — see the gate registry for what it verifies. Not a countersign\n\
+                 \x20 # input: a world fact is not evidence about the tree.\n\
+                 \x20 world-{slug}:\n\
+                 \x20   name: {label}\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   env:\n\
+                 \x20     GH_TOKEN: ${{{{ github.token }}}}\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - run: {}\n",
+                gate.command_line(),
+                slug = job_slug(gate.name),
+                label = gate.name,
+            ));
+        }
+        let weekly_needs: Vec<String> = weekly
+            .iter()
+            .filter(|g| g.effect != Capability::Effectful)
+            .map(|g| weekly_job_id(g))
+            .collect();
+        for gate in weekly.iter().filter(|g| g.sharded) {
+            let shards: Vec<String> = (0..FULL_SWEEP_SHARDS).map(|s| s.to_string()).collect();
+            out.push_str(&format!(
+                "\n  # Whole-crate dogfood: the green gate is \"0 MISSED\". Timeouts (non-termination\n\
+                 \x20 # mutants) are DETECTIONS, not survivors — `.github/mutants-gate.sh` distinguishes\n\
+                 \x20 # a timeout-only exit (pass) from a real survivor in `missed.txt` (fail). The\n\
+                 \x20 # ratified equivalents are carved out by `.cargo/mutants.toml`. Sharded: the\n\
+                 \x20 # ~1,300-mutant sweep is ~5½ serial hours, past a hosted runner's patience.\n\
+                 \x20 mutants-full:\n\
+                 \x20   name: dogfood (full sweep)\n\
+                 \x20   if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   strategy:\n\
+                 \x20     fail-fast: false\n\
+                 \x20     matrix:\n\
+                 \x20       shard: [{shard_list}]\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - uses: taiki-e/install-action@v2\n\
+                 \x20       with:\n\
+                 \x20         tool: cargo-mutants,cargo-nextest\n\
+                 \x20     - run: {} --shard ${{{{ matrix.shard }}}}/{FULL_SWEEP_SHARDS}\n\
+                 \n\
+                 \x20 # The tag is only ever planted or advanced by a run that EARNED it: the\n\
+                 \x20 # incremental gate advances it per-merge, and this countersign advances it when\n\
+                 \x20 # EVERY shard of the full sweep is green — which is also the BOOTSTRAP (no tag\n\
+                 \x20 # yet? dispatch this workflow once; the certification plants it) and the\n\
+                 \x20 # recovery after a red stretch (the weekly green re-anchors the diff).\n\
+                 \x20 # MAIN-ONLY: a branch dispatch runs the sweeps as evidence, but the tag names\n\
+                 \x20 # the certified DEFAULT-BRANCH tree — a branch tip must never claim it.\n\
+                 \x20 mutants-full-countersign:\n\
+                 \x20   name: countersign (full sweep)\n\
+                 \x20   needs: [{needs_list}]\n\
+                 \x20   if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   permissions:\n\
+                 \x20     contents: write\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - name: countersign — advance the certified-tree tag\n\
+                 \x20       run: |\n\
+                 \x20         git tag -f {GREEN_TAG}\n\
+                 \x20         git push -f origin {GREEN_TAG}\n",
+                gate.command_line(),
+                shard_list = shards.join(", "),
+                needs_list = weekly_needs.join(", ")
+            ));
+            release_steps(&mut out);
+        }
+        out
+    }
+
+    /// The registry lock (`spec/gates.spec`) — the pipeline's PROMISES, ratified.
+    pub fn registry_lock() -> Lock {
+        Lock {
+            name: "gate registry".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("spec")
+                .join("gates.spec"),
+            live: Self::render_registry(),
+        }
+    }
+
+    /// The workflow lock — `.github/workflows/ci.yml` itself, held byte for byte to the
+    /// registry's render. A hand edit to the YAML is DRIFT, caught by the same gate the
+    /// YAML executes: the pipeline validates itself on every change it runs.
+    pub fn workflow_lock() -> Lock {
+        Lock {
+            name: "ci workflow".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(".github")
+                .join("workflows")
+                .join("ci.yml"),
+            live: Self::render_workflow(),
+        }
+    }
+}

@@ -1,0 +1,268 @@
+#[cfg(test)]
+pub(crate) mod probes {
+    use super::*;
+    use crate::discover::arithmetic::Arithmetic;
+    use crate::discover::coherence::{GcdMerge, MaxMerge};
+    use crate::discover::cohesion::CohesionReport;
+    use crate::discover::date::Calendar;
+    use crate::discover::protocol::DocFlow;
+    use crate::discover::BoundarySpec;
+
+    /// The `shape` probe's individual sensitivity drill, exposed for the unified probe
+    /// census's rung-3 reconciliation (`discover::probes`): a placement disagreeing with the
+    /// declaration must render UNSETTLED. Fires (returns `true`) when the report is not
+    /// settled — the fixture `a_disagreeing_shape_renders_loud` pins the render.
+    pub(crate) fn shape_sensitivity_drill_fires() -> bool {
+        !ShapeReport {
+            system: "disagreeing",
+            placements: vec![
+                Placement::over("bundle", bundle()),
+                Placement::of::<DocFlow>(),
+            ],
+            candidates: vec![],
+        }
+        .is_settled()
+    }
+
+    fn sig(symbol: &'static str, inputs: &[&str], output: &str) -> NetSignature {
+        (
+            symbol,
+            inputs.iter().map(|s| s.to_string()).collect(),
+            output.to_string(),
+        )
+    }
+
+    /// Three features written as ONE BUNDLE — the agent's no-structure-decisions style —
+    /// and the placer derives the three modules from the signatures alone (no discovery
+    /// run, no laws consulted). Three features, not two, pin the grouping: with three
+    /// parts a flipped membership test cannot masquerade as a swapped order.
+    fn bundle() -> Vec<NetSignature> {
+        vec![
+            sig("zA", &[], "A"),
+            sig("mA", &["A", "A"], "A"),
+            sig("zB", &[], "B"),
+            sig("mB", &["B", "B"], "B"),
+            sig("zC", &[], "C"),
+            sig("mC", &["C", "C"], "C"),
+        ]
+    }
+
+    #[test]
+    fn a_bundle_of_disjoint_features_places_apart() {
+        let p = Placement::over("bundle", bundle());
+        assert_eq!(p.components.len(), 3, "three net-disjoint features");
+        assert!(!p.is_settled());
+        // the degenerate boundary: no operators is settled (nothing is apart).
+        assert!(Placement::over("empty", vec![]).is_settled());
+        let total: usize = p.components.iter().map(|c| c.ops.len()).sum();
+        assert_eq!(total, 6, "each operator in exactly one component");
+        assert_eq!(
+            p.render(),
+            "placement `bundle`: places as 3 modules — the components share no nets, so the split is indisputable:\n\
+             \x20 module 0: { zA, mA } over nets { A }\n\
+             \x20 module 1: { zB, mB } over nets { B }\n\
+             \x20 module 2: { zC, mC } over nets { C }\n"
+        );
+    }
+
+    /// MONOTONE, the locality property the layout-probe census demands of any layout
+    /// engine: a new operator can join a component or bridge two into one, but it can
+    /// never re-split or reshuffle operators it does not touch. The conversion `aToB`
+    /// merges features A and B; feature C's component is byte-identical.
+    #[test]
+    fn a_conversion_bridges_and_the_rest_stay_put() {
+        let mut sigs = bundle();
+        sigs.push(sig("aToB", &["A"], "B"));
+        let p = Placement::over("bundle", sigs);
+        assert_eq!(p.components.len(), 2, "A and B merge; C stands");
+        let merged = &p.components[0];
+        assert_eq!(merged.ops, vec!["zA", "mA", "zB", "mB", "aToB"]);
+        assert_eq!(merged.nets, vec!["A".to_string(), "B".to_string()]);
+        let untouched = &p.components[1];
+        assert_eq!(untouched.ops, vec!["zC", "mC"]);
+        assert_eq!(untouched.nets, vec!["C".to_string()]);
+    }
+
+    /// THE DOGFOOD, and the reason a pin is no longer spent: the three modules this repo
+    /// keeps whole AGAINST the cohesion instrument's advice (see
+    /// `system::tests::the_repo_distance_names_the_latent_splits`) are all SETTLED to the
+    /// placer — nets connect what laws do not. `<` shares `Int` with `+`; `since` shares
+    /// `Date` with `add`; the protocol's transitions share its state sorts. Two
+    /// instruments, two questions: cohesion reads the wiring density (a suggestion),
+    /// placement reads the boundary (a derivation).
+    #[test]
+    fn nets_place_what_laws_cannot_see() {
+        for (split, settled) in [
+            (
+                CohesionReport::of::<Arithmetic>().components.len(),
+                Placement::of::<Arithmetic>(),
+            ),
+            (
+                CohesionReport::of::<Calendar>().components.len(),
+                Placement::of::<Calendar>(),
+            ),
+            (
+                CohesionReport::of::<DocFlow>().components.len(),
+                Placement::of::<DocFlow>(),
+            ),
+        ] {
+            assert!(
+                split > 1,
+                "cohesion suggests a split for {}",
+                settled.theory
+            );
+            assert!(
+                settled.is_settled(),
+                "placement derives keep-whole for {}",
+                settled.theory
+            );
+        }
+    }
+
+    /// The settled render carries the boundary-agreement sentence — the one line a bundle
+    /// author reads.
+    #[test]
+    fn a_settled_placement_renders_the_agreement() {
+        assert_eq!(
+            Placement::of::<DocFlow>().render(),
+            "placement `doc flow`: settled — one component, the declared boundary is the derived boundary.\n\
+             \x20 { submit, revise, approve, edit } over nets { Draft, Published, Review }\n"
+        );
+    }
+
+    /// THE WHOLE SYSTEM'S DERIVED SHAPE, byte-pinned: every declared module settled (the
+    /// declared shape is a fixed point of the placer — the hand shaping re-derived, not
+    /// ratified), and the one cross-module net-name coincidence surfaced as a seam
+    /// candidate: `Duration` names a net in both the calendar and the ttl store, and no
+    /// seam is declared. A suggestion in the honest frame — the two are different Rust
+    /// types that agree on a word; the report will neither merge them nor stay silent.
+    #[test]
+    fn the_derived_shape_is_the_declared_shape() {
+        let report = ShapeReport::of::<BoundarySpec>();
+        assert!(report.is_settled());
+        let expected = "\
+# shape spec: boundary-spec — the DERIVED shape (operators placed by net connectivity); regenerate via this repo's freeze path and ratify the diff.
+
+Two operators share a net when a sort appears in both signatures (the circuit-CAD
+signal: nets, not laws). A settled module is one whose declared boundary the placer
+re-derives; a module placing as several holds operators that share NOTHING — move
+the code, never pin the report.
+
+- interpreter arithmetic: settled — { 0, 1, false, +, *, < } over nets { Bool, Int }
+- router: settled — { empty, or } over nets { Router }
+- date calculus: settled — { zero, +, add, diff, since, at } over nets { Date, Duration }
+- ttl store: settled — { empty, <+, tick, zero, + } over nets { Duration, Store }
+- store protocol: settled — { empty, ++ } over nets { P }
+- doc flow: settled — { submit, revise, approve, edit } over nets { Draft, Published, Review }
+- fabric: settled — { mesh, join, grant, revoke, reach, within, true } over nets { Fabric, Route, Verdict }
+- zset kernel: settled — { zero, +, neg, join, distinct, delay, integrate, differentiate, impulse, latest } over nets { Window, Zset }
+
+verdict: 8 of 8 modules settled — the declared shape is a fixed point of the placer.
+
+seam candidates (cross-module net-NAME coincidences no declared seam covers — a
+suggestion: declare the seam, or leave the shared name standing as coincidence):
+- date calculus ↔ ttl store on Duration
+";
+        assert_eq!(report.render(), expected);
+    }
+
+    // Two systems over the SAME module pair (the merge theories share the `Key` net):
+    // one declares the seam, one does not — the candidate must appear exactly when the
+    // coincidence is undeclared.
+    struct BareMerges;
+    crate::system! {
+        BareMerges : "bare merges",
+        modules {
+            MaxMerge;
+            GcdMerge;
+        }
+    }
+    struct SealedMerges;
+    crate::system! {
+        SealedMerges : "sealed merges",
+        modules {
+            MaxMerge;
+            GcdMerge;
+        }
+        seams {
+            // declared AGAINST registry order on purpose: the seam says Gcd -- Max while
+            // the placements pair up as Max/Gcd, so retiring the candidate only works
+            // because the seal covers BOTH orientations.
+            GcdMerge -- MaxMerge : transport on Key;
+        }
+    }
+
+    /// An undeclared net coincidence is a CANDIDATE; a declared seam retires it —
+    /// regardless of the orientation it was declared in.
+    #[test]
+    fn a_declared_seam_retires_the_candidate() {
+        let bare = ShapeReport::of::<BareMerges>();
+        let [candidate] = bare.candidates.as_slice() else {
+            panic!("one undeclared coincidence, got {}", bare.candidates.len());
+        };
+        assert_eq!(
+            (candidate.left, candidate.right),
+            ("max-merge", "gcd-merge")
+        );
+        assert_eq!(candidate.nets, vec!["Key".to_string()]);
+        assert!(bare.render().contains("- max-merge ↔ gcd-merge on Key"));
+
+        let sealed = ShapeReport::of::<SealedMerges>();
+        assert!(sealed.candidates.is_empty(), "the declared seam covers it");
+        assert!(sealed.render().contains(
+            "seam candidates: none — no cross-module net-name coincidence is undeclared."
+        ));
+    }
+
+    /// An unsettled module renders LOUD inside the system report — the disagreement
+    /// verdict and the component lines a reviewer acts on (by moving code).
+    #[test]
+    fn a_disagreeing_shape_renders_loud() {
+        let report = ShapeReport {
+            system: "disagreeing",
+            placements: vec![
+                Placement::over("bundle", bundle()),
+                Placement::of::<DocFlow>(),
+            ],
+            candidates: vec![],
+        };
+        assert!(!report.is_settled());
+        let text = report.render();
+        assert!(text.contains(
+            "- bundle: PLACES AS 3 — the components share no nets (an indisputable split):"
+        ));
+        assert!(text.contains("      module 0: { zA, mA } over nets { A }"));
+        assert!(text.contains(
+            "verdict: 1 of 2 modules settled — the derived shape DISAGREES with the declaration."
+        ));
+    }
+
+    /// The lock lands at `<spec_dir>/<slug>.shape.spec` — the `.shape.` infix keeping it
+    /// apart from the module and system locks in the same directory.
+    #[test]
+    fn the_shape_lock_has_its_own_namespace() {
+        let lock = ShapeReport::of::<BoundarySpec>().lock_in(Path::new("spec"));
+        assert_eq!(lock.name, "boundary-spec shape");
+        assert_eq!(
+            lock.path,
+            Path::new("spec").join("boundary-spec.shape.spec")
+        );
+        assert_eq!(lock.live, ShapeReport::of::<BoundarySpec>().render());
+    }
+
+    /// The committed SHAPE lock is FRESH: the live derived shape matches what was
+    /// ratified — the CONTINUOUS half of autoshaping. An operator moved, added, or
+    /// re-sorted drifts this file; regenerate with `cargo run --example freeze_spec` and
+    /// ratify the diff.
+    #[test]
+    fn the_committed_shape_spec_is_fresh() {
+        let lock = ShapeReport::of::<BoundarySpec>().lock();
+        if let Err(stale) = spec_lock::check(std::slice::from_ref(&lock)) {
+            panic!(
+                "the derived shape drifted from the committed lock for: {}. \
+                 Run `cargo run --example freeze_spec` and ratify the diff.",
+                stale.join(", ")
+            );
+        }
+    }
+}

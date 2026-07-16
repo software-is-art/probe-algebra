@@ -1,0 +1,24 @@
+# weave-knee — the exterior engine's brick one: the weave knee, DERIVED. Hold a
+# synthetic corpus fixed, vary fanout, have a model weave the child exteriors into one
+# bounded narrative, judge the weave (per-child claim coverage vs cross-child relation
+# coverage, foil rejection, prose quality), and freeze the knee — the fanout where
+# synthesis collapses while retrieval holds — as a lock. The concept budget is a
+# discoverable constant per model, never a design choice. Trials are committed
+# evidence; the gates re-derive the lock from committed trials and never call a model.
+# A research member, never a product: version 0.0.0, publish = false.
+[package]
+name = "weave-knee"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "The weave knee, derived: fanout sweeps scoring claim vs relation coverage, frozen as a lock."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# The lock mechanics — regular dependency: the knee spec is a lock renderer living in
+# the library, where the drift gate reads it.
+spec-lock = { path = "../spec-lock" }
+
+[dev-dependencies]
+# The fire drill: doctored trials proving the drift gate and the parser refusals FIRE.
+fire-drill = { path = "../fire-drill" }

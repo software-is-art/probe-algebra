@@ -724,7 +724,8 @@ pub(crate) mod tests {
                 "ttl store",
                 "store protocol",
                 "doc flow",
-                "fabric"
+                "fabric",
+                "zset kernel"
             ]
         );
         assert!(report.seams.is_empty());
@@ -756,7 +757,7 @@ pub(crate) mod tests {
     #[test]
     fn the_repo_distance_names_the_latent_splits() {
         let distance = SystemDistance::of::<BoundarySpec>();
-        assert_eq!(distance.latent().len(), 3);
+        assert_eq!(distance.latent().len(), 4);
         // `doc flow` is the instructive third split: a PROTOCOL reads as decomposable
         // to the cohesion instrument BY NATURE — one-way doors (approve) and endo
         // loops (edit) look like split points in the operator-interaction graph, but a
@@ -770,7 +771,7 @@ pub(crate) mod tests {
         // `shape::probes::nets_place_what_laws_cannot_see`). Cohesion keeps naming the
         // sparse wiring (this pin); placement settles the boundary.
         let expected = "\
-boundary-spec: 4 of 7 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
+boundary-spec: 4 of 8 declared modules are cohesive; LATENT SPLITS (suggestions, never constraints — re-draw the declaration or deliberately keep the module whole):
   module `interpreter arithmetic`: decomposes into 2 latent modules — consider splitting:
     module 0: { 0, 1, +, * }
     module 1: { false, < }
@@ -785,7 +786,20 @@ boundary-spec: 4 of 7 declared modules are cohesive; LATENT SPLITS (suggestions,
     module 2: { edit }
     seam 0↔1 on Review — transform (algebra changes — check the homomorphism)
     seam 0↔2 on Draft — transform (algebra changes — check the homomorphism)
+  module `zset kernel`: decomposes into 3 latent modules — consider splitting:
+    module 0: { zero, +, neg, join, distinct }
+    module 1: { delay, integrate, differentiate }
+    module 2: { impulse, latest }
+    seam 0↔2 on Zset — transform (algebra changes — check the homomorphism)
+    seam 1↔2 on Window — transform (algebra changes — check the homomorphism)
 ";
+        // The kernel is the fourth keep-whole, ratified: cohesion sees three
+        // clusters (the group with its ring face, the stream calculus, the
+        // injection/observation pair that bridges them) because laws rarely mix
+        // the vocabularies — but integrate and differentiate ARE statements about
+        // the group (the running sum needs `+`, the difference needs `neg`), and
+        // impulse/latest are the seam the placer already accepted as interior.
+        // Splitting would sever the calculus from the algebra it computes with.
         assert_eq!(distance.render(), expected);
     }
 

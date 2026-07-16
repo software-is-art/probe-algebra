@@ -1,0 +1,89 @@
+weave-knee trial v1
+fanout: 8
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Grimir turns in a single ring of eight modules, each handing its findings to the next until the loop closes on itself. At the head sits Ostdor, the beacon: it retries a failed handoff at most 2 times before parking it, evicts anything left unclaimed after 5 ticks, and answers every read from its newest snapshot only. When Ostdor cannot absorb what arrives, it delegates the overflow to Mirost.
+
+  Mirost, the courier, takes on that overflow. It retries a failed handoff at most 1 time before parking it, refuses new writes while its own sweep is running, and carries only digests of what passes through it, never the bodies themselves. Once its sweep concludes, Mirost publishes its verdicts onward to Ruvzin.
+
+  Ruvzin, the registry, receives those verdicts. It too refuses new writes while sweeping, retries a failed handoff at most 2 times before parking it, and will act only once 5 of its peers countersign. What Ruvzin evicts, it streams to Vardor.
+
+  Vardor, the sampler, takes in Ruvzin's evictions. Like Ruvzin, it acts only once 5 peers countersign, and it refuses new writes while its sweep runs; its reads, like Ostdor's, come only from its newest snapshot. Vardor's role in the ring is to signal backpressure onward to Saxbra.
+
+  Saxbra, the cache, receives that backpressure signal. It refuses new writes during its own sweep, keeps only digests of what it carries rather than the bodies — the same discipline as Mirost — and evicts anything unclaimed after 6 ticks. Saxbra's output is a report of missed heartbeats, sent to Nexkel.
+
+  Nexkel, the warden, takes in those missed-heartbeat reports. It acts only once 4 of its peers countersign, answers reads only from its newest snapshot, and, like Mirost and Saxbra, keeps digests rather than bodies. Nexkel's own output is a sealed ledger, handed to Tolruv.
+
+  Tolruv, the ledger, receives that sealed ledger from Nexkel. It evicts anything left unclaimed after 7 ticks, answers reads from its newest snapshot only, and retries a failed handoff at most 2 times before parking it. What Tolruv cannot hold, it delegates as overflow to Quenzin — the same overflow discipline Ostdor uses on Mirost.
+
+  Quenzin, the vault, closes the ring. It keeps only digests of what it carries, retries a failed handoff at most 2 times before parking it, and answers reads from its newest snapshot only. Quenzin's sweep verdicts are published back to Ostdor, completing the circuit that began there.
+
+  So the system moves in one direction only: overflow from Ostdor to Mirost, verdicts from Mirost to Ruvzin, evictions from Ruvzin to Vardor, backpressure from Vardor to Saxbra, heartbeat reports from Saxbra to Nexkel, a sealed ledger from Nexkel to Tolruv, overflow again from Tolruv to Quenzin, and finally verdicts from Quenzin back to Ostdor. Each module's own behavior — its retry ceiling, its eviction window, its snapshot discipline, its countersigning threshold, or its choice to keep digests instead of bodies — governs what it does with what it receives before passing its own output to the next link in the chain.
+verdicts:
+  c6.0F NOT-ENTAILED
+  c2.1F NOT-ENTAILED
+  r2 ENTAILED
+  c3.1 ENTAILED
+  r7 ENTAILED
+  r0 ENTAILED
+  c1.1F NOT-ENTAILED
+  c7.2F NOT-ENTAILED
+  c1.2 ENTAILED
+  c1.2F NOT-ENTAILED
+  r2F NOT-ENTAILED
+  r4 ENTAILED
+  c5.2F NOT-ENTAILED
+  c7.2 ENTAILED
+  c5.2 ENTAILED
+  c7.1F NOT-ENTAILED
+  c3.0F NOT-ENTAILED
+  c3.1F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+  r0F NOT-ENTAILED
+  c1.1 ENTAILED
+  c3.0 ENTAILED
+  c4.0 ENTAILED
+  c2.2F NOT-ENTAILED
+  c5.0F NOT-ENTAILED
+  c6.2 ENTAILED
+  r5F NOT-ENTAILED
+  c2.2 ENTAILED
+  r6F NOT-ENTAILED
+  r3 ENTAILED
+  c6.1F NOT-ENTAILED
+  c4.2 ENTAILED
+  c4.2F NOT-ENTAILED
+  c2.0F NOT-ENTAILED
+  c5.1F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c2.1 ENTAILED
+  r6 ENTAILED
+  c5.1 ENTAILED
+  c1.0F NOT-ENTAILED
+  c2.0 ENTAILED
+  c6.0 ENTAILED
+  r1 ENTAILED
+  c7.1 ENTAILED
+  c7.0 ENTAILED
+  c0.1 ENTAILED
+  c5.0 ENTAILED
+  c3.2F NOT-ENTAILED
+  c3.2 ENTAILED
+  c6.2F NOT-ENTAILED
+  c0.0 ENTAILED
+  r5 ENTAILED
+  c0.2 ENTAILED
+  r3F NOT-ENTAILED
+  c4.0F NOT-ENTAILED
+  r4F NOT-ENTAILED
+  c6.1 ENTAILED
+  c7.0F NOT-ENTAILED
+  r7F NOT-ENTAILED
+  c1.0 ENTAILED
+  c4.1F NOT-ENTAILED
+  c4.1 ENTAILED
+  r1F NOT-ENTAILED

@@ -1,0 +1,33 @@
+weave-knee trial v2
+fanout: 2
+seed: 2
+weaver: claude-sonnet-5
+judge: claude-sonnet-5
+quality: 4
+narrative:
+  Kelzin comprises two modules, Brazin (the monitor) and Tolruv (the index), bound by a tight write-safety and eviction discipline. Both refuse new writes while their own sweep is running, so a sweep on either module halts writes to that module for its duration — a shared floor on availability that neither states alone but both impose identically. Eviction timing differs sharply: Tolruv evicts anything left unclaimed after 7 ticks, while Brazin gives unclaimed items a longer grace of 12 ticks, meaning any item surviving in Tolruv past 7 ticks would already be gone if it depended on Brazin's laxer window, and the system's effective claim deadline for data passing through both is bounded by the stricter of the two: 7 ticks. Tolruv answers reads only from its newest snapshot, so readers never see partial sweep state. The modules are linked operationally: Brazin reports missed heartbeats to Tolruv, giving the index visibility into monitor-side failures, while Tolruv delegates overflow to Brazin, pushing excess load back to the monitor. Brazin, however, does not act unilaterally on what it receives — it acts only once 3 of its peers countersign, so any overflow Tolruv delegates to Brazin is provisional until quorum confirms it. Together, Kelzin's two modules form a loop of delegation and reporting, gated by synchronized write-refusal and a 7-tick eviction floor.
+verdicts:
+  c1.2 ENTAILED
+  r1 ENTAILED
+  c0.1 ENTAILED
+  r0 ENTAILED
+  c0.0 ENTAILED
+  c0.2 ENTAILED
+  c1.1 ENTAILED
+  r0F NOT-ENTAILED
+  c1.0 ENTAILED
+  r1F NOT-ENTAILED
+  c1.2F NOT-ENTAILED
+  c0.2F NOT-ENTAILED
+  c0.0F NOT-ENTAILED
+  c1.1F NOT-ENTAILED
+  c1.0F NOT-ENTAILED
+  c0.1F NOT-ENTAILED
+stated:
+  er0.dwell NOT-STATED
+  e.ring STATED
+  er0.dwellF NOT-STATED
+  e.ringF NOT-STATED
+edges:
+  Brazin -> Tolruv
+  Tolruv -> Brazin

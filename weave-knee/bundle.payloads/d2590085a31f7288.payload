@@ -1,0 +1,15 @@
+/// One fanout's averaged scores across its trials.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CurvePoint {
+    pub fanout: usize,
+    pub trials: usize,
+    pub mention: f64,
+    pub claim_cov: f64,
+    pub relation_cov: f64,
+    pub foil_rej: f64,
+    pub gain: f64,
+    pub e_foil_rej: f64,
+    pub topo_recall: f64,
+    pub topo_prec: f64,
+    pub quality: f64,
+}

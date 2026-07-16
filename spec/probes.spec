@@ -14,6 +14,7 @@
 - store protocol: oracle-swap
 - ttl store: oracle-swap
 - verb algebra: oracle-swap
+- zset kernel: oracle-swap
 
 ## structural probes (shape)
 - catalog: fire-drill

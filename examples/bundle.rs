@@ -53,34 +53,28 @@ fn main() -> ExitCode {
 }
 
 fn run(args: &[String]) -> Result<String, String> {
-    let usage = || {
-        "usage: bundle add <module.rs> <snippet.rs | ->\n\
-         \x20      bundle edit <module.rs> <item-name> <replacement.rs | ->\n\
-         \x20      bundle declare <module.rs> \"<shape(op, ...)>\"\n\
-         \x20      bundle place <module.rs>\n\
-         \x20      bundle check <module.rs>\n\
-         \x20      bundle show <module.rs> [item-name]\n\
-         \x20      bundle collect <module.rs> [item-to-sweep]\n\
-         \x20      bundle squash <bundle.journal>\n\
-         \x20      bundle replay <bundle.journal>\n\
-         \x20      bundle constrains <module.rs> <operator>\n\
-         \x20      bundle trace <theory> '<term>'\n\
-         \x20      bundle lift <module.rs> <theory-name> [declaration ...]\n\
-         \x20      bundle gates | bundle owes\n\
-         \x20      bundle pin"
-            .to_string()
-    };
-    match args {
-        [verb] if verb == "owes" => {
-            // perception: the derived to-do list — green is a fact about a tree hash,
-            // so what this tree still OWES is exactly the every-change gates without
-            // verdicts at its key. Read-only; journals nothing.
+    // argv is bound by the DECLARATION (discover::cli): parse finds the verb and
+    // binds its slots or refuses with the usage text — the same image the first lock
+    // pins — so the hand-written arity match this function held until brick 2 is
+    // gone. The judgments below consume the bound invocation only; the declaration
+    // is the single author of what argv can say.
+    let cli = boundary_spec::discover::cli::CliSpec::bundle();
+    let invocation = cli.parse(args)?;
+    let one = |slot: usize| invocation.values[slot][0].as_str();
+    match invocation.verb.name {
+        "owes" => {
+            // perception: the derived to-do list — green is a fact about a SUPPORT
+            // key (the fingerprint of what each gate declares it reads), so what this
+            // tree still OWES is exactly the every-change gates without verdicts at
+            // their own keys. An edit outside a gate's support cannot owe it.
+            // Read-only; journals nothing.
+            use boundary_spec::discover::gates::Support;
             use boundary_spec::discover::verdict::VerdictStore;
             let root = std::path::Path::new(".");
-            let key = VerdictStore::tree_hash(root)?;
+            let judged = VerdictStore::support_hash(root, &Support::Judged)?;
             let store = VerdictStore::beside(root);
             let standing: Vec<String> = store
-                .owed(&key)
+                .owed(root)?
                 .into_iter()
                 .map(|(name, held)| {
                     if held {
@@ -90,26 +84,28 @@ fn run(args: &[String]) -> Result<String, String> {
                     }
                 })
                 .collect();
-            Ok(format!("tree {key}\n{}", standing.join("\n")))
+            Ok(format!("judged tree {judged}\n{}", standing.join("\n")))
         }
-        [verb] if verb == "gates" => {
+        "gates" => {
             // THE GATES BECOME LOCKS: run every owed every-change gate from the same
-            // declaration CI executes, and record green as a verdict KEYED to the tree
-            // it judged — a held verdict is a content match (the same computation),
-            // never a warm memory. Nothing records unless the tree the gates judged is
-            // the tree that exists afterwards (autofix ratifications move the key).
-            use boundary_spec::discover::gates::{Cadence, GateRegistry};
+            // declaration CI executes, and record green as a verdict KEYED to the
+            // SUPPORT it judged — the projection of the tree the gate declares it
+            // reads — a held verdict is a content match (the same computation), never
+            // a warm memory. Nothing records unless the projection the gates judged
+            // is the one that exists afterwards (autofix ratifications move the key).
+            use boundary_spec::discover::gates::{Cadence, GateRegistry, Support};
             use boundary_spec::discover::verdict::VerdictStore;
             let root = std::path::Path::new(".");
             let store = VerdictStore::beside(root);
-            let before = VerdictStore::tree_hash(root)?;
+            let before = VerdictStore::support_hash(root, &Support::Judged)?;
             let mut judged = Vec::new();
             for gate in GateRegistry::declared()
                 .into_iter()
                 .filter(|gate| matches!(gate.cadence, Cadence::EveryChange))
             {
-                if store.held(gate.name, &before) {
-                    judged.push(format!("held: {} — verdict at this tree", gate.name));
+                let key = VerdictStore::support_hash(root, &gate.support)?;
+                if store.held(gate.name, &key) {
+                    judged.push(format!("held: {} — verdict at its support", gate.name));
                     continue;
                 }
                 println!("judging: {} — {}", gate.name, gate.command.join(" "));
@@ -126,7 +122,7 @@ fn run(args: &[String]) -> Result<String, String> {
                 }
                 judged.push(format!("green: {}", gate.name));
             }
-            let after = VerdictStore::tree_hash(root)?;
+            let after = VerdictStore::support_hash(root, &Support::Judged)?;
             if before != after {
                 return Err(format!(
                     "bundle gates: the gates MOVED the tree (autofix ratifications \
@@ -135,17 +131,21 @@ fn run(args: &[String]) -> Result<String, String> {
                     judged.join("\n")
                 ));
             }
-            for (name, held) in store.owed(&after) {
-                if !held {
-                    store.record(name, &after)?;
+            for gate in GateRegistry::declared()
+                .into_iter()
+                .filter(|gate| matches!(gate.cadence, Cadence::EveryChange))
+            {
+                let key = VerdictStore::support_hash(root, &gate.support)?;
+                if !store.held(gate.name, &key) {
+                    store.record(gate.name, &key)?;
                 }
             }
             Ok(format!(
-                "every-change gates green at tree {after}\n{}",
+                "every-change gates green at judged tree {after}\n{}",
                 judged.join("\n")
             ))
         }
-        [verb] if verb == "pin" => {
+        "pin" => {
             // THE PINNED SUIT (the frozen-arm field report's fix): install THIS
             // RUNNING BINARY at .suit/bundle, so the verbs stop rebuilding behind the
             // gate of the tree they operate on — a mid-transaction tree can no longer
@@ -171,11 +171,12 @@ fn run(args: &[String]) -> Result<String, String> {
                     .to_string(),
             )
         }
-        [verb, module_path, rest @ ..] => {
-            let module = std::fs::read_to_string(module_path).unwrap_or_default();
-            match (verb.as_str(), rest) {
-                ("add", [snippet_source]) => {
-                    let snippet = read_payload("add", snippet_source)?;
+        verb => {
+            let subject = one(0);
+            let module = std::fs::read_to_string(subject).unwrap_or_default();
+            match verb {
+                "add" => {
+                    let snippet = read_payload("add", one(1))?;
                     let grown = Bundle::add(&module, &snippet)?;
                     let named: Vec<String> = syn::parse_file(&snippet)
                         .ok()
@@ -199,95 +200,101 @@ fn run(args: &[String]) -> Result<String, String> {
                     // stage 3: the payload rides the record — stash first, so a store
                     // refusal writes nothing at all.
                     use boundary_spec::discover::store::PayloadStore;
-                    let store = PayloadStore::beside(&nearest_crate_root(module_path));
+                    let store = PayloadStore::beside(&nearest_crate_root(subject));
                     let address = store.stash(&snippet)?;
                     let detail = format!("{} @{address}", named.join(", "));
-                    commit(module_path, &grown, "add", &detail)?;
-                    Ok(format!("added into {module_path} — canonically placed"))
+                    commit(subject, &grown, "add", &detail)?;
+                    Ok(format!("added into {subject} — canonically placed"))
                 }
-                ("edit", [item_name, replacement_source]) => {
-                    let replacement = read_payload("edit", replacement_source)?;
+                "edit" => {
+                    let item_name = one(1);
+                    let replacement = read_payload("edit", one(2))?;
                     let edited = Bundle::edit(&module, item_name, &replacement)?;
                     use boundary_spec::discover::store::PayloadStore;
-                    let store = PayloadStore::beside(&nearest_crate_root(module_path));
+                    let store = PayloadStore::beside(&nearest_crate_root(subject));
                     let address = store.stash(&replacement)?;
-                    commit(
-                        module_path,
-                        &edited,
-                        "edit",
-                        &format!("{item_name} @{address}"),
-                    )?;
+                    commit(subject, &edited, "edit", &format!("{item_name} @{address}"))?;
                     Ok(format!(
-                        "edited `{item_name}` in {module_path} — signature held"
+                        "edited `{item_name}` in {subject} — signature held"
                     ))
                 }
-                ("declare", [declaration]) => {
+                "declare" => {
+                    let declaration = one(1);
                     let declared = Bundle::declare(&module, declaration)?;
-                    commit(module_path, &declared, "declare", declaration)?;
-                    Ok(format!("declared `{declaration}` in {module_path}"))
+                    commit(subject, &declared, "declare", declaration)?;
+                    Ok(format!("declared `{declaration}` in {subject}"))
                 }
-                ("place", []) => {
+                "place" => {
                     let placed = Bundle::parse(&module)?.render();
                     if placed == module {
-                        Ok(format!("{module_path} is already canonically placed"))
+                        Ok(format!("{subject} is already canonically placed"))
                     } else {
-                        commit(module_path, &placed, "place", "re-placed canonically")?;
-                        Ok(format!("{module_path} re-placed canonically"))
+                        commit(subject, &placed, "place", "re-placed canonically")?;
+                        Ok(format!("{subject} re-placed canonically"))
                     }
                 }
-                ("check", []) => {
+                "check" => {
                     if Bundle::parse(&module)?.is_canonical() {
-                        Ok(format!("{module_path}: canonical"))
+                        Ok(format!("{subject}: canonical"))
                     } else {
                         Err(format!(
-                            "{module_path}: NOT canonical — `bundle place` would move it"
+                            "{subject}: NOT canonical — `bundle place` would move it"
                         ))
                     }
                 }
-                ("show", []) => {
-                    // perception: the module's table of contents — addresses, kinds,
-                    // and the exact signatures `edit` will hold, so a payload can be
-                    // authored from the contract. Read-only; journals nothing.
-                    Bundle::inventory(&module).map(|toc| toc.trim_end().to_string())
-                }
-                ("show", [item_name]) => {
-                    // perception: the item's verbatim segment — the same bytes `edit`
-                    // holds — so `bundle show m.rs x > payload` starts an edit cycle
-                    // that never opens a file. Read-only; journals nothing.
-                    Bundle::show(&module, item_name)
-                }
-                ("collect", []) => {
-                    // the MARK census: read-only, journals nothing — a derived fact list.
-                    let root = nearest_crate_root(module_path);
+                "show" => match invocation.values[1].first() {
+                    // perception: with no item named, the module's table of contents —
+                    // addresses, kinds, and the exact signatures `edit` will hold; with
+                    // one, the item's verbatim segment — the same bytes `edit` holds —
+                    // so `bundle show m.rs x > payload` starts an edit cycle that never
+                    // opens a file. Read-only; journals nothing.
+                    None => Bundle::inventory(&module).map(|toc| toc.trim_end().to_string()),
+                    Some(item_name) => Bundle::show(&module, item_name),
+                },
+                "collect" => {
+                    let root = nearest_crate_root(subject);
                     let register = root.join("downstream/reliances.register");
                     let register = register.exists().then_some(register);
-                    let marked =
-                        Bundle::collectable(&module, &root.join("spec"), register.as_deref())?;
-                    if marked.is_empty() {
-                        Ok(format!(
-                            "{module_path}: nothing collectable — every item is reached by a root"
-                        ))
-                    } else {
-                        Ok(marked
-                            .iter()
-                            .map(|(name, evidence)| format!("collectable: {name} — {evidence}"))
-                            .collect::<Vec<_>>()
-                            .join("\n"))
+                    match invocation.values[1].first() {
+                        None => {
+                            // the MARK census: read-only, journals nothing — a derived
+                            // fact list.
+                            let marked = Bundle::collectable(
+                                &module,
+                                &root.join("spec"),
+                                register.as_deref(),
+                            )?;
+                            if marked.is_empty() {
+                                Ok(format!(
+                                    "{subject}: nothing collectable — every item is reached by a root"
+                                ))
+                            } else {
+                                Ok(marked
+                                    .iter()
+                                    .map(|(name, evidence)| {
+                                        format!("collectable: {name} — {evidence}")
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n"))
+                            }
+                        }
+                        Some(name) => {
+                            // the SWEEP: one judged transaction, journaled; refuses the
+                            // unmarked.
+                            let swept = Bundle::collect(
+                                &module,
+                                name,
+                                &root.join("spec"),
+                                register.as_deref(),
+                            )?;
+                            commit(subject, &swept, "collect", name)?;
+                            Ok(format!(
+                                "collected `{name}` from {subject} — the journal remembers it"
+                            ))
+                        }
                     }
                 }
-                ("collect", [name]) => {
-                    // the SWEEP: one judged transaction, journaled; refuses the unmarked.
-                    let root = nearest_crate_root(module_path);
-                    let register = root.join("downstream/reliances.register");
-                    let register = register.exists().then_some(register);
-                    let swept =
-                        Bundle::collect(&module, name, &root.join("spec"), register.as_deref())?;
-                    commit(module_path, &swept, "collect", name)?;
-                    Ok(format!(
-                        "collected `{name}` from {module_path} — the journal remembers it"
-                    ))
-                }
-                ("squash", []) => {
+                "squash" => {
                     // the first slot names the JOURNAL, not a module: compaction to
                     // law-normal form, licensed line by line by the verb algebra's
                     // frozen laws — a collapse the lock does not state never happens.
@@ -296,7 +303,7 @@ fn run(args: &[String]) -> Result<String, String> {
                     // diff).
                     if module.is_empty() {
                         Err(format!(
-                            "bundle squash: no journal at {module_path} — nothing to compact"
+                            "bundle squash: no journal at {subject} — nothing to compact"
                         ))
                     } else {
                         use boundary_spec::discover::squash::SquashRules;
@@ -306,20 +313,20 @@ fn run(args: &[String]) -> Result<String, String> {
                         let compacted = SquashRules::from_spec(&spec).compact(&module)?;
                         if compacted == module {
                             Ok(format!(
-                                "{module_path}: already law-normal — no licensed squash remains"
+                                "{subject}: already law-normal — no licensed squash remains"
                             ))
                         } else {
                             let (was, now) = (module.lines().count(), compacted.lines().count());
-                            std::fs::write(module_path, &compacted)
+                            std::fs::write(subject, &compacted)
                                 .map_err(|e| format!("bundle squash: cannot write: {e}"))?;
                             Ok(format!(
-                                "{module_path}: squashed {was} entries → {now} — every \
+                                "{subject}: squashed {was} entries → {now} — every \
                                  collapse licensed by the frozen verb algebra"
                             ))
                         }
                     }
                 }
-                ("replay", []) => {
+                "replay" => {
                     // perception: the REPLAY DIFFERENTIAL — reconstruct each journaled
                     // file from the record plus the payload store and judge it against
                     // the tree. Read-only; journals nothing. Divergence is a FINDING,
@@ -327,20 +334,30 @@ fn run(args: &[String]) -> Result<String, String> {
                     // (tree == replay(journal), measured file by file).
                     if module.is_empty() {
                         Err(format!(
-                            "bundle replay: no journal at {module_path} — nothing to replay"
+                            "bundle replay: no journal at {subject} — nothing to replay"
                         ))
                     } else {
                         use boundary_spec::discover::store::{PayloadStore, Replay};
-                        let store = PayloadStore::beside(&nearest_crate_root(module_path));
+                        let store = PayloadStore::beside(&nearest_crate_root(subject));
                         Replay::differential(&module, &store)
                             .map(|replay| replay.render().trim_end().to_string())
                     }
                 }
-                ("trace", [term]) => {
+                "constrains" => {
+                    // perception: read-only, journals nothing. The committed record is the
+                    // nearest crate's spec directory and its downstream reliance register.
+                    let root = nearest_crate_root(subject);
+                    let register = root.join("downstream/reliances.register");
+                    let register = register.exists().then_some(register);
+                    Bundle::constrains(&module, one(1), &root.join("spec"), register.as_deref())
+                        .map(|report| report.trim_end().to_string())
+                }
+                "trace" => {
                     // perception: the first argument slot names a THEORY, not a module —
                     // trace runs over compiled theories (the build/text boundary: eval
                     // needs the build). The roster is the theories this example links.
-                    match module_path.as_str() {
+                    let term = one(1);
+                    match subject {
                         "verbs" | "verb algebra" => {
                             Trace::of::<boundary_spec::discover::verbs::state::VerbAlgebra>(term)
                                 .map(|t| t.render())
@@ -356,26 +373,19 @@ fn run(args: &[String]) -> Result<String, String> {
                         )),
                     }
                 }
-                ("constrains", [name]) => {
-                    // perception: read-only, journals nothing. The committed record is the
-                    // nearest crate's spec directory and its downstream reliance register.
-                    let root = nearest_crate_root(module_path);
-                    let register = root.join("downstream/reliances.register");
-                    let register = register.exists().then_some(register);
-                    Bundle::constrains(&module, name, &root.join("spec"), register.as_deref())
-                        .map(|report| report.trim_end().to_string())
-                }
-                ("lift", [theory_name, declarations @ ..]) => {
-                    let declarations: Vec<&str> = declarations.iter().map(String::as_str).collect();
+                "lift" => {
+                    let declarations: Vec<&str> =
+                        invocation.values[2].iter().map(String::as_str).collect();
                     // the generated impl ends with its own newline; println adds the last
                     // one back, so a `> file` redirect captures the artifact byte-exact.
-                    AutoLift::scan_module(&module, theory_name, &declarations)
+                    AutoLift::scan_module(&module, one(1), &declarations)
                         .map(|generated| generated.trim_end().to_string())
                 }
-                _ => Err(usage()),
+                // a verb the declaration speaks but no judgment yet consumes —
+                // declaration/dispatch drift, refused with the teaching text.
+                _ => Err(cli.usage()),
             }
         }
-        _ => Err(usage()),
     }
 }
 
@@ -395,13 +405,15 @@ fn read_payload(verb: &str, source: &str) -> Result<String, String> {
 
 /// The write half of a judged transaction: the module lands AND the verb records itself —
 /// one line appended to `bundle.journal` beside the nearest `Cargo.toml` (the crate is
-/// the journal's scope). The write happens first; a journal failure is reported, never
-/// silently swallowed — a change the record missed is exactly what the journal exists to
-/// prevent.
+/// the journal's scope) — AND the qualify census pair updates at the delta (the
+/// maintained view; the build gate stays the oracle). The write happens first; a journal
+/// or census failure is reported, never silently swallowed — a change the record missed
+/// is exactly what the record exists to prevent.
 fn commit(module_path: &str, content: &str, verb: &str, detail: &str) -> Result<(), String> {
     std::fs::write(module_path, content)
         .map_err(|e| format!("bundle {verb}: cannot write: {e}"))?;
-    let journal = nearest_crate_root(module_path).join("bundle.journal");
+    let root = nearest_crate_root(module_path);
+    let journal = root.join("bundle.journal");
     let entry = Bundle::journal_entry(verb, module_path, detail);
     use std::io::Write;
     std::fs::OpenOptions::new()
@@ -409,7 +421,8 @@ fn commit(module_path: &str, content: &str, verb: &str, detail: &str) -> Result<
         .append(true)
         .open(&journal)
         .and_then(|mut f| f.write_all(entry.as_bytes()))
-        .map_err(|e| format!("bundle {verb}: wrote the module but NOT the journal ({e})"))
+        .map_err(|e| format!("bundle {verb}: wrote the module but NOT the journal ({e})"))?;
+    maintain_census(&root, module_path, content, verb)
 }
 
 /// The nearest ancestor directory carrying a `Cargo.toml` — the journal's home. Falls
@@ -429,4 +442,85 @@ fn nearest_crate_root(module_path: &str) -> std::path::PathBuf {
             None => return start.to_path_buf(),
         }
     }
+}
+
+/// THE MAINTAINED VIEWS at the verb (the item-relation program, bricks 3 and 5):
+/// every committing verb re-derives what its module's movement owes the crate's
+/// committed censuses — the qualify pair by re-judging the one module (a local
+/// judgment), the tier census from the standing lines' own evidence with the
+/// oracle's derivation as the structural fallback — so the drift gates that
+/// re-derive them wholesale on every build (the ORACLES) cannot fire for a
+/// verb-carried change, and the `BLESS_*` ceremony stops being owed at the edit.
+/// A crate without a census owes nothing for it; a module outside the `src/` walk
+/// moves nothing; the bless env names are read from the committed headers, never
+/// configured.
+fn maintain_census(
+    root: &std::path::Path,
+    module_path: &str,
+    content: &str,
+    verb: &str,
+) -> Result<(), String> {
+    let loc = std::path::Path::new(module_path)
+        .strip_prefix(root)
+        .unwrap_or(std::path::Path::new(module_path))
+        .display()
+        .to_string();
+    if !loc.starts_with("src/") {
+        return Ok(());
+    }
+    let env = |text: &str, fallback: &str| -> String {
+        text.lines()
+            .find_map(|l| {
+                let (_, rest) = l.split_once("Regenerate with `")?;
+                let (name, _) = rest.split_once("=1 cargo build")?;
+                Some(name.to_string())
+            })
+            .unwrap_or_else(|| fallback.to_string())
+    };
+    let read = |path: &std::path::Path| -> Result<String, String> {
+        std::fs::read_to_string(path).map_err(|e| format!("bundle {verb}: census unreadable ({e})"))
+    };
+    let write_if_moved =
+        |path: &std::path::Path, fresh: &str, standing: &str| -> Result<(), String> {
+            if fresh != standing {
+                std::fs::write(path, fresh)
+                    .map_err(|e| format!("bundle {verb}: census unwritable ({e})"))?;
+            }
+            Ok(())
+        };
+    let census_path = root.join("spec/qualify.spec");
+    let reasons_path = root.join("spec/qualify-reasons.spec");
+    if census_path.exists() && reasons_path.exists() {
+        let census = read(&census_path)?;
+        let reasons = read(&reasons_path)?;
+        let (fresh_census, fresh_reasons) = boundary_enforce::maintain_qualify(
+            &census,
+            &reasons,
+            &loc,
+            content,
+            &env(&census, "BLESS_QUALIFY"),
+            &env(&reasons, "BLESS_REASONS"),
+        )
+        .map_err(|e| {
+            format!("bundle {verb}: wrote the module but the census did not follow ({e})")
+        })?;
+        write_if_moved(&census_path, &fresh_census, &census)?;
+        write_if_moved(&reasons_path, &fresh_reasons, &reasons)?;
+    }
+    let tiers_path = root.join("spec/tiers.spec");
+    if tiers_path.exists() {
+        let tiers = read(&tiers_path)?;
+        let fresh_tiers = boundary_enforce::maintain_tiers(
+            &tiers,
+            &loc,
+            content,
+            root,
+            &env(&tiers, "BLESS_TIERS"),
+        )
+        .map_err(|e| {
+            format!("bundle {verb}: wrote the module but the tier census did not follow ({e})")
+        })?;
+        write_if_moved(&tiers_path, &fresh_tiers, &tiers)?;
+    }
+    Ok(())
 }

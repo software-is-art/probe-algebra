@@ -1,0 +1,61 @@
+/// Parse a committed `.trial` file. Refusals name the offending line: a corrupt
+/// committed trial is a gate failure, never a shrug.
+pub fn parse(text: &str) -> Result<Record, String> {
+    let mut lines = text.lines();
+    let head = lines.next().unwrap_or_default();
+    if head != "weave-knee trial v1" {
+        return Err(format!("not a weave-knee v1 trial: first line is `{head}`"));
+    }
+    let fanout: usize = field(&mut lines, "fanout")?
+        .parse()
+        .map_err(|e| format!("fanout: {e}"))?;
+    let seed: u64 = field(&mut lines, "seed")?
+        .parse()
+        .map_err(|e| format!("seed: {e}"))?;
+    let weaver = field(&mut lines, "weaver")?.to_string();
+    let judge = field(&mut lines, "judge")?.to_string();
+    let quality: u8 = field(&mut lines, "quality")?
+        .parse()
+        .map_err(|e| format!("quality: {e}"))?;
+    if !(1..=5).contains(&quality) {
+        return Err(format!("quality {quality} outside 1-5"));
+    }
+    let sentinel = lines.next().unwrap_or_default();
+    if sentinel != "narrative:" {
+        return Err(format!("expected `narrative:`, found `{sentinel}`"));
+    }
+    let mut narrative_lines: Vec<&str> = Vec::new();
+    loop {
+        match lines.next() {
+            None => return Err("missing `verdicts:` section".to_string()),
+            Some("verdicts:") => break,
+            Some("") => narrative_lines.push(""),
+            Some(l) => narrative_lines.push(
+                l.strip_prefix("  ")
+                    .ok_or_else(|| format!("narrative line not indented: `{l}`"))?,
+            ),
+        }
+    }
+    let mut verdicts = Vec::new();
+    for l in lines {
+        let l = l
+            .strip_prefix("  ")
+            .ok_or_else(|| format!("verdict line not indented: `{l}`"))?;
+        let (id, word) = l
+            .split_once(' ')
+            .ok_or_else(|| format!("unreadable verdict line: `{l}`"))?;
+        verdicts.push((id.to_string(), verdict_word(word, id)?));
+    }
+    if verdicts.is_empty() {
+        return Err("no verdicts recorded".to_string());
+    }
+    Ok(Record {
+        fanout,
+        seed,
+        weaver,
+        judge,
+        quality,
+        narrative: narrative_lines.join("\n"),
+        verdicts,
+    })
+}

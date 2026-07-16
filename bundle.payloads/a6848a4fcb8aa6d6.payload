@@ -1,0 +1,7 @@
+#[crate::mutate]
+fn tpart(v: &Flow) -> Vec<ZSet<u8>> {
+    match v {
+        Flow::Window(t) => t.clone(),
+        Flow::Zset(z) => vec![z.clone(); TICKS],
+    }
+}

@@ -1,0 +1,12 @@
+/// I — the running sum: each tick is the group sum of everything up to it.
+#[crate::mutate]
+fn integrate(v: &[Flow]) -> Option<Flow> {
+    let t = tpart(&v[0]);
+    let mut acc = ZSet::zero();
+    let mut out = Vec::with_capacity(TICKS);
+    for z in &t {
+        acc = acc.add(z);
+        out.push(acc.clone());
+    }
+    Some(Flow::Window(out))
+}

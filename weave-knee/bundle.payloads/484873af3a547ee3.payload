@@ -1,0 +1,60 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    fn point(fanout: usize, relation_cov: f64, gain: f64) -> CurvePoint {
+        CurvePoint {
+            fanout,
+            trials: 2,
+            mention: 1.0,
+            claim_cov: 1.0,
+            relation_cov,
+            foil_rej: 1.0,
+            gain,
+            e_foil_rej: 1.0,
+            topo_recall: 1.0,
+            topo_prec: 1.0,
+            quality: 4.0,
+        }
+    }
+
+    #[test]
+    fn the_knee_is_the_last_fanout_holding_the_floor() {
+        let c = vec![point(2, 1.0, 0.5), point(4, 0.95, 0.5), point(6, 0.7, 0.5)];
+        assert_eq!(knee(&c), Knee::At(4));
+    }
+
+    #[test]
+    fn a_sweep_the_floor_survives_yields_a_lower_bound() {
+        let c = vec![point(2, 1.0, 0.5), point(4, 0.92, 0.5)];
+        assert_eq!(knee(&c), Knee::NotReached(4));
+    }
+
+    #[test]
+    fn a_sweep_that_never_holds_is_below_the_sweep() {
+        let c = vec![point(2, 0.5, 0.5), point(4, 0.4, 0.5)];
+        assert_eq!(knee(&c), Knee::BelowSweep);
+    }
+
+    #[test]
+    fn a_non_monotonic_curve_ends_at_the_first_drop() {
+        let c = vec![point(2, 1.0, 0.5), point(4, 0.5, 0.5), point(6, 1.0, 0.5)];
+        assert_eq!(knee(&c), Knee::At(2));
+    }
+
+    #[test]
+    fn the_gain_knee_dies_where_gain_touches_zero() {
+        let c = vec![point(2, 1.0, 0.8), point(4, 1.0, 0.25), point(6, 1.0, 0.0)];
+        assert_eq!(gain_knee(&c), Knee::At(4));
+        let c = vec![point(2, 1.0, 0.8), point(4, 1.0, 0.25)];
+        assert_eq!(gain_knee(&c), Knee::NotReached(4));
+        let c = vec![point(2, 1.0, 0.0)];
+        assert_eq!(gain_knee(&c), Knee::BelowSweep);
+    }
+
+    #[test]
+    fn an_empty_trial_set_renders_honestly() {
+        let rendered = render(&BTreeMap::new());
+        assert!(rendered.contains("no trials recorded"));
+    }
+}

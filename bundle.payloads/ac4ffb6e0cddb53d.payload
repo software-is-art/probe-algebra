@@ -1,0 +1,123 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+    use crate::discover::engine::{Engine, Theory};
+
+    /// The engine discovers the kernel's whole algebra by running it: the abelian
+    /// group (with INVERSE — the law that makes differentiation exist), negation as
+    /// an Add-homomorphism, join's ring face (commutative, associative, annihilated
+    /// by zero, distributing over Add — bilinearity's one-sided witness), distinct
+    /// as a projection, and the DBSP theorem itself — I∘D = id and D∘I = id — with
+    /// delay commuting past both and the injection/observation round trip closing
+    /// the two sorts into one module. This pin is the lib-side twin of
+    /// spec/zset-kernel.spec.
+    #[test]
+    fn the_kernel_algebra_is_discovered() {
+        assert_eq!(ZKernel::name(), "zset kernel");
+        let d = Engine::<ZKernel>::new().discover();
+        let equations: Vec<&str> = d.laws.iter().map(|l| l.equation.as_str()).collect();
+        for law in [
+            "(a + b) = (b + a)",
+            "((a + b) + c) = (a + (b + c))",
+            "(zero + a) = a",
+            "(a + neg(a)) = zero",
+            "neg(neg(a)) = a",
+            "neg((a + b)) = (neg(a) + neg(b))",
+            "(a join b) = (b join a)",
+            "(zero join a) = zero",
+            "(a join (b + c)) = ((a join b) + (a join c))",
+            "distinct(distinct(a)) = distinct(a)",
+            "integrate(differentiate(s)) = s",
+            "differentiate(integrate(s)) = s",
+            "delay(integrate(s)) = integrate(delay(s))",
+            "latest(impulse(a)) = a",
+        ] {
+            assert!(
+                equations.contains(&law),
+                "missing law: {law}\nhave: {equations:#?}"
+            );
+        }
+    }
+
+    /// LINEARITY, the shape the law language cannot yet state across sorts: over the
+    /// full inhabitant grid, differentiate, integrate, and delay each commute with
+    /// pointwise trace addition, and join's delta expands by the product rule —
+    /// Δ(a⋈b) = Δa⋈b + a⋈Δb + Δa⋈Δb. These are the theorems the incremental
+    /// executor will lean on; they pin here until the catalog can say them.
+    #[test]
+    fn the_operators_earn_their_delta_shortcuts() {
+        let zs: Vec<ZSet<u8>> = zsets()
+            .into_iter()
+            .map(|f| match f {
+                Flow::Zset(z) => z,
+                Flow::Window(_) => unreachable!(),
+            })
+            .collect();
+        let ts: Vec<Vec<ZSet<u8>>> = traces()
+            .into_iter()
+            .map(|f| match f {
+                Flow::Window(t) => t,
+                Flow::Zset(_) => unreachable!(),
+            })
+            .collect();
+        let tadd = |s: &[ZSet<u8>], t: &[ZSet<u8>]| -> Vec<ZSet<u8>> {
+            s.iter().zip(t).map(|(a, b)| a.add(b)).collect()
+        };
+        let run = |op: fn(&[Flow]) -> Option<Flow>, t: &[ZSet<u8>]| -> Vec<ZSet<u8>> {
+            match op(&[Flow::Window(t.to_vec())]) {
+                Some(Flow::Window(out)) => out,
+                _ => unreachable!(),
+            }
+        };
+        for s in &ts {
+            for t in &ts {
+                for op in [differentiate, integrate, delay] {
+                    assert_eq!(
+                        run(op, &tadd(s, t)),
+                        tadd(&run(op, s), &run(op, t)),
+                        "a stream operator claimed linearity it does not have"
+                    );
+                }
+            }
+        }
+        for a in &zs {
+            for da in &zs {
+                for b in &zs {
+                    for db in &zs {
+                        let whole = a.add(da).join(&b.add(db));
+                        let parts = a
+                            .join(b)
+                            .add(&da.join(b))
+                            .add(&a.join(db))
+                            .add(&da.join(db));
+                        assert_eq!(whole, parts, "the product rule failed");
+                    }
+                }
+            }
+        }
+    }
+
+    /// The carrier's canonicality is load-bearing: a zero weight is absence (so
+    /// structural equality is observational equality), duplicate keys sum, absence
+    /// reads as zero, and entries come out in key order.
+    #[test]
+    fn the_carrier_is_canonical_by_construction() {
+        let z = ZSet::from_pairs(&[(2u8, 1), (0, 2), (2, -1), (1, 0)]);
+        assert_eq!(z.entries(), vec![(0, 2)], "zeros vanish, duplicates sum");
+        assert_eq!(z.weight(&2), 0, "absence is zero");
+        let mut w = ZSet::zero();
+        w.put(3, 5);
+        w.put(3, -5);
+        assert_eq!(w, ZSet::zero(), "a weight returning to zero erases its key");
+        assert_eq!(
+            ZSet::from_pairs(&[(1u8, -2)]).distinct(),
+            ZSet::zero(),
+            "distinct drops non-positive weight"
+        );
+        assert_eq!(
+            ZSet::from_pairs(&[(1u8, 3)]).distinct().entries(),
+            vec![(1, 1)],
+            "distinct caps positive weight at one"
+        );
+    }
+}

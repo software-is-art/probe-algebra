@@ -1,0 +1,3 @@
+/// One judged (or carried) site as the sweep's ledger holds it: census name,
+/// verdict, covering tests, evidence key — the transcript row's in-flight shape.
+type Judged = (String, String, Vec<String>, String);

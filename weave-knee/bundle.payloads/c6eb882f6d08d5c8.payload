@@ -1,0 +1,143 @@
+use std::io::Write as _;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+
+use weave_knee::{corpus, knee, prompt, record};
+
+const USAGE: &str = "usage: knee gen <fanout> <seed>\n       knee sweep --weaver <model> \
+                     --judge <model> --fanouts 2,4,... --seeds 1,2,...\n       knee freeze";
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let verdict = match args.first().map(String::as_str) {
+        Some("gen") => gen(&args[1..]),
+        Some("sweep") => sweep(&args[1..]),
+        Some("freeze") => freeze(),
+        _ => Err(USAGE.to_string()),
+    };
+    if let Err(e) = verdict {
+        eprintln!("{e}");
+        std::process::exit(1);
+    }
+}
+
+fn root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+/// Print the weave prompt for one (fanout, seed) — for eyeballing the corpus.
+fn gen(args: &[String]) -> Result<(), String> {
+    let [fanout, seed] = args else {
+        return Err(USAGE.to_string());
+    };
+    let fanout = fanout.parse().map_err(|e| format!("fanout: {e}"))?;
+    let seed = seed.parse().map_err(|e| format!("seed: {e}"))?;
+    print!("{}", prompt::weave(&corpus::trial(fanout, seed)));
+    Ok(())
+}
+
+/// The only model-calling path: weave, judge, record. Existing trials are kept —
+/// a sweep is resumable, and re-measuring means deleting the trial deliberately.
+fn sweep(args: &[String]) -> Result<(), String> {
+    let weaver = flag(args, "--weaver")?;
+    let judge = flag(args, "--judge")?;
+    let fanouts = list(&flag(args, "--fanouts")?)?;
+    let seeds = list(&flag(args, "--seeds")?)?;
+    let dir = root().join("trials").join(sanitize(&weaver));
+    for &fanout in &fanouts {
+        for &seed in &seeds {
+            let path = dir.join(format!("k{fanout:02}-s{seed}.trial"));
+            if path.exists() {
+                println!("have {}", path.display());
+                continue;
+            }
+            let t = corpus::trial(fanout, seed as u64);
+            println!("weaving fanout {fanout} seed {seed} with {weaver} ...");
+            let narrative = call(&weaver, &prompt::weave(&t))?.trim().to_string();
+            println!("judging with {judge} ...");
+            let raw = call(&judge, &prompt::judge(&t, &narrative))?;
+            let (verdicts, quality) = record::parse_judge(&raw)?;
+            let rec = record::Record {
+                fanout,
+                seed: seed as u64,
+                weaver: weaver.clone(),
+                judge: judge.clone(),
+                quality,
+                narrative,
+                verdicts,
+            };
+            // an incomplete judge census refuses BEFORE anything is written
+            let scored = weave_knee::score::score(&t, &rec)?;
+            std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+            std::fs::write(&path, record::render(&rec))
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+            println!(
+                "recorded {} — relations {:.2}, claims {:.2}, foil-rej {:.2}, quality {}",
+                path.display(),
+                scored.relation_cov,
+                scored.claim_cov,
+                scored.foil_rej,
+                scored.quality
+            );
+        }
+    }
+    println!("sweep done — run `knee freeze` and ratify the spec diff.");
+    Ok(())
+}
+
+/// The one sanctioned writer of `spec/knee.spec`, re-derived from committed trials.
+fn freeze() -> Result<(), String> {
+    let lock = knee::lock_in(&root().join("spec"), &root().join("trials"))?;
+    spec_lock::bless(std::slice::from_ref(&lock)).map_err(|e| format!("bless: {e}"))?;
+    println!("blessed `{}` -> {}", lock.name, lock.path.display());
+    println!("ratify the diff: the committed knee spec is the constant's contract.");
+    Ok(())
+}
+
+fn flag(args: &[String], name: &str) -> Result<String, String> {
+    args.iter()
+        .position(|a| a == name)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
+        .ok_or_else(|| format!("missing {name} <value>\n{USAGE}"))
+}
+
+fn list(csv: &str) -> Result<Vec<usize>, String> {
+    csv.split(',')
+        .map(|s| s.trim().parse().map_err(|e| format!("`{s}`: {e}")))
+        .collect()
+}
+
+fn sanitize(model: &str) -> String {
+    model
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
+}
+
+/// Shell out to `claude -p` — prompt on stdin, narrative or verdicts on stdout.
+fn call(model: &str, prompt_text: &str) -> Result<String, String> {
+    let mut child = Command::new("claude")
+        .args(["-p", "--model", model])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("spawning claude: {e}"))?;
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(prompt_text.as_bytes())
+        .map_err(|e| format!("writing the prompt: {e}"))?;
+    let out = child
+        .wait_with_output()
+        .map_err(|e| format!("waiting on claude: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "claude -p ({model}) failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}

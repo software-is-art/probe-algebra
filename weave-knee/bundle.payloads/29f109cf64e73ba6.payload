@@ -1,0 +1,100 @@
+/// Score a record against its regenerated trial. Every candidate in BOTH censuses
+/// must carry a verdict — a judge that skipped one is an incomplete census, refused.
+/// Edges are matched exactly (from, to); an empty edge list is a zero, not an error.
+pub fn score(t: &Trial, r: &Record) -> Result<Scores, String> {
+    let ruled: BTreeMap<&str, bool> = r.verdicts.iter().map(|(id, e)| (id.as_str(), *e)).collect();
+    let mut claims = (0usize, 0usize);
+    let mut relations = (0usize, 0usize);
+    let mut foils = (0usize, 0usize);
+    for c in candidates(t) {
+        let entailed = *ruled
+            .get(c.id.as_str())
+            .ok_or_else(|| format!("no verdict for candidate `{}`", c.id))?;
+        if !c.truth {
+            foils.1 += 1;
+            if !entailed {
+                foils.0 += 1;
+            }
+        } else if c.id.starts_with('r') {
+            relations.1 += 1;
+            if entailed {
+                relations.0 += 1;
+            }
+        } else {
+            claims.1 += 1;
+            if entailed {
+                claims.0 += 1;
+            }
+        }
+    }
+    let said: BTreeMap<&str, bool> = r.stated.iter().map(|(id, s)| (id.as_str(), *s)).collect();
+    let mut emergents = (0usize, 0usize);
+    let mut e_foils = (0usize, 0usize);
+    for c in crate::prompt::emergent_candidates(t) {
+        let was_stated = *said
+            .get(c.id.as_str())
+            .ok_or_else(|| format!("no stated ruling for emergent `{}`", c.id))?;
+        if c.truth {
+            emergents.1 += 1;
+            if was_stated {
+                emergents.0 += 1;
+            }
+        } else {
+            e_foils.1 += 1;
+            if !was_stated {
+                e_foils.0 += 1;
+            }
+        }
+    }
+    let ring: Vec<(&str, &str)> = t
+        .relations
+        .iter()
+        .map(|rel| {
+            (
+                t.children[rel.from].lexeme.as_str(),
+                t.children[rel.to].lexeme.as_str(),
+            )
+        })
+        .collect();
+    let recovered = ring
+        .iter()
+        .filter(|(from, to)| {
+            r.edges
+                .iter()
+                .any(|(f, t2)| f == from && t2 == to)
+        })
+        .count();
+    let real = r
+        .edges
+        .iter()
+        .filter(|(f, t2)| ring.iter().any(|(from, to)| f == from && t2 == to))
+        .count();
+    let mentioned = t
+        .children
+        .iter()
+        .filter(|c| r.narrative.contains(&c.lexeme))
+        .count();
+    let words = r.narrative.split_whitespace().count();
+    let budget = word_budget(t.fanout);
+    Ok(Scores {
+        fanout: t.fanout,
+        mention: mentioned as f64 / t.children.len() as f64,
+        claim_cov: claims.0 as f64 / claims.1 as f64,
+        relation_cov: relations.0 as f64 / relations.1 as f64,
+        foil_rej: foils.0 as f64 / foils.1 as f64,
+        gain: emergents.0 as f64 / emergents.1 as f64,
+        e_foil_rej: e_foils.0 as f64 / e_foils.1 as f64,
+        topo_recall: recovered as f64 / ring.len() as f64,
+        topo_prec: if r.edges.is_empty() {
+            0.0
+        } else {
+            real as f64 / r.edges.len() as f64
+        },
+        quality: r.quality,
+        words,
+        // a declared tolerance margin: a budget gate that fails on one word is
+        // flaky, and flaky locks teach people to ignore locks.
+        within_budget: words <= budget + budget / 10,
+        prose_only: !r.narrative.lines().any(is_listish),
+    })
+}

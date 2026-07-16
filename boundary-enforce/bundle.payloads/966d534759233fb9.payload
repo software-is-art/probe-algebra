@@ -1,0 +1,100 @@
+/// THE MAINTAINED VIEW for the tier census: apply ONE module's movement to the
+/// committed partition so the `BLESS_TIERS` ceremony stops being owed at the verb.
+/// A tier is not a local judgment — it reads the reachability fixpoint and the
+/// fronting relation — but the committed census IS standing evidence for both:
+/// a non-KERNEL row states its own reachability, and the INTERIOR rows are exactly
+/// the frontable set. So a delta that leaves the module tree's shape alone (every
+/// direct child the census knows still carries the reachability this source
+/// implies for it) moves AT MOST ITS OWN LINE, re-derived tree-free from the same
+/// four facts the oracle reads; a structural delta — a mount, an unmount, a parent
+/// whose reachability the census masks — falls back to the oracle's own derivation
+/// over the tree, with the kernel set read from the census's standing KERNEL rows
+/// (kernel-hood is a decision: a verb never moves it, and a register edit keeps
+/// its ceremony). An unparseable source or census refuses with no movement. The
+/// build gate that re-derives the partition wholesale stays the ORACLE.
+pub fn maintain_tiers(
+    census: &str,
+    loc: &str,
+    source: &str,
+    manifest: &Path,
+    bless_env: &str,
+) -> Result<String, String> {
+    let rows = parse_tier_lines(census)?;
+    if rows.iter().filter(|(l, _, _)| l == loc).count() > 1 {
+        return Err(format!("{loc}: duplicate tier census lines"));
+    }
+    let file =
+        syn::parse_file(source).map_err(|e| format!("{loc}: source does not parse ({e})"))?;
+    let own = rows.iter().find(|(l, _, _)| l == loc);
+    let own_reachable = match own {
+        Some((l, t, _)) => row_reachable(l, t),
+        None => Some(false),
+    };
+
+    // the STRUCTURE CHECK: every census row that a `mod` declaration of this file
+    // could have mounted must still carry the reachability this source implies for
+    // it. Any disagreement — or a masked verdict on either side — means the module
+    // tree's shape moved (or the standing evidence cannot say), and the oracle
+    // recomputes. Crate roots are reachable by definition, mounted by no one.
+    let path = manifest.join(loc);
+    let child_dir = child_dir_of(&path);
+    let declared = child_mods(&file);
+    let structural = rows.iter().any(|(child_loc, child_tier, _)| {
+        if child_loc == loc || child_loc == "src/lib.rs" || child_loc == "src/main.rs" {
+            return false;
+        }
+        let Some(stem) = direct_child_stem(&child_dir, &manifest.join(child_loc)) else {
+            return false;
+        };
+        let implied = match declared.iter().find(|(name, _)| *name == stem) {
+            Some((_, is_pub)) => own_reachable.map(|r| r && *is_pub),
+            None => Some(false),
+        };
+        let standing = row_reachable(child_loc, child_tier);
+        implied.is_none() || standing.is_none() || implied != standing
+    });
+    if structural {
+        let kernel: Vec<String> = rows
+            .iter()
+            .filter(|(_, tier, _)| *tier == "KERNEL")
+            .map(|(l, _, _)| l.clone())
+            .collect();
+        let partition = derive_partition(&manifest.join("src"), manifest, &kernel);
+        return Ok(render_tiers(&partition, bless_env));
+    }
+
+    // the LOCAL path: only this file's line can move. KERNEL is a decision — the
+    // standing line carries; everything else re-derives from the same four facts
+    // the oracle reads, with reachability from the standing row and the frontable
+    // set from the census's own INTERIOR rows.
+    let fresh = match own {
+        Some((_, tier, evidence)) if *tier == "KERNEL" => (*tier, evidence.clone()),
+        _ => {
+            let mut edges: Vec<EdgeImpl> = Vec::new();
+            let mut probed: HashSet<String> = HashSet::new();
+            collect_items(&file.items, loc, &mut edges, &mut probed);
+            let fronts = rows.iter().any(|(l, tier, _)| {
+                *tier == "INTERIOR"
+                    && manifest.join(l).parent() == path.parent()
+                    && manifest
+                        .join(l)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(|stem| source.contains(&format!("{stem}::")))
+            });
+            assign_tier(
+                has_substance(&file),
+                own_reachable.unwrap_or(false),
+                !edges.is_empty(),
+                fronts,
+            )
+        }
+    };
+    let mut partition: Vec<(PathBuf, String, &'static str, String)> = rows
+        .iter()
+        .filter(|(l, _, _)| l != loc)
+        .map(|(l, tier, evidence)| (manifest.join(l), l.clone(), *tier, evidence.clone()))
+        .collect();
+    partition.push((path, loc.to_string(), fresh.0, fresh.1));
+    Ok(render_tiers(&partition, bless_env))
+}
