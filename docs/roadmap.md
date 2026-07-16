@@ -3772,6 +3772,19 @@ missing perception: the reverse edge — uses-of an item across the workspace,
 because a maintained view's first design question is always "who else holds this
 fact."
 
+A note for the remaining conversions, recorded while the family is fresh: the
+maintained view now has THREE shapes, and the choice is dictated by the view's
+dependency structure. (1) The per-row local view (qualify, brick 3): a line
+derives from its module alone — retract, re-judge, assert. (2) The
+self-describing census (tiers, brick 5): the verdict reads global facts, but the
+committed output carries them — maintain locally where standing evidence
+suffices, fall back to the oracle's own derivation where it cannot say. (3) The
+opaque carry (schemata, brick 4): the computation is a black box — key the
+verdict by its evidence cone and carry wholesale. Reasons' member twins are
+shape 1 (they ARE qualify); instrumentation looks like 1 or 2 (a register judged
+against a file roster). A census that fits none of the three is news about the
+census.
+
 ## Candidate: the declared agenda — a change ships its bill of materials first
 
 Named from inside brick 5 (2026-07-16, the suit's own operator reporting). The
@@ -3842,7 +3855,17 @@ first-class.
   same notes: OPERATED failures arrive pre-narrated — the perimeter refused a merge
   method by quoting its own lock; the diagnosis step keeps collapsing into reading —
   and the unkeyed-verdict failure class appeared at a fourth altitude (semver) once the
-  first three gave it a name.
+  first three gave it a name. Fresh evidence from the bricks 1–5 landing (2026-07-16):
+  the PR body was hand-narrated a FOURTH time; the whole landing was hand-sequenced
+  button ceremony (push rightly refused by the perimeter, then branch, `gh pr create`,
+  a watched 6½-minute required check, manual `--squash` merge — repository auto-merge
+  is DISABLED, a settings fact worth a deliberate decision either way); and the
+  session's only honest wait was exactly here. The sharper framing the day's
+  conversation produced: the required check is safety implemented as a GATE IN THE
+  PATH, the one architectural pattern everything inside the tree exists to dissolve —
+  structure in the medium judges at machine speed off the critical path, while a gate
+  queues all throughput behind an attention scheduler. The ceremony layer is not
+  merely un-suited; it is the last bottleneck-shaped safety in the system.
 - **Candidate: the version bump becomes a derived demand** (named by the release the
   big merge broke twice). The mint's second failure was the honest one: the release
   loop is idempotent by version, `boundary-enforce` grew its API without a bump, so
