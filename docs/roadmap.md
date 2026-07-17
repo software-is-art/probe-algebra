@@ -4048,3 +4048,28 @@ tightness, the ratified diff as the intent check). Spec → artifact with proofs
 artifact → spec with evidence and a signature. Each direction is the other's
 missing half, and the promotion path already named (one settled law, discharged)
 is where they would meet.
+
+## Candidate sharpened: eliminating the gate in the path — the countersign chases the tip
+
+Sharpened 2026-07-18, extending the ceremony-layer candidate with the mechanism.
+The required check re-derives, in minutes and under attention, facts the authoring
+container already established; the elimination is three moves plus a floor. (1)
+Verdicts become PORTABLE, COUNTERSIGNED facts: the store already keys green by
+(gate, support, content) — what CI distrusts is the claim, not the math, so give
+verdict records signatures from a trusted runner and the merge check collapses to
+a ledger audit. (2) Judgment moves to CHANGE TIME: a branch of judged transactions
+is green by induction; the missing piece is support grain — per-file admits
+re-keyed the whole store when the support itself moved (measured in the pin PR),
+where per-item/per-site keys (the coverage map already holds site→test edges)
+would re-judge only what moved. (3) The countersign CHASES THE TIP instead of
+gating it — the mutants-green tag already runs this pattern weekly, off the
+critical path; generalized to every change, merge lands when the ledger is
+complete, a red countersign is a detection, and the substrate's history laws name
+the compensation. The floor that remains: the trust root (whose keys countersign
+is a ratified decision), the Effectful world gates (event-time by nature), and
+the async ratification signatures — none of which belong in the path. Beneath all
+three, the endstate's constructed-change program shrinks the owed set itself:
+each invariant that migrates into the verb algebra stops being a gate that
+re-runs and becomes a refusal that never needed to. Near-term, boring, real: CI
+carrying its own verdict store across runs, and the auto-merge settings decision
+already flagged above.
