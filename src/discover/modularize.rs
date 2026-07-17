@@ -156,7 +156,7 @@ fn modularize<T: Theory>() -> Proposal {
 
     // rank richest-first; misfits (zero laws) sink to the bottom. A stable sort keeps clusters of
     // equal richness in their cohesion order, so the proposal is deterministic.
-    modules.sort_by(|a, b| b.laws.cmp(&a.laws));
+    modules.sort_by_key(|m| std::cmp::Reverse(m.laws));
 
     Proposal {
         theory: T::name(),

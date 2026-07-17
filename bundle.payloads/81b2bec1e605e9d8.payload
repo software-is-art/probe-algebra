@@ -1,0 +1,5 @@
+/// The pinned Rust toolchain the workflow installs. Pinned, not `@stable`: the
+/// `tests/compile_fail` trybuild suites match saved `.stderr` files, and rustc's diagnostic
+/// rendering changes between versions. Bump this in lockstep with regenerating the
+/// `.stderr` files (`TRYBUILD=overwrite`), then re-freeze the gates.
+pub const TOOLCHAIN: &str = "1.97.1";

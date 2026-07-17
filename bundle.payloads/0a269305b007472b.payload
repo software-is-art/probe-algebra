@@ -1,0 +1,48 @@
+/// Propose a modular decomposition of a theory's (flat) algebra. Partition by law-connectivity, score
+/// each cluster by the laws it holds, mark its tightness, and rank the shapes ahead of the misfits.
+/// (Private — reached as `Proposal::of`.)
+#[crate::mutate]
+fn modularize<T: Theory>() -> Proposal {
+    let engine = Engine::<T>::new();
+    let sigs = engine.signatures();
+    let layers = LayeringReport::of::<T>();
+
+    // score: how many discovered laws live entirely inside each component. Because the components are
+    // the law-connectivity clusters, every law's operators fall wholly within exactly one — so a law
+    // whose operators a component all contains is one the component fully owns.
+    let mut law_counts = vec![0usize; layers.components.len()];
+    for law in engine.discover().laws {
+        let mut ops = BTreeSet::new();
+        ops_in(&law.lhs, &mut ops);
+        ops_in(&law.rhs, &mut ops);
+        let symbols: Vec<&'static str> = ops.iter().map(|&i| sigs[i].0).collect();
+        if let Some(idx) = layers
+            .components
+            .iter()
+            .position(|c| symbols.iter().all(|s| c.operators.contains(s)))
+        {
+            law_counts[idx] += 1;
+        }
+    }
+
+    // the partition and the tightness both come from the one layering report — no re-matching.
+    let mut modules: Vec<ProposedModule> = layers
+        .components
+        .iter()
+        .enumerate()
+        .map(|(i, c)| ProposedModule {
+            operators: c.operators.clone(),
+            laws: law_counts[i],
+            atomic: c.is_atomic(),
+        })
+        .collect();
+
+    // rank richest-first; misfits (zero laws) sink to the bottom. A stable sort keeps clusters of
+    // equal richness in their cohesion order, so the proposal is deterministic.
+    modules.sort_by_key(|m| std::cmp::Reverse(m.laws));
+
+    Proposal {
+        theory: T::name(),
+        modules,
+    }
+}
