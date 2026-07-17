@@ -3523,6 +3523,49 @@ status, candidates, readings). A zoomed rendering — one line per entry at
 altitude zero, expand on demand — is the cheapest honest test of the family,
 and the consumer is real: every session opens with exactly this need.
 
+Extended 2026-07-17 (Callum): a candidate viewport, a second consumer, and a
+second delta source.
+
+Viewport candidate: the tldraw SDK (the library, not their app). Semantic zoom
+is native to it — custom shapes render differently per zoom level, culling and
+text LOD are built in — and its store sits on incrementally-maintained signals,
+so a Pad++ portal is just a shape subscribed to a maintained query: the same
+claim the dataflow kernel makes, in a different medium. Field evidence from an
+outside experiment: recursive frame-collapse — a frame folds into its parent
+space as a single named node, at every depth — was buildable in an afternoon on
+the SDK and made freehand architecture diagrams tidy. That discrete nesting
+fits our ladder (topography → theory → items → body) better than continuous
+geometric zoom does, since the ladder is discrete anyway. The constraint stands
+regardless of viewport: the altitude-indexed rendering family lives on the Rust
+side as a declared function; the canvas maps zoom to altitude and displays what
+the kernel serves — zoom levels never live in shape code. Two costs, named:
+the relation has no geometry, so placement is its own derived view (a layout
+function, not hand-arranged positions), and the SDK's license trades a
+watermark for a fee.
+
+Second consumer: the human at the glass, beside the agent at the aperture.
+Every verb is already a delta source — an edit is a two-row delta, a collect a
+set of retractions — so a canvas subscribed to the delta stream shows agent
+work live with zero added instrumentation: no invented event schema, the
+mechanism IS the schema. And because "what the agent sees at altitude k" is a
+declared function, an agent's context viewport is itself renderable as a
+portal — watch the aperture move across the surface in one frame while its
+writes land in another. Seeing an agent stuck, or sensing how the work is
+going well enough to improve the process, falls out of watching deltas and
+apertures; nothing extra is built for it.
+
+Second delta source: human gestures, as coordination — not micromanagement,
+and not approval gates (judgment stays off the critical path). A gesture on
+the canvas compiles to a judged artifact, never open text feeding rules: a
+region drawn around modules is a scoped work item, a wireframe sketched in a
+frame is a dispatch — an agent picks it up as data and implements it — a note
+dropped on a frame is a roadmap candidate. Human intent enters the medium the
+same way everything else does, as deltas over the relation, and agents consume
+it the same way they consume everything else. Ordering unchanged: all of this
+subscribes to the item-relation bricks (relation at repo scale, maintained
+views, the delta stream) and can arrive late; none of it can arrive honestly
+before them.
+
 ## The item relation, brick 1: the tree recognized as data (BUILT)
 
 Built 2026-07-15, the same day brick 2 closed the CLI loop — the two are one
@@ -3772,6 +3815,56 @@ missing perception: the reverse edge — uses-of an item across the workspace,
 because a maintained view's first design question is always "who else holds this
 fact."
 
+A note for the remaining conversions, recorded while the family is fresh: the
+maintained view now has THREE shapes, and the choice is dictated by the view's
+dependency structure. (1) The per-row local view (qualify, brick 3): a line
+derives from its module alone — retract, re-judge, assert. (2) The
+self-describing census (tiers, brick 5): the verdict reads global facts, but the
+committed output carries them — maintain locally where standing evidence
+suffices, fall back to the oracle's own derivation where it cannot say. (3) The
+opaque carry (schemata, brick 4): the computation is a black box — key the
+verdict by its evidence cone and carry wholesale. Reasons' member twins are
+shape 1 (they ARE qualify); instrumentation looks like 1 or 2 (a register judged
+against a file roster). A census that fits none of the three is news about the
+census.
+
+## Candidate: the declared agenda — a change ships its bill of materials first
+
+Named from inside brick 5 (2026-07-16, the suit's own operator reporting). The
+observation: the verbs' biggest effect on the work was not safety but
+DECOMPOSITION PRESSURE. Because `edit` holds signatures and `add` places items,
+the change had to exist as a named item roster — five adds, three edits — before
+anything touched the tree. A file editor lets design and implementation smear
+together across a diff; the verbs force the design artifact to exist first. And
+that pressure is not a side effect, it is what funds the delta economy: every
+incremental instrument here (evidence keys, carried verdicts, maintained views)
+prices a change by its SUPPORT, which only works because the medium refuses
+ill-formed deltas. Brick 1's "an edit is a two-row delta" is a fact the verbs
+make true.
+
+The gap: the bill of materials is real and nothing holds it. It lived in the
+operator's head and scratchpad; the journal records the transactions only after
+they land. The candidate is the dual of agenda-from-journal (PR bodies derived
+from the record): JOURNAL-TOWARD-AGENDA. Declare the intended transaction set —
+which items, which files, add vs edit — as a judged artifact, and the suit
+tracks discharge: `owes`, but for a change instead of a tree. Two in-tree
+precedents: genesis declares target locks and converges to green (this is the
+same pattern one level down — a change declares its roster and converges to
+done), and `owes` already derives obligation from declaration. Two named
+consumers: review shifts left another rung (judge the nine-line roster before
+any payload exists — cheaper than judging 584 lines after), and any multi-agent
+split where one mind plans and another discharges.
+
+The honest counterweight, recorded with the candidate: decomposition pressure
+taxes exploration. Brick 5 decomposed cleanly because `show` made recon cheap
+and the shape was derivable; a change whose items are unknown until tried would
+fight an agenda. What the operator actually did — draft freely in a scratchpad,
+offer finished payloads whole — reproduces the tier system in the change
+process itself: an INTERIOR drafting table, a strict grammar at the boundary.
+So the agenda must stay a declaration of intent, revisable by the same judged
+means, never a cage; the payload store is already half the drafting table made
+first-class.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
@@ -3805,7 +3898,17 @@ fact."
   same notes: OPERATED failures arrive pre-narrated — the perimeter refused a merge
   method by quoting its own lock; the diagnosis step keeps collapsing into reading —
   and the unkeyed-verdict failure class appeared at a fourth altitude (semver) once the
-  first three gave it a name.
+  first three gave it a name. Fresh evidence from the bricks 1–5 landing (2026-07-16):
+  the PR body was hand-narrated a FOURTH time; the whole landing was hand-sequenced
+  button ceremony (push rightly refused by the perimeter, then branch, `gh pr create`,
+  a watched 6½-minute required check, manual `--squash` merge — repository auto-merge
+  is DISABLED, a settings fact worth a deliberate decision either way); and the
+  session's only honest wait was exactly here. The sharper framing the day's
+  conversation produced: the required check is safety implemented as a GATE IN THE
+  PATH, the one architectural pattern everything inside the tree exists to dissolve —
+  structure in the medium judges at machine speed off the critical path, while a gate
+  queues all throughput behind an attention scheduler. The ceremony layer is not
+  merely un-suited; it is the last bottleneck-shaped safety in the system.
 - **Candidate: the version bump becomes a derived demand** (named by the release the
   big merge broke twice). The mint's second failure was the honest one: the release
   loop is idempotent by version, `boundary-enforce` grew its API without a bump, so
