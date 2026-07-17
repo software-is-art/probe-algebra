@@ -3981,3 +3981,18 @@ relation grew by. Residual, named: the consumer `Pipeline::locks_in` (what genes
 emits) still renders only the registry and workflow locks — a generated crate's
 checkout does not yet carry its declared pin; the consumer twin of this brick is
 one more lock in that list when a genesis crate first trips the same gap.
+
+Judgment addendum, same session: the minted site was judged killed by hand
+(`PROBE_MUTANT` × the gates probes — the freshness lock and the pin probe both go
+red under the flip). The judging surfaced a reading worth keeping: a site's id is
+the WHOLE census line, arrow and flip value included
+(`...render_toolchain:deaf -> String::new()`), and the truncated form arms
+nothing — silently, a green that means "you flipped nothing". Nothing ratifies
+that answer today; it took a macro-interior read (`mutate_body`'s
+`format!("{label}:deaf -> {desc}")`) to learn. Two candidate bricks it names:
+`schemata judge` (or a new verb) could refuse a `PROBE_MUTANT` that matches no
+census site — the deaf-but-armed state is exactly the unkeyed-verdict class,
+one altitude down; and the full local `verify` after a support change re-keys
+everything (~950 moved sites, serial cargo-test-per-site without nextest) is a
+container-hours run — the incremental tier's economics depend on the warm store
+the session hook (PR #56) provisions.
