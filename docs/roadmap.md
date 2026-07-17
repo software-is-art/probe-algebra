@@ -3865,6 +3865,43 @@ So the agenda must stay a declaration of intent, revisable by the same judged
 means, never a cage; the payload store is already half the drafting table made
 first-class.
 
+## The item relation, brick 6: the reverse edge — `uses` (BUILT)
+
+Built 2026-07-16, the day after brick 5 named it three times in one reading: the
+sixteenth verb, `bundle uses <item-name>` — who else in the tree holds this fact.
+`ItemRelation::uses` filters the tree relation (brick 2's walk, at item grain) to
+the rows whose bodies speak the name as a whole identifier, through the ONE
+ident-bounded matcher the verbs already trust (`bundle::mentions` — `constrains`'
+own; no second vocabulary), in the relation's canonical order, the addressed row
+included and marked. `uses_report` is the perception voice: one row per speaker,
+a census at the foot, and a name nothing speaks refuses by name — a typo teaches
+instead of reading as an honest empty. The honesty is stated in the report's
+first line: a TOKEN READING, not a resolve — same-named strangers are counted,
+macro-hidden uses are missed; the report suggests, it never proves. Acceptance
+at the real tree: `bundle uses maintain_qualify` answered brick 5's exact grep
+("who consumes this function") in one call — four speakers across two modules,
+the cross-crate consumer (`examples/bundle.rs — maintain_census`) on its roster.
+Probes pin the ident boundary (`redoubled` is a stranger), the byte-exact report
+and refusal, and self-recognition at the real tree (the reverse edge of
+`of_tree` names both its declaring impl row and its CLI consumer). All four new
+schemata sites judged.
+
+Readings from the brick, per the instrument. (a) The verb's own design paid the
+fallback twice for a question the verb itself now answers — "who consumes
+`of_tree`", "where does `constrains` dispatch" — the bootstrapping irony, noted
+and now closed for the next brick. (b) One reading the verb does NOT close:
+"does an ident-bounded matcher already exist somewhere?" is a search by
+CAPABILITY, not by name — `uses` walks edges from a name; nothing yet perceives
+"what in the tree can do X". Named here so the next reacher knows it is still
+the encyclopedia's. (c) The sibling-impl ambiguity fired again, in the first
+minute: `show src/discover/items.rs 'impl ItemRelation'` refused (two rows, one
+address) — the third firing; the discriminator or the method-grain rung remains
+the address grammar's most-demanded gap, and `uses` answering methods only at
+containing-item grain (ask `of_tree`, be told `impl ItemRelation`) is the same
+gap seen from the perception side. (d) The payload-formatting idiom (rustfmt
+outside the tree, offer whole) carried the entire brick: six judged
+transactions (one `add`, five `edit`s), zero hand edits in code.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified

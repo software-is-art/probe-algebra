@@ -8,7 +8,7 @@ Almost every artifact here is generated from a declaration and compared byte for
 
 Change CODE through the bundle CLI wherever the verbs reach, never by writing text into
 the file: `cargo run --example bundle -- <verb> ...` with verbs
-add|edit|declare|place|check|show|collect|squash|replay|constrains|trace|lift|pin (each a
+add|edit|declare|place|check|show|collect|squash|replay|constrains|uses|trace|lift|pin (each a
 judged transaction — a refusal writes nothing), plus gates|owes (green as a fact about a
 tree hash: `bundle owes` derives what the current tree still owes, `bundle gates` runs
 the owed every-change gates and records content-keyed verdicts — never trust a
@@ -24,8 +24,9 @@ code; the gaps you hit are the roadmap's fuel.
 
 When you reach for grep, or open a file to READ its interior, notice it: you are
 consulting the fallback encyclopedia because the question you hold is not yet a lock
-class or a perception verb (`cargo run --example bundle -- constrains <module> <op>` is
-the first of those verbs — try it before the grep). The reach itself is the instrument:
+class or a perception verb (`cargo run --example bundle -- constrains <module> <op>` was
+the first of those verbs; `bundle uses <item-name>` answers "who else holds this fact" —
+try them before the grep). The reach itself is the instrument:
 "what was I trying to confirm that nothing ratifies?" names the next brick. Record the
 reading in docs/roadmap.md (the editor disposition carries the census). Interior reads
 go archaic the same way interior writes did — the answer set grows until the fallback

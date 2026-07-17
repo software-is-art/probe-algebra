@@ -1,0 +1,24 @@
+/// The argument-type vocabulary: seven sorts cover all sixteen of bundle's verbs. A
+/// sort is what the harness knows about a slot before any judgment runs — how the
+/// token renders in usage (its shell-quoting discipline included) and, when dispatch
+/// migrates here, how its value is fetched. The sort is the type; the label on each
+/// slot is the face (`add`'s payload is a snippet, `edit`'s a replacement — same sort).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sort {
+    /// `<module.rs>` — a module path, the subject of most verbs. It may not exist
+    /// yet: `add` founds files, so fetching tolerates absence.
+    Module,
+    /// `<item-name>` — an address inside a module: an item or operator name.
+    Item,
+    /// `<snippet.rs | ->` — content by file path, or `-` for stdin.
+    Payload,
+    /// `"<shape(op, ...)>"` — a law-language stanza; shell-quoted when it binds one
+    /// value (a stanza carries spaces), bare when variadic (one stanza per word).
+    Declaration,
+    /// `<bundle.journal>` — the record itself as the verb's subject.
+    Journal,
+    /// `<theory>` — a compiled theory's name from the binary's roster.
+    Theory,
+    /// `'<term>'` — a ground term over a theory's operators; single-quoted.
+    Term,
+}
