@@ -3922,3 +3922,16 @@ first-class.
   memory. (The SIGPIPE that broke the first mint is fixed in release.sh itself; the
   deeper item — the release ceremony as typed Rust, the last shell carrying
   semantics — stands.)
+- **Candidate: the toolchain pin binds CI but not the local cargo** (named by the
+  1.97.1 bump, 2026-07-17). `discover::gates::TOOLCHAIN` renders into ci.yml, so the
+  pin governs every runner — but a local `cargo test` consults rustup's default, and
+  the day's evidence is what that gap costs: dependabot proposed "1.100.0" against
+  the rendered YAML (an action-repo tag, not a Rust that exists — the artifact patch
+  was refused by the drift gate, as designed, but nothing refused the premise), and
+  the bump's regenerated compile-fail `.stderr` files left the un-updated local
+  machine failing bare `cargo test` until a by-hand `rustup default`. The fix is one
+  more frozen artifact: `freeze_gates` renders `rust-toolchain.toml` from the same
+  constant, rustup obeys it in every checkout, and the pin becomes structure in the
+  medium instead of a fact about CI. The hand-work line this entry retires: the
+  `rustup default` run by hand this session, a derivation (the committed pin) plus a
+  signature (nobody's — it should need none).
