@@ -1,0 +1,20 @@
+/// What a gate READS — the projection of the tree its verdict is a fact about. A
+/// verdict keyed by a support fingerprint cannot be owed by an edit outside the
+/// support: the delta's image under the gate is zero BY DECLARATION, not by memory.
+/// Supports are conservative over-approximations — admitting too much only costs
+/// re-judgment; admitting too little would hold a stale green, the exact failure
+/// class the verdict store exists to kill — so narrowing carries the burden of proof.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Support {
+    /// Everything the verdict walk yields except declared-inert prose — `docs/` and
+    /// `README.md`, which nothing compiles, embeds, or reads (no `include_str!`
+    /// reaches them; no probe opens them; the agenda classifies their PATHS only).
+    /// For gates that compile or read arbitrarily: clippy/test/schemata embed
+    /// `spec/` via `include_str!`, ride `build.rs`, and read the registers.
+    Judged,
+    /// The Rust surface only: `*.rs` plus the manifests that discover workspace
+    /// members (`Cargo.toml`, `Cargo.lock`), rustfmt config, and the toolchain pin
+    /// (`rust-toolchain.toml` selects the rustfmt that runs) — `cargo fmt` parses
+    /// Rust and nothing else.
+    RustSurface,
+}

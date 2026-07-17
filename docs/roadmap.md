@@ -3954,3 +3954,30 @@ first-class.
   question, pointed at its own ratification step: some of what is signed today is a
   derivation whose dataset has not finished arriving. What no amount of journal
   converts: the loss function — which demands ought to exist stays prose.
+
+## The toolchain pin becomes structure in the medium: `rust-toolchain.toml` (BUILT)
+
+Built 2026-07-17, closing the candidate named the same day (#59). The pin is now the
+THIRD pipeline lock: `GateRegistry::render_toolchain` renders `rust-toolchain.toml`
+from the same `TOOLCHAIN` constant that pins every CI runner (components mirror the
+CI install — rustfmt, clippy), `toolchain_lock` rides `freeze_gates` beside the
+registry and the workflow, and the freshness probe holds all three byte for byte —
+a hand edit to the pin fails inside the very `cargo test` the pin governs. rustup
+obeys the committed file in every checkout, so "the toolchain CI tests against" and
+"the toolchain a checkout builds with" are one claim, not a memory and a hope.
+
+Acceptance was this container itself: rustup's default here is 1.94.1 — the exact
+gap the candidate documented, compile-fail suites red under bare `cargo test` — and
+after the mint the same bare command went green with no `rustup default` run by
+hand. The hand-work line the candidate flagged is retired by the artifact. The
+support census keeps the honesty: `Support::RustSurface` now admits
+`rust-toolchain.toml` (the rustfmt that runs rides the pin), so a toolchain bump
+can never hold a stale fmt green in the verdict store.
+
+Readings from the build: the suit refused the first attempt — `bundle edit` holds
+an impl's method-signature set ("an interface change is not an edit"), so the two
+new methods arrived as a sibling impl through `add`, the same grain the item
+relation grew by. Residual, named: the consumer `Pipeline::locks_in` (what genesis
+emits) still renders only the registry and workflow locks — a generated crate's
+checkout does not yet carry its declared pin; the consumer twin of this brick is
+one more lock in that list when a genesis crate first trips the same gap.

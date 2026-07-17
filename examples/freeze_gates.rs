@@ -24,6 +24,7 @@ fn main() {
     let mut locks = vec![
         GateRegistry::registry_lock(),
         GateRegistry::workflow_lock(),
+        GateRegistry::toolchain_lock(),
         perimeter.lock(),
         perimeter.ruleset_lock(),
         Substrate::declared().lock(),

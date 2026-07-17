@@ -1,0 +1,515 @@
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `check_context` renders a gate's status-check name: the `mutation (...)` sugar
+    /// unwrapped to `dogfood (...)`, the bare name otherwise. Probed directly because the
+    /// library's own pipeline declares no per-diff gate to reach it through the render.
+    #[test]
+    fn check_context_renders_the_status_name() {
+        let mutation = Gate {
+            name: "mutation (changed lines)",
+            verifies: "",
+            command: &[],
+            cadence: Cadence::PerDiff,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        };
+        assert_eq!(check_context(&mutation), "dogfood (changed lines)");
+        let plain = Gate {
+            name: "audit",
+            verifies: "",
+            command: &[],
+            cadence: Cadence::PerDiff,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        };
+        assert_eq!(check_context(&plain), "dogfood (audit)");
+    }
+
+    /// ALL THREE pipeline locks are fresh: the committed inventory, the committed
+    /// workflow, and the committed toolchain pin match the registry's renders. A hand
+    /// edit to `ci.yml` or `rust-toolchain.toml` fails HERE — inside the very
+    /// `cargo test` the workflow runs — so the pipeline can no longer drift silently the
+    /// way it did (the `--workspace` gap lived undetected precisely because nothing held
+    /// the YAML to a declaration).
+    #[test]
+    fn the_pipeline_locks_are_fresh() {
+        let locks = [
+            GateRegistry::registry_lock(),
+            GateRegistry::workflow_lock(),
+            GateRegistry::toolchain_lock(),
+        ];
+        if let Err(stale) = spec_lock::check(&locks) {
+            panic!(
+                "the pipeline drifted from its declaration: {}. Regenerate with \
+                 `cargo run --example freeze_gates` and ratify the diff — never edit the \
+                 YAML or the spec by hand.",
+                stale.join(", ")
+            );
+        }
+    }
+
+    /// The pin's render is held at its load-bearing points: the channel IS the
+    /// constant, the components match the CI install, and the lock lands at the
+    /// repository root where rustup looks for it.
+    #[test]
+    fn the_toolchain_pin_renders_the_constant() {
+        let pin = GateRegistry::render_toolchain();
+        assert!(pin.contains(&format!("channel = \"{TOOLCHAIN}\"")));
+        assert!(pin.contains("components = [\"rustfmt\", \"clippy\"]"));
+        assert!(pin.starts_with("# GENERATED from `discover::gates::TOOLCHAIN`"));
+        let lock = GateRegistry::toolchain_lock();
+        assert_eq!(lock.name, "rust toolchain pin");
+        assert!(lock.path.ends_with("rust-toolchain.toml"));
+        assert_eq!(lock.live, pin);
+    }
+
+    /// THE PAID-FOR BUG CLASS, as a census over the DATA: every cargo gate that runs tests
+    /// or lints carries `--workspace` — the fixture-silently-untested gap cannot recur as
+    /// a YAML editing accident, because the scope now lives in one reviewed declaration.
+    #[test]
+    fn workspace_scoped_gates_stay_workspace_scoped() {
+        for gate in GateRegistry::declared() {
+            let is_cargo_verifier = gate.command.first() == Some(&"cargo")
+                && matches!(gate.command.get(1), Some(&"test") | Some(&"clippy"));
+            if is_cargo_verifier {
+                assert!(
+                    gate.command.contains(&"--workspace"),
+                    "gate `{}` runs a package-scoped verifier — the whole workspace is \
+                     the unit of the pipeline: {:?}",
+                    gate.name,
+                    gate.command
+                );
+            }
+        }
+        // and fmt's workspace scope is spelled --all in cargo-fmt's dialect.
+        let fmt = &GateRegistry::declared()[0];
+        assert!(fmt.command.contains(&"--all"));
+    }
+
+    /// The registry's SHAPE is pinned: thirteen gates — four every-change (fmt,
+    /// clippy, test, and the compiled-mutant schemata sweep: the full-tree compiled
+    /// population rides every PR, which is what RETIRED the per-diff source gate —
+    /// the first cargo-mutants retirement, ratified by the instrumentation
+    /// completeness census), one default-branch incremental, seven weekly (the
+    /// sharded whole-tree sweep, four member/corpus companions, and the two world
+    /// gates), and the release gate on the certification cadence — and every
+    /// declared command reappears verbatim in the rendered workflow (nothing
+    /// declared can fall out of execution).
+    /// Every gate is Pure except exactly three, each wearing the EFFECTFUL tag for its
+    /// own reason: the release WRITES the world (tags, a GitHub release, crates.io),
+    /// the perimeter READS state the tree cannot contain (the live repository
+    /// settings), and the substrate READS the repository's own tags and history —
+    /// which is also why no world gate feeds the countersign.
+    #[test]
+    fn every_declared_gate_is_rendered_into_the_workflow() {
+        let gates = GateRegistry::declared();
+        assert_eq!(gates.len(), 13);
+        assert_eq!(
+            gates
+                .iter()
+                .filter(|g| g.cadence == Cadence::Weekly)
+                .count(),
+            7
+        );
+        assert_eq!(
+            gates.iter().filter(|g| g.sharded).count(),
+            1,
+            "exactly one gate fans out over the shard matrix"
+        );
+        assert_eq!(
+            gates
+                .iter()
+                .filter(|g| g.cadence == Cadence::EveryChange)
+                .count(),
+            4
+        );
+        let effectful: Vec<&Gate> = gates
+            .iter()
+            .filter(|g| g.effect == Capability::Effectful)
+            .collect();
+        assert_eq!(
+            effectful.len(),
+            3,
+            "the release (a world write), the perimeter and the substrate (world reads)"
+        );
+        assert_eq!(effectful[0].name, "release (certified tree)");
+        assert_eq!(effectful[0].cadence, Cadence::OnCertify);
+        assert_eq!(effectful[1].name, "perimeter (settings drift)");
+        assert_eq!(effectful[1].cadence, Cadence::Weekly);
+        assert_eq!(effectful[2].name, "substrate (git drift)");
+        assert_eq!(effectful[2].cadence, Cadence::Weekly);
+
+        // the world gates ride the weekly clock but are NOT countersign inputs, and
+        // their jobs carry the read token: a world fact is not evidence about the tree.
+        let workflow = GateRegistry::render_workflow();
+        for world_job in [
+            "world-perimeter-settings-drift",
+            "world-substrate-git-drift",
+        ] {
+            assert!(workflow.contains(&format!("{world_job}:")), "{workflow}");
+            assert!(
+                !workflow.contains(&format!("{world_job},"))
+                    && !workflow.contains(&format!(", {world_job}")),
+                "`{world_job}` must never appear in the countersign's needs list"
+            );
+        }
+
+        let workflow = GateRegistry::render_workflow();
+        for gate in &gates {
+            assert!(
+                workflow.contains(&gate.command_line()),
+                "gate `{}` is declared but not executed by the workflow",
+                gate.name
+            );
+        }
+        assert!(workflow.contains(&format!("dtolnay/rust-toolchain@{TOOLCHAIN}")));
+        assert!(workflow.contains(&format!("- cron: \"{FULL_SWEEP_CRON}\"")));
+        assert!(workflow.contains("GENERATED from the gate registry"));
+    }
+
+    /// The SWEEP ECONOMICS are executed as declared: the weekly job fans out over exactly
+    /// `FULL_SWEEP_SHARDS` matrix shards (and passes its shard to cargo-mutants), and the
+    /// incremental job diffs against `GREEN_TAG` and advances it on green — the
+    /// countersignature step exists and pushes the tag.
+    #[test]
+    fn the_sweep_economics_are_rendered() {
+        let workflow = GateRegistry::render_workflow();
+        let shard_list: Vec<String> = (0..FULL_SWEEP_SHARDS).map(|s| s.to_string()).collect();
+        assert!(workflow.contains(&format!("shard: [{}]", shard_list.join(", "))));
+        assert!(workflow.contains(&format!(
+            "--shard ${{{{ matrix.shard }}}}/{FULL_SWEEP_SHARDS}"
+        )));
+        // certification is no longer a cargo-mutants run: the certify job NEEDS the
+        // check job (which carries the whole compiled-mutant population) and only
+        // marks and releases.
+        assert!(workflow.contains("needs: check"));
+        assert!(!workflow.contains("since-green.diff"));
+        assert!(workflow.contains(&format!("git tag -f {GREEN_TAG}")));
+        assert!(workflow.contains(&format!("git push -f origin {GREEN_TAG}")));
+        // the full sweep runs on the clock and the button, never per-merge (that is the
+        // incremental job's cadence — the whole point of the split).
+        assert!(workflow.contains(
+            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        ));
+        // the tag has NO manual path: it is planted and advanced only by runs that earned
+        // it — the full sweep's countersign (also the bootstrap: dispatch the workflow
+        // once), gated on every shard via `needs`, and the incremental gate per-merge.
+        assert!(workflow.contains("mutants-full-countersign:"));
+        // ... and the countersign is MAIN-ONLY: a branch dispatch runs the sweeps as
+        // evidence, but the tag names the certified default-branch tree, so a branch
+        // tip must never claim it (found live: a branch dispatch nearly moved the tag).
+        assert!(workflow.contains(
+            "if: (github.event_name == 'schedule' || github.event_name == \
+             'workflow_dispatch') && github.ref == 'refs/heads/main'"
+        ));
+        // ... and it needs EVERY weekly job: the tag is the whole weekly verdict, so a
+        // red companion gate withholds the countersign exactly like a red shard.
+        assert!(workflow.contains(
+            "needs: [mutants-full, mutants-delta-render-plumbing, \
+             mutants-statement-bites-lean-corpus, mutants-fire-drill-plumbing, \
+             mutants-layout-probe-plumbing]"
+        ));
+        let advances = workflow
+            .matches(&format!("git push -f origin {GREEN_TAG}"))
+            .count();
+        assert_eq!(
+            advances, 2,
+            "the tag must advance in exactly two places: the incremental gate and the \
+             full sweep's countersign"
+        );
+        // and the RELEASE rides both advances — wherever the tag moves, the certified
+        // tree publishes itself, with the token in scope for `gh release create`.
+        assert_eq!(
+            workflow.matches("run: .github/release.sh").count(),
+            2,
+            "one release step per tag-advance site"
+        );
+        assert_eq!(
+            workflow
+                .matches("- name: release — the certified tree publishes itself")
+                .count(),
+            2
+        );
+        assert!(workflow.contains("GH_TOKEN: ${{ github.token }}"));
+    }
+
+    /// Everywhere cargo-mutants is installed, cargo-nextest rides along: the mutation
+    /// gates run their per-mutant suites through nextest's fail-fast runner
+    /// (`test_tool = "nextest"` in .cargo/mutants.toml), so a killed mutant stops at its
+    /// first failing probe instead of running out the whole suite.
+    #[test]
+    fn every_mutation_job_installs_the_fail_fast_runner() {
+        let workflow = GateRegistry::render_workflow();
+        let installs: Vec<&str> = workflow
+            .lines()
+            .filter(|l| l.trim_start().starts_with("tool: ") && l.contains("cargo-mutants"))
+            .collect();
+        assert!(!installs.is_empty());
+        for line in installs {
+            assert!(
+                line.contains("cargo-nextest"),
+                "a mutation job installs cargo-mutants without its test runner: {line}"
+            );
+        }
+        let config = include_str!("../../.cargo/mutants.toml");
+        assert!(
+            config.contains("test_tool = \"nextest\""),
+            "the mutants config no longer selects nextest — the fail-fast speedup is gone"
+        );
+    }
+
+    /// THE STARTER PIPELINE, byte-pinned end to end — this is exactly what a genesis
+    /// crate is born with, so its shape is a product surface: three every-change gates,
+    /// no schedule block (no weekly gates declared), one `check` job carrying every
+    /// declared command.
+    #[test]
+    fn the_starter_pipeline_renders_exactly() {
+        let starter = Pipeline::starter();
+        assert_eq!(
+            starter.render_registry(),
+            "# gate registry: the pipeline as a declaration — regenerate via `cargo run --example freeze_gates`; ratify the diff.\n\
+             #\n\
+             # Every gate below is a declared, executable claim: the workflow CI runs is\n\
+             # RENDERED from this same declaration and drift-gated byte for byte, so \"green\n\
+             # locally\" and \"green in CI\" are one claim. Cadence and capability are visible\n\
+             # here instead of implicit in YAML.\n\
+             \n\
+             - format (every change; pure)\n\
+             \x20     cargo fmt --all --check\n\
+             \x20     promises: the whole workspace is rustfmt-canonical\n\
+             \n\
+             - lint (every change; pure)\n\
+             \x20     cargo clippy --workspace --all-targets --all-features -- -D warnings\n\
+             \x20     promises: clippy holds every workspace member, all targets and features, to deny-warnings\n\
+             \n\
+             - test (every change; pure)\n\
+             \x20     cargo test --workspace --all-targets\n\
+             \x20     promises: every suite: the drift gates (module, system, and gates locks), the distance gates, and the probes\n"
+        );
+        assert_eq!(
+            starter.render_workflow().expect("the starter renders"),
+            format!(
+                "# GENERATED from this crate's gate declaration — THE PIPELINE IS A LOCK.\n\
+                 # Never edit by hand: regenerate with `cargo run --example freeze_gates` and ratify the diff. The\n\
+                 # declaration is the single source for the commands, the cadences, and the\n\
+                 # toolchain pin; `spec/gates.spec` carries the promises.\n\
+                 name: ci\n\
+                 \n\
+                 on:\n\
+                 \x20 push:\n\
+                 \x20   branches: [main]\n\
+                 \x20 pull_request:\n\
+                 \n\
+                 env:\n\
+                 \x20 CARGO_TERM_COLOR: always\n\
+                 \x20 RUSTFLAGS: \"-D warnings\"\n\
+                 \n\
+                 jobs:\n\
+                 \x20 check:\n\
+                 \x20   name: fmt + clippy + test\n\
+                 \x20   runs-on: ubuntu-latest\n\
+                 \x20   steps:\n\
+                 \x20     - uses: actions/checkout@v4\n\
+                 \x20     - uses: dtolnay/rust-toolchain@{TOOLCHAIN}\n\
+                 \x20       with:\n\
+                 \x20         components: rustfmt, clippy\n\
+                 \x20     - uses: Swatinem/rust-cache@v2\n\
+                 \x20     - run: cargo fmt --all --check\n\
+                 \x20     - run: cargo clippy --workspace --all-targets --all-features -- -D warnings\n\
+                 \x20     - run: cargo test --workspace --all-targets\n"
+            )
+        );
+    }
+
+    /// The consumer form GROWS to the general tiers: a per-diff mutation gate and a
+    /// weekly gate render as their own jobs (per-diff on pull requests, weekly on the
+    /// declared schedule — which also switches on the workflow's schedule block).
+    #[test]
+    fn the_consumer_tiers_render_their_jobs() {
+        let mut pipeline = Pipeline::starter();
+        pipeline.cron = Some("0 4 * * 1");
+        pipeline.gates.push(Gate {
+            name: "mutation (changed lines)",
+            verifies: "no mutant of the PR's changed lines survives",
+            command: &["cargo", "mutants", "--in-diff", "pr.diff"],
+            cadence: Cadence::PerDiff,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        });
+        pipeline.gates.push(Gate {
+            name: "mutation (full sweep)",
+            verifies: "no mutant of the whole crate survives",
+            command: &["cargo", "mutants"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        });
+        let workflow = pipeline.render_workflow().expect("all tiers supported");
+        assert!(workflow.contains("  schedule:\n    - cron: \"0 4 * * 1\"\n  workflow_dispatch:\n"));
+        assert!(workflow.contains("  diff-mutation-changed-lines:\n"));
+        assert!(workflow.contains("    if: github.event_name == 'pull_request'\n"));
+        assert!(workflow
+            .contains("        git diff \"origin/${{ github.base_ref }}...HEAD\" > pr.diff\n"));
+        assert!(workflow.contains("  weekly-mutation-full-sweep:\n"));
+        assert!(workflow.contains(
+            "    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\n"
+        ));
+        // every declared command reappears in execution — the census the root registry
+        // pins, held for consumers too.
+        for gate in &pipeline.gates {
+            assert!(workflow.contains(&gate.command_line()));
+        }
+    }
+
+    /// The bespoke tiers REFUSE by name — wrong YAML is never rendered, and each refusal
+    /// points at the reference implementation. A weekly gate without a schedule and a
+    /// job-id collision refuse the same way.
+    #[test]
+    fn the_bespoke_tiers_are_named_refusals() {
+        let with = |gate: Gate| {
+            let mut p = Pipeline::starter();
+            p.gates.push(gate);
+            p
+        };
+        let incremental = with(Gate {
+            name: "mutation (since green)",
+            verifies: "",
+            command: &["cargo", "mutants"],
+            cadence: Cadence::DefaultBranch,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        });
+        let refusal = incremental.render_workflow().unwrap_err();
+        assert!(
+            refusal.contains("green-tag countersign economics"),
+            "{refusal}"
+        );
+        assert!(
+            incremental.locks_in(Path::new(".")).is_err(),
+            "a refused render never half-writes the lock list"
+        );
+
+        let sharded = with(Gate {
+            name: "mutation (full sweep)",
+            verifies: "",
+            command: &["cargo", "mutants"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: true,
+        });
+        assert!(sharded
+            .render_workflow()
+            .unwrap_err()
+            .contains("sweep economics"));
+
+        let certify = with(Gate {
+            name: "release (certified tree)",
+            verifies: "",
+            command: &[".github/release.sh"],
+            cadence: Cadence::OnCertify,
+            effect: Capability::Effectful,
+            support: Support::Judged,
+            sharded: false,
+        });
+        assert!(certify
+            .render_workflow()
+            .unwrap_err()
+            .contains("rides the green-tag countersign"));
+
+        let unscheduled = with(Gate {
+            name: "audit",
+            verifies: "",
+            command: &["cargo", "audit"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        });
+        assert!(unscheduled
+            .render_workflow()
+            .unwrap_err()
+            .contains("declares no schedule"));
+
+        let mut colliding = with(Gate {
+            name: "audit!",
+            verifies: "",
+            command: &["cargo", "audit"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        });
+        colliding.cron = Some("0 4 * * 1");
+        colliding.gates.push(Gate {
+            name: "audit?",
+            verifies: "",
+            command: &["cargo", "audit"],
+            cadence: Cadence::Weekly,
+            effect: Capability::Pure,
+            support: Support::Judged,
+            sharded: false,
+        });
+        assert!(colliding
+            .render_workflow()
+            .unwrap_err()
+            .contains("same workflow job id `weekly-audit`"));
+    }
+
+    /// `locks_in` roots BOTH locks in the caller's repository: the registry under
+    /// `spec/`, the workflow under `.github/workflows/<name>.yml` — the consumer twin
+    /// of this repo's `registry_lock`/`workflow_lock`.
+    #[test]
+    fn the_consumer_locks_land_in_the_callers_repo() {
+        let locks = Pipeline::starter()
+            .locks_in(Path::new("/downstream"))
+            .expect("the starter renders");
+        let [registry, workflow] = locks.as_slice() else {
+            panic!("two locks, got {}", locks.len());
+        };
+        assert_eq!(registry.name, "ci gate registry");
+        assert_eq!(
+            registry.path,
+            Path::new("/downstream").join("spec").join("gates.spec")
+        );
+        assert_eq!(registry.live, Pipeline::starter().render_registry());
+        assert_eq!(workflow.name, "ci workflow");
+        assert_eq!(
+            workflow.path,
+            Path::new("/downstream")
+                .join(".github")
+                .join("workflows")
+                .join("ci.yml")
+        );
+    }
+
+    /// The inventory render is pinned at its load-bearing points: the header names the
+    /// regeneration path, and a stanza carries cadence, capability, command, and promise.
+    #[test]
+    fn the_registry_renders_the_promises() {
+        let text = GateRegistry::render_registry();
+        assert!(text.starts_with(
+            "# gate registry: the pipeline as a declaration — regenerate via `cargo run --example freeze_gates`; ratify the diff.\n"
+        ));
+        assert!(text.contains(
+            "\n- test (every change; pure)\n      cargo test --workspace --all-targets\n"
+        ));
+        assert!(text.contains(
+            "\n- certify (mutants-green) (default branch, after the every-change gates; pure)\n"
+        ));
+        assert!(text.contains("\n- mutation (full sweep) (weekly + manual, sharded; pure)\n"));
+        // the release stanza wears both distinctions: the certification cadence and the
+        // registry's one EFFECTFUL capability.
+        assert!(text.contains(
+            "\n- release (certified tree) (on certification, when the mutants-green tag \
+             advances; EFFECTFUL)\n"
+        ));
+    }
+}

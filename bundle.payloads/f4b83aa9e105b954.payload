@@ -1,0 +1,23 @@
+#[crate::mutate]
+impl Support {
+    /// Does this support admit a root-relative path? The verdict walk asks this per
+    /// file; only admitted bytes reach a gate's key.
+    pub fn admits(&self, relative: &str) -> bool {
+        let inert = relative.starts_with("docs/") || relative == "README.md";
+        match self {
+            Support::Judged => !inert,
+            Support::RustSurface => {
+                let name = relative.rsplit('/').next().unwrap_or(relative);
+                relative.ends_with(".rs")
+                    || matches!(
+                        name,
+                        "Cargo.toml"
+                            | "Cargo.lock"
+                            | "rustfmt.toml"
+                            | ".rustfmt.toml"
+                            | "rust-toolchain.toml"
+                    )
+            }
+        }
+    }
+}
