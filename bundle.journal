@@ -169,3 +169,5 @@ edit examples/bundle.rs — read_payload @2c4a1bb5dc237042
 edit examples/bundle.rs — read_payload @7364ae3073ddd7db
 edit examples/bundle.rs — maintain_census @e5508faceaed2bfe
 edit src/discover/items.rs — Item @5a2473da55d9a068
+edit src/discover/gates.rs — TOOLCHAIN @81b2bec1e605e9d8
+edit src/discover/modularize.rs — modularize @0a269305b007472b

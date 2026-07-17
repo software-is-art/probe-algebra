@@ -44,7 +44,7 @@ use crate::boundary::Capability;
 /// `tests/compile_fail` trybuild suites match saved `.stderr` files, and rustc's diagnostic
 /// rendering changes between versions. Bump this in lockstep with regenerating the
 /// `.stderr` files (`TRYBUILD=overwrite`), then re-freeze the gates.
-pub const TOOLCHAIN: &str = "1.94.1";
+pub const TOOLCHAIN: &str = "1.97.1";
 
 /// The weekly full-sweep schedule (Mondays 04:00 UTC) — the periodic whole-crate guarantee.
 pub const FULL_SWEEP_CRON: &str = "0 4 * * 1";
