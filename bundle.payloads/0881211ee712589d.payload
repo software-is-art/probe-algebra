@@ -1,0 +1,89 @@
+/// The address grammar's DISCRIMINATOR (the sibling-impl refusal's other half,
+/// third session to hit it): `addr#N` names the Nth item, 1-based in file order,
+/// among those sharing `addr`. `#` cannot appear in a bare address, so the split
+/// is never ambiguous; a bare address stays the common case — the discriminated
+/// form exists exactly where bareness refuses.
+#[crate::mutate]
+pub(crate) fn split_discriminator(given: &str) -> (&str, Option<usize>) {
+    if let Some((base, ordinal)) = given.rsplit_once('#') {
+        if !base.is_empty() {
+            if let Ok(n) = ordinal.parse::<usize>() {
+                if n >= 1 {
+                    return (base, Some(n));
+                }
+            }
+        }
+    }
+    (given, None)
+}
+
+/// What a sibling HOLDS, for the teaching refusal: an impl or trait names its
+/// method idents (the surface `edit` would hold), anything else names itself a
+/// further declaration — enough to pick an ordinal without opening the file.
+#[crate::mutate]
+fn sibling_holdings(item: &syn::Item) -> String {
+    let methods: Vec<String> = match item {
+        syn::Item::Impl(block) => block
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                syn::ImplItem::Fn(f) => Some(f.sig.ident.to_string()),
+                _ => None,
+            })
+            .collect(),
+        syn::Item::Trait(block) => block
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                syn::TraitItem::Fn(f) => Some(f.sig.ident.to_string()),
+                _ => None,
+            })
+            .collect(),
+        _ => return "a further declaration".to_string(),
+    };
+    if methods.is_empty() {
+        "holds no methods".to_string()
+    } else {
+        format!("holds {}", methods.join(", "))
+    }
+}
+
+/// ONE SELECTOR for every verb that answers an address: resolve `given` (bare or
+/// discriminated) against the file's items. `Ok(None)` is "nothing answers" — the
+/// caller owns that refusal, each verb teaches differently there. An ambiguity or
+/// a dangling ordinal refuses HERE: the ambiguous refusal now TEACHES the
+/// discriminated addresses instead of only naming the collision.
+#[crate::mutate]
+pub(crate) fn select_addressed<'a>(
+    verb: &str,
+    file: &'a syn::File,
+    given: &str,
+) -> Result<Option<&'a syn::Item>, String> {
+    let (base, ordinal) = split_discriminator(given);
+    let siblings: Vec<&syn::Item> = file
+        .items
+        .iter()
+        .filter(|item| item_address(item).as_deref() == Some(base))
+        .collect();
+    match (siblings.len(), ordinal) {
+        (0, _) => Ok(None),
+        (1, None) => Ok(Some(siblings[0])),
+        (_, Some(n)) if n <= siblings.len() => Ok(Some(siblings[n - 1])),
+        (count, Some(n)) => Err(format!(
+            "bundle {verb}: `{base}#{n}` names nothing — {count} item(s) answer to \
+             `{base}`"
+        )),
+        (count, None) => {
+            let taught: Vec<String> = siblings
+                .iter()
+                .enumerate()
+                .map(|(i, item)| format!("`{base}#{}` ({})", i + 1, sibling_holdings(item)))
+                .collect();
+            Err(format!(
+                "bundle {verb}: {count} items share the address `{base}` — ambiguous; \
+                 say {}",
+                taught.join(" or ")
+            ))
+        }
+    }
+}

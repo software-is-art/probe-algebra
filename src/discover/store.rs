@@ -192,6 +192,125 @@ impl Replay {
     }
 }
 
+#[crate::mutate("store")]
+impl Replay {
+    /// JOURNAL TIME (the reverse edge pointed at the record): which judged
+    /// transaction each speaker of `name` ARRIVED or LEFT in — the item relation
+    /// differentiated over the journal instead of integrated over the tree, so
+    /// "who holds this fact" gains "and since when". Speakers are read exactly as
+    /// `uses` reads them (item rows, the one ident-bounded matcher) — one
+    /// vocabulary. A reading of what replay RECONSTRUCTS (effects, from the
+    /// payload store): entries beyond that horizon — pre-store, judged verbs, a
+    /// module gone dark — are COUNTED, never guessed at, and git holds the past
+    /// the journal never saw. A name the journal never heard refuses by name,
+    /// horizon disclosed.
+    pub fn spoke(journal: &str, store: &PayloadStore, name: &str) -> Result<String, String> {
+        use crate::discover::items::ItemRelation;
+        let speakers = |module: &str, text: &str| -> Vec<String> {
+            ItemRelation::of_module(module, text)
+                .map(|relation| {
+                    relation
+                        .entries()
+                        .into_iter()
+                        .filter(|(item, _)| crate::discover::bundle::mentions(&item.body, name))
+                        .map(|(item, _)| item.name)
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let mut states: BTreeMap<String, Result<String, String>> = BTreeMap::new();
+        let mut moves: Vec<String> = Vec::new();
+        let mut total = 0usize;
+        let mut beyond = 0usize;
+        for (n, line) in journal.lines().enumerate() {
+            total += 1;
+            let parsed = line
+                .split_once(' ')
+                .and_then(|(verb, rest)| rest.split_once(" — ").map(|(m, d)| (verb, m, d)));
+            let Some((verb, module, detail)) = parsed else {
+                return Err(format!(
+                    "bundle spoke: line {} is not `<verb> <module> — <detail>`: `{line}`",
+                    n + 1
+                ));
+            };
+            let current = match states.get(module) {
+                Some(Ok(text)) => text.clone(),
+                Some(Err(_)) => {
+                    beyond += 1;
+                    continue;
+                }
+                None => String::new(),
+            };
+            let (head, address) = match detail.rsplit_once(" @") {
+                Some((head, addr))
+                    if addr.len() == 16 && addr.chars().all(|c| c.is_ascii_hexdigit()) =>
+                {
+                    (head, Some(addr))
+                }
+                _ => (detail, None),
+            };
+            let next = match verb {
+                "add" | "edit" => match address {
+                    None => Err(()),
+                    Some(addr) => store
+                        .fetch(addr)
+                        .and_then(|payload| {
+                            if verb == "add" {
+                                Bundle::add(&current, &payload)
+                            } else {
+                                Bundle::edit(&current, head, &payload)
+                            }
+                        })
+                        .map_err(|_| ()),
+                },
+                "declare" => Bundle::declare(&current, head).map_err(|_| ()),
+                "place" => Bundle::parse(&current).map(|b| b.render()).map_err(|_| ()),
+                _ => Err(()),
+            };
+            match next {
+                Err(()) => {
+                    beyond += 1;
+                    states.insert(
+                        module.to_string(),
+                        Err(format!("dark from entry {}", n + 1)),
+                    );
+                }
+                Ok(next_text) => {
+                    let before = speakers(module, &current);
+                    let after = speakers(module, &next_text);
+                    let arrived = after.iter().filter(|s| !before.contains(s));
+                    let left = before.iter().filter(|s| !after.contains(s));
+                    let delta: Vec<String> = arrived
+                        .map(|s| format!("+ {s}"))
+                        .chain(left.map(|s| format!("- {s}")))
+                        .collect();
+                    if !delta.is_empty() {
+                        moves.push(format!(
+                            "  entry {} ({verb} {module} — {head}): {}\n",
+                            n + 1,
+                            delta.join(", ")
+                        ));
+                    }
+                    states.insert(module.to_string(), Ok(next_text));
+                }
+            }
+        }
+        let horizon =
+            format!("{beyond} of {total} entries beyond the horizon (pre-store, judged, or dark)");
+        if moves.is_empty() {
+            return Err(format!(
+                "bundle spoke: the journal never heard `{name}` within its horizon \
+                 ({horizon}) — git holds the earlier past"
+            ));
+        }
+        Ok(format!(
+            "spoke `{name}` — journal time, effects only (what replay reconstructs; \
+             git holds the earlier past):\n{}  {horizon}\n",
+            moves.join("")
+        ))
+    }
+}
+
 #[cfg(test)]
 mod probes {
     use super::{PayloadStore, Replay};
@@ -323,5 +442,73 @@ mod probes {
                 "wrong-length or non-hex stays detail: {report}"
             );
         }
+    }
+
+    /// JOURNAL TIME, the headline: a miniature history where a speaker of
+    /// `double` arrives at birth and stops speaking in a later edit — the report
+    /// names the exact transactions, byte-pinned, and speakers are read with the
+    /// same matcher `uses` trusts (one vocabulary).
+    #[test]
+    fn spoke_names_the_transaction_each_speaker_arrived_and_left_in() {
+        let root = scratch("spoke");
+        let store = PayloadStore::beside(&root);
+        let birth = "/// Doubles.\npub fn double(x: i64) -> i64 {\n    x * 2\n}\n\npub fn quadruple(x: i64) -> i64 {\n    double(double(x))\n}\n";
+        let revision = "pub fn quadruple(x: i64) -> i64 {\n    x * 4\n}\n";
+        let journal = format!(
+            "add m.rs — fn double, fn quadruple @{}\nedit m.rs — quadruple @{}\n",
+            store.stash(birth).unwrap(),
+            store.stash(revision).unwrap()
+        );
+        let report = Replay::spoke(&journal, &store, "double").expect("reports");
+        assert_eq!(
+            report,
+            "spoke `double` — journal time, effects only (what replay reconstructs; \
+             git holds the earlier past):\n\
+             \x20 entry 1 (add m.rs — fn double, fn quadruple): + double, + quadruple\n\
+             \x20 entry 2 (edit m.rs — quadruple): - quadruple\n\
+             \x20 0 of 2 entries beyond the horizon (pre-store, judged, or dark)\n"
+        );
+    }
+
+    /// A name the journal never heard refuses BY NAME with the horizon disclosed —
+    /// the record's silence is not evidence of absence, and the refusal says whose
+    /// past (git's) holds the rest.
+    #[test]
+    fn spoke_refuses_the_unheard_name_disclosing_the_horizon() {
+        let root = scratch("spoke-unheard");
+        let store = PayloadStore::beside(&root);
+        let journal = format!(
+            "add m.rs — fn one @{}\n",
+            store.stash("pub fn one() -> i64 {\n    1\n}\n").unwrap()
+        );
+        let refusal = Replay::spoke(&journal, &store, "unspoken").expect_err("refuses");
+        assert!(refusal.contains("never heard `unspoken`"), "{refusal}");
+        assert!(
+            refusal.contains("0 of 1 entries beyond the horizon"),
+            "{refusal}"
+        );
+        assert!(refusal.contains("git holds the earlier past"), "{refusal}");
+    }
+
+    /// Entries replay cannot reconstruct — pre-store, judged verbs — are COUNTED
+    /// beyond the horizon, and a module gone dark stays dark: no guessed deltas,
+    /// only disclosed blindness.
+    #[test]
+    fn spoke_counts_what_it_cannot_reconstruct() {
+        let root = scratch("spoke-horizon");
+        let store = PayloadStore::beside(&root);
+        let journal = format!(
+            "add old.rs — fn relic\ncollect old.rs — relic\nadd m.rs — fn one @{}\n",
+            store.stash("pub fn one() -> i64 {\n    1\n}\n").unwrap()
+        );
+        let report = Replay::spoke(&journal, &store, "one").expect("reports");
+        assert!(
+            report.contains("entry 3 (add m.rs — fn one): + one"),
+            "{report}"
+        );
+        assert!(
+            report.contains("2 of 3 entries beyond the horizon"),
+            "{report}"
+        );
     }
 }

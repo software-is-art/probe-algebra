@@ -177,3 +177,13 @@ edit src/discover/cli.rs — impl CliSpec @655f78ed43142406
 edit src/discover/cli.rs — probes @ed9b3b46d67d3179
 edit src/discover/cli.rs — Sort @4db9e8bfcac9e34d
 edit examples/bundle.rs — run @b050bd253c2a8948
+add src/discover/bundle.rs — fn split_discriminator, fn sibling_holdings, fn select_addressed @0881211ee712589d
+edit src/discover/bundle.rs — impl Bundle @1d5dee6f4ba70993
+edit src/discover/bundle.rs — probes @eb47ca2bd3f85fd5
+add src/discover/store.rs —  @6267f7153dbd1d52
+edit src/discover/cli.rs — impl CliSpec @a72d7479051e9477
+edit src/discover/cli.rs — probes @1f909a13800c58f9
+edit src/discover/cli.rs — Sort @62d2837ce61f2034
+edit examples/bundle.rs — run @26a24beb8696e1e0
+edit src/discover/store.rs — probes @163e6c7cea399bcb
+edit src/discover/bundle.rs — select_addressed @38f122ab54a0d443

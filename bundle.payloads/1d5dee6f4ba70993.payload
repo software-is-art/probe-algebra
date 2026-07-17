@@ -1,0 +1,801 @@
+#[crate::mutate("bundle")]
+impl Bundle {
+    /// Parse a module's source into its bundle. Refusals are named, never guessed: an
+    /// unparseable module (the half-written-edit case), or an operator name that is not
+    /// unique across the file's functions (the dealing would be ambiguous).
+    pub fn parse(source: &str) -> Result<Bundle, String> {
+        let file = syn::parse_file(source).map_err(|e| format!("bundle: unparseable: {e}"))?;
+        let sigs = Ticker::parse_rust_sigs(source)?;
+
+        // the top-level operator names: functions at item level whose signature nets on an
+        // own type. The net model recurses into impls and inline modules too — those
+        // operators exist but ride their enclosing item; only top-level fns are re-dealt.
+        let top_level: Vec<String> = file
+            .items
+            .iter()
+            .filter_map(|it| match it {
+                syn::Item::Fn(f) => Some(f.sig.ident.to_string()),
+                _ => None,
+            })
+            .collect();
+        let netted: BTreeSet<&str> = sigs.iter().map(|(name, _, _)| *name).collect();
+        let operators: BTreeSet<&String> = top_level
+            .iter()
+            .filter(|n| netted.contains(n.as_str()))
+            .collect();
+        for op in &operators {
+            if sigs
+                .iter()
+                .filter(|(name, _, _)| *name == op.as_str())
+                .count()
+                > 1
+            {
+                return Err(format!(
+                    "bundle: operator name `{op}` is not unique across the module's \
+                     functions — the dealing would be ambiguous, refused"
+                ));
+            }
+        }
+
+        // segmentation: an item's TEXT runs from its span start (doc comments are
+        // attributes, so they open it) to its span end; the GAP after it — up to the next
+        // item's start — is the position's separator trivia and stays where it stood.
+        let starts: Vec<usize> = file
+            .items
+            .iter()
+            .map(|it| byte_offset(source, it.span().start()))
+            .collect();
+        let preamble = match starts.first() {
+            Some(&s) => source[..s].to_string(),
+            None => source.to_string(),
+        };
+        let items: Vec<BundleItem> = file
+            .items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let text_end = byte_offset(source, item.span().end());
+                let gap_end = starts.get(i + 1).copied().unwrap_or(source.len());
+                let operator = match item {
+                    syn::Item::Fn(f) => {
+                        let n = f.sig.ident.to_string();
+                        operators.contains(&n).then_some(n)
+                    }
+                    _ => None,
+                };
+                BundleItem {
+                    operator,
+                    text: source[starts[i]..text_end].to_string(),
+                    gap: source[text_end..gap_end].to_string(),
+                }
+            })
+            .collect();
+
+        // the canonical dealing order, from the one placer.
+        let canonical: Vec<String> = Placement::over("bundle", sigs)
+            .components
+            .iter()
+            .flat_map(|c| c.ops.iter())
+            .filter(|n| operators.contains(&n.to_string()))
+            .map(|n| n.to_string())
+            .collect();
+
+        Ok(Bundle {
+            preamble,
+            items,
+            canonical,
+        })
+    }
+
+    /// The module, rendered in canonical placed order: every non-operator item keeps its
+    /// position and its bytes; the operator positions are re-dealt with the operator TEXTS
+    /// in placement order, each position keeping its own separator gap. A module already in
+    /// canonical order renders to its own source exactly — the round-trip pin below holds
+    /// this on a real committed module.
+    pub fn render(&self) -> String {
+        let mut out = self.preamble.clone();
+        let mut dealing = self.canonical.iter();
+        for item in &self.items {
+            if item.operator.is_some() {
+                let next = dealing
+                    .next()
+                    .expect("one canonical name per operator slot");
+                let dealt = self
+                    .items
+                    .iter()
+                    .find(|i| i.operator.as_deref() == Some(next.as_str()))
+                    .map(|i| i.text.as_str())
+                    .expect("every canonical operator names an item");
+                out.push_str(dealt);
+            } else {
+                out.push_str(&item.text);
+            }
+            out.push_str(&item.gap);
+        }
+        out
+    }
+
+    /// THE EDIT VERB — the largest gap named at the second rule's adoption, closed: replace
+    /// one named item's TEXT while its SIGNATURE holds. Change is mutation, not only
+    /// addition — but a signature move is an interface change wearing an edit's clothes, so
+    /// it is REFUSED here by name (retire the item and `add` its successor; a future
+    /// `resign` verb may earn the combined form). What an edit may change is the body, the
+    /// docs, and the attributes: the meaning and its prose — everything a caller cannot
+    /// observe through the signature. Everything that names the item re-judges downstream
+    /// exactly because the signature held: the laws re-run at the next judgment, the lift
+    /// drift-gate demands regeneration, the censuses re-derive.
+    ///
+    /// Refusals, named: an unparseable replacement, a replacement that is not exactly ONE
+    /// item, an address the module does not carry, a replacement whose address differs
+    /// (an edit is not a rename), an AMBIGUOUS address (two impl blocks may legally share
+    /// one — refused by count, never guessed between), a FUNCTION whose signature moved
+    /// (token-for-token), and an IMPL or TRAIT whose METHOD-SIGNATURE SET moved — the
+    /// interface-hold at whole-item grain, which is what lets `edit` reach the host's own
+    /// item kinds (the self-hosting disposition's rung-2 gap, closed). Non-function items
+    /// (types, consts) hold their name and kind.
+    pub fn edit(module: &str, item_name_text: &str, replacement: &str) -> Result<String, String> {
+        let new = syn::parse_file(replacement)
+            .map_err(|e| format!("bundle edit: replacement unparseable: {e}"))?;
+        let [new_item] = new.items.as_slice() else {
+            return Err(format!(
+                "bundle edit: the replacement must be exactly one item, got {} — one edit, \
+                 one judged transaction",
+                new.items.len()
+            ));
+        };
+        let Some(new_name) = item_address(new_item) else {
+            return Err(
+                "bundle edit: the replacement has no defining name — nothing to hold an \
+                 edit to"
+                    .to_string(),
+            );
+        };
+        let (base, _) = split_discriminator(item_name_text);
+        if new_name != base {
+            return Err(format!(
+                "bundle edit: the replacement names `{new_name}`, not `{base}` — \
+                 an edit is not a rename"
+            ));
+        }
+
+        let file =
+            syn::parse_file(module).map_err(|e| format!("bundle edit: module unparseable: {e}"))?;
+        let target = select_addressed("edit", &file, item_name_text)?.ok_or_else(|| {
+            format!(
+                "bundle edit: no item named `{base}` in the module — `add` \
+                 grows, `edit` changes; nothing here to change"
+            )
+        })?;
+
+        // the signature hold: for functions, token-for-token equality of the signature; for
+        // everything else, the kind must match (a struct stays a struct) — reshaping is
+        // interface change either way, and interface change is not an edit.
+        match (target, new_item) {
+            (syn::Item::Fn(old), syn::Item::Fn(new)) => {
+                use quote::ToTokens;
+                let held = old.sig.to_token_stream().to_string();
+                let offered = new.sig.to_token_stream().to_string();
+                if held != offered {
+                    return Err(format!(
+                        "bundle edit: `{item_name_text}`'s signature moved (`{held}` -> \
+                         `{offered}`) — an interface change is not an edit; retire the item \
+                         and add its successor"
+                    ));
+                }
+            }
+            (old @ syn::Item::Impl(_), new @ syn::Item::Impl(_))
+            | (old @ syn::Item::Trait(_), new @ syn::Item::Trait(_)) => {
+                let held = method_signatures(old);
+                let offered = method_signatures(new);
+                if held != offered {
+                    return Err(format!(
+                        "bundle edit: `{item_name_text}`'s method-signature set moved \
+                         ({} held, {} offered) — an interface change is not an edit; \
+                         bodies and docs are free, the surface holds",
+                        held.len(),
+                        offered.len()
+                    ));
+                }
+            }
+            (old, new) if std::mem::discriminant(old) == std::mem::discriminant(new) => {}
+            _ => {
+                return Err(format!(
+                    "bundle edit: `{item_name_text}` changed item kind — an interface \
+                     change is not an edit"
+                ));
+            }
+        }
+
+        // the splice: the target's TEXT is replaced in place (its position and its gap are
+        // the module's furniture and stay), then one parse∘render keeps the canonical
+        // guarantee.
+        let start = byte_offset(module, target.span().start());
+        let end = byte_offset(module, target.span().end());
+        let mut out = String::with_capacity(module.len());
+        out.push_str(&module[..start]);
+        out.push_str(replacement.trim_end());
+        out.push_str(&module[end..]);
+        Ok(Bundle::parse(&out)?.render())
+    }
+
+    /// THE CONTINUATION VERB, library form (rung 2): add a snippet to a module, purely
+    /// additively, and return the module re-rendered in canonical placed order — the new
+    /// operator lands WITH ITS COMPONENT (the placer's dealing, not an append), a new type
+    /// or helper lands before the trailing `#[cfg(test)]` module (tests stay last), and
+    /// every existing item's bytes survive verbatim (addition is monotone by union-find's
+    /// own algebra — the snippet can join or bridge components, never reshuffle what it
+    /// does not touch). The caller writes the result to the file; the verb has no I/O.
+    ///
+    /// Refusals are named, never guessed: an unparseable snippet, an empty snippet, and a
+    /// NAME COLLISION with an existing top-level item — the anti-duplication guarantee at
+    /// the mechanical level, the type-library voice's whisper made a hard stop.
+    pub fn add(module: &str, snippet: &str) -> Result<String, String> {
+        let new = syn::parse_file(snippet)
+            .map_err(|e| format!("bundle add: snippet unparseable: {e}"))?;
+        if new.items.is_empty() {
+            return Err("bundle add: the snippet declares nothing".to_string());
+        }
+        let existing =
+            syn::parse_file(module).map_err(|e| format!("bundle add: module unparseable: {e}"))?;
+        let taken: BTreeSet<String> = existing.items.iter().filter_map(item_name).collect();
+        for name in new.items.iter().filter_map(item_name) {
+            if taken.contains(&name) {
+                return Err(format!(
+                    "bundle add: `{name}` already exists in the module — addition is \
+                     additive; edit the existing item or pick a name"
+                ));
+            }
+        }
+
+        // splice the snippet before the trailing `#[cfg(test)]` module when there is one
+        // (tests stay last), else at the end — then one parse∘render places it.
+        let block = format!("{}\n", snippet.trim_end());
+        let test_start = existing.items.iter().find_map(|item| match item {
+            syn::Item::Mod(m) if is_cfg_test(&m.attrs) => {
+                Some(byte_offset(module, item.span().start()))
+            }
+            _ => None,
+        });
+        let mut spliced = String::new();
+        match test_start {
+            Some(at) => {
+                spliced.push_str(&module[..at]);
+                pad_to_blank_line(&mut spliced);
+                spliced.push_str(&block);
+                spliced.push('\n');
+                spliced.push_str(&module[at..]);
+            }
+            None => {
+                spliced.push_str(module);
+                pad_to_blank_line(&mut spliced);
+                spliced.push_str(&block);
+            }
+        }
+        Ok(Bundle::parse(&spliced)?.render())
+    }
+
+    /// THE DECLARATION ENTRY, first form (the disposition's end state, rung 1): declare an
+    /// expectation into a module's `#[algebra(...)]` attribute, additively — the SHOULD half
+    /// joining the bundle the operators live in. `declaration` is the `expects` grammar
+    /// exactly as the macro takes it (`commutative(peak)`, `identity(grant, zero)`); the
+    /// result is the module re-rendered canonically, differing only in that attribute.
+    ///
+    /// Parser-as-gate, all refusals named: a shape word outside the ratified catalog is
+    /// refused TEACHING the vocabulary (`Expectation::canonical` — the same validator the
+    /// engine panics with, in its non-panicking form); a duplicate of an already-declared
+    /// expectation is refused; a module with no `#[algebra]` item is refused naming the fix
+    /// (the zero-annotation declaration channel — expectations on a `Lifted` module — is a
+    /// disclosed further rung); two `#[algebra]` items are refused as ambiguous rather than
+    /// guessed between.
+    pub fn declare(module: &str, declaration: &str) -> Result<String, String> {
+        let (key, _args) = parse_declaration(declaration)?;
+        let canonical_key = super::expect::Expectation::canonical(&key).ok_or_else(|| {
+            format!(
+                "bundle declare: `{key}` is not in the ratified catalog \
+                 (spec/shapes.spec). Declarable shapes: {}",
+                super::expect::Expectation::vocabulary_keys().join(", ")
+            )
+        })?;
+
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle declare: module unparseable: {e}"))?;
+        let mut algebra_attrs: Vec<&syn::Attribute> = Vec::new();
+        for item in &file.items {
+            let attrs: &[syn::Attribute] = match item {
+                syn::Item::Mod(m) => &m.attrs,
+                _ => continue,
+            };
+            algebra_attrs.extend(attrs.iter().filter(|a| {
+                a.path()
+                    .segments
+                    .last()
+                    .is_some_and(|s| s.ident == "algebra")
+            }));
+        }
+        let attr = match algebra_attrs.as_slice() {
+            [] => {
+                return Err(
+                    "bundle declare: no `#[algebra]` module to declare into — attach \
+                     `#[algebra(Marker, \"name\")]` to the module (the zero-annotation \
+                     declaration channel is a further rung)"
+                        .to_string(),
+                )
+            }
+            [one] => *one,
+            many => {
+                return Err(format!(
+                    "bundle declare: {} `#[algebra]` modules in one file — ambiguous, \
+                     refused rather than guessed between",
+                    many.len()
+                ))
+            }
+        };
+
+        let start = byte_offset(module, attr.span().start());
+        let end = byte_offset(module, attr.span().end());
+        let attr_text = &module[start..end];
+        let entry = declaration.trim();
+
+        // a duplicate of an already-declared expectation is refused, compared through the
+        // canonical shape name so `idempotent(x)` and its catalog name cannot both land.
+        for existing in expects_entries(attr_text) {
+            let Ok((existing_key, existing_args)) = parse_declaration(&existing) else {
+                continue;
+            };
+            let (_, new_args) = parse_declaration(entry)?;
+            if super::expect::Expectation::canonical(&existing_key) == Some(canonical_key)
+                && existing_args == new_args
+            {
+                return Err(format!(
+                    "bundle declare: `{entry}` is already declared — a declaration is \
+                     additive, never repeated"
+                ));
+            }
+        }
+
+        // the edit: append inside an existing `expects(...)` (the grammar keeps it last,
+        // so the attribute ends `))]`), or open one (the attribute ends `)]`). Anything
+        // else is refused, never guessed at.
+        let new_attr = if let Some(head) = attr_text.strip_suffix("))]") {
+            if attr_text.contains("expects(") {
+                format!("{head}, {entry}))]")
+            } else {
+                return Err(format!(
+                    "bundle declare: unrecognized `#[algebra]` shape `{attr_text}` — \
+                     declare by hand"
+                ));
+            }
+        } else if let Some(head) = attr_text.strip_suffix(")]") {
+            format!("{head}, expects({entry}))]")
+        } else {
+            return Err(format!(
+                "bundle declare: unrecognized `#[algebra]` shape `{attr_text}` — declare \
+                 by hand"
+            ));
+        };
+
+        let mut out = String::with_capacity(module.len() + new_attr.len());
+        out.push_str(&module[..start]);
+        out.push_str(&new_attr);
+        out.push_str(&module[end..]);
+        Ok(Bundle::parse(&out)?.render())
+    }
+
+    /// THE PERCEPTION VERB — everything that PINS a named operator, read from the
+    /// committed record and rendered as one deterministic report: the blast radius an
+    /// agent wants BEFORE touching anything, derived instead of grepped. Four senses, one
+    /// page: the operator's placement COMPONENT (who it is wired to), the committed LAWS
+    /// naming it (the contract — an edit that breaks one refuses at the next judgment),
+    /// its ratified FREEDOMS (the mutation-lock survivors at it — where a change is
+    /// invisible to the spec, the guarantee's own fine print), and the downstream
+    /// RELIANCES naming it (who breaks, and the why they declared). Read-only: perception
+    /// writes nothing and journals nothing.
+    ///
+    /// Empty sections render honestly ("none — …"): silence is a finding, not a blank.
+    /// An operator the module does not declare is a refusal — perception does not guess.
+    /// Disclosed: declared expectations are read from `#[algebra]` attributes in the
+    /// module text; a lifted module's declarations live in its lift artifact and reach
+    /// this report through their frozen laws instead.
+    ///
+    /// Capability: Effectful — reads the committed locks in `spec_dir` and the optional
+    /// reliance register.
+    pub fn constrains(
+        module: &str,
+        name: &str,
+        spec_dir: &Path,
+        reliances: Option<&Path>,
+    ) -> Result<String, String> {
+        let sigs = Ticker::parse_rust_sigs(module)?;
+        let declared_here = sigs
+            .iter()
+            .any(|(op, _, _)| *op == name || op.ends_with(&format!("::{name}")));
+        if !declared_here {
+            return Err(format!(
+                "bundle constrains: the module declares no operator `{name}` — \
+                 perception does not guess"
+            ));
+        }
+
+        let mut out = format!("constrains `{name}`:\n");
+
+        // the COMPONENT: who the operator is wired to, from the one placer.
+        let placement = Placement::over("bundle", sigs);
+        for component in &placement.components {
+            if component
+                .ops
+                .iter()
+                .any(|op| *op == name || op.ends_with(&format!("::{name}")))
+            {
+                out.push_str(&format!(
+                    "  component: {{ {} }} over nets {{ {} }}\n",
+                    component.ops.join(", "),
+                    component.nets.join(", ")
+                ));
+            }
+        }
+
+        // the LAWS: every committed behaviour lock in spec_dir whose equation or prose
+        // names the operator.
+        let mut laws: Vec<String> = Vec::new();
+        let mut freedoms: Vec<String> = Vec::new();
+        if let Ok(dir) = std::fs::read_dir(spec_dir) {
+            let mut files: Vec<_> = dir
+                .flatten()
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect();
+            files.sort();
+            for file in files {
+                let Ok(text) = std::fs::read_to_string(spec_dir.join(&file)) else {
+                    continue;
+                };
+                if file.ends_with(".mutation.spec") {
+                    let stem = file.trim_end_matches(".mutation.spec");
+                    for line in text.lines() {
+                        if line.contains("SURVIVED") && line.contains(&format!("`{name}`")) {
+                            freedoms.push(format!(
+                                "    - {stem}: {}\n",
+                                line.trim_start_matches(['-', ' '])
+                            ));
+                        }
+                    }
+                } else if text.starts_with("# discovered spec:") {
+                    let stem = file.trim_end_matches(".spec");
+                    for (prose, equation) in Spec::parse_lock(&text) {
+                        if mentions(&equation, name) {
+                            laws.push(format!("    - {stem}: {equation}  ({prose})\n"));
+                        }
+                    }
+                }
+            }
+        }
+        out.push_str("  laws naming it (the contract):\n");
+        if laws.is_empty() {
+            out.push_str("    none — the committed spec is silent about this operator\n");
+        } else {
+            laws.iter().for_each(|l| out.push_str(l));
+        }
+
+        // the DECLARED expectations: the SHOULD half, read from `#[algebra]` attributes.
+        let declared: Vec<String> = expects_entries(module)
+            .into_iter()
+            .filter(|entry| mentions(entry, name))
+            .collect();
+        out.push_str("  declared expectations naming it:\n");
+        if declared.is_empty() {
+            out.push_str("    none — conduct only; no declared contract names it here\n");
+        } else {
+            for entry in declared {
+                out.push_str(&format!("    - {entry}\n"));
+            }
+        }
+
+        // the FREEDOMS: the ratified survivors at this operator — the fine print.
+        out.push_str("  freedoms at it (ratified degrees of freedom):\n");
+        if freedoms.is_empty() {
+            out.push_str("    none — every judged mutant of this operator dies\n");
+        } else {
+            freedoms.iter().for_each(|f| out.push_str(f));
+        }
+
+        // the RELIANCES: who declared they stand on a law naming it.
+        out.push_str("  downstream reliances naming it:\n");
+        let mut relied = Vec::new();
+        if let Some(path) = reliances {
+            let register = spec_lock::Register {
+                name: "downstream reliances".to_string(),
+                path: path.to_path_buf(),
+            };
+            for (key, justification) in register.entries()? {
+                if mentions(&key, name) {
+                    relied.push(format!("    - {key} ({justification})\n"));
+                }
+            }
+        }
+        if relied.is_empty() {
+            out.push_str("    none declared — semver's old blind spot, now an honest empty\n");
+        } else {
+            relied.iter().for_each(|r| out.push_str(r));
+        }
+        Ok(out)
+    }
+
+    /// PERCEPTION AT THE TEXT GRAIN: the item's VERBATIM SEGMENT, cut by the same spans
+    /// `edit` holds and `replay` reconstructs — so a show → revise → edit cycle never
+    /// opens a file, and editing an item with its own shown text is a byte-exact no-op.
+    /// Read-only; journals nothing. Addresses are `edit`'s addresses (`merge`,
+    /// `impl Type`, `impl Trait for Type`, `probes`), the discriminated `addr#N`
+    /// form included; refusals teach — an address nothing carries lists what the
+    /// module does declare, and a shared bare address refuses naming the
+    /// discriminated addresses it will accept.
+    pub fn show(module: &str, item_name_text: &str) -> Result<String, String> {
+        let file =
+            syn::parse_file(module).map_err(|e| format!("bundle show: module unparseable: {e}"))?;
+        let target = select_addressed("show", &file, item_name_text)?.ok_or_else(|| {
+            let roster: Vec<String> = file.items.iter().filter_map(item_address).collect();
+            format!(
+                "bundle show: no item at `{item_name_text}` — addressable here: {}",
+                roster.join(", ")
+            )
+        })?;
+        let start = byte_offset(module, target.span().start());
+        let end = byte_offset(module, target.span().end());
+        Ok(module[start..end].to_string())
+    }
+
+    /// THE ITEM RELATION'S FEED: every addressable item as an (address, verbatim
+    /// segment) row, cut by the same spans `show` prints and `edit` holds — one
+    /// vocabulary, no restatement. Items nothing addresses (uses, macro calls) are
+    /// not rows, and the trivia between items belongs to the RENDERING, not the
+    /// relation — the row list is the module's addressable projection, disclosed as
+    /// such. Read-only; journals nothing.
+    pub fn rows(module: &str) -> Result<Vec<(String, String)>, String> {
+        let file =
+            syn::parse_file(module).map_err(|e| format!("bundle rows: module unparseable: {e}"))?;
+        Ok(file
+            .items
+            .iter()
+            .filter_map(|item| {
+                let address = item_address(item)?;
+                let start = byte_offset(module, item.span().start());
+                let end = byte_offset(module, item.span().end());
+                Some((address, module[start..end].to_string()))
+            })
+            .collect())
+    }
+
+    /// The module's TABLE OF CONTENTS — orientation without an interior read: every
+    /// addressable item with its kind, visibility, operator status, and (for functions)
+    /// the exact signature `edit` will hold, token for token — the published interface,
+    /// so an edit payload can be authored FROM THE CONTRACT. Impls and traits report
+    /// the size of their held method-signature set. Read-only; journals nothing.
+    pub fn inventory(module: &str) -> Result<String, String> {
+        use quote::ToTokens;
+        let bundle = Bundle::parse(module)?;
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle inventory: module unparseable: {e}"))?;
+        let mut out = format!(
+            "{} items, {} operators, {}:\n",
+            file.items.iter().filter_map(item_address).count(),
+            bundle.canonical.len(),
+            if bundle.is_canonical() {
+                "canonically placed"
+            } else {
+                "NOT canonical — `bundle place` would move it"
+            }
+        );
+        for item in &file.items {
+            let Some(address) = item_address(item) else {
+                continue;
+            };
+            let mut tags: Vec<String> = Vec::new();
+            if is_public(item) && !matches!(item, syn::Item::Impl(_)) {
+                tags.push("pub".to_string());
+            }
+            let held = match item {
+                syn::Item::Fn(f) => {
+                    if bundle
+                        .canonical
+                        .iter()
+                        .any(|op| *op == f.sig.ident.to_string())
+                    {
+                        tags.push("operator".to_string());
+                    }
+                    format!(" — {}", f.sig.to_token_stream())
+                }
+                syn::Item::Impl(_) | syn::Item::Trait(_) => {
+                    format!(
+                        " — {} method signatures held",
+                        method_signatures(item).len()
+                    )
+                }
+                syn::Item::Mod(m) if is_cfg_test(&m.attrs) => {
+                    tags.push("tests".to_string());
+                    String::new()
+                }
+                _ => String::new(),
+            };
+            let kind = match item {
+                syn::Item::Fn(_) => "fn",
+                syn::Item::Struct(_) => "struct",
+                syn::Item::Enum(_) => "enum",
+                syn::Item::Union(_) => "union",
+                syn::Item::Type(_) => "type",
+                syn::Item::Mod(_) => "mod",
+                syn::Item::Const(_) => "const",
+                syn::Item::Static(_) => "static",
+                syn::Item::Trait(_) => "trait",
+                syn::Item::Impl(_) => "impl",
+                _ => "item",
+            };
+            let name = if matches!(item, syn::Item::Impl(_)) {
+                address
+            } else {
+                format!("{kind} {address}")
+            };
+            let tags = if tags.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", tags.join(", "))
+            };
+            out.push_str(&format!("- {name}{tags}{held}\n"));
+        }
+        Ok(out)
+    }
+
+    /// THE MARK PHASE of garbage collection (the removal disposition: mark is derived,
+    /// sweep is ratified): every named top-level item REACHED BY NO ROOT, with the
+    /// evidence rendered per item. The roots, each an existing sense: `pub` visibility
+    /// (the module boundary — consumers this walk cannot see, so public is pinned by
+    /// definition), reference by any other item's text, a committed law naming it, a
+    /// declared expectation naming it, and a downstream reliance naming it. An item
+    /// every root is silent about is COLLECTABLE — a derived fact, not a deletion.
+    ///
+    /// Scope, disclosed: module-level. A crate-wide collector needs the tree walk (the
+    /// tier derivation's reachability at item grain) — this rung proves the mark/sweep
+    /// split on the substrate the verbs already govern.
+    ///
+    /// Capability: Effectful — reads the committed locks and the optional register.
+    pub fn collectable(
+        module: &str,
+        spec_dir: &Path,
+        reliances: Option<&Path>,
+    ) -> Result<Vec<(String, String)>, String> {
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle collect: module unparseable: {e}"))?;
+
+        // the committed record, read once: every law equation and reliance key.
+        let mut law_text = String::new();
+        if let Ok(dir) = std::fs::read_dir(spec_dir) {
+            for entry in dir.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !name.ends_with(".mutation.spec") {
+                    if let Ok(text) = std::fs::read_to_string(entry.path()) {
+                        if text.starts_with("# discovered spec:") {
+                            law_text.push_str(&text);
+                        }
+                    }
+                }
+            }
+        }
+        let mut reliance_text = String::new();
+        if let Some(path) = reliances {
+            let register = spec_lock::Register {
+                name: "downstream reliances".to_string(),
+                path: path.to_path_buf(),
+            };
+            for (key, _) in register.entries()? {
+                reliance_text.push_str(&key);
+                reliance_text.push('\n');
+            }
+        }
+        let expectations = expects_entries(module).join("\n");
+
+        let mut marked = Vec::new();
+        for (i, item) in file.items.iter().enumerate() {
+            let Some(name) = item_name(item) else {
+                continue;
+            };
+            if is_public(item) {
+                continue; // the module boundary is a root: consumers are out of sight.
+            }
+            let referenced = file.items.iter().enumerate().any(|(j, other)| {
+                j != i && {
+                    let start = byte_offset(module, other.span().start());
+                    let end = byte_offset(module, other.span().end());
+                    mentions(&module[start..end], &name)
+                }
+            });
+            if referenced {
+                continue;
+            }
+            if mentions(&law_text, &name)
+                || mentions(&expectations, &name)
+                || mentions(&reliance_text, &name)
+            {
+                continue;
+            }
+            marked.push((
+                name,
+                "private, referenced by no item, named in no committed law, no declared \
+                 expectation, no reliance"
+                    .to_string(),
+            ));
+        }
+        Ok(marked)
+    }
+
+    /// THE SWEEP — one judged transaction removing exactly ONE marked item: the verb
+    /// refuses anything [`Bundle::collectable`] did not derive (the sweep only takes what
+    /// the mark proved — automatic in the sense that matters, ratified by the diff the
+    /// caller commits). The item's text goes and its position's gap goes with it; every
+    /// other byte survives, and the result is the canonical render. Nothing is ever
+    /// destroyed one level up: the journal remembers what the tree forgets.
+    pub fn collect(
+        module: &str,
+        name: &str,
+        spec_dir: &Path,
+        reliances: Option<&Path>,
+    ) -> Result<String, String> {
+        let marked = Bundle::collectable(module, spec_dir, reliances)?;
+        if !marked.iter().any(|(m, _)| m == name) {
+            return Err(format!(
+                "bundle collect: `{name}` is not collectable — a root reaches it (or no \
+                 such item exists); the sweep only takes what the mark derives. \
+                 Marked now: [{}]",
+                marked
+                    .iter()
+                    .map(|(m, _)| m.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        let file = syn::parse_file(module)
+            .map_err(|e| format!("bundle collect: module unparseable: {e}"))?;
+        let target = file
+            .items
+            .iter()
+            .enumerate()
+            .find(|(_, item)| {
+                let n = item_name(item);
+                n.as_deref() == Some(name)
+            })
+            .expect("marked items exist");
+        let start = byte_offset(module, target.1.span().start());
+        let end = match file.items.get(target.0 + 1) {
+            Some(next) => byte_offset(module, next.span().start()),
+            None => module.len(),
+        };
+        let mut out = String::with_capacity(module.len());
+        out.push_str(&module[..start]);
+        out.push_str(&module[end..]);
+        Ok(Bundle::parse(&out)?.render())
+    }
+
+    /// One journal line — stage 2 of the zero-file-patching aim: THE VERBS RECORD
+    /// THEMSELVES. The format is deliberately minimal and deterministic
+    /// (`<verb> <module> — <detail>`, no timestamps: order is the journal's only clock),
+    /// so the file is an append-only record a PR body can be derived from —
+    /// `bundle-demo/MANIFEST.md`'s hand-written story, machined. Disclosed limit, recorded
+    /// where the roadmap names stage 3: entries carry NAMES, not payloads, so the journal
+    /// is the agenda's source and the reviewer's record but not yet REPLAYABLE —
+    /// tree == replay(journal) needs the payload store.
+    pub fn journal_entry(verb: &str, module: &str, detail: &str) -> String {
+        format!("{verb} {module} — {detail}\n")
+    }
+
+    /// Is the module already in canonical placed order? (Parse-only judgment: true exactly
+    /// when `render` would reproduce the input.)
+    pub fn is_canonical(&self) -> bool {
+        let declared: Vec<&str> = self
+            .items
+            .iter()
+            .filter_map(|i| i.operator.as_deref())
+            .collect();
+        declared
+            == self
+                .canonical
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+    }
+}

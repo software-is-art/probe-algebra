@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 957 sites.
+# 968 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -158,11 +158,9 @@
 - boundary_spec::discover::bundle::bundle::declare:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::declare:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::edit:0: != -> ==
-- boundary_spec::discover::bundle::bundle::edit:1: == -> !=
-- boundary_spec::discover::bundle::bundle::edit:2: > -> <=
-- boundary_spec::discover::bundle::bundle::edit:3: != -> ==
-- boundary_spec::discover::bundle::bundle::edit:4: != -> ==
-- boundary_spec::discover::bundle::bundle::edit:5: == -> !=
+- boundary_spec::discover::bundle::bundle::edit:1: != -> ==
+- boundary_spec::discover::bundle::bundle::edit:2: != -> ==
+- boundary_spec::discover::bundle::bundle::edit:3: == -> !=
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::inventory:0: ! -> (deleted)
@@ -181,8 +179,6 @@
 - boundary_spec::discover::bundle::bundle::render:deaf -> String::new()
 - boundary_spec::discover::bundle::bundle::rows:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::rows:deaf -> Ok(vec![])
-- boundary_spec::discover::bundle::bundle::show:0: == -> !=
-- boundary_spec::discover::bundle::bundle::show:1: > -> <=
 - boundary_spec::discover::bundle::bundle::show:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::show:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::expects_entries:0: == -> !=
@@ -212,6 +208,13 @@
 - boundary_spec::discover::bundle::pad_to_blank_line:1: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:0: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::select_addressed:0: == -> !=
+- boundary_spec::discover::bundle::select_addressed:1: <= -> >
+- boundary_spec::discover::bundle::select_addressed:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::select_addressed:deaf -> Ok(None)
+- boundary_spec::discover::bundle::sibling_holdings:deaf -> String::new()
+- boundary_spec::discover::bundle::split_discriminator:0: ! -> (deleted)
+- boundary_spec::discover::bundle::split_discriminator:1: >= -> <
 - boundary_spec::discover::cli::CliSpec::parse:0: == -> !=
 - boundary_spec::discover::cli::CliSpec::parse:1: < -> >=
 - boundary_spec::discover::cli::CliSpec::parse:2: < -> >=
@@ -847,6 +850,14 @@
 - boundary_spec::discover::store::store::fetch:deaf -> Ok(String::new())
 - boundary_spec::discover::store::store::fingerprint:deaf -> String::new()
 - boundary_spec::discover::store::store::render:deaf -> String::new()
+- boundary_spec::discover::store::store::spoke:0: == -> !=
+- boundary_spec::discover::store::store::spoke:1: && -> ||
+- boundary_spec::discover::store::store::spoke:2: == -> !=
+- boundary_spec::discover::store::store::spoke:3: ! -> (deleted)
+- boundary_spec::discover::store::store::spoke:4: ! -> (deleted)
+- boundary_spec::discover::store::store::spoke:5: ! -> (deleted)
+- boundary_spec::discover::store::store::spoke:deaf -> Err(String::new())
+- boundary_spec::discover::store::store::spoke:deaf -> Ok(String::new())
 - boundary_spec::discover::store::store::stash:0: == -> !=
 - boundary_spec::discover::store::store::stash:deaf -> Err(String::new())
 - boundary_spec::discover::store::store::stash:deaf -> Ok(String::new())

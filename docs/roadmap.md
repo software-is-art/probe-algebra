@@ -3991,3 +3991,58 @@ transactions (one `add`, five `edit`s), zero hand edits in code.
   question, pointed at its own ratification step: some of what is signed today is a
   derivation whose dataset has not finished arriving. What no amount of journal
   converts: the loss function — which demands ought to exist stays prose.
+
+## The address grammar, discriminated: `addr#N` (BUILT)
+
+Built 2026-07-17, the same session brick 6's readings counted the sibling-impl
+ambiguity firing for the third time — and it fired again in this session's first
+minute (`show src/discover/items.rs 'impl ItemRelation'`, now THREE blocks). The
+gap is closed from both sides: `addr#N` (1-based, file order — `#` cannot appear
+in a bare address, so the split is never ambiguous) is accepted wherever an
+address resolves, and the ambiguous refusal now TEACHES the discriminated
+addresses with what each sibling holds:
+
+    bundle show: 3 items share the address `impl ItemRelation` — ambiguous; say
+    `impl ItemRelation#1` (holds of_module, of_files) or `impl ItemRelation#2`
+    (holds of_tree) or `impl ItemRelation#3` (holds uses, uses_report)
+
+One selector (`select_addressed`) now owns bare/discriminated/dangling for
+`show` and `edit`; the zero-match refusal stays with each verb (they teach
+differently there). `edit` through `impl Count#2` holds the same
+method-signature-set it always held, and the replacement names the BASE address
+— `#N` is a coordinate, not a name, so an edit is still not a rename. Residual,
+named: `collect`'s resolution is not yet wired through the selector, and the
+inventory does not print the `#N` forms (the refusal teaches them instead). The
+method-grain rung (ask for `of_tree`, edit just `of_tree`) remains open — the
+discriminator picks between blocks; it does not enter them.
+
+## The item relation, brick 7: journal time — `spoke` (BUILT)
+
+Built 2026-07-17: the seventeenth verb, `bundle spoke <item-name>` — the reverse
+edge pointed at the record. `Replay::spoke` walks the journal exactly as the
+replay differential does (same grammar, same payload store, same effects-only
+honesty), and at each reconstructible entry DIFFERENTIATES the speaker roster —
+the item relation over journal time instead of tree space, so "who holds this
+fact" gains "and since which judged transaction". Speakers are read with the one
+matcher `uses` trusts; one vocabulary, three verbs deep now. Acceptance on the
+real journal, first ask:
+
+    spoke `uses_report` — journal time, effects only (what replay reconstructs;
+    git holds the earlier past):
+      entry 172 (add src/discover/items.rs — ): + impl ItemRelation
+      entry 173 (edit src/discover/items.rs — probes): + probes
+      110 of 186 entries beyond the horizon (pre-store, judged, or dark)
+
+The horizon is the report's spine: pre-store entries, judged verbs, and modules
+gone dark are COUNTED, never guessed at — a module born before the journal goes
+dark at its first edit (replay reconstructs from empty), which is conservative
+and disclosed; git holds that past. A name the journal never heard refuses with
+the horizon in the refusal. Readings: the `#[mutate]` deafness transform turned
+a one-line `filter(|item| item_address(item).as_deref() == ...)` into an E0716
+under `--features schemata` where plain builds passed — the two-line binding the
+older code always used turns out to be a rule the instrumentation imposes, worth
+knowing before the next helper. Infrastructure, same session: the session-start
+hook now provisions cargo-nextest (crates.io build; the prebuilt hosts are
+policy-denied) and pins the suit, so future sessions start with the verbs warm
+and the sweep's incremental tier real — two container restarts ate full sweeps
+this week, and the fix was an environment line, not a code brick.
