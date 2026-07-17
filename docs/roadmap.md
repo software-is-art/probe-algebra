@@ -4073,3 +4073,32 @@ each invariant that migrates into the verb algebra stops being a gate that
 re-runs and becomes a refusal that never needed to. Near-term, boring, real: CI
 carrying its own verdict store across runs, and the auto-merge settings decision
 already flagged above.
+
+## Auto-merge joins the floor: green is the merge decision (BUILT)
+
+Built 2026-07-18, the first brick of the lead-time sprint. The repository's
+`allow_auto_merge` flag is now a DECLARED perimeter fact: one more line in the
+floor (`- auto-merge: enabled`), one more judged observation (the flag rides the
+repo payload `.github/perimeter.sh` already fetches — no new read), two more
+dents (disabled, unreadable — the deaf-judge census moves 8 → 10), and the
+refusals teach ("auto-merge is DISABLED — the declared perimeter makes green the
+merge decision"). The toggle was flipped by hand first (the WRITE stays human);
+the declaration makes the click a locked fact the weekly world gate defends —
+switched off silently, it refuses by name. What this buys: PR lead time on green
+collapses from attention-hours to check-minutes; the merge button leaves the
+path for every PR that arms auto-merge, which agents can do through the API.
+
+FIELD REPORT from the build — the verbs strand on a multi-item interface change:
+growing `Perimeter` by a field was accepted by `edit` (structs hold no signature
+set), but the tree was then briefly un-compilable until `declared()` learned the
+field — and the NEXT verb refused on that broken build, including `show`:
+perception judges too, so the suit was unreachable from inside its own
+intermediate state. There is no transaction envelope spanning items — a change
+whose smallest honest unit is "field + its initializers + its observers" cannot
+be said in one judged breath. The remaining edits fell back to file patching
+(recorded, as the second rule requires). The missing verb is the atomic
+multi-item transaction: stage several item edits, judge the RESULT, land all or
+none — the same all-or-nothing the single-item verbs already promise, one level
+up. Note the asymmetry worth keeping when it is built: single-item refusal
+teaches instantly; a staged transaction should refuse with the full residue
+(which items still owe what), not just the first error.

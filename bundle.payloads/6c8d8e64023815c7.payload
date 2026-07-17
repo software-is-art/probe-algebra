@@ -1,0 +1,16 @@
+/// The declared perimeter — the repository-settings floor.
+pub struct Perimeter {
+    /// Status-check contexts a PR must pass — derived from the gate registry
+    /// (rendered job names: the contexts GitHub actually reports).
+    pub required_checks: Vec<String>,
+    /// Exactly this many required approvals (see the module docs for why zero).
+    pub required_approvals: u64,
+    /// The only merge methods the ruleset allows.
+    pub merge_methods: &'static [&'static str],
+    /// Private vulnerability reporting must be enabled (SECURITY.md points at it).
+    pub private_vulnerability_reporting: bool,
+    /// Auto-merge must be enabled: green is the merge decision — the gates are the
+    /// reviewer, and a merge waiting on attention after green is the queue the
+    /// method exists to dissolve.
+    pub auto_merge: bool,
+}
