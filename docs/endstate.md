@@ -40,6 +40,25 @@ artifact of the journal, the way `ci.yml` is a derived artifact of the gate
 registry today. "Opening a file to read its interior" sounds, from the end state,
 the way "poking bytes into memory" sounds now.
 
+## The change itself is constructed
+
+Object-level verification — even proof-carrying artifacts — leaves the PROCESS
+that changes them unconstrained: raw file IO, raw shell, a checker judging the
+wreckage after the fact. This repository's deeper bet is that by-construction
+applies to the change, not only the changed. If states are inhabitants of the
+spec, changes are paths — and the end state types the path space: the verb
+algebra is the agent's ENTIRE affordance set, perception verbs the only
+observation channel, change verbs the only action channel, every action a judged
+transaction that either inhabits the algebra or refuses to exist. A refusal is a
+type error in the action language ("an interface change is not an edit"), caught
+before the change is real rather than after. The journal is then the composable
+record of well-typed paths — which is exactly what makes it minable as the
+environment's own memory. The fallback encyclopedia going quiet stops being a
+discipline and becomes a closure property. The honest frontier this leaves: the
+medium judging changes to the medium itself — self-reference is where
+by-construction processes bootstrap, and it is named here so it is worked, not
+waved at.
+
 ## No unkeyed green
 
 One invariant, enforced at every altitude at once: **a verdict cannot exist
@@ -65,7 +84,10 @@ but name — and the declared/derived split already separates what must be prove
 from what must be decided. The end state: a declared law is *discharged*, not
 probed; the battery survives as the counterexample-hunter for conjectures not yet
 proven and as the fast judge during authoring; the mutation sweeps retire
-degree-of-freedom by degree-of-freedom as the proofs pin each one. The HoTT frame
+degree-of-freedom by degree-of-freedom as the proofs pin each one. Where a proved
+source and a runnable artifact both exist, the artifact is EXTRACTED from the
+source — correspondence by derivation, never two renders held in sync by a lock
+when one can be a render of the other. The HoTT frame
 names where this points: the spec is the type, implementations are its
 inhabitants, and an equivalence between two implementations is a path — "derive
 the spec by running the thing" inverted, at last, into "inhabit the spec by
