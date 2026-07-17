@@ -7,6 +7,13 @@ once: **programming as a correct-by-construction activity.** Every gap between
 "the change I intended" and "the change that is true" closed by the medium, not by
 memory, discipline, or review-time vigilance.
 
+Epistemic status: a destination hypothesis, not a rule. It is deliberately NOT in
+the every-turn context — an aim injected on every turn hardens into dogma, a
+remembered green about the future. It lives here, reached through the roadmap's
+deliberate read, and it is held the way everything else here is held: adopted by a
+ratified diff, revisable by the same. A reading along the way that re-aims the
+destination is not a failure of this document; it is this document working.
+
 The method's one move — derive the fact, ratify the decision — does not change at
 the end. What changes is how much of the world it has eaten.
 

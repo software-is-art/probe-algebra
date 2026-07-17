@@ -4005,7 +4005,12 @@ evidence become construction, the roadmap deriving itself — with the one
 permanent remainder named (the loss function stays human). The honest frame is
 reframed by it, not repealed: "green is evidence" is a fact about the CURRENT
 instrument's bounded grids and sampled batteries, and the end state closes that
-gap like any other rather than enshrining it.
+gap like any other rather than enshrining it. Custody, decided deliberately: the
+document is reachable through this roadmap, NOT through the every-turn context —
+CLAUDE.md carries invariants that bind every action, and a destination is a
+hypothesis that new evidence may re-aim; injecting it per-turn would harden it
+into a remembered aim outliving its ratification, the exact class the method
+kills. Aims live where deliberate reads happen; rules live where every turn does.
 
 Field report, same day (the reading that sharpened the adoption): an outside
 system generated roughly eight thousand lines of systems code carrying roughly
