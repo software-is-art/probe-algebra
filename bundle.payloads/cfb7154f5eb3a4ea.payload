@@ -1,0 +1,52 @@
+/// Extract the judged facts from the three API payloads: the active branch rules
+/// (`GET /repos/{o}/{r}/rules/branches/<default>`), the repository object (merge-method
+/// flags, for rules that predate `allowed_merge_methods`, and the auto-merge flag), and
+/// the private vulnerability reporting flag. Unreadable payloads extract to the ABSENT
+/// state — which the judge refuses by name, never assumes.
+fn extract(rules_json: &str, repo_json: &str, pvr_json: &str) -> LivePerimeter {
+    let rules: Vec<serde_json::Value> = serde_json::from_str(rules_json).unwrap_or_default();
+    let repo: serde_json::Value = serde_json::from_str(repo_json).unwrap_or_default();
+    let pvr: serde_json::Value = serde_json::from_str(pvr_json).unwrap_or_default();
+
+    let has = |t: &str| rules.iter().any(|r| r["type"] == t);
+    let pull_request = rules.iter().find(|r| r["type"] == "pull_request");
+    let required_approvals =
+        pull_request.and_then(|r| r["parameters"]["required_approving_review_count"].as_u64());
+    // merge methods: the pull-request rule's `allowed_merge_methods` where present;
+    // otherwise the repository's allow_* flags (older rules / classic protection).
+    let merge_methods: Vec<String> =
+        match pull_request.and_then(|r| r["parameters"]["allowed_merge_methods"].as_array()) {
+            Some(methods) => methods
+                .iter()
+                .filter_map(|m| m.as_str())
+                .map(str::to_lowercase)
+                .collect(),
+            None => [
+                ("allow_merge_commit", "merge"),
+                ("allow_squash_merge", "squash"),
+                ("allow_rebase_merge", "rebase"),
+            ]
+            .iter()
+            .filter(|(flag, _)| repo[*flag].as_bool() == Some(true))
+            .map(|(_, method)| method.to_string())
+            .collect(),
+        };
+    let required_checks: Vec<String> = rules
+        .iter()
+        .filter(|r| r["type"] == "required_status_checks")
+        .filter_map(|r| r["parameters"]["required_status_checks"].as_array())
+        .flatten()
+        .filter_map(|c| c["context"].as_str())
+        .map(str::to_string)
+        .collect();
+
+    LivePerimeter {
+        deletion_blocked: has("deletion"),
+        force_push_blocked: has("non_fast_forward"),
+        required_approvals,
+        merge_methods,
+        required_checks,
+        private_vulnerability_reporting: pvr["enabled"].as_bool(),
+        auto_merge: repo["allow_auto_merge"].as_bool(),
+    }
+}

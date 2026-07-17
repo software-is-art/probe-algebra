@@ -48,6 +48,10 @@ pub struct Perimeter {
     pub merge_methods: &'static [&'static str],
     /// Private vulnerability reporting must be enabled (SECURITY.md points at it).
     pub private_vulnerability_reporting: bool,
+    /// Auto-merge must be enabled: green is the merge decision — the gates are the
+    /// reviewer, and a merge waiting on attention after green is the queue the
+    /// method exists to dissolve.
+    pub auto_merge: bool,
 }
 
 /// What the world reports, extracted from the GitHub API by `examples/perimeter.rs`
@@ -67,6 +71,9 @@ pub struct LivePerimeter {
     pub required_checks: Vec<String>,
     /// `None` = the endpoint could not be read; refused by name, never assumed.
     pub private_vulnerability_reporting: Option<bool>,
+    /// The repository's `allow_auto_merge` flag. `None` = unreadable; refused by
+    /// name, never assumed.
+    pub auto_merge: Option<bool>,
 }
 
 impl LivePerimeter {
@@ -83,6 +90,7 @@ impl LivePerimeter {
             merge_methods: _,
             required_checks,
             private_vulnerability_reporting: _,
+            auto_merge: _,
         } = self;
         let mut dents = Vec::new();
         let mut dent = |what: &str, must_name: &str, live: LivePerimeter| {
@@ -142,6 +150,16 @@ impl LivePerimeter {
             l.private_vulnerability_reporting = None;
             l
         });
+        dent("auto-merge disabled", "auto-merge is DISABLED", {
+            let mut l = self.clone();
+            l.auto_merge = Some(false);
+            l
+        });
+        dent("auto-merge unreadable", "auto-merge could not be READ", {
+            let mut l = self.clone();
+            l.auto_merge = None;
+            l
+        });
         dents
     }
 
@@ -174,6 +192,7 @@ impl LivePerimeter {
             "vuln".to_string(),
             Observed::Toggle(self.private_vulnerability_reporting),
         );
+        world.insert("auto_merge".to_string(), Observed::Toggle(self.auto_merge));
         world
     }
 }
@@ -186,6 +205,7 @@ impl Perimeter {
             required_approvals: 0,
             merge_methods: &["squash"],
             private_vulnerability_reporting: true,
+            auto_merge: true,
         }
     }
 
@@ -221,6 +241,15 @@ impl Perimeter {
         out.push_str(&format!(
             "- private vulnerability reporting: {}\n",
             if self.private_vulnerability_reporting {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        ));
+        out.push_str(&format!(
+            "- auto-merge: {} (green is the merge decision — the gates are the\n\
+             \x20 reviewer; a merge waiting on attention after green is the queue)\n",
+            if self.auto_merge {
                 "enabled"
             } else {
                 "disabled"
@@ -338,6 +367,7 @@ impl Perimeter {
                 Check::Covers(self.required_checks.clone()),
             ),
             Requirement::new("vuln", Check::Enabled),
+            Requirement::new("auto_merge", Check::Enabled),
         ])
     }
 
@@ -386,6 +416,15 @@ impl Perimeter {
                  READ — refused by name, never assumed enabled; verify the endpoint and \
                  the token's read access"
                 .to_string(),
+            ("auto_merge", Ok(())) => "auto-merge: enabled".to_string(),
+            ("auto_merge", Err(Fail::Off)) => "auto-merge is DISABLED — the declared \
+                 perimeter makes green the merge decision (enable auto-merge in the \
+                 repository's pull-request settings)"
+                .to_string(),
+            ("auto_merge", Err(Fail::Unread)) => "auto-merge could not be READ — refused \
+                 by name, never assumed enabled; verify the repository payload and the \
+                 token's read access"
+                .to_string(),
             other => panic!("unmapped perimeter line: {other:?}"),
         }
     }
@@ -407,6 +446,7 @@ mod probes {
                 .map(|s| s.to_string())
                 .collect(),
             private_vulnerability_reporting: Some(true),
+            auto_merge: Some(true),
         }
     }
 
@@ -504,6 +544,15 @@ mod probes {
         off.private_vulnerability_reporting = Some(false);
         let violations = p.judge(&off).unwrap_err();
         assert!(violations.iter().any(|v| v.contains("DISABLED")));
+
+        // auto-merge switched back off refuses by name — green stays the merge
+        // decision, or the gate says so:
+        let mut unarmed = applied_floor();
+        unarmed.auto_merge = Some(false);
+        let violations = p.judge(&unarmed).unwrap_err();
+        assert!(violations
+            .iter()
+            .any(|v| v.contains("auto-merge is DISABLED")));
     }
 
     /// The judge is DEAF TO NOTHING: every single-fact perturbation of the applied
@@ -519,7 +568,7 @@ mod probes {
             applied.dents(),
         )
         .expect("the perimeter judge distinguishes every fact");
-        assert_eq!(held.len(), 8, "{held:#?}");
+        assert_eq!(held.len(), 10, "{held:#?}");
         assert!(held
             .iter()
             .any(|h| h == "sensitive to required check `fmt + clippy + test` removed"));

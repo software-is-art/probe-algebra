@@ -53,7 +53,7 @@ diff — the committed diff is the ratification. A missing lock counts as stale.
 |---|---|
 | `spec/<theory>.spec`, `.system.spec`, `.shape.spec`, `.world.spec`, `.mutation.spec` | `cargo run --example freeze_spec` |
 | `spec/shapes.spec` (the law-language catalog) | `cargo run --example freeze_shapes` |
-| `spec/gates.spec`, `.github/workflows/ci.yml`, `spec/perimeter.spec`, `spec/perimeter.ruleset.json`, `spec/substrate.spec`, `spec/schemata.spec` (pipeline, settings perimeter, git substrate, and the compiled-mutant census are locks) | `cargo run --features schemata --example freeze_gates` |
+| `spec/gates.spec`, `.github/workflows/ci.yml`, `rust-toolchain.toml`, `spec/perimeter.spec`, `spec/perimeter.ruleset.json`, `spec/substrate.spec`, `spec/schemata.spec` (pipeline, toolchain pin, settings perimeter, git substrate, and the compiled-mutant census are locks) | `cargo run --features schemata --example freeze_gates` |
 | `spec/<system>.infra.spec` (the declared infra graph; its `.infra.register` floor is hand-authored, never generated) | `cargo run --example freeze_infra` |
 | `spec/qualify.spec` (public-surface census; build fails when stale) | `BLESS_QUALIFY=1 cargo build` |
 | `spec/tiers.spec` (the derived tier partition; KERNEL only via `spec/kernel.register`) | `BLESS_TIERS=1 cargo build` |

@@ -1,0 +1,34 @@
+/// The third pipeline lock: the toolchain pin as a derived artifact. The registry and
+/// the workflow froze first; this impl carries the pin's render and its lock — split
+/// from the sibling because an edit holds an impl's method-signature set.
+#[crate::mutate]
+impl GateRegistry {
+    /// The rustup pin — the same `TOOLCHAIN` constant that pins every CI runner,
+    /// rendered as the directory override rustup obeys in every checkout, so "the
+    /// toolchain CI tests against" and "the toolchain a checkout builds with" are one
+    /// claim. Components mirror the CI install (rustfmt, clippy): the gates a
+    /// contributor runs locally need the same tools the workflow provisions.
+    pub fn render_toolchain() -> String {
+        format!(
+            "# GENERATED from `discover::gates::TOOLCHAIN` — THE PIN IS A LOCK.\n\
+             # Never edit by hand: bump the constant in lockstep with regenerating the\n\
+             # compile-fail `.stderr` files (TRYBUILD=overwrite), then re-freeze with\n\
+             # `cargo run --example freeze_gates` and ratify the diff. rustup reads\n\
+             # this file in every checkout, so the pin binds local builds, not only CI.\n\
+             [toolchain]\n\
+             channel = \"{TOOLCHAIN}\"\n\
+             components = [\"rustfmt\", \"clippy\"]\n"
+        )
+    }
+
+    /// The toolchain lock — `rust-toolchain.toml` held byte for byte to the constant's
+    /// render, beside the registry and the workflow: a hand edit to the pin is DRIFT,
+    /// caught by the same `cargo test` the pin governs.
+    pub fn toolchain_lock() -> Lock {
+        Lock {
+            name: "rust toolchain pin".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("rust-toolchain.toml"),
+            live: Self::render_toolchain(),
+        }
+    }
+}

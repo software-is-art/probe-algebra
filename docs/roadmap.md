@@ -3954,3 +3954,151 @@ first-class.
   question, pointed at its own ratification step: some of what is signed today is a
   derivation whose dataset has not finished arriving. What no amount of journal
   converts: the loss function — which demands ought to exist stays prose.
+
+## The toolchain pin becomes structure in the medium: `rust-toolchain.toml` (BUILT)
+
+Built 2026-07-17, closing the candidate named the same day (#59). The pin is now the
+THIRD pipeline lock: `GateRegistry::render_toolchain` renders `rust-toolchain.toml`
+from the same `TOOLCHAIN` constant that pins every CI runner (components mirror the
+CI install — rustfmt, clippy), `toolchain_lock` rides `freeze_gates` beside the
+registry and the workflow, and the freshness probe holds all three byte for byte —
+a hand edit to the pin fails inside the very `cargo test` the pin governs. rustup
+obeys the committed file in every checkout, so "the toolchain CI tests against" and
+"the toolchain a checkout builds with" are one claim, not a memory and a hope.
+
+Acceptance was this container itself: rustup's default here is 1.94.1 — the exact
+gap the candidate documented, compile-fail suites red under bare `cargo test` — and
+after the mint the same bare command went green with no `rustup default` run by
+hand. The hand-work line the candidate flagged is retired by the artifact. The
+support census keeps the honesty: `Support::RustSurface` now admits
+`rust-toolchain.toml` (the rustfmt that runs rides the pin), so a toolchain bump
+can never hold a stale fmt green in the verdict store.
+
+Readings from the build: the suit refused the first attempt — `bundle edit` holds
+an impl's method-signature set ("an interface change is not an edit"), so the two
+new methods arrived as a sibling impl through `add`, the same grain the item
+relation grew by. Residual, named: the consumer `Pipeline::locks_in` (what genesis
+emits) still renders only the registry and workflow locks — a generated crate's
+checkout does not yet carry its declared pin; the consumer twin of this brick is
+one more lock in that list when a genesis crate first trips the same gap.
+
+Judgment addendum, same session: the minted site was judged killed by hand
+(`PROBE_MUTANT` × the gates probes — the freshness lock and the pin probe both go
+red under the flip). The judging surfaced a reading worth keeping: a site's id is
+the WHOLE census line, arrow and flip value included
+(`...render_toolchain:deaf -> String::new()`), and the truncated form arms
+nothing — silently, a green that means "you flipped nothing". Nothing ratifies
+that answer today; it took a macro-interior read (`mutate_body`'s
+`format!("{label}:deaf -> {desc}")`) to learn. Two candidate bricks it names:
+`schemata judge` (or a new verb) could refuse a `PROBE_MUTANT` that matches no
+census site — the deaf-but-armed state is exactly the unkeyed-verdict class,
+one altitude down; and the full local `verify` after a support change re-keys
+everything (~950 moved sites, serial cargo-test-per-site without nextest) is a
+container-hours run — the incremental tier's economics depend on the warm store
+the session hook (PR #56) provisions.
+
+## The end state, adopted: correct by construction (docs/endstate.md)
+
+Adopted 2026-07-17: the destination now has its own document. The five asymptotes
+— structure as the only memory, the text file gone archaic, no unkeyed green,
+evidence become construction, the roadmap deriving itself — with the one
+permanent remainder named (the loss function stays human). The honest frame is
+reframed by it, not repealed: "green is evidence" is a fact about the CURRENT
+instrument's bounded grids and sampled batteries, and the end state closes that
+gap like any other rather than enshrining it. Custody, decided deliberately: the
+document is reachable through this roadmap, NOT through the every-turn context —
+CLAUDE.md carries invariants that bind every action, and a destination is a
+hypothesis that new evidence may re-aim; injecting it per-turn would harden it
+into a remembered aim outliving its ratification, the exact class the method
+kills. Aims live where deliberate reads happen; rules live where every turn does.
+
+Field report, same day (the reading that sharpened the adoption): an outside
+system generated roughly eight thousand lines of systems code carrying roughly
+ten thousand lines of machine-checked proof — hundreds of definitions and
+theorems, end-to-end correctness properties, authored autonomously in about three
+minutes. What it taught: the route from sampled refutation to discharged theorem
+is not speculative, it is shipping — proof-carrying machine authorship at
+interactive speed is a demonstrated capability, so the gap between our batteries
+(evidence) and proofs (construction) is an engineering distance, not a research
+bet. What it did NOT show, which is exactly this repository's ground: the medium
+that keeps a thousand such artifacts honest across time — judged transactions,
+drift gates, content-keyed verdicts, the census of what is and is not yet proven.
+The two halves are complementary: their demonstration is the discharge step;
+our machinery is what makes discharge a STANDING fact about a living tree
+instead of a one-shot artifact. The HoTT angle, named for the catalog: a shape's
+law is already a typed, slotted equation — a proof obligation in everything but
+name; the spec as the type, implementations as inhabitants, equivalence between
+implementations as a path. The promotion path when this brick is picked up: one
+law of one settled theory, discharged as a proof and its ratified mutation
+survivors retired by it — the first green that is not a sample.
+
+Field report amendment (2026-07-18, on reaching the primary source): the earlier
+reading undersold it. The outside system is not "generate then check" — the model
+is confined to ONE hop (natural language → a formal DSL spec) and everything
+downstream is a deterministic compiler emitting the implementation AND its proofs
+from the same source, claimed verified down to the floating-point axioms. That is
+the second rule at proof altitude: one declaration, many derived artifacts,
+nothing restated — their DSL is to their C-plus-proofs what our gate registry is
+to ci.yml and the toolchain pin. The near-1:1 proof-to-code ratio that looked
+suspicious is the signature of proofs RENDERED rather than searched for. The
+sharpened complement: their residual trust sits in the compiler and in the one
+stochastic hop — does the spec say what was meant? — and spec-judgment is exactly
+this repository's half (derive the spec by running the thing, mutation as
+tightness, the ratified diff as the intent check). Spec → artifact with proofs;
+artifact → spec with evidence and a signature. Each direction is the other's
+missing half, and the promotion path already named (one settled law, discharged)
+is where they would meet.
+
+## Candidate sharpened: eliminating the gate in the path — the countersign chases the tip
+
+Sharpened 2026-07-18, extending the ceremony-layer candidate with the mechanism.
+The required check re-derives, in minutes and under attention, facts the authoring
+container already established; the elimination is three moves plus a floor. (1)
+Verdicts become PORTABLE, COUNTERSIGNED facts: the store already keys green by
+(gate, support, content) — what CI distrusts is the claim, not the math, so give
+verdict records signatures from a trusted runner and the merge check collapses to
+a ledger audit. (2) Judgment moves to CHANGE TIME: a branch of judged transactions
+is green by induction; the missing piece is support grain — per-file admits
+re-keyed the whole store when the support itself moved (measured in the pin PR),
+where per-item/per-site keys (the coverage map already holds site→test edges)
+would re-judge only what moved. (3) The countersign CHASES THE TIP instead of
+gating it — the mutants-green tag already runs this pattern weekly, off the
+critical path; generalized to every change, merge lands when the ledger is
+complete, a red countersign is a detection, and the substrate's history laws name
+the compensation. The floor that remains: the trust root (whose keys countersign
+is a ratified decision), the Effectful world gates (event-time by nature), and
+the async ratification signatures — none of which belong in the path. Beneath all
+three, the endstate's constructed-change program shrinks the owed set itself:
+each invariant that migrates into the verb algebra stops being a gate that
+re-runs and becomes a refusal that never needed to. Near-term, boring, real: CI
+carrying its own verdict store across runs, and the auto-merge settings decision
+already flagged above.
+
+## Auto-merge joins the floor: green is the merge decision (BUILT)
+
+Built 2026-07-18, the first brick of the lead-time sprint. The repository's
+`allow_auto_merge` flag is now a DECLARED perimeter fact: one more line in the
+floor (`- auto-merge: enabled`), one more judged observation (the flag rides the
+repo payload `.github/perimeter.sh` already fetches — no new read), two more
+dents (disabled, unreadable — the deaf-judge census moves 8 → 10), and the
+refusals teach ("auto-merge is DISABLED — the declared perimeter makes green the
+merge decision"). The toggle was flipped by hand first (the WRITE stays human);
+the declaration makes the click a locked fact the weekly world gate defends —
+switched off silently, it refuses by name. What this buys: PR lead time on green
+collapses from attention-hours to check-minutes; the merge button leaves the
+path for every PR that arms auto-merge, which agents can do through the API.
+
+FIELD REPORT from the build — the verbs strand on a multi-item interface change:
+growing `Perimeter` by a field was accepted by `edit` (structs hold no signature
+set), but the tree was then briefly un-compilable until `declared()` learned the
+field — and the NEXT verb refused on that broken build, including `show`:
+perception judges too, so the suit was unreachable from inside its own
+intermediate state. There is no transaction envelope spanning items — a change
+whose smallest honest unit is "field + its initializers + its observers" cannot
+be said in one judged breath. The remaining edits fell back to file patching
+(recorded, as the second rule requires). The missing verb is the atomic
+multi-item transaction: stage several item edits, judge the RESULT, land all or
+none — the same all-or-nothing the single-item verbs already promise, one level
+up. Note the asymmetry worth keeping when it is built: single-item refusal
+teaches instantly; a staged transaction should refuse with the full residue
+(which items still owe what), not just the first error.

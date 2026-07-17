@@ -1,0 +1,8 @@
+# GENERATED from `discover::gates::TOOLCHAIN` — THE PIN IS A LOCK.
+# Never edit by hand: bump the constant in lockstep with regenerating the
+# compile-fail `.stderr` files (TRYBUILD=overwrite), then re-freeze with
+# `cargo run --example freeze_gates` and ratify the diff. rustup reads
+# this file in every checkout, so the pin binds local builds, not only CI.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]

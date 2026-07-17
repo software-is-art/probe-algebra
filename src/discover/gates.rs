@@ -1113,7 +1113,8 @@ pub enum Support {
     /// `spec/` via `include_str!`, ride `build.rs`, and read the registers.
     Judged,
     /// The Rust surface only: `*.rs` plus the manifests that discover workspace
-    /// members (`Cargo.toml`, `Cargo.lock`) and rustfmt config — `cargo fmt` parses
+    /// members (`Cargo.toml`, `Cargo.lock`), rustfmt config, and the toolchain pin
+    /// (`rust-toolchain.toml` selects the rustfmt that runs) — `cargo fmt` parses
     /// Rust and nothing else.
     RustSurface,
 }
@@ -1131,9 +1132,48 @@ impl Support {
                 relative.ends_with(".rs")
                     || matches!(
                         name,
-                        "Cargo.toml" | "Cargo.lock" | "rustfmt.toml" | ".rustfmt.toml"
+                        "Cargo.toml"
+                            | "Cargo.lock"
+                            | "rustfmt.toml"
+                            | ".rustfmt.toml"
+                            | "rust-toolchain.toml"
                     )
             }
+        }
+    }
+}
+
+/// The third pipeline lock: the toolchain pin as a derived artifact. The registry and
+/// the workflow froze first; this impl carries the pin's render and its lock — split
+/// from the sibling because an edit holds an impl's method-signature set.
+#[crate::mutate]
+impl GateRegistry {
+    /// The rustup pin — the same `TOOLCHAIN` constant that pins every CI runner,
+    /// rendered as the directory override rustup obeys in every checkout, so "the
+    /// toolchain CI tests against" and "the toolchain a checkout builds with" are one
+    /// claim. Components mirror the CI install (rustfmt, clippy): the gates a
+    /// contributor runs locally need the same tools the workflow provisions.
+    pub fn render_toolchain() -> String {
+        format!(
+            "# GENERATED from `discover::gates::TOOLCHAIN` — THE PIN IS A LOCK.\n\
+             # Never edit by hand: bump the constant in lockstep with regenerating the\n\
+             # compile-fail `.stderr` files (TRYBUILD=overwrite), then re-freeze with\n\
+             # `cargo run --example freeze_gates` and ratify the diff. rustup reads\n\
+             # this file in every checkout, so the pin binds local builds, not only CI.\n\
+             [toolchain]\n\
+             channel = \"{TOOLCHAIN}\"\n\
+             components = [\"rustfmt\", \"clippy\"]\n"
+        )
+    }
+
+    /// The toolchain lock — `rust-toolchain.toml` held byte for byte to the constant's
+    /// render, beside the registry and the workflow: a hand edit to the pin is DRIFT,
+    /// caught by the same `cargo test` the pin governs.
+    pub fn toolchain_lock() -> Lock {
+        Lock {
+            name: "rust toolchain pin".to_string(),
+            path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("rust-toolchain.toml"),
+            live: Self::render_toolchain(),
         }
     }
 }
@@ -1169,14 +1209,19 @@ mod tests {
         assert_eq!(check_context(&plain), "dogfood (audit)");
     }
 
-    /// BOTH pipeline locks are fresh: the committed inventory and the committed workflow
-    /// match the registry's renders. A hand edit to `ci.yml` fails HERE — inside the very
+    /// ALL THREE pipeline locks are fresh: the committed inventory, the committed
+    /// workflow, and the committed toolchain pin match the registry's renders. A hand
+    /// edit to `ci.yml` or `rust-toolchain.toml` fails HERE — inside the very
     /// `cargo test` the workflow runs — so the pipeline can no longer drift silently the
     /// way it did (the `--workspace` gap lived undetected precisely because nothing held
     /// the YAML to a declaration).
     #[test]
     fn the_pipeline_locks_are_fresh() {
-        let locks = [GateRegistry::registry_lock(), GateRegistry::workflow_lock()];
+        let locks = [
+            GateRegistry::registry_lock(),
+            GateRegistry::workflow_lock(),
+            GateRegistry::toolchain_lock(),
+        ];
         if let Err(stale) = spec_lock::check(&locks) {
             panic!(
                 "the pipeline drifted from its declaration: {}. Regenerate with \
@@ -1185,6 +1230,21 @@ mod tests {
                 stale.join(", ")
             );
         }
+    }
+
+    /// The pin's render is held at its load-bearing points: the channel IS the
+    /// constant, the components match the CI install, and the lock lands at the
+    /// repository root where rustup looks for it.
+    #[test]
+    fn the_toolchain_pin_renders_the_constant() {
+        let pin = GateRegistry::render_toolchain();
+        assert!(pin.contains(&format!("channel = \"{TOOLCHAIN}\"")));
+        assert!(pin.contains("components = [\"rustfmt\", \"clippy\"]"));
+        assert!(pin.starts_with("# GENERATED from `discover::gates::TOOLCHAIN`"));
+        let lock = GateRegistry::toolchain_lock();
+        assert_eq!(lock.name, "rust toolchain pin");
+        assert!(lock.path.ends_with("rust-toolchain.toml"));
+        assert_eq!(lock.live, pin);
     }
 
     /// THE PAID-FOR BUG CLASS, as a census over the DATA: every cargo gate that runs tests
