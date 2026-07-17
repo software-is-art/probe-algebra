@@ -3935,3 +3935,22 @@ first-class.
   medium instead of a fact about CI. The hand-work line this entry retires: the
   `rustup default` run by hand this session, a derivation (the committed pin) plus a
   signature (nobody's — it should need none).
+- **Candidate: the journal as the environment — change locality as the carving's
+  empirical judge** (named 2026-07-17, reading an outside harness that saturated an
+  interactive benchmark by holding state representation and transition rules in one
+  editable program). What that work has and we lack is a fast judge: its next frame
+  arrives in milliseconds and cleanly indicts the last revision, so representation
+  repairs need no signature — the environment punishes the bad ones. Our next frame
+  is the next hundred edits: a wrong module carving is punished by demands that
+  should be local deltas smearing across items, a verdict that arrives in days and
+  confounded with task difficulty. The ratification signature on representation
+  choices is therefore a LATENCY PROXY, not a metaphysical necessity — and the item
+  relation is quietly accumulating the dataset that could retire part of it, because
+  verbs are typed deltas, so delta size and locality per demand is computable over
+  journal history where text churn never was. The promotion path: the cohesion
+  report, today a static suggestion from law-connectivity, gains an empirical
+  column — this carving's measured cost against the actual change stream — and
+  "this module is secretly several" upgrades from taste to evidence. The standing
+  question, pointed at its own ratification step: some of what is signed today is a
+  derivation whose dataset has not finished arriving. What no amount of journal
+  converts: the loss function — which demands ought to exist stays prose.
