@@ -109,3 +109,15 @@ which freedoms are worth keeping, what the thing is *for* — that is judgment, 
 its signature stays human. Everything between a human's "this ought to be true"
 and the machine's "it is, constructively" belongs to the medium. The end state is
 reached when that sentence describes the whole distance.
+
+## A note on the name
+
+"Probe-algebra" names the instrument of the first stratum: an algebra whose
+inhabitants were probes. The thesis has outgrown it — probes survive at the end
+state only as the counterexample-hunter and the fast authoring judge, while the
+algebra's real carriers are the verbs and the paths, the constructed change
+itself. The name is now too narrow: the one-word spec of the whole describes a
+part. It stays for now — a name is the most prose a thing has, and the right one
+may fall out of whichever brick lands first from these sections, the way the
+built things here keep naming themselves. Recorded so the eventual rename is a
+ratification of something already true, not a rebrand.
