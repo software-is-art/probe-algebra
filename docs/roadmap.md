@@ -3996,3 +3996,33 @@ one altitude down; and the full local `verify` after a support change re-keys
 everything (~950 moved sites, serial cargo-test-per-site without nextest) is a
 container-hours run — the incremental tier's economics depend on the warm store
 the session hook (PR #56) provisions.
+
+## The end state, adopted: correct by construction (docs/endstate.md)
+
+Adopted 2026-07-17: the destination now has its own document. The five asymptotes
+— structure as the only memory, the text file gone archaic, no unkeyed green,
+evidence become construction, the roadmap deriving itself — with the one
+permanent remainder named (the loss function stays human). The honest frame is
+reframed by it, not repealed: "green is evidence" is a fact about the CURRENT
+instrument's bounded grids and sampled batteries, and the end state closes that
+gap like any other rather than enshrining it.
+
+Field report, same day (the reading that sharpened the adoption): an outside
+system generated roughly eight thousand lines of systems code carrying roughly
+ten thousand lines of machine-checked proof — hundreds of definitions and
+theorems, end-to-end correctness properties, authored autonomously in about three
+minutes. What it taught: the route from sampled refutation to discharged theorem
+is not speculative, it is shipping — proof-carrying machine authorship at
+interactive speed is a demonstrated capability, so the gap between our batteries
+(evidence) and proofs (construction) is an engineering distance, not a research
+bet. What it did NOT show, which is exactly this repository's ground: the medium
+that keeps a thousand such artifacts honest across time — judged transactions,
+drift gates, content-keyed verdicts, the census of what is and is not yet proven.
+The two halves are complementary: their demonstration is the discharge step;
+our machinery is what makes discharge a STANDING fact about a living tree
+instead of a one-shot artifact. The HoTT angle, named for the catalog: a shape's
+law is already a typed, slotted equation — a proof obligation in everything but
+name; the spec as the type, implementations as inhabitants, equivalence between
+implementations as a path. The promotion path when this brick is picked up: one
+law of one settled theory, discharged as a proof and its ratified mutation
+survivors retired by it — the first green that is not a sample.

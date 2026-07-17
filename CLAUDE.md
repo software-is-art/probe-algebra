@@ -42,7 +42,8 @@ record it in docs/roadmap.md's hand-work inventory — naming it is the brick's 
 Orientation: `README.md` is the front door, `docs/tour.md` the guided walk,
 `docs/discovery.md` the discovery reference, `docs/compile-time.md` the compile-time
 edge grammar, `docs/roadmap.md` the build history and what's next, `docs/experience.md`
-the authoring program. Read the roadmap before designing anything new.
+the authoring program, `docs/endstate.md` the destination (correct-by-construction,
+adopted 2026-07-17). Read the roadmap before designing anything new.
 
 ## The one rule
 
