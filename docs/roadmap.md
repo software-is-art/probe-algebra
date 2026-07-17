@@ -3523,6 +3523,49 @@ status, candidates, readings). A zoomed rendering — one line per entry at
 altitude zero, expand on demand — is the cheapest honest test of the family,
 and the consumer is real: every session opens with exactly this need.
 
+Extended 2026-07-17 (Callum): a candidate viewport, a second consumer, and a
+second delta source.
+
+Viewport candidate: the tldraw SDK (the library, not their app). Semantic zoom
+is native to it — custom shapes render differently per zoom level, culling and
+text LOD are built in — and its store sits on incrementally-maintained signals,
+so a Pad++ portal is just a shape subscribed to a maintained query: the same
+claim the dataflow kernel makes, in a different medium. Field evidence from an
+outside experiment: recursive frame-collapse — a frame folds into its parent
+space as a single named node, at every depth — was buildable in an afternoon on
+the SDK and made freehand architecture diagrams tidy. That discrete nesting
+fits our ladder (topography → theory → items → body) better than continuous
+geometric zoom does, since the ladder is discrete anyway. The constraint stands
+regardless of viewport: the altitude-indexed rendering family lives on the Rust
+side as a declared function; the canvas maps zoom to altitude and displays what
+the kernel serves — zoom levels never live in shape code. Two costs, named:
+the relation has no geometry, so placement is its own derived view (a layout
+function, not hand-arranged positions), and the SDK's license trades a
+watermark for a fee.
+
+Second consumer: the human at the glass, beside the agent at the aperture.
+Every verb is already a delta source — an edit is a two-row delta, a collect a
+set of retractions — so a canvas subscribed to the delta stream shows agent
+work live with zero added instrumentation: no invented event schema, the
+mechanism IS the schema. And because "what the agent sees at altitude k" is a
+declared function, an agent's context viewport is itself renderable as a
+portal — watch the aperture move across the surface in one frame while its
+writes land in another. Seeing an agent stuck, or sensing how the work is
+going well enough to improve the process, falls out of watching deltas and
+apertures; nothing extra is built for it.
+
+Second delta source: human gestures, as coordination — not micromanagement,
+and not approval gates (judgment stays off the critical path). A gesture on
+the canvas compiles to a judged artifact, never open text feeding rules: a
+region drawn around modules is a scoped work item, a wireframe sketched in a
+frame is a dispatch — an agent picks it up as data and implements it — a note
+dropped on a frame is a roadmap candidate. Human intent enters the medium the
+same way everything else does, as deltas over the relation, and agents consume
+it the same way they consume everything else. Ordering unchanged: all of this
+subscribes to the item-relation bricks (relation at repo scale, maintained
+views, the delta stream) and can arrive late; none of it can arrive honestly
+before them.
+
 ## The item relation, brick 1: the tree recognized as data (BUILT)
 
 Built 2026-07-15, the same day brick 2 closed the CLI loop — the two are one
