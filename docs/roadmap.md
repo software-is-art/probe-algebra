@@ -4031,3 +4031,20 @@ name; the spec as the type, implementations as inhabitants, equivalence between
 implementations as a path. The promotion path when this brick is picked up: one
 law of one settled theory, discharged as a proof and its ratified mutation
 survivors retired by it — the first green that is not a sample.
+
+Field report amendment (2026-07-18, on reaching the primary source): the earlier
+reading undersold it. The outside system is not "generate then check" — the model
+is confined to ONE hop (natural language → a formal DSL spec) and everything
+downstream is a deterministic compiler emitting the implementation AND its proofs
+from the same source, claimed verified down to the floating-point axioms. That is
+the second rule at proof altitude: one declaration, many derived artifacts,
+nothing restated — their DSL is to their C-plus-proofs what our gate registry is
+to ci.yml and the toolchain pin. The near-1:1 proof-to-code ratio that looked
+suspicious is the signature of proofs RENDERED rather than searched for. The
+sharpened complement: their residual trust sits in the compiler and in the one
+stochastic hop — does the spec say what was meant? — and spec-judgment is exactly
+this repository's half (derive the spec by running the thing, mutation as
+tightness, the ratified diff as the intent check). Spec → artifact with proofs;
+artifact → spec with evidence and a signature. Each direction is the other's
+missing half, and the promotion path already named (one settled law, discharged)
+is where they would meet.
