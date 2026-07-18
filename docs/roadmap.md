@@ -4102,3 +4102,21 @@ none — the same all-or-nothing the single-item verbs already promise, one leve
 up. Note the asymmetry worth keeping when it is built: single-item refusal
 teaches instantly; a staged transaction should refuse with the full residue
 (which items still owe what), not just the first error.
+
+- **Candidate: the authored medium flips per-module — Rust becomes the render**
+  (named 2026-07-18, the third surfacing of the theme). The suit editing Rust
+  items is the bootstrap, not the asymptote: every brick to date has moved a fact
+  up into a declaration and turned the Rust beneath it into a render (the
+  registry, the catalog, genesis, the perimeter, the pin), and `declare`/`lift`
+  already make declarations partial citizens of the verb algebra. The long-term
+  shape: for each SETTLED theory, authorship flips from "Rust, spec derived by
+  running" to "spec, Rust derived by construction" — the endstate's arrow
+  inversion applied module by module, with the engine itself staying hand-Rust
+  (kernel tier) the way compilers are still written in something. The promotion
+  criterion falls out of machinery we already trust: a module is ready to flip
+  when its mutation lock stops growing — no degrees of freedom left that its
+  declaration does not pin. The grain lesson to carry: the suit's true unit was
+  never the Rust item but the smallest ratifiable claim; items were the proxy,
+  declarations are truer, and the render target keeps mattering — Rust's types
+  carry by-construction guarantees the rendered layer inherits for free, where a
+  C render must haul every guarantee in proofs.
