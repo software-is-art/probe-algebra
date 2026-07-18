@@ -4194,3 +4194,25 @@ none — the same all-or-nothing the single-item verbs already promise, one leve
 up. Note the asymmetry worth keeping when it is built: single-item refusal
 teaches instantly; a staged transaction should refuse with the full residue
 (which items still owe what), not just the first error.
+
+## The survivor named, and the vacuous-green class confirmed live (2026-07-18)
+
+The red check on this branch's sweep is diagnosed and killed: the survivor was
+`spoke:1: && -> ||` — the payload-address recognizer's conjunction
+(`len == 16 && all-hex`), whose flip strips a short hex-looking tail (` @cafe`)
+off a declare line and lets the declaration silently succeed where the true code
+counts the entry beyond the horizon. The killing probe pins the honest reading: a
+short hex tail is PROSE, not an address. Two lessons the diagnosis paid for:
+(1) this branch's "22 sites judged killed by hand" was VACUOUS — the judging
+predated the site-id discovery (the id is the whole census line, arrow and flip
+included; a truncated id arms nothing and passes green), so all 22 hand-verdicts
+judged an unflipped tree. Twenty-one were covered by real probes anyway; this one
+was not, and only CI's sweep — which arms sites by their true ids — caught it.
+The refusing-selector candidate (a PROBE_MUTANT matching no census site refuses)
+graduates from convenience to CONFIRMED NEED: the vacuous green has now cost two
+CI cycles and a container-day of local sweeps. (2) The check run's failure output
+is EMPTY and its logs 404 from the API — the sweep's survivor list died with the
+runner, and the diagnosis had to be re-derived locally by hand-judging the
+branch's minted sites (fast path: narrow per-module test filters, full-suite
+confirm on candidates). The red-checks-carry-their-diagnosis brick is likewise
+confirmed, not speculative.

@@ -511,4 +511,30 @@ mod probes {
             "{report}"
         );
     }
+
+    /// The address recognizer demands BOTH facts — sixteen chars AND hex — before a
+    /// tail is a payload address: a short hex-looking tail (` @cafe`) is PROSE, part
+    /// of the declaration, so the entry refuses and counts beyond the horizon rather
+    /// than silently shedding its tail. (The compiled site this pins: `spoke:1:
+    /// && -> ||` — under the flip the tail is stripped, the declare succeeds, and
+    /// the horizon count lies.)
+    #[test]
+    fn spoke_reads_a_short_hex_tail_as_prose_not_address() {
+        let root = scratch("spoke-tail");
+        let store = PayloadStore::beside(&root);
+        let birth = "#[crate::algebra(Peak, \"peak\")]\npub mod peak {\n    pub fn peak(a: i64, b: i64) -> i64 {\n        a.max(b)\n    }\n}\n";
+        let journal = format!(
+            "add m.rs — mod peak @{}\ndeclare m.rs — commutative(peak) @cafe\n",
+            store.stash(birth).unwrap()
+        );
+        let report = Replay::spoke(&journal, &store, "peak").expect("reports");
+        assert!(
+            report.contains("entry 1 (add m.rs — mod peak): + peak"),
+            "{report}"
+        );
+        assert!(
+            report.contains("1 of 2 entries beyond the horizon"),
+            "{report}"
+        );
+    }
 }

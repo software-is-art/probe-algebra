@@ -195,3 +195,5 @@ edit examples/freeze_gates.rs — main @a4680e2b8dbbc9b9
 edit src/discover/perimeter.rs — Perimeter @6c8d8e64023815c7
 edit examples/perimeter.rs — extract @cfb7154f5eb3a4ea
 edit examples/perimeter.rs — probes @795e343cf167ddb5
+edit src/discover/store.rs — probes @5109ee5f85e6d561
+edit src/discover/store.rs — probes @8064e30c54babbaa
