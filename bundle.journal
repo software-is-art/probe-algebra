@@ -197,3 +197,4 @@ edit examples/perimeter.rs — extract @cfb7154f5eb3a4ea
 edit examples/perimeter.rs — probes @795e343cf167ddb5
 edit src/discover/store.rs — probes @5109ee5f85e6d561
 edit src/discover/store.rs — probes @8064e30c54babbaa
+edit examples/schemata.rs — outcome @352eaac80081d879

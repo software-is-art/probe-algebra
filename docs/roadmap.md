@@ -4216,3 +4216,27 @@ runner, and the diagnosis had to be re-derived locally by hand-judging the
 branch's minted sites (fast path: narrow per-module test filters, full-suite
 confirm on candidates). The red-checks-carry-their-diagnosis brick is likewise
 confirmed, not speculative.
+
+## The wedge named: a shell-out inside the no-shell pipeline (2026-07-18)
+
+The three-PR red streak on the perception-verbs branch is fully diagnosed, and
+the mutant was innocent. The chain: `shape::find:0: != -> ==` flips the
+union-find's loop into a spin, every placer-touching test hangs, the per-site
+timeout fires as designed — and then the harness's group kill, `kill -9 -<pid>`
+run as an EXTERNAL command, refuses silently (procps `kill` reads `-<pid>` as a
+flag; only the shell builtin accepts the bare form), its status is discarded,
+and the blocking `wait` one line later wedges the worker forever on a child that
+was never killed. In CI the wedged job died with empty check output and
+unfetchable logs, which is why three diagnosis rounds ran blind. The fix is `--`
+before the negative pid — but the lesson is the doctrine the sweep already
+states: "the whole pipeline is typed Rust with pinned semantics, no shell." The
+one shell-out left in the judgment path is exactly where it broke; the residual
+brick is replacing it with a direct signal syscall so the kill's failure is at
+least observable. Timeout-as-detection held throughout: once unwedged, the site
+judged `timeout (detection)` and the sweep ran clean — 969 sites, 2 survivors,
+both long-ratified. The fresh attestation commits with this entry; every PR
+since #58 had been silently paying a 190-site incremental re-judgment because
+the transcript was three trees stale, and the countersign tier now judges in
+minutes. Also confirmed at cost, again: red checks must carry their diagnosis —
+this hunt burned four local sweep attempts across container deaths because the
+runner's knowledge died with it.
