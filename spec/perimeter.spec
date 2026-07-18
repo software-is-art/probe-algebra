@@ -16,3 +16,5 @@
 - force pushes to the default branch: blocked
 - deletion of the default branch: blocked
 - private vulnerability reporting: enabled
+- auto-merge: enabled (green is the merge decision — the gates are the
+  reviewer; a merge waiting on attention after green is the queue)

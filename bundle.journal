@@ -187,3 +187,11 @@ edit src/discover/cli.rs — Sort @62d2837ce61f2034
 edit examples/bundle.rs — run @26a24beb8696e1e0
 edit src/discover/store.rs — probes @163e6c7cea399bcb
 edit src/discover/bundle.rs — select_addressed @38f122ab54a0d443
+add src/discover/gates.rs —  @a14c653516b0cb17
+edit src/discover/gates.rs — impl Support @f4b83aa9e105b954
+edit src/discover/gates.rs — Support @0b5063377e2fe8ff
+edit src/discover/gates.rs — tests @0ab7d21afb8529f4
+edit examples/freeze_gates.rs — main @a4680e2b8dbbc9b9
+edit src/discover/perimeter.rs — Perimeter @6c8d8e64023815c7
+edit examples/perimeter.rs — extract @cfb7154f5eb3a4ea
+edit examples/perimeter.rs — probes @795e343cf167ddb5

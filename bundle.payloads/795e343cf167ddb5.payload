@@ -1,0 +1,43 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    /// EXTRACTION over real payload shapes: a fully-applied perimeter round-trips into
+    /// the judged facts, `allowed_merge_methods` wins over the repo flags when present,
+    /// the flags carry rules that predate it, and garbage payloads extract to the
+    /// absent state the judge refuses.
+    #[test]
+    fn the_api_payloads_extract_into_the_judged_facts() {
+        let rules = r#"[
+            {"type":"deletion"},
+            {"type":"non_fast_forward"},
+            {"type":"pull_request","parameters":{"required_approving_review_count":0,"allowed_merge_methods":["squash"]}},
+            {"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"fmt + clippy + test"},{"context":"dogfood (changed lines)"}]}}
+        ]"#;
+        let repo = r#"{"allow_merge_commit":true,"allow_squash_merge":true,"allow_rebase_merge":false,"allow_auto_merge":true}"#;
+        let live = extract(rules, repo, r#"{"enabled":true}"#);
+        assert!(live.deletion_blocked && live.force_push_blocked);
+        assert_eq!(live.required_approvals, Some(0));
+        // the rule's allowed_merge_methods wins — the repo's wider flags are ignored:
+        assert_eq!(live.merge_methods, vec!["squash"]);
+        assert_eq!(live.required_checks.len(), 2);
+        assert_eq!(live.private_vulnerability_reporting, Some(true));
+        assert_eq!(live.auto_merge, Some(true));
+        assert!(Perimeter::declared().judge(&live).is_ok());
+
+        // no allowed_merge_methods on the rule: the repo flags carry the answer.
+        let old_rule =
+            r#"[{"type":"pull_request","parameters":{"required_approving_review_count":0}}]"#;
+        let live = extract(old_rule, repo, "{}");
+        assert_eq!(live.merge_methods, vec!["merge", "squash"]);
+        assert_eq!(live.private_vulnerability_reporting, None);
+        assert_eq!(live.auto_merge, Some(true));
+
+        // garbage extracts to absence — and absence refuses downstream, never passes.
+        let live = extract("not json", "also not", "");
+        assert!(!live.deletion_blocked);
+        assert_eq!(live.required_approvals, None);
+        assert_eq!(live.auto_merge, None);
+        assert!(Perimeter::declared().judge(&live).is_err());
+    }
+}
