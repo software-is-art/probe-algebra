@@ -352,8 +352,13 @@ fn outcome(mut cmd: Command, limit: Duration) -> &'static str {
             }
             None if start.elapsed() > limit => {
                 // negative pid = the whole group; then reap the direct child.
+                // `--` ends option parsing: without it the external `kill` (procps)
+                // reads `-<pid>` as a flag and refuses — silently, since this status
+                // is unpropagatable mid-timeout — and the blocking `wait` below then
+                // wedges the worker forever on a child that was never killed. The
+                // shell builtin accepts the bare form; the binary does not.
                 let _ = Command::new("kill")
-                    .args(["-9", &format!("-{}", child.id())])
+                    .args(["-9", "--", &format!("-{}", child.id())])
                     .status();
                 let _ = child.wait();
                 // NEXTEST puts each test in its OWN process group, so the group

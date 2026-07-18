@@ -171,6 +171,22 @@ edit examples/bundle.rs — maintain_census @e5508faceaed2bfe
 edit src/discover/items.rs — Item @5a2473da55d9a068
 edit src/discover/gates.rs — TOOLCHAIN @81b2bec1e605e9d8
 edit src/discover/modularize.rs — modularize @0a269305b007472b
+add src/discover/items.rs —  @8d6f261837619612
+edit src/discover/items.rs — probes @d84b86e855312989
+edit src/discover/cli.rs — impl CliSpec @655f78ed43142406
+edit src/discover/cli.rs — probes @ed9b3b46d67d3179
+edit src/discover/cli.rs — Sort @4db9e8bfcac9e34d
+edit examples/bundle.rs — run @b050bd253c2a8948
+add src/discover/bundle.rs — fn split_discriminator, fn sibling_holdings, fn select_addressed @0881211ee712589d
+edit src/discover/bundle.rs — impl Bundle @1d5dee6f4ba70993
+edit src/discover/bundle.rs — probes @eb47ca2bd3f85fd5
+add src/discover/store.rs —  @6267f7153dbd1d52
+edit src/discover/cli.rs — impl CliSpec @a72d7479051e9477
+edit src/discover/cli.rs — probes @1f909a13800c58f9
+edit src/discover/cli.rs — Sort @62d2837ce61f2034
+edit examples/bundle.rs — run @26a24beb8696e1e0
+edit src/discover/store.rs — probes @163e6c7cea399bcb
+edit src/discover/bundle.rs — select_addressed @38f122ab54a0d443
 add src/discover/gates.rs —  @a14c653516b0cb17
 edit src/discover/gates.rs — impl Support @f4b83aa9e105b954
 edit src/discover/gates.rs — Support @0b5063377e2fe8ff
@@ -179,3 +195,6 @@ edit examples/freeze_gates.rs — main @a4680e2b8dbbc9b9
 edit src/discover/perimeter.rs — Perimeter @6c8d8e64023815c7
 edit examples/perimeter.rs — extract @cfb7154f5eb3a4ea
 edit examples/perimeter.rs — probes @795e343cf167ddb5
+edit src/discover/store.rs — probes @5109ee5f85e6d561
+edit src/discover/store.rs — probes @8064e30c54babbaa
+edit examples/schemata.rs — outcome @352eaac80081d879

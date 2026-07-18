@@ -1,4 +1,4 @@
-/// The argument-type vocabulary: seven sorts cover all fifteen of bundle's verbs. A
+/// The argument-type vocabulary: seven sorts cover all seventeen of bundle's verbs. A
 /// sort is what the harness knows about a slot before any judgment runs — how the
 /// token renders in usage (its shell-quoting discipline included) and, when dispatch
 /// migrates here, how its value is fetched. The sort is the type; the label on each
@@ -149,8 +149,8 @@ pub struct CliSpec {
 
 #[crate::mutate]
 impl CliSpec {
-    /// bundle's own fifteen verbs, declared — the hand-built witness of the class
-    /// becomes its first instance. Seven sorts cover every slot; fourteen usage rows
+    /// bundle's own seventeen verbs, declared — the hand-built witness of the class
+    /// becomes its first instance. Seven sorts cover every slot; sixteen usage rows
     /// (gates and owes share one, by declaration) render byte-identical to the text
     /// the hand-written harness always printed, which is the first lock.
     pub fn bundle() -> CliSpec {
@@ -205,6 +205,8 @@ impl CliSpec {
                         Slot::required(Item, "operator"),
                     ],
                 ),
+                VerbSpec::verb("uses", vec![Slot::required(Item, "item-name")]),
+                VerbSpec::verb("spoke", vec![Slot::required(Item, "item-name")]),
                 VerbSpec::verb(
                     "trace",
                     vec![
@@ -345,6 +347,8 @@ mod probes {
              \x20      bundle squash <bundle.journal>\n\
              \x20      bundle replay <bundle.journal>\n\
              \x20      bundle constrains <module.rs> <operator>\n\
+             \x20      bundle uses <item-name>\n\
+             \x20      bundle spoke <item-name>\n\
              \x20      bundle trace <theory> '<term>'\n\
              \x20      bundle lift <module.rs> <theory-name> [declaration ...]\n\
              \x20      bundle gates | bundle owes\n\
@@ -394,13 +398,13 @@ mod probes {
         assert_eq!(cli.parse(&[]).unwrap_err(), usage);
     }
 
-    /// The declaration's census, pinned: fifteen verbs, and the slot vocabulary is
+    /// The declaration's census, pinned: seventeen verbs, and the slot vocabulary is
     /// exactly the seven sorts — every sort earns its place by appearing, and an
     /// eighth would be a diff to this probe, i.e. a decision to sign.
     #[test]
-    fn fifteen_verbs_speak_exactly_the_seven_sorts() {
+    fn seventeen_verbs_speak_exactly_the_seven_sorts() {
         let cli = CliSpec::bundle();
-        assert_eq!(cli.verbs.len(), 15);
+        assert_eq!(cli.verbs.len(), 17);
         let spoken: Vec<Sort> = cli
             .verbs
             .iter()

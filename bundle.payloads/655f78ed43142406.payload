@@ -1,0 +1,159 @@
+#[crate::mutate]
+impl CliSpec {
+    /// bundle's own sixteen verbs, declared — the hand-built witness of the class
+    /// becomes its first instance. Seven sorts cover every slot; fifteen usage rows
+    /// (gates and owes share one, by declaration) render byte-identical to the text
+    /// the hand-written harness always printed, which is the first lock.
+    pub fn bundle() -> CliSpec {
+        use Sort::*;
+        CliSpec {
+            name: "bundle",
+            verbs: vec![
+                VerbSpec::verb(
+                    "add",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Payload, "snippet.rs"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "edit",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Item, "item-name"),
+                        Slot::required(Payload, "replacement.rs"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "declare",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Declaration, "shape(op, ...)"),
+                    ],
+                ),
+                VerbSpec::verb("place", vec![Slot::required(Module, "module.rs")]),
+                VerbSpec::verb("check", vec![Slot::required(Module, "module.rs")]),
+                VerbSpec::verb(
+                    "show",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::optional(Item, "item-name"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "collect",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::optional(Item, "item-to-sweep"),
+                    ],
+                ),
+                VerbSpec::verb("squash", vec![Slot::required(Journal, "bundle.journal")]),
+                VerbSpec::verb("replay", vec![Slot::required(Journal, "bundle.journal")]),
+                VerbSpec::verb(
+                    "constrains",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Item, "operator"),
+                    ],
+                ),
+                VerbSpec::verb("uses", vec![Slot::required(Item, "item-name")]),
+                VerbSpec::verb(
+                    "trace",
+                    vec![
+                        Slot::required(Theory, "theory"),
+                        Slot::required(Term, "term"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "lift",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Theory, "theory-name"),
+                        Slot::variadic(Declaration, "declaration"),
+                    ],
+                ),
+                VerbSpec::verb("gates", vec![]),
+                VerbSpec::sibling("owes", vec![]),
+                VerbSpec::verb("pin", vec![]),
+            ],
+        }
+    }
+
+    /// The usage text, derived: one row per verb (siblings joined with ` | `),
+    /// first row prefixed `usage: `, the rest aligned under it, no trailing
+    /// newline. This is the text the first lock pins byte-for-byte against what
+    /// `bundle` has always printed.
+    pub fn usage(&self) -> String {
+        let mut rows: Vec<String> = Vec::new();
+        for verb in &self.verbs {
+            let mut cell = format!("{} {}", self.name, verb.name);
+            for slot in &verb.slots {
+                cell.push(' ');
+                cell.push_str(&slot.render());
+            }
+            match rows.last_mut() {
+                Some(last) if verb.sibling => {
+                    last.push_str(" | ");
+                    last.push_str(&cell);
+                }
+                _ => rows.push(cell),
+            }
+        }
+        let head = "usage: ";
+        rows.iter()
+            .enumerate()
+            .map(|(i, row)| {
+                if i == 0 {
+                    format!("{head}{row}")
+                } else {
+                    format!("{}{row}", " ".repeat(head.len()))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Match argv against the declaration: find the verb by its first word, bind
+    /// the rest to its slots left to right (required takes one or refuses, optional
+    /// takes one if present, variadic takes the remainder), and refuse a stray. The
+    /// refusal is the usage text — the same teaching the hand-written harness gives —
+    /// and a refusal binds nothing.
+    pub fn parse<'a>(&'a self, args: &[String]) -> Result<Invocation<'a>, String> {
+        let Some((name, rest)) = args.split_first() else {
+            return Err(self.usage());
+        };
+        let Some(verb) = self.verbs.iter().find(|v| v.name == name) else {
+            return Err(self.usage());
+        };
+        let mut values = Vec::new();
+        let mut at = 0;
+        for slot in &verb.slots {
+            match slot.mode {
+                Mode::Required => {
+                    if at < rest.len() {
+                        values.push(vec![rest[at].clone()]);
+                        at += 1;
+                    } else {
+                        return Err(self.usage());
+                    }
+                }
+                Mode::Optional => {
+                    if at < rest.len() {
+                        values.push(vec![rest[at].clone()]);
+                        at += 1;
+                    } else {
+                        values.push(Vec::new());
+                    }
+                }
+                Mode::Variadic => {
+                    values.push(rest[at..].to_vec());
+                    at = rest.len();
+                }
+            }
+        }
+        if at != rest.len() {
+            return Err(self.usage());
+        }
+        Ok(Invocation { verb, values })
+    }
+}
