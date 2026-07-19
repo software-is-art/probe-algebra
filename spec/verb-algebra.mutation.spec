@@ -1,4 +1,4 @@
-# algebra mutation: verb algebra — 64 operator-table mutants, all killed — regenerate via this repo's freeze path; ratify the diff.
+# algebra mutation: verb algebra — 100 operator-table mutants, all killed — regenerate via this repo's freeze path; ratify the diff.
 #
 # Every mutant is a perturbed operator table (a VALUE, not a build), judged by
 # re-running discovery: KILLED means the named-law set changed — the committed
@@ -14,6 +14,8 @@
 - killed    `add_a` evaluates as `collect_a`
 - killed    `add_a` evaluates as `collect_b`
 - killed    `add_a` evaluates as `declare`
+- killed    `add_a` evaluates as `recast_a`
+- killed    `add_a` evaluates as `recast_b`
 - killed    `add_b` evaluates as `empty`
 - killed    `add_b` evaluates as `add_a`
 - killed    `add_b` evaluates as `edit_a`
@@ -21,6 +23,8 @@
 - killed    `add_b` evaluates as `collect_a`
 - killed    `add_b` evaluates as `collect_b`
 - killed    `add_b` evaluates as `declare`
+- killed    `add_b` evaluates as `recast_a`
+- killed    `add_b` evaluates as `recast_b`
 - killed    `edit_a` evaluates as `empty`
 - killed    `edit_a` evaluates as `add_a`
 - killed    `edit_a` evaluates as `add_b`
@@ -28,6 +32,8 @@
 - killed    `edit_a` evaluates as `collect_a`
 - killed    `edit_a` evaluates as `collect_b`
 - killed    `edit_a` evaluates as `declare`
+- killed    `edit_a` evaluates as `recast_a`
+- killed    `edit_a` evaluates as `recast_b`
 - killed    `edit_b` evaluates as `empty`
 - killed    `edit_b` evaluates as `add_a`
 - killed    `edit_b` evaluates as `add_b`
@@ -35,6 +41,8 @@
 - killed    `edit_b` evaluates as `collect_a`
 - killed    `edit_b` evaluates as `collect_b`
 - killed    `edit_b` evaluates as `declare`
+- killed    `edit_b` evaluates as `recast_a`
+- killed    `edit_b` evaluates as `recast_b`
 - killed    `collect_a` evaluates as `empty`
 - killed    `collect_a` evaluates as `add_a`
 - killed    `collect_a` evaluates as `add_b`
@@ -42,6 +50,8 @@
 - killed    `collect_a` evaluates as `edit_b`
 - killed    `collect_a` evaluates as `collect_b`
 - killed    `collect_a` evaluates as `declare`
+- killed    `collect_a` evaluates as `recast_a`
+- killed    `collect_a` evaluates as `recast_b`
 - killed    `collect_b` evaluates as `empty`
 - killed    `collect_b` evaluates as `add_a`
 - killed    `collect_b` evaluates as `add_b`
@@ -49,6 +59,8 @@
 - killed    `collect_b` evaluates as `edit_b`
 - killed    `collect_b` evaluates as `collect_a`
 - killed    `collect_b` evaluates as `declare`
+- killed    `collect_b` evaluates as `recast_a`
+- killed    `collect_b` evaluates as `recast_b`
 - killed    `declare` evaluates as `empty`
 - killed    `declare` evaluates as `add_a`
 - killed    `declare` evaluates as `add_b`
@@ -56,6 +68,26 @@
 - killed    `declare` evaluates as `edit_b`
 - killed    `declare` evaluates as `collect_a`
 - killed    `declare` evaluates as `collect_b`
+- killed    `declare` evaluates as `recast_a`
+- killed    `declare` evaluates as `recast_b`
+- killed    `recast_a` evaluates as `empty`
+- killed    `recast_a` evaluates as `add_a`
+- killed    `recast_a` evaluates as `add_b`
+- killed    `recast_a` evaluates as `edit_a`
+- killed    `recast_a` evaluates as `edit_b`
+- killed    `recast_a` evaluates as `collect_a`
+- killed    `recast_a` evaluates as `collect_b`
+- killed    `recast_a` evaluates as `declare`
+- killed    `recast_a` evaluates as `recast_b`
+- killed    `recast_b` evaluates as `empty`
+- killed    `recast_b` evaluates as `add_a`
+- killed    `recast_b` evaluates as `add_b`
+- killed    `recast_b` evaluates as `edit_a`
+- killed    `recast_b` evaluates as `edit_b`
+- killed    `recast_b` evaluates as `collect_a`
+- killed    `recast_b` evaluates as `collect_b`
+- killed    `recast_b` evaluates as `declare`
+- killed    `recast_b` evaluates as `recast_a`
 - killed    `add_a` returns its input unchanged
 - killed    `add_b` returns its input unchanged
 - killed    `edit_a` returns its input unchanged
@@ -63,6 +95,8 @@
 - killed    `collect_a` returns its input unchanged
 - killed    `collect_b` returns its input unchanged
 - killed    `declare` returns its input unchanged
+- killed    `recast_a` returns its input unchanged
+- killed    `recast_b` returns its input unchanged
 - killed    `empty` becomes undefined everywhere
 - killed    `add_a` becomes undefined everywhere
 - killed    `add_b` becomes undefined everywhere
@@ -71,10 +105,12 @@
 - killed    `collect_a` becomes undefined everywhere
 - killed    `collect_b` becomes undefined everywhere
 - killed    `declare` becomes undefined everywhere
+- killed    `recast_a` becomes undefined everywhere
+- killed    `recast_b` becomes undefined everywhere
 
-# deafness floor: 126 constant-return mutants (every operator × every distinct
+# deafness floor: 216 constant-return mutants (every operator × every distinct
 # output), judged by re-checking the discovered laws — all killed: every operator's output provably depends on its input.
 
-# dent sweep: 224 one-point mutants (first 16 grid points per operator,
+# dent sweep: 288 one-point mutants (first 16 grid points per operator,
 # 2 wrong outputs per point — a resource bound, not a curated list), judged by
 # re-checking the discovered laws — all killed: every sampled point is pinned.

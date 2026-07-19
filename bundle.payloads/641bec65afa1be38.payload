@@ -1,0 +1,192 @@
+#[crate::mutate("squash")]
+impl SquashRules {
+    /// Read the rule table off a spec's law equations (the engine's machine grammar:
+    /// `f(g(x)) = h(x)`, `f(f(x)) = f(x)`, `f(g(x)) = g(f(x))`); every other law shape
+    /// carries no journal rule and is skipped. Same-item composition only becomes a
+    /// collapse; same-item commutation is deliberately NOT mobility — same-key entries
+    /// collapse or stay put, they never leapfrog.
+    pub fn from_spec(spec: &Spec) -> SquashRules {
+        let mut rules = SquashRules {
+            collapses: BTreeMap::new(),
+            projections: BTreeSet::new(),
+            commutes: BTreeSet::new(),
+        };
+        for law in &spec.laws {
+            let Some((lhs, rhs)) = law.equation().split_once('=') else {
+                continue;
+            };
+            let (Some(l), Some(r)) = (Self::nest(lhs), Self::nest(rhs)) else {
+                continue;
+            };
+            match (l.as_slice(), r.as_slice()) {
+                // f(f(x)) = f(x): a projection — replay noise filters to one entry.
+                ([f, g], [h]) if f == g && g == h => {
+                    rules.projections.insert(Self::split_verb(f).0);
+                }
+                // f(g(x)) = h(x), one shared item: g-then-f collapses to h.
+                ([f, g], [h]) => {
+                    let (f_base, f_item) = Self::split_verb(f);
+                    let (g_base, g_item) = Self::split_verb(g);
+                    let (h_base, h_item) = Self::split_verb(h);
+                    if f_item == g_item && g_item == h_item && !f_item.is_empty() {
+                        rules.collapses.insert((g_base, f_base), h_base);
+                    }
+                }
+                // f(g(x)) = g(f(x)), items apart: the pair slides on different keys.
+                ([f, g], [g2, f2]) if f == f2 && g == g2 => {
+                    let (f_base, f_item) = Self::split_verb(f);
+                    let (g_base, g_item) = Self::split_verb(g);
+                    if f_item != g_item {
+                        rules.commutes.insert(Self::unordered(&f_base, &g_base));
+                    }
+                }
+                _ => {}
+            }
+        }
+        rules
+    }
+
+    /// Compact a journal to its LAW-NORMAL FORM: the nearest same-key pair whose
+    /// in-between entries all commute past the later verb collapses to the verb the
+    /// lock names, repeated to a fixed point. Conservatism is silence, not error: a
+    /// pair the table is silent on keeps both lines (add-then-edit composes to no
+    /// single verb — the journal keeps the whole story), and a verb the algebra does
+    /// not model (`place`) is opaque — nothing slides past it. The one hard refusal is
+    /// a line the journal grammar cannot read: the record is machine-written, so a
+    /// strange line means a hand touched it.
+    ///
+    /// Payload addresses (a trailing ` @<16 hex>`, the store's suffix) are NOT part of
+    /// the key — two edits of one item are the same conversation even though their
+    /// payloads differ — and when a pair collapses, the LATER line's payload survives
+    /// under the verb the lock names. Edit-then-edit keeps the later line whole;
+    /// recast-then-edit keeps the later edit's payload under the `recast` name (the
+    /// sticky-license composition names the earlier verb, but the later write is the
+    /// truth — last write wins). The miniature's laws license the shapes, and the
+    /// replay differential is the judge that keeps the transport honest
+    /// (`replay(squash(j)) == replay(j)`).
+    pub fn compact(&self, journal: &str) -> Result<String, String> {
+        fn stripped(key: &str) -> &str {
+            match key.rsplit_once(" @") {
+                Some((head, addr))
+                    if addr.len() == 16 && addr.chars().all(|c| c.is_ascii_hexdigit()) =>
+                {
+                    head
+                }
+                _ => key,
+            }
+        }
+        let mut entries = Vec::new();
+        for (n, line) in journal.lines().enumerate() {
+            let parsed = line
+                .split_once(' ')
+                .filter(|(verb, key)| !verb.is_empty() && key.contains(" — "));
+            match parsed {
+                Some((verb, key)) => entries.push((verb.to_string(), key.to_string())),
+                None => {
+                    return Err(format!(
+                        "bundle squash: line {} is not `<verb> <module> — <detail>` — \
+                         the journal is machine-written, so a line the grammar cannot \
+                         read means a hand touched it: `{line}`",
+                        n + 1
+                    ))
+                }
+            }
+        }
+        let mut changed = true;
+        while changed {
+            changed = false;
+            'scan: for i in 0..entries.len() {
+                for j in i + 1..entries.len() {
+                    if stripped(&entries[j].1) != stripped(&entries[i].1) {
+                        continue;
+                    }
+                    let slides = entries[i + 1..j]
+                        .iter()
+                        .all(|e| self.mobile(&e.0, &entries[j].0));
+                    if slides {
+                        if let Some(one) = self.collapse(&entries[i].0, &entries[j].0) {
+                            if entries[j].0 == one {
+                                entries[i] = entries[j].clone();
+                            } else if stripped(&entries[j].1) != entries[j].1
+                                && stripped(&entries[i].1) != entries[i].1
+                            {
+                                // the payload transport: the lock names the earlier
+                                // verb, but the later line carries the last write —
+                                // when both lines carry addresses, the later key
+                                // survives under the named verb, so the compacted
+                                // journal replays to the same tree.
+                                entries[i] = (one, entries[j].1.clone());
+                            } else {
+                                entries[i].0 = one;
+                            }
+                            entries.remove(j);
+                            changed = true;
+                            break 'scan;
+                        }
+                    }
+                    // the nearest same-key partner is judged; farther ones may not
+                    // leapfrog it.
+                    break;
+                }
+            }
+        }
+        Ok(entries
+            .into_iter()
+            .map(|(verb, key)| format!("{verb} {key}\n"))
+            .collect())
+    }
+
+    /// May two entries on DIFFERENT keys slide past each other? Only when the lock
+    /// froze this verb pair as cross-item commuting; an unknown verb is opaque.
+    pub fn mobile(&self, a: &str, b: &str) -> bool {
+        self.commutes.contains(&Self::unordered(a, b))
+    }
+
+    /// The single verb `first`-then-`then` on ONE key equals — `None` is honest
+    /// silence, and silence means both lines stay.
+    pub fn collapse(&self, first: &str, then: &str) -> Option<String> {
+        if first == then && self.projections.contains(first) {
+            return Some(first.to_string());
+        }
+        self.collapses
+            .get(&(first.to_string(), then.to_string()))
+            .cloned()
+    }
+
+    /// `add_a` → `("add", "a")`; a name without the miniature's one-letter item suffix
+    /// is item-blind (`declare` → `("declare", "")`).
+    fn split_verb(op: &str) -> (String, String) {
+        match op.rsplit_once('_') {
+            Some((base, item)) if item.len() == 1 => (base.to_string(), item.to_string()),
+            _ => (op.to_string(), String::new()),
+        }
+    }
+
+    fn unordered(a: &str, b: &str) -> (String, String) {
+        if a <= b {
+            (a.to_string(), b.to_string())
+        } else {
+            (b.to_string(), a.to_string())
+        }
+    }
+
+    /// `f(g(x))` → `["f", "g"]` when the term is a pure nest over one variable;
+    /// anything else (a second variable, an infix symbol) carries no journal rule.
+    fn nest(term: &str) -> Option<Vec<String>> {
+        let mut ops = Vec::new();
+        let mut t = term.trim();
+        while let Some((head, rest)) = t.split_once('(') {
+            let head = head.trim();
+            if head.is_empty() || !head.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return None;
+            }
+            ops.push(head.to_string());
+            t = rest.trim_end().strip_suffix(')')?;
+        }
+        let t = t.trim();
+        (!ops.is_empty()
+            && !t.is_empty()
+            && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+        .then_some(ops)
+    }
+}

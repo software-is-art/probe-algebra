@@ -16,7 +16,7 @@ src/discover/probes.rs: QUALIFIES — operators [ProbeCensus::lock, ProbeCensus:
 src/discover/shape.rs: QUALIFIES — operators [ShapeReport::lock] over sorts {Lock, ShapeReport}
 src/discover/substrate.rs: QUALIFIES — operators [Substrate::lock] over sorts {Lock, Substrate}
 src/discover/system.rs: QUALIFIES — operators [SystemReport::lock] over sorts {Lock, SystemReport}
-src/discover/verbs.rs: QUALIFIES — operators [add_a, add_b, collect_a, collect_b, declare, edit_a, edit_b] over sorts {BundleState}
+src/discover/verbs.rs: QUALIFIES — operators [add_a, add_b, collect_a, collect_b, declare, edit_a, edit_b, recast_a, recast_b] over sorts {BundleState}
 src/discover/world.rs: QUALIFIES — operators [FakeRemoteStore::snapshot, WorldReport::lock] over sorts {FakeRemoteStore, Lock, State, WorldReport}
 src/interp/boundary.rs: QUALIFIES — operators [Bound::new, Env::bind, Expr::bin, Expr::bind, Expr::cond, Expr::var, Int::plus, Int::times, Pos::next] over sorts {Bound, Env, Expr, Ident, Int, Op, Pos}
 src/kvstore/store.rs: QUALIFIES — operators [Advance::by, Advance::new, Clock::advanced, Clock::until, Entry::expires_at, Entry::new, Entry::remaining_at, Entry::ttl, Entry::val, Lookup::new, Store::clock, Store::put, Store::tick, Store::view, Ttl::plus, Write::new, Write::ttl, Write::val] over sorts {Advance, Clock, Entry, Key, Lookup, Snapshot, Store, Ttl, Val, Write}

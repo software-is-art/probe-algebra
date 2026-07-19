@@ -4356,3 +4356,48 @@ mods — landed as one, then drilled live (composite show mid-envelope, the seal
 row, replay and spoke reading through it). Residuals 3 (the verb algebra models
 recast) and 5 (fmt-normal payloads) are the next brick; 4 and 6 keep their
 dispositions.
+
+## Recast enters the algebra; the record goes fmt-normal (residuals 3 and 5 closed)
+
+Built 2026-07-19, the wearability sprint's second brick — the envelope's last
+two live residuals. The verb algebra learned the licensed edit the honest way:
+a `License { Unused, Used }` field on the carrier (36 inhabitants now), with
+`recast_a`/`recast_b` as `edit`'s twins that spend it — so the engine DISCOVERS
+what squash may do near a recast instead of being told. The findings, frozen in
+the verb-algebra pair and pinned: every cross-name recast pair commutes
+(licensed mobility — an envelope's interface move no longer freezes compaction
+around it); same-name edit/recast composes to `recast` from either side (the
+sticky license: once spent, it is what the state remembers); add/recast stays a
+conflict class (a refusal spends nothing); and recast/collect stays deliberate
+silence — the license outlives the item. The mutation lock still reads ALL
+KILLED: the license field is exactly what keeps recast distinguishable from
+edit under confusion mutants. Squash gained the one refinement the new
+compositions demanded: when a collapse names the earlier verb and both lines
+carry payload addresses, the LATER address survives under the named verb (last
+write wins), so `replay(squash(j)) == replay(j)` — the differential stays the
+judge.
+
+And the record went fmt-normal, retiring the replay-divergence class: one
+driver seam (`fmt_normal`, the pinned toolchain's rustfmt on stdin, a named
+refusal when it cannot run) applied at every write path — `commit`, the land
+loop (normalizing the whole bill BEFORE any write, so all-or-none holds), and
+`place`/`check`'s composed canonicality judge (parse∘render for the dealing,
+fmt-normal for the bytes — without which every landing would read NOT canonical
+and place would churn against the fmt gate forever). The replay differential
+grew the symmetric half: a `normalize` hook applied to reconstructed FINALS
+only (intermediates stay raw; a normalizer error is a verdict, never a
+refusal), and the driver passes the same `fmt_normal` land uses. Payloads stay
+verbatim — addresses stable, `show → edit` cycles byte-exact; it is the landed
+render that normalizes, on both sides. Old journals need nothing: the tree is
+always fmt-clean, so byte-exact replays still match, and fmt-only divergences
+HEAL (the progress bar moves).
+
+The build dogfooded both bricks at once: staged as a nine-row envelope (the
+`differential` signature move landing as `recast` — the license's first
+production use), landed under the previous brick's seal, then drilled live: an
+unformatted payload landing rustfmt-normal, replay byte-exact through the
+symmetric normalizer, and `squash` collapsing recast-then-edit to `recast` with
+the later payload — "every collapse licensed by the frozen verb algebra", now
+including the licensed edit itself. All six envelope residuals are now closed
+or dispositioned: 1 (seal), 2 (composite show), 3 (this brick), 5 (this brick);
+4 and 6 keep their recorded dispositions.

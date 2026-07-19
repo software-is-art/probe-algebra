@@ -1,0 +1,9 @@
+edit src/discover/verbs.rs — state @6c3b15c4a1e7406f
+edit src/discover/verbs.rs — probes @de6136e5d1bbbe38
+edit src/discover/squash.rs — impl SquashRules @641bec65afa1be38
+edit src/discover/squash.rs — probes @79b6b1b9a4b80284
+recast src/discover/store.rs — impl Replay#1 @776d7c7b99de3454
+edit src/discover/store.rs — probes @301974d20d7a3a13
+add examples/bundle.rs — fn fmt_normal @d3bb37daf524d3f4
+edit examples/bundle.rs — run @4d69045d8927a7d9
+edit examples/bundle.rs — commit @a9e08f8a8be7a23c

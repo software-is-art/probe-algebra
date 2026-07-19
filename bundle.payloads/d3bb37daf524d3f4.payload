@@ -1,0 +1,35 @@
+/// The FMT-NORMAL seam (the replay-divergence class, retired): every module text the
+/// driver writes passes through the pinned toolchain's rustfmt first, and the replay
+/// differential applies the SAME normalization to its reconstructed finals — the
+/// symmetry is what keeps `replay(journal) == tree` true after `cargo fmt` moves
+/// nothing. Payload bytes stay verbatim (addresses stable, `show → edit` cycles
+/// byte-exact); it is the LANDED render that goes fmt-normal, on both sides of the
+/// differential. A rustfmt that cannot run or refuses the text is a NAMED refusal —
+/// a silently half-normal land would reintroduce the class this retires.
+fn fmt_normal(text: &str) -> Result<String, String> {
+    use std::io::Write as _;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new("rustfmt")
+        .args(["--edition", "2021", "--emit", "stdout"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("fmt-normal: rustfmt did not start ({e})"))?;
+    child
+        .stdin
+        .take()
+        .ok_or("fmt-normal: rustfmt grew no stdin")?
+        .write_all(text.as_bytes())
+        .map_err(|e| format!("fmt-normal: rustfmt stdin closed early ({e})"))?;
+    let out = child
+        .wait_with_output()
+        .map_err(|e| format!("fmt-normal: rustfmt did not finish ({e})"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "fmt-normal: rustfmt refused the text ({})",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    String::from_utf8(out.stdout).map_err(|e| format!("fmt-normal: rustfmt spoke non-utf8 ({e})"))
+}
