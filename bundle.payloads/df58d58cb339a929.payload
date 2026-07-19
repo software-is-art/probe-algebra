@@ -1,0 +1,128 @@
+#[crate::mutate("store")]
+impl Replay {
+    /// JOURNAL TIME (the reverse edge pointed at the record): which judged
+    /// transaction each speaker of `name` ARRIVED or LEFT in — the item relation
+    /// differentiated over the journal instead of integrated over the tree, so
+    /// "who holds this fact" gains "and since when". Speakers are read exactly as
+    /// `uses` reads them (item rows, the one ident-bounded matcher) — one
+    /// vocabulary. A reading of what replay RECONSTRUCTS (effects, from the
+    /// payload store): entries beyond that horizon — pre-store, judged verbs, a
+    /// module gone dark — are COUNTED, never guessed at, and git holds the past
+    /// the journal never saw. A name the journal never heard refuses by name,
+    /// horizon disclosed.
+    pub fn spoke(journal: &str, store: &PayloadStore, name: &str) -> Result<String, String> {
+        use crate::discover::items::ItemRelation;
+        let speakers = |module: &str, text: &str| -> Vec<String> {
+            ItemRelation::of_module(module, text)
+                .map(|relation| {
+                    relation
+                        .entries()
+                        .into_iter()
+                        .filter(|(item, _)| crate::discover::bundle::mentions(&item.body, name))
+                        .map(|(item, _)| item.name)
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let mut states: BTreeMap<String, Result<String, String>> = BTreeMap::new();
+        let mut moves: Vec<String> = Vec::new();
+        let mut total = 0usize;
+        let mut beyond = 0usize;
+        for (n, line) in journal.lines().enumerate() {
+            let parsed = line
+                .split_once(' ')
+                .and_then(|(verb, rest)| rest.split_once(" — ").map(|(m, d)| (verb, m, d)));
+            let Some((verb, module, detail)) = parsed else {
+                return Err(format!(
+                    "bundle spoke: line {} is not `<verb> <module> — <detail>`: `{line}`",
+                    n + 1
+                ));
+            };
+            // a seal row is the envelope's journal boundary — a grouping mark, not
+            // an effect entry: spoke reads straight through it, and it counts
+            // nowhere (neither total nor horizon — a boundary is not blindness).
+            if verb == "seal" {
+                continue;
+            }
+            total += 1;
+            let current = match states.get(module) {
+                Some(Ok(text)) => text.clone(),
+                Some(Err(_)) => {
+                    beyond += 1;
+                    continue;
+                }
+                None => String::new(),
+            };
+            let (head, address) = match detail.rsplit_once(" @") {
+                Some((head, addr))
+                    if addr.len() == 16 && addr.chars().all(|c| c.is_ascii_hexdigit()) =>
+                {
+                    (head, Some(addr))
+                }
+                _ => (detail, None),
+            };
+            let next = match verb {
+                "add" | "edit" | "recast" => match address {
+                    None => Err(()),
+                    Some(addr) => store
+                        .fetch(addr)
+                        .and_then(|payload| match verb {
+                            "add" => Bundle::add(&current, &payload),
+                            "edit" => Bundle::edit(&current, head, &payload),
+                            // a recast landed under the envelope's license replays
+                            // through the effect half alone, exactly as the
+                            // differential does — journal time must not go dark on
+                            // a licensed interface move.
+                            _ => {
+                                crate::discover::bundle::splice("recast", &current, head, &payload)
+                            }
+                        })
+                        .map_err(|_| ()),
+                },
+                "declare" => Bundle::declare(&current, head).map_err(|_| ()),
+                "place" => Bundle::parse(&current).map(|b| b.render()).map_err(|_| ()),
+                _ => Err(()),
+            };
+            match next {
+                Err(()) => {
+                    beyond += 1;
+                    states.insert(
+                        module.to_string(),
+                        Err(format!("dark from entry {}", n + 1)),
+                    );
+                }
+                Ok(next_text) => {
+                    let before = speakers(module, &current);
+                    let after = speakers(module, &next_text);
+                    let arrived = after.iter().filter(|s| !before.contains(s));
+                    let left = before.iter().filter(|s| !after.contains(s));
+                    let delta: Vec<String> = arrived
+                        .map(|s| format!("+ {s}"))
+                        .chain(left.map(|s| format!("- {s}")))
+                        .collect();
+                    if !delta.is_empty() {
+                        moves.push(format!(
+                            "  entry {} ({verb} {module} — {head}): {}\n",
+                            n + 1,
+                            delta.join(", ")
+                        ));
+                    }
+                    states.insert(module.to_string(), Ok(next_text));
+                }
+            }
+        }
+        let horizon =
+            format!("{beyond} of {total} entries beyond the horizon (pre-store, judged, or dark)");
+        if moves.is_empty() {
+            return Err(format!(
+                "bundle spoke: the journal never heard `{name}` within its horizon \
+                 ({horizon}) — git holds the earlier past"
+            ));
+        }
+        Ok(format!(
+            "spoke `{name}` — journal time, effects only (what replay reconstructs; \
+             git holds the earlier past):\n{}  {horizon}\n",
+            moves.join("")
+        ))
+    }
+}

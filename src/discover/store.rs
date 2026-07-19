@@ -115,6 +115,12 @@ impl Replay {
                     n + 1
                 ));
             };
+            // a seal row is the envelope's journal boundary — a grouping mark, not
+            // an effect: it claims nothing about any file, so replay reads through
+            // it (skip, never refuse — the boundary is grammar, not a gap).
+            if verb == "seal" {
+                continue;
+            }
             let current = match states.get(module) {
                 Some(Ok(text)) => text.clone(),
                 Some(Err(_)) => continue,
@@ -217,7 +223,6 @@ impl Replay {
         let mut total = 0usize;
         let mut beyond = 0usize;
         for (n, line) in journal.lines().enumerate() {
-            total += 1;
             let parsed = line
                 .split_once(' ')
                 .and_then(|(verb, rest)| rest.split_once(" — ").map(|(m, d)| (verb, m, d)));
@@ -227,6 +232,13 @@ impl Replay {
                     n + 1
                 ));
             };
+            // a seal row is the envelope's journal boundary — a grouping mark, not
+            // an effect entry: spoke reads straight through it, and it counts
+            // nowhere (neither total nor horizon — a boundary is not blindness).
+            if verb == "seal" {
+                continue;
+            }
+            total += 1;
             let current = match states.get(module) {
                 Some(Ok(text)) => text.clone(),
                 Some(Err(_)) => {
@@ -590,6 +602,35 @@ mod probes {
         assert!(
             report.contains("1 of 2 entries beyond the horizon"),
             "{report}"
+        );
+    }
+    /// A SEAL row — the envelope's journal boundary — is grammar, not an effect:
+    /// the differential reads through it (no `envelope` verdict line, the file
+    /// still replays byte-exact) and `spoke` counts it nowhere — a boundary is
+    /// not blindness.
+    #[test]
+    fn a_seal_row_is_a_boundary_not_an_effect() {
+        let root = scratch("seal");
+        let store = PayloadStore::beside(&root);
+        let path = root.join("m.rs").to_string_lossy().into_owned();
+        let birth = "pub fn one() -> u32 {\n    1\n}\n";
+        let born = Bundle::add("", birth).unwrap();
+        std::fs::write(&path, &born).unwrap();
+        let journal = format!(
+            "add {path} — fn one @{}\nseal envelope — 1 row(s) across 1 file(s) @{}\n",
+            store.stash(birth).unwrap(),
+            store.stash("the bill\n").unwrap()
+        );
+        let report = Replay::differential(&journal, &store).unwrap().render();
+        assert!(report.contains("replays to the committed text"), "{report}");
+        assert!(
+            !report.contains("envelope"),
+            "no verdict line for the boundary: {report}"
+        );
+        let spoke = Replay::spoke(&journal, &store, "one").unwrap();
+        assert!(
+            spoke.contains("0 of 1 entries beyond the horizon"),
+            "the seal counts nowhere: {spoke}"
         );
     }
 }
