@@ -1,0 +1,206 @@
+#[cfg(test)]
+mod probes {
+    use std::collections::BTreeMap;
+
+    use super::{split_address, Envelope};
+
+    /// The staging grammar round-trips, and a hand-mangled line refuses by number —
+    /// the envelope file is machine-written, so a strange line means a hand.
+    #[test]
+    fn the_grammar_round_trips_and_a_strange_line_refuses() {
+        let text = "add src/m.rs — fn one @0123456789abcdef\n\
+                    edit src/m.rs — one @fedcba9876543210\n\
+                    declare src/m.rs — commutative(join)\n";
+        let envelope = Envelope::parse(text).expect("parses");
+        assert_eq!(envelope.rows.len(), 3);
+        assert_eq!(envelope.render(), text, "parse∘render is the identity");
+        let err = Envelope::parse("add src/m.rs fn one\n").unwrap_err();
+        assert!(err.contains("staged line 1"), "{err}");
+    }
+
+    /// THE HEADLINE — the field report's exact shape lands whole: a struct grows a
+    /// field (an interface move on the type) and the function reading it moves in
+    /// the SAME breath. Singly, the tree would exhibit a broken intermediate state;
+    /// under the envelope both rows judge against the composite and land as one.
+    #[test]
+    fn the_field_reports_shape_lands_whole() {
+        let module = "pub struct Perimeter {\n    pub merge: bool,\n}\n\n\
+                      /// The declared floor.\n\
+                      pub fn declared() -> Perimeter {\n    Perimeter { merge: true }\n}\n";
+        let grown_struct = "pub struct Perimeter {\n    pub merge: bool,\n    pub auto: bool,\n}\n";
+        let grown_reader = "/// The declared floor.\n\
+                            pub fn declared() -> Perimeter {\n    Perimeter { merge: true, auto: true }\n}\n";
+        let tree = BTreeMap::from([("src/perimeter.rs".to_string(), module.to_string())]);
+        let shelf = BTreeMap::from([
+            ("aaaaaaaaaaaaaaaa".to_string(), grown_struct.to_string()),
+            ("bbbbbbbbbbbbbbbb".to_string(), grown_reader.to_string()),
+        ]);
+        let read = |module: &str| tree.get(module).cloned();
+        let fetch = |_module: &str, address: &str| {
+            shelf
+                .get(address)
+                .cloned()
+                .ok_or_else(|| format!("payload store: nothing at @{address}"))
+        };
+        let envelope = Envelope::parse(
+            "edit src/perimeter.rs — Perimeter @aaaaaaaaaaaaaaaa\n\
+             edit src/perimeter.rs — declared @bbbbbbbbbbbbbbbb\n",
+        )
+        .unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(judgment.landable(), "{:?}", judgment.residue());
+        let (_, landed) = &judgment.files[0];
+        assert!(landed.contains("pub auto: bool"), "{landed}");
+        assert!(landed.contains("auto: true"), "{landed}");
+        assert_eq!(judgment.files.len(), 1, "one file, two rows, one write");
+    }
+
+    /// An edit whose INTERFACE moved is refused alone but lands as `recast` inside
+    /// the envelope — the license is the envelope itself, and the record says so.
+    #[test]
+    fn an_interface_move_lands_as_recast_only_under_the_envelope() {
+        let module = "/// One.\npub fn one() -> u32 {\n    1\n}\n";
+        let moved = "/// One, widened.\npub fn one() -> u64 {\n    1\n}\n";
+        assert!(
+            crate::discover::bundle::Bundle::edit(module, "one", moved)
+                .unwrap_err()
+                .contains("signature moved"),
+            "the single verb still refuses"
+        );
+        let tree = BTreeMap::from([("src/m.rs".to_string(), module.to_string())]);
+        let shelf = BTreeMap::from([("cccccccccccccccc".to_string(), moved.to_string())]);
+        let read = |module: &str| tree.get(module).cloned();
+        let fetch = |_module: &str, address: &str| {
+            shelf
+                .get(address)
+                .cloned()
+                .ok_or_else(|| format!("payload store: nothing at @{address}"))
+        };
+        let envelope = Envelope::parse("edit src/m.rs — one @cccccccccccccccc\n").unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(judgment.landable(), "{:?}", judgment.residue());
+        assert_eq!(judgment.verdicts[0].lands_as, "recast");
+        assert!(judgment.files[0].1.contains("u64"));
+    }
+
+    /// A red envelope refuses with the WHOLE bill: every owing row is named, the
+    /// green row stays green, and a red row is skipped — the rows after it judge
+    /// against the composite without it.
+    #[test]
+    fn the_residue_is_the_whole_bill_and_a_red_row_is_skipped() {
+        let module = "pub fn one() -> u32 {\n    1\n}\n";
+        let tree = BTreeMap::from([("src/m.rs".to_string(), module.to_string())]);
+        let shelf = BTreeMap::from([
+            (
+                "dddddddddddddddd".to_string(),
+                "pub struct Two;\n".to_string(),
+            ),
+            (
+                "eeeeeeeeeeeeeeee".to_string(),
+                "pub fn one() -> u32 {\n    2\n}\n".to_string(),
+            ),
+        ]);
+        let read = |module: &str| tree.get(module).cloned();
+        let fetch = |_module: &str, address: &str| {
+            shelf
+                .get(address)
+                .cloned()
+                .ok_or_else(|| format!("payload store: nothing at @{address}"))
+        };
+        let envelope = Envelope::parse(
+            "edit src/m.rs — ghost @dddddddddddddddd\n\
+             add src/m.rs — struct Two @dddddddddddddddd\n\
+             edit src/m.rs — one @0000000000000000\n\
+             edit src/m.rs — one @eeeeeeeeeeeeeeee\n",
+        )
+        .unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(!judgment.landable());
+        let residue = judgment.residue();
+        assert_eq!(residue.len(), 2, "both debts named: {residue:?}");
+        assert!(residue[0].contains("ghost"), "{residue:?}");
+        assert!(residue[1].contains("@0000000000000000"), "{residue:?}");
+        // the red rows did not poison the rest: the add landed, the last edit
+        // landed against the composite carrying it.
+        assert_eq!(judgment.verdicts[1].owes, None);
+        assert_eq!(judgment.verdicts[3].owes, None);
+        assert!(judgment.files[0].1.contains("struct Two"));
+        assert!(judgment.files[0].1.contains("    2\n"));
+        assert!(judgment
+            .render()
+            .contains("NOT landable: 2 of 4 row(s) owe"));
+    }
+
+    /// Rows COMPOSE: a module born by the envelope's first row is editable by its
+    /// second — birth is the degenerate continuation here exactly as in `add` —
+    /// and `admits` judges a candidate against that same composite.
+    #[test]
+    fn rows_compose_and_admits_judges_against_the_composite() {
+        let tree: BTreeMap<String, String> = BTreeMap::new();
+        let shelf = BTreeMap::from([
+            (
+                "ffffffffffffffff".to_string(),
+                "pub fn one() -> u32 {\n    1\n}\n".to_string(),
+            ),
+            (
+                "abababababababab".to_string(),
+                "/// One, told.\npub fn one() -> u32 {\n    1\n}\n".to_string(),
+            ),
+        ]);
+        let read = |module: &str| tree.get(module).cloned();
+        let fetch = |_module: &str, address: &str| {
+            shelf
+                .get(address)
+                .cloned()
+                .ok_or_else(|| format!("payload store: nothing at @{address}"))
+        };
+        let envelope = Envelope::parse(
+            "add src/new.rs — fn one @ffffffffffffffff\n\
+             edit src/new.rs — one @abababababababab\n",
+        )
+        .unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(judgment.landable(), "{:?}", judgment.residue());
+        assert!(judgment.files[0].1.starts_with("/// One, told."));
+        // admits: a colliding add refuses instantly; a fresh add is admitted.
+        let err = judgment
+            .admits(
+                None,
+                "add",
+                "src/new.rs",
+                "fn one",
+                Some("pub fn one() {}\n"),
+            )
+            .unwrap_err();
+        assert!(err.contains("already exists"), "{err}");
+        let lands_as = judgment
+            .admits(
+                None,
+                "add",
+                "src/new.rs",
+                "fn two",
+                Some("pub fn two() {}\n"),
+            )
+            .unwrap();
+        assert_eq!(lands_as, "add");
+    }
+
+    /// The address guard is the same conjunction replay holds: wrong length or
+    /// non-hex trailing `@` tokens are detail, not addresses.
+    #[test]
+    fn a_stray_at_token_is_detail_not_an_address() {
+        assert_eq!(
+            split_address("one @0123456789abcdef"),
+            ("one", Some("0123456789abcdef"))
+        );
+        assert_eq!(split_address("one @abc"), ("one @abc", None));
+        assert_eq!(
+            split_address("one @zzzzzzzzzzzzzzzz"),
+            ("one @zzzzzzzzzzzzzzzz", None)
+        );
+        assert_eq!(
+            split_address("commutative(join)"),
+            ("commutative(join)", None)
+        );
+    }
+}

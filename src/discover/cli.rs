@@ -149,10 +149,10 @@ pub struct CliSpec {
 
 #[crate::mutate]
 impl CliSpec {
-    /// bundle's own fifteen verbs, declared — the hand-built witness of the class
-    /// becomes its first instance. Seven sorts cover every slot; fourteen usage rows
-    /// (gates and owes share one, by declaration) render byte-identical to the text
-    /// the hand-written harness always printed, which is the first lock.
+    /// bundle's own nineteen verbs, declared — the hand-built witness of the class
+    /// becomes its first instance. Seven sorts cover every slot; seventeen usage rows
+    /// (gates and owes share one, land and staged another, by declaration) render
+    /// byte-identical to the text the first lock pins.
     pub fn bundle() -> CliSpec {
         use Sort::*;
         CliSpec {
@@ -223,6 +223,10 @@ impl CliSpec {
                 VerbSpec::verb("gates", vec![]),
                 VerbSpec::sibling("owes", vec![]),
                 VerbSpec::verb("pin", vec![]),
+                VerbSpec::verb("begin", vec![]),
+                VerbSpec::verb("land", vec![]),
+                VerbSpec::sibling("staged", vec![]),
+                VerbSpec::verb("drop", vec![]),
             ],
         }
     }
@@ -348,7 +352,10 @@ mod probes {
              \x20      bundle trace <theory> '<term>'\n\
              \x20      bundle lift <module.rs> <theory-name> [declaration ...]\n\
              \x20      bundle gates | bundle owes\n\
-             \x20      bundle pin"
+             \x20      bundle pin\n\
+             \x20      bundle begin\n\
+             \x20      bundle land | bundle staged\n\
+             \x20      bundle drop"
         );
     }
 
@@ -382,6 +389,11 @@ mod probes {
         assert_eq!(none.values[2], Vec::<String>::new());
 
         assert_eq!(cli.parse(&argv(&["pin"])).expect("binds").values.len(), 0);
+        assert_eq!(
+            cli.parse(&argv(&["land"])).expect("binds").verb.name,
+            "land"
+        );
+        assert_eq!(cli.parse(&argv(&["begin", "stray"])).unwrap_err(), usage);
 
         assert_eq!(cli.parse(&argv(&["add", "m.rs"])).unwrap_err(), usage);
         assert_eq!(cli.parse(&argv(&["pin", "stray"])).unwrap_err(), usage);
@@ -394,13 +406,13 @@ mod probes {
         assert_eq!(cli.parse(&[]).unwrap_err(), usage);
     }
 
-    /// The declaration's census, pinned: fifteen verbs, and the slot vocabulary is
+    /// The declaration's census, pinned: nineteen verbs, and the slot vocabulary is
     /// exactly the seven sorts — every sort earns its place by appearing, and an
     /// eighth would be a diff to this probe, i.e. a decision to sign.
     #[test]
-    fn fifteen_verbs_speak_exactly_the_seven_sorts() {
+    fn nineteen_verbs_speak_exactly_the_seven_sorts() {
         let cli = CliSpec::bundle();
-        assert_eq!(cli.verbs.len(), 15);
+        assert_eq!(cli.verbs.len(), 19);
         let spoken: Vec<Sort> = cli
             .verbs
             .iter()

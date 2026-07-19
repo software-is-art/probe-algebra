@@ -1,0 +1,12 @@
+/// The write half of a judged transaction: the module lands AND the verb records itself
+/// (`record` appends the journal line beside the nearest `Cargo.toml` — the crate is
+/// the journal's scope) — AND the qualify census pair updates at the delta (the
+/// maintained view; the build gate stays the oracle). The write happens first; a journal
+/// or census failure is reported, never silently swallowed — a change the record missed
+/// is exactly what the record exists to prevent.
+fn commit(module_path: &str, content: &str, verb: &str, detail: &str) -> Result<(), String> {
+    std::fs::write(module_path, content)
+        .map_err(|e| format!("bundle {verb}: cannot write: {e}"))?;
+    record(verb, module_path, detail)?;
+    maintain_census(&nearest_crate_root(module_path), module_path, content, verb)
+}
