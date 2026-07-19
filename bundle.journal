@@ -274,3 +274,17 @@ add src/discover/mod.rs — mod join @8fd6fe9c54f2d931
 seal envelope — 5 row(s) across 4 file(s) @89ee696194fbf8ef
 edit src/discover/join.rs — name_of @3d610f45de8abe59
 seal envelope — 1 row(s) across 1 file(s) @37f8f10e7ad39e64
+edit src/discover/cli.rs — impl CliSpec::bundle @32c2634d7d678e1f
+edit src/discover/cli.rs — probes @01273f5efe2c8d5f
+edit examples/bundle.rs — run @82d78c76e0c9b559
+add src/discover/pins.rs — struct Pin, struct Pins, fn walk_items, fn literals_carry, mod probes @50ff6a2cc0652ac3
+add src/discover/mod.rs — mod pins @caafee475517ad05
+seal envelope — 5 row(s) across 4 file(s) @340e5c2649716ac7
+edit examples/bundle.rs — run @b93fb26640a51b8c
+seal envelope — 1 row(s) across 1 file(s) @3722f7126d3d3469
+edit src/discover/pins.rs — walk_items @ae0326c3bb66537a
+edit src/discover/pins.rs — literals_carry @5f61ad189b029bcf
+seal envelope — 2 row(s) across 1 file(s) @2fd9b664484946ed
+edit src/discover/pins.rs — walk_items @1bd0e718ee98ce60
+edit src/discover/pins.rs — probes @b4608347881488cc
+seal envelope — 2 row(s) across 1 file(s) @37f7ae4552ada5dc

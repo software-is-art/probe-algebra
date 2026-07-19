@@ -152,8 +152,8 @@ pub struct CliSpec {
 
 #[crate::mutate]
 impl CliSpec {
-    /// bundle's own twenty-six verbs, declared — the hand-built witness of the class
-    /// becomes its first instance. Eight sorts cover every slot; twenty-three usage rows
+    /// bundle's own twenty-seven verbs, declared — the hand-built witness of the class
+    /// becomes its first instance. Eight sorts cover every slot; twenty-four usage rows
     /// (gates and owes share one, land and staged another, by declaration) render
     /// byte-identical to the text the first lock pins.
     pub fn bundle() -> CliSpec {
@@ -243,6 +243,7 @@ impl CliSpec {
                 VerbSpec::verb("offer", vec![]),
                 VerbSpec::sibling("desk", vec![]),
                 VerbSpec::verb("join", vec![Slot::required(Journal, "bundle.journal")]),
+                VerbSpec::verb("pins", vec![Slot::required(Term, "text")]),
             ],
         }
     }
@@ -377,7 +378,8 @@ mod probes {
              \x20      bundle judge [offer ...]\n\
              \x20      bundle open <module.rs> [address]\n\
              \x20      bundle offer | bundle desk\n\
-             \x20      bundle join <bundle.journal>"
+             \x20      bundle join <bundle.journal>\n\
+             \x20      bundle pins '<text>'"
         );
     }
 
@@ -434,15 +436,15 @@ mod probes {
         assert_eq!(cli.parse(&[]).unwrap_err(), usage);
     }
 
-    /// The declaration's census, pinned: twenty-six verbs, and the slot vocabulary is
+    /// The declaration's census, pinned: twenty-seven verbs, and the slot vocabulary is
     /// exactly the eight sorts — every sort earns its place by appearing, and a
     /// ninth would be a diff to this probe, i.e. a decision to sign. (The eighth,
     /// `Offer`, is the signed diff this probe invited: judge's slot is an entire
     /// invocation, re-bound by the same declaration.)
     #[test]
-    fn twenty_six_verbs_speak_exactly_the_eight_sorts() {
+    fn twenty_seven_verbs_speak_exactly_the_eight_sorts() {
         let cli = CliSpec::bundle();
-        assert_eq!(cli.verbs.len(), 26);
+        assert_eq!(cli.verbs.len(), 27);
         let spoken: Vec<Sort> = cli
             .verbs
             .iter()

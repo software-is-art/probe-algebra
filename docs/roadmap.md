@@ -4561,3 +4561,28 @@ data for reordering — that rung (join licensing row commutation from
 `spec/verb-algebra.spec` the way squash licenses collapses) stays open; and
 `join` does not yet write a `join` journal row — the landed rows keep their
 own verbs so replay stays truthful, and the seal is the grouping mark.
+
+## Pins: the wording change learns what it owes (BUILT)
+
+Built 2026-07-19, the wearability sprint's seventh brick — the retrospective's
+named grep ("which probes pin this refusal text") become a reading. `bundle
+pins '<text>'` walks the crate from its root and reads STRING LITERALS inside
+test items (`#[test]` functions, everything under `#[cfg(test)]` mods), after
+Rust unescaping, and reports every probe carrying the fragment — the owed
+updates of a wording change, found before the red suite finds them, each one
+"a wording change owes each one, same commit" (the byte-pin convention, now
+with its reverse index). Drilled on the tree's own prose: `signature moved`
+answers six pinning probes across three modules — the exact answer the grep
+was hunting. Honesty in the report itself: prose assembled at runtime
+(`format!` with moving parts) is invisible to a literal reading, so an empty
+census says "the suite stays the oracle" rather than claiming freedom. Built
+through the desk end to end, including its own bug fix (the walk rooted at
+the empty path read nothing — caught by drilling the landed verb, fixed as a
+one-sheet offer).
+
+The deeper dissolution stays on the roadmap deliberately: refusal prose as a
+CATALOG (data, stated once, asserted by key) would make this census a lookup
+and the wording change a one-item edit — the standing question's shape, a
+representation change for a later rung. And `uses` tagging test surfaces in
+its census line — the other half of the perception-rung residue — remains
+open here, named again so it is not lost.

@@ -1,0 +1,125 @@
+#[cfg(test)]
+mod probes {
+    use super::*;
+
+    fn argv(words: &[&str]) -> Vec<String> {
+        words.iter().map(|w| w.to_string()).collect()
+    }
+
+    /// THE FIRST LOCK of the language constructor: the usage text is an IMAGE of
+    /// the declaration, byte-identical to the text the hand-written harness has
+    /// always printed. The pin is the ratification — a declaration change that moves
+    /// these bytes is a diff to sign, and the hand-written second author is gone
+    /// (examples/bundle.rs renders its usage from this declaration).
+    #[test]
+    fn the_generated_usage_is_bundles_usage_byte_for_byte() {
+        assert_eq!(
+            CliSpec::bundle().usage(),
+            "usage: bundle add <module.rs> <snippet.rs | ->\n\
+             \x20      bundle edit <module.rs> <item-name> <replacement.rs | ->\n\
+             \x20      bundle declare <module.rs> \"<shape(op, ...)>\"\n\
+             \x20      bundle place <module.rs>\n\
+             \x20      bundle check <module.rs>\n\
+             \x20      bundle show <module.rs> [item-name]\n\
+             \x20      bundle collect <module.rs> [item-to-sweep]\n\
+             \x20      bundle squash <bundle.journal>\n\
+             \x20      bundle replay <bundle.journal>\n\
+             \x20      bundle constrains <module.rs> <operator>\n\
+             \x20      bundle uses <item-name>\n\
+             \x20      bundle spoke <item-name>\n\
+             \x20      bundle trace <theory> '<term>'\n\
+             \x20      bundle lift <module.rs> <theory-name> [declaration ...]\n\
+             \x20      bundle gates | bundle owes\n\
+             \x20      bundle pin\n\
+             \x20      bundle begin\n\
+             \x20      bundle land | bundle staged\n\
+             \x20      bundle drop\n\
+             \x20      bundle judge [offer ...]\n\
+             \x20      bundle open <module.rs> [address]\n\
+             \x20      bundle offer | bundle desk\n\
+             \x20      bundle join <bundle.journal>\n\
+             \x20      bundle pins '<text>'"
+        );
+    }
+
+    /// The matcher binds every arity shape the verbs use and refuses everything
+    /// else with the usage text: required missing, stray trailing, unknown verb,
+    /// empty argv. A refusal binds nothing — there is no partially-bound invocation
+    /// to observe.
+    #[test]
+    fn every_argv_shape_binds_or_refuses_with_usage() {
+        let cli = CliSpec::bundle();
+        let usage = cli.usage();
+
+        let inv = cli
+            .parse(&argv(&["edit", "m.rs", "x", "-"]))
+            .expect("binds");
+        assert_eq!(inv.verb.name, "edit");
+        assert_eq!(inv.values, vec![vec!["m.rs"], vec!["x"], vec!["-"]]);
+
+        let bare = cli.parse(&argv(&["show", "m.rs"])).expect("binds");
+        assert_eq!(bare.values, vec![vec!["m.rs".to_string()], vec![]]);
+        let one = cli.parse(&argv(&["show", "m.rs", "item"])).expect("binds");
+        assert_eq!(one.values[1], vec!["item"]);
+
+        let many = cli
+            .parse(&argv(&["lift", "m.rs", "theory", "a", "b", "c"]))
+            .expect("binds");
+        assert_eq!(many.values[2], vec!["a", "b", "c"]);
+        let none = cli
+            .parse(&argv(&["lift", "m.rs", "theory"]))
+            .expect("binds");
+        assert_eq!(none.values[2], Vec::<String>::new());
+
+        let offer = cli
+            .parse(&argv(&["judge", "edit", "m.rs", "x", "-"]))
+            .expect("binds");
+        assert_eq!(offer.verb.name, "judge");
+        assert_eq!(offer.values[0], vec!["edit", "m.rs", "x", "-"]);
+
+        assert_eq!(cli.parse(&argv(&["pin"])).expect("binds").values.len(), 0);
+        assert_eq!(
+            cli.parse(&argv(&["land"])).expect("binds").verb.name,
+            "land"
+        );
+        assert_eq!(cli.parse(&argv(&["begin", "stray"])).unwrap_err(), usage);
+
+        assert_eq!(cli.parse(&argv(&["add", "m.rs"])).unwrap_err(), usage);
+        assert_eq!(cli.parse(&argv(&["pin", "stray"])).unwrap_err(), usage);
+        assert_eq!(
+            cli.parse(&argv(&["show", "m.rs", "item", "stray"]))
+                .unwrap_err(),
+            usage
+        );
+        assert_eq!(cli.parse(&argv(&["summon", "m.rs"])).unwrap_err(), usage);
+        assert_eq!(cli.parse(&[]).unwrap_err(), usage);
+    }
+
+    /// The declaration's census, pinned: twenty-seven verbs, and the slot vocabulary is
+    /// exactly the eight sorts — every sort earns its place by appearing, and a
+    /// ninth would be a diff to this probe, i.e. a decision to sign. (The eighth,
+    /// `Offer`, is the signed diff this probe invited: judge's slot is an entire
+    /// invocation, re-bound by the same declaration.)
+    #[test]
+    fn twenty_seven_verbs_speak_exactly_the_eight_sorts() {
+        let cli = CliSpec::bundle();
+        assert_eq!(cli.verbs.len(), 27);
+        let spoken: Vec<Sort> = cli
+            .verbs
+            .iter()
+            .flat_map(|v| v.slots.iter().map(|s| s.sort))
+            .collect();
+        for sort in [
+            Sort::Module,
+            Sort::Item,
+            Sort::Payload,
+            Sort::Declaration,
+            Sort::Journal,
+            Sort::Theory,
+            Sort::Term,
+            Sort::Offer,
+        ] {
+            assert!(spoken.contains(&sort), "{sort:?} is never spoken");
+        }
+    }
+}

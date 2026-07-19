@@ -607,6 +607,8 @@ pub mod desk;
 
 pub mod join;
 
+pub mod pins;
+
 #[cfg(test)]
 mod tests {
     use super::*;

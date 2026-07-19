@@ -1,0 +1,60 @@
+#[cfg(test)]
+mod probes {
+    use super::{Pin, Pins};
+
+    /// The census finds a pinning probe by its literal — through escapes, inside
+    /// a `#[cfg(test)]` mod — and stays silent where nothing pins.
+    #[test]
+    fn the_census_finds_the_pinning_probe_through_escapes() {
+        let module = r#"
+pub fn speak() -> String { "not a test".to_string() }
+
+#[cfg(test)]
+mod probes {
+    #[test]
+    fn the_refusal_is_pinned() {
+        assert_eq!(refuse(), "bundle add: `two` already exists\n in the module");
+    }
+
+    #[test]
+    fn another_probe_pins_nothing_related() {
+        assert_eq!(1 + 1, 2);
+    }
+}
+"#;
+        let pins = Pins::in_module("src/m.rs", module, "already exists").expect("parses");
+        assert_eq!(
+            pins,
+            vec![Pin {
+                module: "src/m.rs".to_string(),
+                item: "the_refusal_is_pinned".to_string(),
+            }]
+        );
+        assert_eq!(
+            Pins::in_module("src/m.rs", module, "\n in the module")
+                .expect("parses")
+                .len(),
+            1,
+            "matching runs on the unescaped value"
+        );
+        assert!(Pins::in_module("src/m.rs", module, "no such prose")
+            .expect("parses")
+            .is_empty());
+    }
+
+    /// The report names each pinning item and owes-line; an empty census says
+    /// so with its honesty disclosure rather than saying nothing.
+    #[test]
+    fn the_report_names_the_pins_and_the_empty_census_discloses() {
+        let pins = vec![Pin {
+            module: "src/m.rs".to_string(),
+            item: "the_refusal_is_pinned".to_string(),
+        }];
+        let full = Pins::render("already exists", &pins);
+        assert!(full.contains("src/m.rs — the_refusal_is_pinned"), "{full}");
+        assert!(full.contains("1 pinning item(s)"), "{full}");
+        let empty = Pins::render("ghost prose", &[]);
+        assert!(empty.contains("none found"), "{empty}");
+        assert!(empty.contains("the suite stays the oracle"), "{empty}");
+    }
+}
