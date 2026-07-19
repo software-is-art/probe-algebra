@@ -266,3 +266,11 @@ edit src/discover/cli.rs — impl CliSpec::bundle @880378adb8f55d73
 edit src/discover/cli.rs — probes @3746b7fbf0080f41
 edit examples/bundle.rs — run @4280137b42bb449b
 seal envelope — 6 row(s) across 4 file(s) @3cbe8aae46565808
+edit src/discover/cli.rs — impl CliSpec::bundle @5e1cb15e7e2e0c18
+edit src/discover/cli.rs — probes @730f193b55bd72bd
+edit examples/bundle.rs — run @3191b4e3d255993c
+add src/discover/join.rs — enum Planned, struct Join, fn touched, fn split_row, fn name_of, mod probes @90025f5ff3492c37
+add src/discover/mod.rs — mod join @8fd6fe9c54f2d931
+seal envelope — 5 row(s) across 4 file(s) @89ee696194fbf8ef
+edit src/discover/join.rs — name_of @3d610f45de8abe59
+seal envelope — 1 row(s) across 1 file(s) @37f8f10e7ad39e64

@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 1015 sites.
+# 1028 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -742,6 +742,19 @@
 - boundary_spec::discover::items::ItemRelation::uses_report:0: == -> !=
 - boundary_spec::discover::items::ItemRelation::uses_report:deaf -> Err(String::new())
 - boundary_spec::discover::items::ItemRelation::uses_report:deaf -> Ok(String::new())
+- boundary_spec::discover::join::join::fork:0: == -> !=
+- boundary_spec::discover::join::join::plan:0: == -> !=
+- boundary_spec::discover::join::join::plan:1: != -> ==
+- boundary_spec::discover::join::join::plan:deaf -> Err(String::new())
+- boundary_spec::discover::join::join::plan:deaf -> Ok(vec![])
+- boundary_spec::discover::join::join::split_conflicted:0: ! -> (deleted)
+- boundary_spec::discover::join::join::split_conflicted:1: == -> !=
+- boundary_spec::discover::join::join::split_conflicted:2: && -> ||
+- boundary_spec::discover::join::join::split_conflicted:3: != -> ==
+- boundary_spec::discover::join::join::split_conflicted:4: != -> ==
+- boundary_spec::discover::join::join::split_conflicted:deaf -> None
+- boundary_spec::discover::join::name_of:deaf -> String::new()
+- boundary_spec::discover::join::split_row:deaf -> None
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Err(vec![])
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Ok(vec![])
 - boundary_spec::discover::layering::ComponentLayering::is_atomic:deaf -> false

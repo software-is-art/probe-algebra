@@ -4520,3 +4520,44 @@ tree and the store stay the only truth); a sheet's verdict can go stale the
 moment the tree moves under it (the preflight is a reading, not a lock); and
 `desk`'s tail counts changed sheets, not green ones — a desk of one refusing
 sheet still says the offer would stage it, and the offer is what refuses.
+
+## The join: the merge becomes a verb (BUILT)
+
+Built 2026-07-19, the wearability sprint's sixth brick — the missing
+transaction the concurrent-session field report named, built as that report's
+own reading said: the conflict was never in the items, it was in the renders,
+so `bundle join` never reads a render. The subject is the sibling's journal —
+or OUR OWN, still carrying git's conflict markers: the conflict block splits
+back into the two records it interleaved, so the one artifact git hands you
+is already join's input, zero hand-weaving. The records fork at their longest
+common prefix (order is the only clock, so shared history IS a shared
+prefix); the sibling segment plans against ours — commuting rows stage
+mechanically into an envelope the join begins (a sibling `recast` stages as
+`edit` and the envelope re-licenses it; `declare` always commutes, exactly as
+the frozen algebra says), a both-touched item surfaces as a DECISION naming
+the sibling's payload address so taking theirs is one staged verb away, seals
+skip as boundary, and the non-stageable verbs skip by name. `land` stays the
+judged step: the bill is the merge review, all or none, and a join that
+stages nothing drops the envelope it began. Payloads travel because the store
+is content-addressed and committed — git's union merge of `bundle.payloads/`
+is trivially conflict-free, which is the indirection instinct's payoff
+arriving early: the store already made the item universe grow-only; join
+concentrates all remaining conflict into the rows.
+
+The drill rebuilt the field report's exact scenario in two scratch crates —
+one base, one side editing `one` and adding `two`, the other editing `one`
+and adding `three` — and the join staged `three`, surfaced `one` as the named
+decision with the take-theirs teaching, landed as one sealed envelope, and
+the joined journal REPLAYS TO THE COMMITTED TEXT: tree == replay(journal)
+holds through a merge. The conflicted-file form drilled too: markers split,
+the colliding row refused as an honest debt in `add`'s own voice, and the
+empty envelope dropped itself.
+
+Deliberate keeps, disclosed: the fork is row-identity, nothing subtler; a
+block-grain edit on one side composes silently with a method-grain edit
+inside it from the other (the composite judgment still rules); the verb
+algebra's laws surface as stage-time refusals rather than being consulted as
+data for reordering — that rung (join licensing row commutation from
+`spec/verb-algebra.spec` the way squash licenses collapses) stays open; and
+`join` does not yet write a `join` journal row — the landed rows keep their
+own verbs so replay stays truthful, and the seal is the grouping mark.

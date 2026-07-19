@@ -605,6 +605,8 @@ pub mod envelope;
 
 pub mod desk;
 
+pub mod join;
+
 #[cfg(test)]
 mod tests {
     use super::*;
