@@ -188,27 +188,27 @@ impl Bundle {
     /// Refusals, named: an unparseable replacement, a replacement that is not exactly ONE
     /// item, an address the module does not carry, a replacement whose address differs
     /// (an edit is not a rename), an AMBIGUOUS address (two impl blocks may legally share
-    /// one — refused by count, never guessed between), a FUNCTION whose signature moved
+    /// one — refused teaching the `addr#N` discriminated forms, never guessed between), a
+    /// FUNCTION whose signature moved
     /// (token-for-token), and an IMPL or TRAIT whose METHOD-SIGNATURE SET moved — the
     /// interface-hold at whole-item grain, which is what lets `edit` reach the host's own
     /// item kinds (the self-hosting disposition's rung-2 gap, closed). Non-function items
     /// (types, consts) hold their name and kind.
     pub fn edit(module: &str, item_name_text: &str, replacement: &str) -> Result<String, String> {
         // edit's OWN judgment is the interface hold; every shared judgment (one item,
-        // naming, existence, ambiguity) and the effect itself live in `splice`, the
-        // half `recast` re-applies without this hold. The hold runs only when the
-        // pair it compares binds cleanly — one parsed replacement naming the one
-        // target — otherwise it is vacuous here and `splice` speaks the refusal.
+        // naming, existence, ambiguity — now discriminator-aware through
+        // `select_addressed`) and the effect itself live in `splice`, the half `recast`
+        // re-applies without this hold. The hold runs only when the pair it compares
+        // binds cleanly — one parsed replacement naming the one addressed target —
+        // otherwise it is vacuous here and `splice` speaks the refusal.
         if let (Ok(new), Ok(file)) = (syn::parse_file(replacement), syn::parse_file(module)) {
-            let mut targets = file.items.iter().filter(|item| {
-                let address = item_address(item);
-                address.as_deref() == Some(item_name_text)
-            });
-            if let ([new_item], Some(target), None) =
-                (new.items.as_slice(), targets.next(), targets.next())
-            {
-                let offered_name = item_address(new_item);
-                if offered_name.as_deref() == Some(item_name_text) {
+            if let ([new_item], Ok(Some(target))) = (
+                new.items.as_slice(),
+                select_addressed("edit", &file, item_name_text),
+            ) {
+                let (base, _) = split_discriminator(item_name_text);
+                let offered = item_address(new_item);
+                if offered.as_deref() == Some(base) {
                     // the signature hold: for functions, token-for-token equality of the
                     // signature; for impls and traits, the method-signature set; for
                     // everything else, the kind must match (a struct stays a struct) —
@@ -561,31 +561,20 @@ impl Bundle {
     /// `edit` holds and `replay` reconstructs — so a show → revise → edit cycle never
     /// opens a file, and editing an item with its own shown text is a byte-exact no-op.
     /// Read-only; journals nothing. Addresses are `edit`'s addresses (`merge`,
-    /// `impl Type`, `impl Trait for Type`, `probes`); refusals teach — an address
-    /// nothing carries lists what the module does declare, and a shared address refuses
-    /// as ambiguous rather than guessing.
+    /// `impl Type`, `impl Trait for Type`, `probes`), the discriminated `addr#N`
+    /// form included; refusals teach — an address nothing carries lists what the
+    /// module does declare, and a shared bare address refuses naming the
+    /// discriminated addresses it will accept.
     pub fn show(module: &str, item_name_text: &str) -> Result<String, String> {
         let file =
             syn::parse_file(module).map_err(|e| format!("bundle show: module unparseable: {e}"))?;
-        let mut targets = file.items.iter().filter(|item| {
-            let address = item_address(item);
-            address.as_deref() == Some(item_name_text)
-        });
-        let target = targets.next().ok_or_else(|| {
+        let target = select_addressed("show", &file, item_name_text)?.ok_or_else(|| {
             let roster: Vec<String> = file.items.iter().filter_map(item_address).collect();
             format!(
                 "bundle show: no item at `{item_name_text}` — addressable here: {}",
                 roster.join(", ")
             )
         })?;
-        let shadowed = targets.count();
-        if shadowed > 0 {
-            return Err(format!(
-                "bundle show: {} items share the address `{item_name_text}` — ambiguous, \
-                 refused rather than guessed between",
-                shadowed + 1
-            ));
-        }
         let start = byte_offset(module, target.span().start());
         let end = byte_offset(module, target.span().end());
         Ok(module[start..end].to_string())
@@ -1053,12 +1042,107 @@ fn pad_to_blank_line(out: &mut String) {
     }
 }
 
+/// The address grammar's DISCRIMINATOR (the sibling-impl refusal's other half,
+/// third session to hit it): `addr#N` names the Nth item, 1-based in file order,
+/// among those sharing `addr`. `#` cannot appear in a bare address, so the split
+/// is never ambiguous; a bare address stays the common case — the discriminated
+/// form exists exactly where bareness refuses.
+#[crate::mutate]
+pub(crate) fn split_discriminator(given: &str) -> (&str, Option<usize>) {
+    if let Some((base, ordinal)) = given.rsplit_once('#') {
+        if !base.is_empty() {
+            if let Ok(n) = ordinal.parse::<usize>() {
+                if n >= 1 {
+                    return (base, Some(n));
+                }
+            }
+        }
+    }
+    (given, None)
+}
+
+/// What a sibling HOLDS, for the teaching refusal: an impl or trait names its
+/// method idents (the surface `edit` would hold), anything else names itself a
+/// further declaration — enough to pick an ordinal without opening the file.
+#[crate::mutate]
+fn sibling_holdings(item: &syn::Item) -> String {
+    let methods: Vec<String> = match item {
+        syn::Item::Impl(block) => block
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                syn::ImplItem::Fn(f) => Some(f.sig.ident.to_string()),
+                _ => None,
+            })
+            .collect(),
+        syn::Item::Trait(block) => block
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                syn::TraitItem::Fn(f) => Some(f.sig.ident.to_string()),
+                _ => None,
+            })
+            .collect(),
+        _ => return "a further declaration".to_string(),
+    };
+    if methods.is_empty() {
+        "holds no methods".to_string()
+    } else {
+        format!("holds {}", methods.join(", "))
+    }
+}
+
+/// ONE SELECTOR for every verb that answers an address: resolve `given` (bare or
+/// discriminated) against the file's items. `Ok(None)` is "nothing answers" — the
+/// caller owns that refusal, each verb teaches differently there. An ambiguity or
+/// a dangling ordinal refuses HERE: the ambiguous refusal now TEACHES the
+/// discriminated addresses instead of only naming the collision.
+#[crate::mutate]
+pub(crate) fn select_addressed<'a>(
+    verb: &str,
+    file: &'a syn::File,
+    given: &str,
+) -> Result<Option<&'a syn::Item>, String> {
+    let (base, ordinal) = split_discriminator(given);
+    let siblings: Vec<&syn::Item> = file
+        .items
+        .iter()
+        .filter(|item| {
+            let address = item_address(item);
+            address.as_deref() == Some(base)
+        })
+        .collect();
+    match (siblings.len(), ordinal) {
+        (0, _) => Ok(None),
+        (1, None) => Ok(Some(siblings[0])),
+        (_, Some(n)) if n <= siblings.len() => Ok(Some(siblings[n - 1])),
+        (count, Some(n)) => Err(format!(
+            "bundle {verb}: `{base}#{n}` names nothing — {count} item(s) answer to \
+             `{base}`"
+        )),
+        (count, None) => {
+            let taught: Vec<String> = siblings
+                .iter()
+                .enumerate()
+                .map(|(i, item)| format!("`{base}#{}` ({})", i + 1, sibling_holdings(item)))
+                .collect();
+            Err(format!(
+                "bundle {verb}: {count} items share the address `{base}` — ambiguous; \
+                 say {}",
+                taught.join(" or ")
+            ))
+        }
+    }
+}
+
 /// The EFFECT half of an item replacement — the judged splice `edit` and `recast`
 /// share. It holds everything about a replacement EXCEPT the interface: exactly one
 /// item, naming the target (a replacement is not a rename), landing on an existing,
-/// unambiguous address. The signature hold is deliberately absent — that judgment is
-/// `edit`'s alone, and the envelope's `land` licenses its absence as `recast`. `verb`
-/// names the caller in every refusal, so each voice teaches as itself.
+/// unambiguously addressed item (`select_addressed` resolves bare and `addr#N`
+/// discriminated forms alike). The signature hold is deliberately absent — that
+/// judgment is `edit`'s alone, and the envelope's `land` licenses its absence as
+/// `recast`. `verb` names the caller in every refusal, so each voice teaches as
+/// itself.
 #[crate::mutate]
 pub(crate) fn splice(
     verb: &str,
@@ -1081,33 +1165,22 @@ pub(crate) fn splice(
              to hold"
         ));
     };
-    if new_name != item_name_text {
+    let (base, _) = split_discriminator(item_name_text);
+    if new_name != base {
         return Err(format!(
-            "bundle {verb}: the replacement names `{new_name}`, not `{item_name_text}` — \
+            "bundle {verb}: the replacement names `{new_name}`, not `{base}` — \
              an edit is not a rename"
         ));
     }
 
     let file =
         syn::parse_file(module).map_err(|e| format!("bundle {verb}: module unparseable: {e}"))?;
-    let mut targets = file.items.iter().filter(|item| {
-        let address = item_address(item);
-        address.as_deref() == Some(item_name_text)
-    });
-    let target = targets.next().ok_or_else(|| {
+    let target = select_addressed(verb, &file, item_name_text)?.ok_or_else(|| {
         format!(
-            "bundle {verb}: no item named `{item_name_text}` in the module — `add` \
+            "bundle {verb}: no item named `{base}` in the module — `add` \
              grows, `{verb}` changes; nothing here to change"
         )
     })?;
-    let shadowed = targets.count();
-    if shadowed > 0 {
-        return Err(format!(
-            "bundle {verb}: {} items share the address `{item_name_text}` — ambiguous, \
-             refused rather than guessed between",
-            shadowed + 1
-        ));
-    }
 
     // the splice: the target's TEXT is replaced in place (its position and its gap are
     // the module's furniture and stay), then one parse∘render keeps the canonical
@@ -1784,5 +1857,67 @@ fn orphan(a: Count) -> Count {
         let twice = Bundle::declare(&once, "involution(f)").expect("appends");
         let refusal = Bundle::declare(&twice, "involution(f)").unwrap_err();
         assert!(refusal.contains("already declared"), "{refusal}");
+    }
+
+    /// THE DISCRIMINATOR, drilled end to end: a shared bare address refuses
+    /// TEACHING the `addr#N` forms (each with what it holds), `#N` selects the
+    /// Nth sibling in file order for show AND edit, a dangling ordinal refuses
+    /// by count, and `#1` on a unique address is the bare address — one selector,
+    /// every path named.
+    #[test]
+    fn a_shared_address_teaches_and_the_discriminator_selects() {
+        let module = "\
+pub struct Count;
+
+impl Count {
+    /// up.
+    pub fn up(self) -> Count {
+        self
+    }
+}
+
+impl Count {
+    /// down.
+    pub fn down(self) -> Count {
+        self
+    }
+}
+";
+        let refusal = Bundle::show(module, "impl Count").unwrap_err();
+        assert_eq!(
+            refusal,
+            "bundle show: 2 items share the address `impl Count` — ambiguous; say \
+             `impl Count#1` (holds up) or `impl Count#2` (holds down)"
+        );
+        let second = Bundle::show(module, "impl Count#2").expect("selected");
+        assert!(second.contains("fn down"), "{second}");
+        assert!(!second.contains("fn up"), "{second}");
+        let dangling = Bundle::show(module, "impl Count#3").unwrap_err();
+        assert_eq!(
+            dangling,
+            "bundle show: `impl Count#3` names nothing — 2 item(s) answer to `impl Count`"
+        );
+        assert_eq!(
+            Bundle::show(module, "Count#1").expect("bare-unique tolerates #1"),
+            Bundle::show(module, "Count").expect("shown")
+        );
+        // edit through the discriminated address: the SECOND block's doc moves, the
+        // first block and every byte outside stay verbatim; the replacement names
+        // the BASE address (an edit is not a rename, and `#N` is not a name).
+        let edited = Bundle::edit(
+            module,
+            "impl Count#2",
+            "impl Count {\n    /// downward.\n    pub fn down(self) -> Count {\n        self\n    }\n}\n",
+        )
+        .expect("edited");
+        assert!(edited.contains("/// downward."), "{edited}");
+        assert!(edited.contains("/// up."), "{edited}");
+        let refusal = Bundle::edit(
+            module,
+            "impl Count",
+            "impl Count {\n    pub fn up(self) -> Count {\n        self\n    }\n}\n",
+        )
+        .unwrap_err();
+        assert!(refusal.contains("say `impl Count#1`"), "{refusal}");
     }
 }

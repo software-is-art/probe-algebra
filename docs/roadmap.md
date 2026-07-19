@@ -3865,6 +3865,43 @@ So the agenda must stay a declaration of intent, revisable by the same judged
 means, never a cage; the payload store is already half the drafting table made
 first-class.
 
+## The item relation, brick 6: the reverse edge — `uses` (BUILT)
+
+Built 2026-07-16, the day after brick 5 named it three times in one reading: the
+sixteenth verb, `bundle uses <item-name>` — who else in the tree holds this fact.
+`ItemRelation::uses` filters the tree relation (brick 2's walk, at item grain) to
+the rows whose bodies speak the name as a whole identifier, through the ONE
+ident-bounded matcher the verbs already trust (`bundle::mentions` — `constrains`'
+own; no second vocabulary), in the relation's canonical order, the addressed row
+included and marked. `uses_report` is the perception voice: one row per speaker,
+a census at the foot, and a name nothing speaks refuses by name — a typo teaches
+instead of reading as an honest empty. The honesty is stated in the report's
+first line: a TOKEN READING, not a resolve — same-named strangers are counted,
+macro-hidden uses are missed; the report suggests, it never proves. Acceptance
+at the real tree: `bundle uses maintain_qualify` answered brick 5's exact grep
+("who consumes this function") in one call — four speakers across two modules,
+the cross-crate consumer (`examples/bundle.rs — maintain_census`) on its roster.
+Probes pin the ident boundary (`redoubled` is a stranger), the byte-exact report
+and refusal, and self-recognition at the real tree (the reverse edge of
+`of_tree` names both its declaring impl row and its CLI consumer). All four new
+schemata sites judged.
+
+Readings from the brick, per the instrument. (a) The verb's own design paid the
+fallback twice for a question the verb itself now answers — "who consumes
+`of_tree`", "where does `constrains` dispatch" — the bootstrapping irony, noted
+and now closed for the next brick. (b) One reading the verb does NOT close:
+"does an ident-bounded matcher already exist somewhere?" is a search by
+CAPABILITY, not by name — `uses` walks edges from a name; nothing yet perceives
+"what in the tree can do X". Named here so the next reacher knows it is still
+the encyclopedia's. (c) The sibling-impl ambiguity fired again, in the first
+minute: `show src/discover/items.rs 'impl ItemRelation'` refused (two rows, one
+address) — the third firing; the discriminator or the method-grain rung remains
+the address grammar's most-demanded gap, and `uses` answering methods only at
+containing-item grain (ask `of_tree`, be told `impl ItemRelation`) is the same
+gap seen from the perception side. (d) The payload-formatting idiom (rustfmt
+outside the tree, offer whole) carried the entire brick: six judged
+transactions (one `add`, five `edit`s), zero hand edits in code.
+
 ## Standing follow-ups
 
 - ~~**Tag `v0.1.0`**~~ — superseded by AUTOMATIC RELEASES (the `release (certified
@@ -3954,6 +3991,61 @@ first-class.
   question, pointed at its own ratification step: some of what is signed today is a
   derivation whose dataset has not finished arriving. What no amount of journal
   converts: the loss function — which demands ought to exist stays prose.
+
+## The address grammar, discriminated: `addr#N` (BUILT)
+
+Built 2026-07-17, the same session brick 6's readings counted the sibling-impl
+ambiguity firing for the third time — and it fired again in this session's first
+minute (`show src/discover/items.rs 'impl ItemRelation'`, now THREE blocks). The
+gap is closed from both sides: `addr#N` (1-based, file order — `#` cannot appear
+in a bare address, so the split is never ambiguous) is accepted wherever an
+address resolves, and the ambiguous refusal now TEACHES the discriminated
+addresses with what each sibling holds:
+
+    bundle show: 3 items share the address `impl ItemRelation` — ambiguous; say
+    `impl ItemRelation#1` (holds of_module, of_files) or `impl ItemRelation#2`
+    (holds of_tree) or `impl ItemRelation#3` (holds uses, uses_report)
+
+One selector (`select_addressed`) now owns bare/discriminated/dangling for
+`show` and `edit`; the zero-match refusal stays with each verb (they teach
+differently there). `edit` through `impl Count#2` holds the same
+method-signature-set it always held, and the replacement names the BASE address
+— `#N` is a coordinate, not a name, so an edit is still not a rename. Residual,
+named: `collect`'s resolution is not yet wired through the selector, and the
+inventory does not print the `#N` forms (the refusal teaches them instead). The
+method-grain rung (ask for `of_tree`, edit just `of_tree`) remains open — the
+discriminator picks between blocks; it does not enter them.
+
+## The item relation, brick 7: journal time — `spoke` (BUILT)
+
+Built 2026-07-17: the seventeenth verb, `bundle spoke <item-name>` — the reverse
+edge pointed at the record. `Replay::spoke` walks the journal exactly as the
+replay differential does (same grammar, same payload store, same effects-only
+honesty), and at each reconstructible entry DIFFERENTIATES the speaker roster —
+the item relation over journal time instead of tree space, so "who holds this
+fact" gains "and since which judged transaction". Speakers are read with the one
+matcher `uses` trusts; one vocabulary, three verbs deep now. Acceptance on the
+real journal, first ask:
+
+    spoke `uses_report` — journal time, effects only (what replay reconstructs;
+    git holds the earlier past):
+      entry 172 (add src/discover/items.rs — ): + impl ItemRelation
+      entry 173 (edit src/discover/items.rs — probes): + probes
+      110 of 186 entries beyond the horizon (pre-store, judged, or dark)
+
+The horizon is the report's spine: pre-store entries, judged verbs, and modules
+gone dark are COUNTED, never guessed at — a module born before the journal goes
+dark at its first edit (replay reconstructs from empty), which is conservative
+and disclosed; git holds that past. A name the journal never heard refuses with
+the horizon in the refusal. Readings: the `#[mutate]` deafness transform turned
+a one-line `filter(|item| item_address(item).as_deref() == ...)` into an E0716
+under `--features schemata` where plain builds passed — the two-line binding the
+older code always used turns out to be a rule the instrumentation imposes, worth
+knowing before the next helper. Infrastructure, same session: the session-start
+hook now provisions cargo-nextest (crates.io build; the prebuilt hosts are
+policy-denied) and pins the suit, so future sessions start with the verbs warm
+and the sweep's incremental tier real — two container restarts ate full sweeps
+this week, and the fix was an environment line, not a code brick.
 
 ## The toolchain pin becomes structure in the medium: `rust-toolchain.toml` (BUILT)
 
@@ -4103,6 +4195,52 @@ up. Note the asymmetry worth keeping when it is built: single-item refusal
 teaches instantly; a staged transaction should refuse with the full residue
 (which items still owe what), not just the first error.
 
+## The survivor named, and the vacuous-green class confirmed live (2026-07-18)
+
+The red check on this branch's sweep is diagnosed and killed: the survivor was
+`spoke:1: && -> ||` — the payload-address recognizer's conjunction
+(`len == 16 && all-hex`), whose flip strips a short hex-looking tail (` @cafe`)
+off a declare line and lets the declaration silently succeed where the true code
+counts the entry beyond the horizon. The killing probe pins the honest reading: a
+short hex tail is PROSE, not an address. Two lessons the diagnosis paid for:
+(1) this branch's "22 sites judged killed by hand" was VACUOUS — the judging
+predated the site-id discovery (the id is the whole census line, arrow and flip
+included; a truncated id arms nothing and passes green), so all 22 hand-verdicts
+judged an unflipped tree. Twenty-one were covered by real probes anyway; this one
+was not, and only CI's sweep — which arms sites by their true ids — caught it.
+The refusing-selector candidate (a PROBE_MUTANT matching no census site refuses)
+graduates from convenience to CONFIRMED NEED: the vacuous green has now cost two
+CI cycles and a container-day of local sweeps. (2) The check run's failure output
+is EMPTY and its logs 404 from the API — the sweep's survivor list died with the
+runner, and the diagnosis had to be re-derived locally by hand-judging the
+branch's minted sites (fast path: narrow per-module test filters, full-suite
+confirm on candidates). The red-checks-carry-their-diagnosis brick is likewise
+confirmed, not speculative.
+
+## The wedge named: a shell-out inside the no-shell pipeline (2026-07-18)
+
+The three-PR red streak on the perception-verbs branch is fully diagnosed, and
+the mutant was innocent. The chain: `shape::find:0: != -> ==` flips the
+union-find's loop into a spin, every placer-touching test hangs, the per-site
+timeout fires as designed — and then the harness's group kill, `kill -9 -<pid>`
+run as an EXTERNAL command, refuses silently (procps `kill` reads `-<pid>` as a
+flag; only the shell builtin accepts the bare form), its status is discarded,
+and the blocking `wait` one line later wedges the worker forever on a child that
+was never killed. In CI the wedged job died with empty check output and
+unfetchable logs, which is why three diagnosis rounds ran blind. The fix is `--`
+before the negative pid — but the lesson is the doctrine the sweep already
+states: "the whole pipeline is typed Rust with pinned semantics, no shell." The
+one shell-out left in the judgment path is exactly where it broke; the residual
+brick is replacing it with a direct signal syscall so the kill's failure is at
+least observable. Timeout-as-detection held throughout: once unwedged, the site
+judged `timeout (detection)` and the sweep ran clean — 969 sites, 2 survivors,
+both long-ratified. The fresh attestation commits with this entry; every PR
+since #58 had been silently paying a 190-site incremental re-judgment because
+the transcript was three trees stale, and the countersign tier now judges in
+minutes. Also confirmed at cost, again: red checks must carry their diagnosis —
+this hunt burned four local sweep attempts across container deaths because the
+runner's knowledge died with it.
+
 ## The envelope: the atomic multi-item transaction (BUILT)
 
 Built 2026-07-18, closing the field report directly above, same day it was filed.
@@ -4166,3 +4304,17 @@ is the known replay-divergence class; fmt-normal payloads at stage time would
 retire it. (6) Generated crates (genesis's `Pipeline::locks_in`) do not yet ship
 the envelope's floor — the consumer twin, owed when a genesis crate first needs
 it.
+
+FIELD REPORT from the landing (2026-07-19): two suited sessions built
+concurrently from the same base — one grew the envelope, the other grew `uses`,
+`spoke`, and `addr#N` — and the reconciliation had NO VERB: the merge was file
+patching end to end, conflict markers resolved by hand in the same files both
+sessions had only ever touched through judged transactions. The synthesis
+itself was mechanical in exactly the way the method likes (`splice` absorbed
+`select_addressed`; the effect/judgment split and the discriminator compose
+cleanly — two verbs' worth of judgment met in one function with no residue),
+which sharpens the reading: the CONFLICT was never in the items, it was in the
+renders. A journal-level merge — replaying two sessions' judged rows onto one
+tree and judging the composite, the envelope's `land` pointed at a sibling
+history — is the missing verb, and it is the journal-as-environment candidate's
+first concrete consumer. Until then, concurrent sessions cost a hand merge.

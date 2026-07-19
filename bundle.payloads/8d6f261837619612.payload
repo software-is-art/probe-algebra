@@ -1,0 +1,54 @@
+#[crate::mutate]
+impl ItemRelation {
+    /// THE REVERSE EDGE (`constrains` read backwards — the perception brick 5's
+    /// readings paid grep for three times): every row of the relation whose body
+    /// speaks `name` as a whole identifier — who else holds this fact. A TOKEN
+    /// READING through the one ident-bounded matcher the verbs already trust
+    /// (`bundle::mentions`), not a resolve: same-named strangers are counted,
+    /// macro-hidden uses are missed — the report suggests, it never proves. Rows
+    /// return in the relation's canonical (module, name, body) order, the row
+    /// that ADDRESSES `name` included: the caller reads the roster whole.
+    pub fn uses(tree: &ZSet<Item>, name: &str) -> Vec<Item> {
+        tree.entries()
+            .into_iter()
+            .filter(|(item, _)| super::bundle::mentions(&item.body, name))
+            .map(|(item, _)| item)
+            .collect()
+    }
+
+    /// The reverse edge in the report voice: one row per speaking item, the
+    /// addressed row marked, the census at the foot. A name nothing in the tree
+    /// speaks is refused by name — perception does not guess a typo into an
+    /// honest empty.
+    pub fn uses_report(tree: &ZSet<Item>, name: &str) -> Result<String, String> {
+        let rows = ItemRelation::uses(tree, name);
+        if rows.is_empty() {
+            return Err(format!(
+                "bundle uses: nothing in the tree speaks `{name}` — perception \
+                 does not guess"
+            ));
+        }
+        let mut out = format!(
+            "uses of `{name}` — a token reading over the item relation, not a \
+             resolve:\n"
+        );
+        for item in &rows {
+            if item.name == name {
+                out.push_str(&format!(
+                    "  {} — {} (the address itself)\n",
+                    item.module, item.name
+                ));
+            } else {
+                out.push_str(&format!("  {} — {}\n", item.module, item.name));
+            }
+        }
+        let modules: std::collections::BTreeSet<&str> =
+            rows.iter().map(|item| item.module.as_str()).collect();
+        out.push_str(&format!(
+            "  {} speaking item(s) across {} module(s)\n",
+            rows.len(),
+            modules.len()
+        ));
+        Ok(out)
+    }
+}

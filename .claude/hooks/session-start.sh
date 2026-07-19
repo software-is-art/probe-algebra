@@ -67,3 +67,14 @@ command -v rtk >/dev/null 2>&1 ||
 # put it on PATH so the PostToolUse `command: "probe-hook"` resolves. Fail-open.
 command -v probe-hook >/dev/null 2>&1 ||
   cargo install --path probe-hook --quiet 2>/dev/null || true
+# nextest is the schemata sweep's fail-fast runner: without it `schemata verify`
+# degrades to whole-suite evidence (carries nothing, judges everything — hours);
+# with it the incremental tier works as designed (minutes). Paid once per container
+# cache, like rtk. Fail-open: the sweep still runs without it, just honestly slower.
+command -v cargo-nextest >/dev/null 2>&1 ||
+  cargo install cargo-nextest --locked --quiet >/dev/null 2>&1 || true
+# the PINNED SUIT, from session one: without this the first verb of every fresh
+# container pays a full workspace build mid-conversation. Quiet and fail-open;
+# stdout stays byte-stable (the injection shares the prompt-cache prefix).
+[ -x .suit/bundle ] ||
+  cargo run --quiet --example bundle -- pin >/dev/null 2>&1 || true

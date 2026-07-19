@@ -1,0 +1,201 @@
+#[cfg(test)]
+mod probes {
+    use super::{PayloadStore, Replay};
+    use crate::discover::bundle::Bundle;
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("probe-store-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("scratch dir");
+        dir
+    }
+
+    /// THE HEADLINE: content addressing round-trips, and stash is a projection — the
+    /// same payload always lands at the same address, so re-recording never bloats the
+    /// store. The verb algebra's replay-safety law, holding at the storage layer.
+    #[test]
+    fn the_store_is_content_addressed_and_stash_is_a_projection() {
+        let root = scratch("address");
+        let store = PayloadStore::beside(&root);
+        let first = store.stash("pub fn one() {}\n").unwrap();
+        let again = store.stash("pub fn one() {}\n").unwrap();
+        let other = store.stash("pub fn two() {}\n").unwrap();
+        assert_eq!(first, again, "stash is a projection");
+        assert_ne!(first, other, "distinct payloads, distinct addresses");
+        assert_eq!(store.fetch(&first).unwrap(), "pub fn one() {}\n");
+        assert!(
+            store.fetch("0000000000000000").is_err(),
+            "a missing address refuses by name"
+        );
+    }
+
+    /// The collision seam, exercised: a blob planted at an address the payload would
+    /// take makes stash REFUSE rather than overwrite — the fingerprint's honesty rule.
+    #[test]
+    fn a_collision_refuses_rather_than_overwrites() {
+        let root = scratch("collision");
+        let store = PayloadStore::beside(&root);
+        let address = store.stash("the real payload").unwrap();
+        let blob = root
+            .join("bundle.payloads")
+            .join(format!("{address}.payload"));
+        std::fs::write(&blob, "an impostor").unwrap();
+        let refusal = store.stash("the real payload").unwrap_err();
+        assert!(refusal.contains("collision"), "{refusal}");
+    }
+
+    /// STAGE 3'S CLAIM, judged on a real (miniature) history: a verb-only file, its
+    /// entries carrying addresses, replays byte-exact from journal plus store — the
+    /// differential says the journal is a second source for the file.
+    #[test]
+    fn a_verb_only_history_replays_byte_exact() {
+        let root = scratch("replay");
+        let store = PayloadStore::beside(&root);
+        let path = root.join("m.rs").to_string_lossy().into_owned();
+
+        // the WHOLE history goes through the journal — birth included (a birth the
+        // record never saw is exactly what divergence reports).
+        let birth = "pub struct Tick;\n\n/// One.\npub fn one() -> Tick {\n    Tick\n}\n";
+        let revision = "/// One, revised.\npub fn one() -> Tick {\n    Tick\n}\n";
+        let born = Bundle::add("", birth).unwrap();
+        let edited = Bundle::edit(&born, "one", revision).unwrap();
+        std::fs::write(&path, &edited).unwrap();
+
+        let journal = format!(
+            "add {path} — struct Tick, fn one @{}\nedit {path} — one @{}\n",
+            store.stash(birth).unwrap(),
+            store.stash(revision).unwrap()
+        );
+        let report = Replay::differential(&journal, &store).unwrap().render();
+        assert!(report.contains("replays to the committed text"), "{report}");
+    }
+
+    /// A hand touch reads as DIVERGENCE — the differential is exactly the detector the
+    /// log-and-anchor disposition promised (agreement is a judged fact).
+    #[test]
+    fn a_hand_touch_reads_as_divergence() {
+        let root = scratch("diverge");
+        let store = PayloadStore::beside(&root);
+        let path = root.join("m.rs").to_string_lossy().into_owned();
+
+        let birth = "pub struct Tick;\n\npub fn one() -> Tick {\n    Tick\n}\n";
+        let born = Bundle::add("", birth).unwrap();
+        std::fs::write(&path, format!("{born}// touched by hand\n")).unwrap();
+
+        let journal = format!("add {path} — fn one @{}\n", store.stash(birth).unwrap());
+        let report = Replay::differential(&journal, &store).unwrap().render();
+        assert!(report.contains("DIVERGES"), "{report}");
+    }
+
+    /// Entries that predate the store are NAMED, not errored — the report is a
+    /// progress bar, and history starts wherever it starts.
+    #[test]
+    fn a_pre_store_entry_is_named_honestly() {
+        let root = scratch("prestore");
+        let store = PayloadStore::beside(&root);
+        let report = Replay::differential("add src/never.rs — fn x\n", &store)
+            .unwrap()
+            .render();
+        assert!(report.contains("predates the payload store"), "{report}");
+    }
+
+    /// A judged verb (`collect`) refuses replay by NAMING the effect/judgment split —
+    /// the disclosed gap, pinned so its closure is visible.
+    #[test]
+    fn a_judged_verb_names_the_effect_judgment_split() {
+        let root = scratch("judged");
+        let store = PayloadStore::beside(&root);
+        let report = Replay::differential("collect src/m.rs — fn x\n", &store)
+            .unwrap()
+            .render();
+        assert!(report.contains("effect/judgment split"), "{report}");
+    }
+
+    /// The address guard is a CONJUNCTION: a trailing `@` token that is not exactly
+    /// 16 hex digits is DETAIL, not an address — either half alone would send a
+    /// stray token to the store and turn an honest pre-store verdict into a
+    /// missing-blob error.
+    #[test]
+    fn a_stray_at_token_is_not_an_address() {
+        let root = scratch("stray");
+        let store = PayloadStore::beside(&root);
+        for stray in [
+            "add src/m.rs — fn x @abcdef12345\n",
+            "add src/m.rs — fn x @zzzzzzzzzzzzzzzz\n",
+        ] {
+            let report = Replay::differential(stray, &store).unwrap().render();
+            assert!(
+                report.contains("predates the payload store"),
+                "wrong-length or non-hex stays detail: {report}"
+            );
+        }
+    }
+
+    /// JOURNAL TIME, the headline: a miniature history where a speaker of
+    /// `double` arrives at birth and stops speaking in a later edit — the report
+    /// names the exact transactions, byte-pinned, and speakers are read with the
+    /// same matcher `uses` trusts (one vocabulary).
+    #[test]
+    fn spoke_names_the_transaction_each_speaker_arrived_and_left_in() {
+        let root = scratch("spoke");
+        let store = PayloadStore::beside(&root);
+        let birth = "/// Doubles.\npub fn double(x: i64) -> i64 {\n    x * 2\n}\n\npub fn quadruple(x: i64) -> i64 {\n    double(double(x))\n}\n";
+        let revision = "pub fn quadruple(x: i64) -> i64 {\n    x * 4\n}\n";
+        let journal = format!(
+            "add m.rs — fn double, fn quadruple @{}\nedit m.rs — quadruple @{}\n",
+            store.stash(birth).unwrap(),
+            store.stash(revision).unwrap()
+        );
+        let report = Replay::spoke(&journal, &store, "double").expect("reports");
+        assert_eq!(
+            report,
+            "spoke `double` — journal time, effects only (what replay reconstructs; \
+             git holds the earlier past):\n\
+             \x20 entry 1 (add m.rs — fn double, fn quadruple): + double, + quadruple\n\
+             \x20 entry 2 (edit m.rs — quadruple): - quadruple\n\
+             \x20 0 of 2 entries beyond the horizon (pre-store, judged, or dark)\n"
+        );
+    }
+
+    /// A name the journal never heard refuses BY NAME with the horizon disclosed —
+    /// the record's silence is not evidence of absence, and the refusal says whose
+    /// past (git's) holds the rest.
+    #[test]
+    fn spoke_refuses_the_unheard_name_disclosing_the_horizon() {
+        let root = scratch("spoke-unheard");
+        let store = PayloadStore::beside(&root);
+        let journal = format!(
+            "add m.rs — fn one @{}\n",
+            store.stash("pub fn one() -> i64 {\n    1\n}\n").unwrap()
+        );
+        let refusal = Replay::spoke(&journal, &store, "unspoken").expect_err("refuses");
+        assert!(refusal.contains("never heard `unspoken`"), "{refusal}");
+        assert!(
+            refusal.contains("0 of 1 entries beyond the horizon"),
+            "{refusal}"
+        );
+        assert!(refusal.contains("git holds the earlier past"), "{refusal}");
+    }
+
+    /// Entries replay cannot reconstruct — pre-store, judged verbs — are COUNTED
+    /// beyond the horizon, and a module gone dark stays dark: no guessed deltas,
+    /// only disclosed blindness.
+    #[test]
+    fn spoke_counts_what_it_cannot_reconstruct() {
+        let root = scratch("spoke-horizon");
+        let store = PayloadStore::beside(&root);
+        let journal = format!(
+            "add old.rs — fn relic\ncollect old.rs — relic\nadd m.rs — fn one @{}\n",
+            store.stash("pub fn one() -> i64 {\n    1\n}\n").unwrap()
+        );
+        let report = Replay::spoke(&journal, &store, "one").expect("reports");
+        assert!(
+            report.contains("entry 3 (add m.rs — fn one): + one"),
+            "{report}"
+        );
+        assert!(
+            report.contains("2 of 3 entries beyond the horizon"),
+            "{report}"
+        );
+    }
+}
