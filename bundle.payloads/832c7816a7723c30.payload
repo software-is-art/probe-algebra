@@ -1,0 +1,99 @@
+/// ONE SELECTOR for every verb that answers an address: resolve `given` — bare,
+/// `addr#N` discriminated, or method-grain `addr::method` (discriminators bind to
+/// the host: `addr#N::method`) — against the file's items. `Ok(None)` is "nothing
+/// answers" — the caller owns that refusal, each verb teaches differently there.
+/// An ambiguity or a dangling ordinal refuses HERE, teaching the discriminated
+/// addresses. The two readings of a `::` address (`impl a::b` is legitimately
+/// either the block for type `a::b` or method `b` of `impl a`) are tallied by
+/// COUNTING, never precedence: both inhabited refuses rather than guesses.
+#[crate::mutate]
+pub(crate) fn select_addressed<'a>(
+    verb: &str,
+    file: &'a syn::File,
+    given: &str,
+) -> Result<Option<Addressed<'a>>, String> {
+    // the whole-item reading: today's rules, refusals deferred so an empty method
+    // reading can surface them unchanged.
+    let (base, ordinal) = split_discriminator(given);
+    let siblings: Vec<&syn::Item> = file
+        .items
+        .iter()
+        .filter(|item| {
+            let address = item_address(item);
+            address.as_deref() == Some(base)
+        })
+        .collect();
+    let whole: Result<Option<&syn::Item>, String> = match (siblings.len(), ordinal) {
+        (0, _) => Ok(None),
+        (1, None) => Ok(Some(siblings[0])),
+        (_, Some(n)) if n <= siblings.len() => Ok(Some(siblings[n - 1])),
+        (count, Some(n)) => Err(format!(
+            "bundle {verb}: `{base}#{n}` names nothing — {count} item(s) answer to \
+             `{base}`"
+        )),
+        (count, None) => {
+            let taught: Vec<String> = siblings
+                .iter()
+                .enumerate()
+                .map(|(i, item)| format!("`{base}#{}` ({})", i + 1, sibling_holdings(item)))
+                .collect();
+            Err(format!(
+                "bundle {verb}: {count} items share the address `{base}` — ambiguous; \
+                 say {}",
+                taught.join(" or ")
+            ))
+        }
+    };
+
+    // the method reading: the text after the LAST `::` is a candidate method name
+    // when it is a bare ident and a host answers to everything before it.
+    // the tail needs no ident judgment of its own: `method_sig` compares against
+    // real method idents, so a non-ident tail simply inhabits nothing — one less
+    // degree of freedom to defend.
+    let method: Result<Option<(&syn::Item, String)>, String> = match given
+        .rsplit_once("::")
+        .filter(|(host, _)| !host.is_empty())
+    {
+        None => Ok(None),
+        Some((host_given, name)) => {
+            let (host_base, host_ordinal) = split_discriminator(host_given);
+            let hosts: Vec<&syn::Item> = file
+                .items
+                .iter()
+                .filter(|item| {
+                    let address = item_address(item);
+                    address.as_deref() == Some(host_base) && method_sig(item, name).is_some()
+                })
+                .collect();
+            match (hosts.len(), host_ordinal) {
+                (0, _) => Ok(None),
+                (1, None) => Ok(Some((hosts[0], name.to_string()))),
+                (_, Some(n)) if n <= hosts.len() => Ok(Some((hosts[n - 1], name.to_string()))),
+                (count, Some(n)) => Err(format!(
+                    "bundle {verb}: `{host_base}#{n}::{name}` names nothing — {count} \
+                     item(s) answering to `{host_base}` hold `{name}`"
+                )),
+                (count, None) => Err(format!(
+                    "bundle {verb}: {count} items answering to `{host_base}` hold \
+                     `{name}` — ambiguous; say `{host_base}#1::{name}` through \
+                     `{host_base}#{count}::{name}`"
+                )),
+            }
+        }
+    };
+
+    match (whole, method) {
+        (Ok(None), Ok(None)) => Ok(None),
+        (Ok(Some(item)), Ok(None)) => Ok(Some(Addressed::Whole(item))),
+        (Ok(None), Ok(Some((host, name)))) => Ok(Some(Addressed::Method { host, name })),
+        (Ok(Some(_)), Ok(Some((_, name)))) => Err(format!(
+            "bundle {verb}: `{given}` reads two ways — a whole item answers to it AND \
+             a host holds method `{name}` — refused rather than guessed between"
+        )),
+        (Err(refusal), Ok(None)) | (Ok(None), Err(refusal)) => Err(refusal),
+        // one side refuses while the other holds inhabitants: still over-inhabited —
+        // the whole-item side's refusal teaches first, by file order of the grammar.
+        (Err(refusal), _) => Err(refusal),
+        (_, Err(refusal)) => Err(refusal),
+    }
+}

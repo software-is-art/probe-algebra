@@ -196,29 +196,42 @@ impl Bundle {
     /// (types, consts) hold their name and kind.
     pub fn edit(module: &str, item_name_text: &str, replacement: &str) -> Result<String, String> {
         // edit's OWN judgment is the interface hold; every shared judgment (one item,
-        // naming, existence, ambiguity — now discriminator-aware through
+        // naming, existence, ambiguity — discriminator- and method-grain-aware through
         // `select_addressed`) and the effect itself live in `splice`, the half `recast`
         // re-applies without this hold. The hold runs only when the pair it compares
-        // binds cleanly — one parsed replacement naming the one addressed target —
+        // binds cleanly — one parsed replacement naming the one addressed subject —
         // otherwise it is vacuous here and `splice` speaks the refusal.
-        if let (Ok(new), Ok(file)) = (syn::parse_file(replacement), syn::parse_file(module)) {
-            if let ([new_item], Ok(Some(target))) = (
-                new.items.as_slice(),
-                select_addressed("edit", &file, item_name_text),
-            ) {
-                let (base, _) = split_discriminator(item_name_text);
-                let offered = item_address(new_item);
-                if offered.as_deref() == Some(base) {
-                    // the signature hold: for functions, token-for-token equality of the
-                    // signature; for impls and traits, the method-signature set; for
-                    // everything else, the kind must match (a struct stays a struct) —
-                    // reshaping is interface change either way, and interface change is
-                    // not an edit.
-                    match (target, new_item) {
-                        (syn::Item::Fn(old), syn::Item::Fn(new)) => {
-                            use quote::ToTokens;
-                            let held = old.sig.to_token_stream().to_string();
-                            let offered = new.sig.to_token_stream().to_string();
+        if let Ok(file) = syn::parse_file(module) {
+            if let Ok(Some(resolved)) = select_addressed("edit", &file, item_name_text) {
+                match &resolved {
+                    Addressed::Whole(target) => {
+                        if let Ok(new) = syn::parse_file(replacement) {
+                            if let [new_item] = new.items.as_slice() {
+                                let (base, _) = split_discriminator(item_name_text);
+                                let offered = item_address(new_item);
+                                if offered.as_deref() == Some(base) {
+                                    Self::hold_interface(item_name_text, target, new_item)?;
+                                }
+                            }
+                        }
+                    }
+                    Addressed::Method { host, name } => {
+                        // the hold, one grain down: token-for-token equality of the ONE
+                        // method's signature — bodies and docs free, the surface holds.
+                        // Vacuous unless the replacement NAMES the target (a rename is
+                        // `splice`'s judgment, spoken in its own voice).
+                        use quote::ToTokens;
+                        let offered = match host {
+                            syn::Item::Trait(_) => syn::parse_str::<syn::TraitItemFn>(replacement)
+                                .ok()
+                                .filter(|f| f.sig.ident == name.as_str())
+                                .map(|f| f.sig.to_token_stream().to_string()),
+                            _ => syn::parse_str::<syn::ImplItemFn>(replacement)
+                                .ok()
+                                .filter(|f| f.sig.ident == name.as_str())
+                                .map(|f| f.sig.to_token_stream().to_string()),
+                        };
+                        if let (Some(held), Some(offered)) = (method_sig(host, name), offered) {
                             if held != offered {
                                 return Err(format!(
                                     "bundle edit: `{item_name_text}`'s signature moved (`{held}` -> \
@@ -227,33 +240,59 @@ impl Bundle {
                                 ));
                             }
                         }
-                        (old @ syn::Item::Impl(_), new @ syn::Item::Impl(_))
-                        | (old @ syn::Item::Trait(_), new @ syn::Item::Trait(_)) => {
-                            let held = method_signatures(old);
-                            let offered = method_signatures(new);
-                            if held != offered {
-                                return Err(format!(
-                                    "bundle edit: `{item_name_text}`'s method-signature set moved \
-                                     ({} held, {} offered) — an interface change is not an edit; \
-                                     bodies and docs are free, the surface holds",
-                                    held.len(),
-                                    offered.len()
-                                ));
-                            }
-                        }
-                        (old, new)
-                            if std::mem::discriminant(old) == std::mem::discriminant(new) => {}
-                        _ => {
-                            return Err(format!(
-                                "bundle edit: `{item_name_text}` changed item kind — an interface \
-                                 change is not an edit"
-                            ));
-                        }
                     }
                 }
             }
         }
         splice("edit", module, item_name_text, replacement)
+    }
+
+    /// The whole-item interface hold, `edit`'s own judgment factored to its grain:
+    /// for functions, token-for-token equality of the signature; for impls and
+    /// traits, the method-signature set; for everything else, the kind must match
+    /// (a struct stays a struct) — reshaping is interface change either way, and
+    /// interface change is not an edit.
+    fn hold_interface(
+        item_name_text: &str,
+        target: &syn::Item,
+        new_item: &syn::Item,
+    ) -> Result<(), String> {
+        match (target, new_item) {
+            (syn::Item::Fn(old), syn::Item::Fn(new)) => {
+                use quote::ToTokens;
+                let held = old.sig.to_token_stream().to_string();
+                let offered = new.sig.to_token_stream().to_string();
+                if held != offered {
+                    return Err(format!(
+                        "bundle edit: `{item_name_text}`'s signature moved (`{held}` -> \
+                         `{offered}`) — an interface change is not an edit; retire the item \
+                         and add its successor"
+                    ));
+                }
+            }
+            (old @ syn::Item::Impl(_), new @ syn::Item::Impl(_))
+            | (old @ syn::Item::Trait(_), new @ syn::Item::Trait(_)) => {
+                let held = method_signatures(old);
+                let offered = method_signatures(new);
+                if held != offered {
+                    return Err(format!(
+                        "bundle edit: `{item_name_text}`'s method-signature set moved \
+                         ({} held, {} offered) — an interface change is not an edit; \
+                         bodies and docs are free, the surface holds",
+                        held.len(),
+                        offered.len()
+                    ));
+                }
+            }
+            (old, new) if std::mem::discriminant(old) == std::mem::discriminant(new) => {}
+            _ => {
+                return Err(format!(
+                    "bundle edit: `{item_name_text}` changed item kind — an interface \
+                     change is not an edit"
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// THE CONTINUATION VERB, library form (rung 2): add a snippet to a module, purely
@@ -568,15 +607,22 @@ impl Bundle {
     pub fn show(module: &str, item_name_text: &str) -> Result<String, String> {
         let file =
             syn::parse_file(module).map_err(|e| format!("bundle show: module unparseable: {e}"))?;
-        let target = select_addressed("show", &file, item_name_text)?.ok_or_else(|| {
+        let resolved = select_addressed("show", &file, item_name_text)?.ok_or_else(|| {
             let roster: Vec<String> = file.items.iter().filter_map(item_address).collect();
             format!(
-                "bundle show: no item at `{item_name_text}` — addressable here: {}",
+                "bundle show: no item at `{item_name_text}` — addressable here: {} \
+                 (a method inside an impl or trait addresses as `<address>::<method>`)",
                 roster.join(", ")
             )
         })?;
-        let start = byte_offset(module, target.span().start());
-        let end = byte_offset(module, target.span().end());
+        let (start, end) = match &resolved {
+            Addressed::Whole(target) => (
+                byte_offset(module, target.span().start()),
+                byte_offset(module, target.span().end()),
+            ),
+            Addressed::Method { host, name } => method_span(module, host, name)
+                .ok_or_else(|| format!("bundle show: `{name}` vanished from its host mid-read"))?,
+        };
         Ok(module[start..end].to_string())
     }
 
@@ -1092,17 +1138,22 @@ fn sibling_holdings(item: &syn::Item) -> String {
     }
 }
 
-/// ONE SELECTOR for every verb that answers an address: resolve `given` (bare or
-/// discriminated) against the file's items. `Ok(None)` is "nothing answers" — the
-/// caller owns that refusal, each verb teaches differently there. An ambiguity or
-/// a dangling ordinal refuses HERE: the ambiguous refusal now TEACHES the
-/// discriminated addresses instead of only naming the collision.
+/// ONE SELECTOR for every verb that answers an address: resolve `given` — bare,
+/// `addr#N` discriminated, or method-grain `addr::method` (discriminators bind to
+/// the host: `addr#N::method`) — against the file's items. `Ok(None)` is "nothing
+/// answers" — the caller owns that refusal, each verb teaches differently there.
+/// An ambiguity or a dangling ordinal refuses HERE, teaching the discriminated
+/// addresses. The two readings of a `::` address (`impl a::b` is legitimately
+/// either the block for type `a::b` or method `b` of `impl a`) are tallied by
+/// COUNTING, never precedence: both inhabited refuses rather than guesses.
 #[crate::mutate]
 pub(crate) fn select_addressed<'a>(
     verb: &str,
     file: &'a syn::File,
     given: &str,
-) -> Result<Option<&'a syn::Item>, String> {
+) -> Result<Option<Addressed<'a>>, String> {
+    // the whole-item reading: today's rules, refusals deferred so an empty method
+    // reading can surface them unchanged.
     let (base, ordinal) = split_discriminator(given);
     let siblings: Vec<&syn::Item> = file
         .items
@@ -1112,7 +1163,7 @@ pub(crate) fn select_addressed<'a>(
             address.as_deref() == Some(base)
         })
         .collect();
-    match (siblings.len(), ordinal) {
+    let whole: Result<Option<&syn::Item>, String> = match (siblings.len(), ordinal) {
         (0, _) => Ok(None),
         (1, None) => Ok(Some(siblings[0])),
         (_, Some(n)) if n <= siblings.len() => Ok(Some(siblings[n - 1])),
@@ -1132,17 +1183,69 @@ pub(crate) fn select_addressed<'a>(
                 taught.join(" or ")
             ))
         }
+    };
+
+    // the method reading: the text after the LAST `::` is a candidate method name
+    // when it is a bare ident and a host answers to everything before it.
+    // the tail needs no ident judgment of its own: `method_sig` compares against
+    // real method idents, so a non-ident tail simply inhabits nothing — one less
+    // degree of freedom to defend.
+    let method: Result<Option<(&syn::Item, String)>, String> =
+        match given.rsplit_once("::").filter(|(host, _)| !host.is_empty()) {
+            None => Ok(None),
+            Some((host_given, name)) => {
+                let (host_base, host_ordinal) = split_discriminator(host_given);
+                let hosts: Vec<&syn::Item> = file
+                    .items
+                    .iter()
+                    .filter(|item| {
+                        let address = item_address(item);
+                        address.as_deref() == Some(host_base) && method_sig(item, name).is_some()
+                    })
+                    .collect();
+                match (hosts.len(), host_ordinal) {
+                    (0, _) => Ok(None),
+                    (1, None) => Ok(Some((hosts[0], name.to_string()))),
+                    (_, Some(n)) if n <= hosts.len() => Ok(Some((hosts[n - 1], name.to_string()))),
+                    (count, Some(n)) => Err(format!(
+                        "bundle {verb}: `{host_base}#{n}::{name}` names nothing — {count} \
+                     item(s) answering to `{host_base}` hold `{name}`"
+                    )),
+                    (count, None) => Err(format!(
+                        "bundle {verb}: {count} items answering to `{host_base}` hold \
+                     `{name}` — ambiguous; say `{host_base}#1::{name}` through \
+                     `{host_base}#{count}::{name}`"
+                    )),
+                }
+            }
+        };
+
+    match (whole, method) {
+        (Ok(None), Ok(None)) => Ok(None),
+        (Ok(Some(item)), Ok(None)) => Ok(Some(Addressed::Whole(item))),
+        (Ok(None), Ok(Some((host, name)))) => Ok(Some(Addressed::Method { host, name })),
+        (Ok(Some(_)), Ok(Some((_, name)))) => Err(format!(
+            "bundle {verb}: `{given}` reads two ways — a whole item answers to it AND \
+             a host holds method `{name}` — refused rather than guessed between"
+        )),
+        (Err(refusal), Ok(None)) | (Ok(None), Err(refusal)) => Err(refusal),
+        // one side refuses while the other holds inhabitants: still over-inhabited —
+        // the whole-item side's refusal teaches first, by file order of the grammar.
+        (Err(refusal), _) => Err(refusal),
+        (_, Err(refusal)) => Err(refusal),
     }
 }
 
-/// The EFFECT half of an item replacement — the judged splice `edit` and `recast`
-/// share. It holds everything about a replacement EXCEPT the interface: exactly one
-/// item, naming the target (a replacement is not a rename), landing on an existing,
-/// unambiguously addressed item (`select_addressed` resolves bare and `addr#N`
-/// discriminated forms alike). The signature hold is deliberately absent — that
-/// judgment is `edit`'s alone, and the envelope's `land` licenses its absence as
-/// `recast`. `verb` names the caller in every refusal, so each voice teaches as
-/// itself.
+/// The EFFECT half of a replacement — the judged splice `edit` and `recast` share.
+/// It holds everything about a replacement EXCEPT the interface: exactly one item
+/// (or, at method grain, exactly one method in the host's own grammar), naming the
+/// target (a replacement is not a rename), landing on an existing, unambiguously
+/// addressed subject (`select_addressed` resolves bare, `addr#N`, and
+/// `addr::method` forms alike — the resolution comes first, so the judgment
+/// speaks the grain the address named). The signature hold is deliberately absent
+/// — that judgment is `edit`'s alone, and the envelope's `land` licenses its
+/// absence as `recast`. `verb` names the caller in every refusal, so each voice
+/// teaches as itself.
 #[crate::mutate]
 pub(crate) fn splice(
     verb: &str,
@@ -1150,31 +1253,9 @@ pub(crate) fn splice(
     item_name_text: &str,
     replacement: &str,
 ) -> Result<String, String> {
-    let new = syn::parse_file(replacement)
-        .map_err(|e| format!("bundle {verb}: replacement unparseable: {e}"))?;
-    let [new_item] = new.items.as_slice() else {
-        return Err(format!(
-            "bundle {verb}: the replacement must be exactly one item, got {} — one {verb}, \
-             one judged transaction",
-            new.items.len()
-        ));
-    };
-    let Some(new_name) = item_address(new_item) else {
-        return Err(format!(
-            "bundle {verb}: the replacement has no defining name — `{verb}` has nothing \
-             to hold"
-        ));
-    };
-    let (base, _) = split_discriminator(item_name_text);
-    if new_name != base {
-        return Err(format!(
-            "bundle {verb}: the replacement names `{new_name}`, not `{base}` — \
-             an edit is not a rename"
-        ));
-    }
-
     let file =
         syn::parse_file(module).map_err(|e| format!("bundle {verb}: module unparseable: {e}"))?;
+    let (base, _) = split_discriminator(item_name_text);
     let target = select_addressed(verb, &file, item_name_text)?.ok_or_else(|| {
         format!(
             "bundle {verb}: no item named `{base}` in the module — `add` \
@@ -1182,16 +1263,126 @@ pub(crate) fn splice(
         )
     })?;
 
-    // the splice: the target's TEXT is replaced in place (its position and its gap are
-    // the module's furniture and stay), then one parse∘render keeps the canonical
-    // guarantee.
-    let start = byte_offset(module, target.span().start());
-    let end = byte_offset(module, target.span().end());
+    let (start, end) = match &target {
+        Addressed::Whole(target) => {
+            let new = syn::parse_file(replacement)
+                .map_err(|e| format!("bundle {verb}: replacement unparseable: {e}"))?;
+            let [new_item] = new.items.as_slice() else {
+                return Err(format!(
+                    "bundle {verb}: the replacement must be exactly one item, got {} — \
+                     one {verb}, one judged transaction",
+                    new.items.len()
+                ));
+            };
+            let Some(new_name) = item_address(new_item) else {
+                return Err(format!(
+                    "bundle {verb}: the replacement has no defining name — `{verb}` has \
+                     nothing to hold"
+                ));
+            };
+            if new_name != base {
+                return Err(format!(
+                    "bundle {verb}: the replacement names `{new_name}`, not `{base}` — \
+                     an edit is not a rename"
+                ));
+            }
+            (
+                byte_offset(module, target.span().start()),
+                byte_offset(module, target.span().end()),
+            )
+        }
+        Addressed::Method { host, name } => {
+            // the replacement speaks the host's own grammar: one method, docs and
+            // attributes riding its span exactly as items ride theirs.
+            let offered =
+                match host {
+                    syn::Item::Trait(_) => syn::parse_str::<syn::TraitItemFn>(replacement)
+                        .map(|f| f.sig.ident.to_string()),
+                    _ => syn::parse_str::<syn::ImplItemFn>(replacement)
+                        .map(|f| f.sig.ident.to_string()),
+                }
+                .map_err(|e| format!("bundle {verb}: the replacement is not one method: {e}"))?;
+            if &offered != name {
+                return Err(format!(
+                    "bundle {verb}: the replacement names `{offered}`, not `{name}` — \
+                     an edit is not a rename"
+                ));
+            }
+            method_span(module, host, name).ok_or_else(|| {
+                format!("bundle {verb}: `{name}` vanished from its host mid-judgment")
+            })?
+        }
+    };
+
+    // the splice: the subject's TEXT is replaced in place (its position and its gap
+    // are the module's furniture and stay), then one parse∘render keeps the
+    // canonical guarantee.
     let mut out = String::with_capacity(module.len());
     out.push_str(&module[..start]);
     out.push_str(replacement.trim_end());
     out.push_str(&module[end..]);
     Ok(Bundle::parse(&out)?.render())
+}
+
+/// What an address RESOLVES to: a whole item, or ONE METHOD inside an impl or
+/// trait host — the method-grain rung. Perception and action stay one grammar:
+/// `select_addressed` owns both readings, so `show`, `edit`, and the splice they
+/// share reach a method with the same string.
+pub(crate) enum Addressed<'a> {
+    /// The whole item at the address — every pre-method-grain resolution.
+    Whole(&'a syn::Item),
+    /// One method of an impl or trait: the host item and the method's ident.
+    Method {
+        /// The impl or trait item holding the method.
+        host: &'a syn::Item,
+        /// The method's ident — unique within its host by Rust's own rules.
+        name: String,
+    },
+}
+
+/// The SIGNATURE of one named method inside an impl or trait host, token for
+/// token — the method-grain twin of `method_signatures`, and the hold `edit`
+/// compares at this grain. `None` when the host holds no such method.
+#[crate::mutate]
+pub(crate) fn method_sig(host: &syn::Item, name: &str) -> Option<String> {
+    use quote::ToTokens;
+    match host {
+        syn::Item::Impl(block) => block.items.iter().find_map(|i| match i {
+            syn::ImplItem::Fn(f) if f.sig.ident == name => {
+                Some(f.sig.to_token_stream().to_string())
+            }
+            _ => None,
+        }),
+        syn::Item::Trait(block) => block.items.iter().find_map(|i| match i {
+            syn::TraitItem::Fn(f) if f.sig.ident == name => {
+                Some(f.sig.to_token_stream().to_string())
+            }
+            _ => None,
+        }),
+        _ => None,
+    }
+}
+
+/// The byte span of one named method inside its host, docs and attributes
+/// included — the same span rule items follow, one grain down: what `show`
+/// prints is what `edit` replaces, byte for byte.
+#[crate::mutate]
+pub(crate) fn method_span(module: &str, host: &syn::Item, name: &str) -> Option<(usize, usize)> {
+    let span = match host {
+        syn::Item::Impl(block) => block.items.iter().find_map(|i| match i {
+            syn::ImplItem::Fn(f) if f.sig.ident == name => Some(i.span()),
+            _ => None,
+        }),
+        syn::Item::Trait(block) => block.items.iter().find_map(|i| match i {
+            syn::TraitItem::Fn(f) if f.sig.ident == name => Some(i.span()),
+            _ => None,
+        }),
+        _ => None,
+    }?;
+    Some((
+        byte_offset(module, span.start()),
+        byte_offset(module, span.end()),
+    ))
 }
 
 #[cfg(test)]
@@ -1919,5 +2110,138 @@ impl Count {
         )
         .unwrap_err();
         assert!(refusal.contains("say `impl Count#1`"), "{refusal}");
+    }
+    /// THE METHOD-GRAIN RUNG: `addr::method` reaches one method inside an impl —
+    /// show cuts the same bytes edit replaces (docs riding the span), so the
+    /// show → revise → edit cycle holds one grain down, and a show-then-edit of
+    /// the same text is a byte-exact no-op that moves nothing outside the method.
+    #[test]
+    fn a_method_addresses_shows_and_edits_at_its_own_grain() {
+        let module = "pub struct Count;\n\nimpl Count {\n    /// Speaks.\n    pub fn speak(&self) -> u32 {\n        1\n    }\n\n    pub fn quiet(&self) -> u32 {\n        0\n    }\n}\n";
+        let shown = Bundle::show(module, "impl Count::speak").unwrap();
+        assert_eq!(
+            shown, "/// Speaks.\n    pub fn speak(&self) -> u32 {\n        1\n    }",
+            "the segment is the method with its docs, exactly as edit will hold it"
+        );
+        let unchanged = Bundle::edit(module, "impl Count::speak", &shown).unwrap();
+        assert_eq!(unchanged, module, "show → edit round-trips byte-exact");
+        let retold = "/// Speaks, twice.\n    pub fn speak(&self) -> u32 {\n        2\n    }";
+        let edited = Bundle::edit(module, "impl Count::speak", retold).unwrap();
+        assert!(edited.contains("Speaks, twice."), "{edited}");
+        assert!(
+            edited.contains("pub fn quiet"),
+            "the sibling method is untouched"
+        );
+        assert!(
+            edited.contains("pub struct Count;"),
+            "the rest of the module is furniture"
+        );
+    }
+
+    /// The method-grain HOLD: a moved method signature refuses standalone with the
+    /// same voice the item-grain hold speaks — and a rename refuses as a rename.
+    /// (The envelope licenses the move as `recast`; that half is drilled in
+    /// `envelope.rs`'s probes.)
+    #[test]
+    fn a_moved_method_signature_refuses_at_method_grain() {
+        let module = "pub struct Count;\n\nimpl Count {\n    pub fn speak(&self) -> u32 {\n        1\n    }\n}\n";
+        let widened = "pub fn speak(&self) -> u64 {\n        1\n    }";
+        let refusal = Bundle::edit(module, "impl Count::speak", widened).unwrap_err();
+        assert!(refusal.contains("signature moved"), "{refusal}");
+        assert!(
+            refusal.contains("an interface change is not an edit"),
+            "{refusal}"
+        );
+        let renamed = "pub fn shout(&self) -> u32 {\n        1\n    }";
+        let refusal = Bundle::edit(module, "impl Count::speak", renamed).unwrap_err();
+        assert!(refusal.contains("an edit is not a rename"), "{refusal}");
+    }
+
+    /// THE SIBLING DISSOLUTION — the worn field-report case: two impl blocks share
+    /// an address, but the METHOD is held by exactly one of them, so the method
+    /// address resolves BARE — no ordinal needed. A method both siblings hold
+    /// refuses teaching the `#N::method` forms; a method neither holds falls to
+    /// the zero-match refusal, which now teaches the method grammar.
+    #[test]
+    fn a_method_held_by_one_sibling_resolves_without_a_discriminator() {
+        let module = "pub struct Count;\n\nimpl Count {\n    pub fn speak(&self) -> u32 {\n        1\n    }\n}\n\nimpl Count {\n    pub fn quiet(&self) -> u32 {\n        0\n    }\n}\n";
+        assert!(
+            Bundle::show(module, "impl Count").is_err(),
+            "the bare block address still refuses between siblings"
+        );
+        let shown = Bundle::show(module, "impl Count::quiet").unwrap();
+        assert!(shown.contains("pub fn quiet"), "{shown}");
+        let both = "pub struct Count;\n\nimpl Count {\n    pub fn speak(&self) -> u32 {\n        1\n    }\n}\n\nimpl Count {\n    pub fn speak(&self) -> u32 {\n        2\n    }\n}\n";
+        let refusal = Bundle::show(both, "impl Count::speak").unwrap_err();
+        assert_eq!(
+            refusal,
+            "bundle show: 2 items answering to `impl Count` hold `speak` — ambiguous; \
+             say `impl Count#1::speak` through `impl Count#2::speak`"
+        );
+        let ordinal = Bundle::show(both, "impl Count#2::speak").unwrap();
+        assert!(ordinal.contains("2"), "{ordinal}");
+        let refusal = Bundle::show(module, "impl Count::sing").unwrap_err();
+        assert!(refusal.contains("addressable here"), "{refusal}");
+        assert!(
+            refusal.contains("`<address>::<method>`"),
+            "the zero-match refusal teaches the method grammar: {refusal}"
+        );
+    }
+
+    /// THE TWO-READINGS COLLISION: `impl a::b` is legitimately the block for type
+    /// `a::b` AND method `b` of `impl a` — when both readings are inhabited the
+    /// selector refuses by count, never guesses. Either reading alone resolves.
+    #[test]
+    fn an_address_reading_two_ways_refuses_rather_than_guesses() {
+        #[rustfmt::skip]
+        let module = "pub mod a {\n    pub struct b;\n}\n\nimpl a::b {\n    pub fn c(&self) {}\n}\n\npub struct Host;\n";
+        let shown = Bundle::show(module, "impl a::b").unwrap();
+        assert!(
+            shown.contains("pub fn c"),
+            "one reading inhabited resolves: {shown}"
+        );
+        let collided = "pub mod a {\n    pub struct b;\n}\n\nimpl a::b {\n    pub fn c(&self) {}\n}\n\npub struct a2;\n\nimpl a {\n    pub fn b(&self) {}\n}\npub struct a;\n";
+        let refusal = Bundle::show(collided, "impl a::b").unwrap_err();
+        assert!(refusal.contains("reads two ways"), "{refusal}");
+        assert!(
+            refusal.contains("refused rather than guessed between"),
+            "{refusal}"
+        );
+    }
+
+    /// The REAL HOST drill — the exact address that fired in the field: the two
+    /// sibling `impl VerdictStore` blocks in the committed `verdict.rs`, where
+    /// `files` is held by one sibling only, so the method address resolves bare.
+    #[test]
+    fn the_field_reports_method_address_resolves_on_the_committed_tree() {
+        let module = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/discover/verdict.rs"),
+        )
+        .expect("the committed module reads");
+        let shown = Bundle::show(&module, "impl VerdictStore::files").unwrap();
+        assert!(shown.contains("pub fn files"), "{shown}");
+    }
+    /// The TRAIT HOST is the method grain's equal citizen: `Trait::method` shows
+    /// the method with its docs, round-trips byte-exact, and holds the signature —
+    /// the arm the sweep found undefended (the trait-side survivors die here).
+    #[test]
+    fn a_trait_hosts_methods_at_the_same_grain() {
+        let module = "pub trait Speaker {\n    /// Speaks.\n    fn speak(&self) -> u32 {\n        1\n    }\n}\n";
+        let shown = Bundle::show(module, "Speaker::speak").unwrap();
+        assert_eq!(
+            shown, "/// Speaks.\n    fn speak(&self) -> u32 {\n        1\n    }",
+            "the trait method's segment, docs riding the span"
+        );
+        assert_eq!(
+            Bundle::edit(module, "Speaker::speak", &shown).unwrap(),
+            module,
+            "show → edit round-trips byte-exact on a trait host"
+        );
+        let retold = "/// Speaks, twice.\n    fn speak(&self) -> u32 {\n        2\n    }";
+        let edited = Bundle::edit(module, "Speaker::speak", retold).unwrap();
+        assert!(edited.contains("Speaks, twice."), "{edited}");
+        let widened = "fn speak(&self) -> u64 {\n        1\n    }";
+        let refusal = Bundle::edit(module, "Speaker::speak", widened).unwrap_err();
+        assert!(refusal.contains("signature moved"), "{refusal}");
     }
 }

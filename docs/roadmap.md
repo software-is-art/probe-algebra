@@ -4401,3 +4401,47 @@ the later payload — "every collapse licensed by the frozen verb algebra", now
 including the licensed edit itself. All six envelope residuals are now closed
 or dispositioned: 1 (seal), 2 (composite show), 3 (this brick), 5 (this brick);
 4 and 6 keep their recorded dispositions.
+
+## The method-grain rung: the address grammar enters the item (BUILT)
+
+Built 2026-07-19, the wearability sprint's third brick. The address grammar
+gains its method half: `<address>::<method>` (discriminators bind the host:
+`addr#N::method`) resolves ONE method inside an impl or trait, and the
+resolution lives where the whole grammar lives — `select_addressed` returns an
+`Addressed` (whole item or host + method), so `show`, `edit`, the splice they
+share, the envelope's licensing, and replay all speak the new form with no
+per-verb code. Resolution is counting, never precedence: `impl a::b` is
+legitimately the block for type `a::b` OR method `b` of `impl a`, and when both
+readings are inhabited the selector refuses by name rather than guesses —
+pinned. The hold, one grain down: an edit at a method address holds THAT
+method's signature token for token (bodies and docs free); a moved signature
+refuses standalone and lands as `recast` under the envelope — the license at
+the grain the intent has. `show` cuts the method's bytes exactly as `edit`
+holds them (docs riding the span), so the show → revise → edit cycle now works
+one grain down, byte-exact, pinned on the field report's own address
+(`impl VerdictStore::files` on the committed tree).
+
+THE SIBLING DISSOLUTION rides along: the worn case behind every sibling-impl
+field report was a METHOD edit, and a method held by one sibling now resolves
+BARE — no ordinal. A method both siblings hold refuses teaching the
+`#N::method` forms; `addr#N` stays for the block-grain residue (editing a
+sibling's own docs). No third discriminator vocabulary.
+
+GROW, DISSOLVED — the disposition, recorded: the most-worn missing verb is now
+sayable without existing. Its scenario — an impl gains or reshapes surface,
+probes ride along, censuses follow — is an envelope: the interface move stages
+as an edit and lands as `recast` (at method grain when one method moves — the
+probe drills grow's exact shape), the probe rider stages beside it, all-or-none
+at land, and the census delta is no longer outside the transaction
+(`maintain_census` runs per landed file; the BLESS build is the oracle, not
+the ceremony). Struck the way `remove` was struck: dissolved, not built. Two
+honest residues, disclosed as disclosures rather than bricks: the record
+distinguishes `recast`, not additive-vs-breaking (a report-word refinement if
+ever missed in anger), and the probe rider is convention, not judgment (the
+mutation sweep is the backstop).
+
+Remaining from the perception-rung design, named for the next session: the
+preflight `bundle judge` (the perception face of judgment — its design is
+settled: reuse `Judgment::admits` against composite-or-committed, plus the
+fmt-normal half at offer time), and `uses` tagging test surfaces in its
+census line.

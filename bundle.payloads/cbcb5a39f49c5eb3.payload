@@ -1,0 +1,73 @@
+/// What an address RESOLVES to: a whole item, or ONE METHOD inside an impl or
+/// trait host — the method-grain rung. Perception and action stay one grammar:
+/// `select_addressed` owns both readings, so `show`, `edit`, and the splice they
+/// share reach a method with the same string.
+pub(crate) enum Addressed<'a> {
+    /// The whole item at the address — every pre-method-grain resolution.
+    Whole(&'a syn::Item),
+    /// One method of an impl or trait: the host item and the method's ident.
+    Method {
+        /// The impl or trait item holding the method.
+        host: &'a syn::Item,
+        /// The method's ident — unique within its host by Rust's own rules.
+        name: String,
+    },
+}
+
+/// Is this text a bare ident — the only shape the method half of an
+/// `<address>::<method>` reading accepts? (A `#` or a space means the tail is
+/// part of a type path or a discriminator, not a method name.)
+#[crate::mutate]
+fn is_bare_ident(text: &str) -> bool {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(c) if c.is_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_alphanumeric() || c == '_')
+}
+
+/// The SIGNATURE of one named method inside an impl or trait host, token for
+/// token — the method-grain twin of `method_signatures`, and the hold `edit`
+/// compares at this grain. `None` when the host holds no such method.
+#[crate::mutate]
+pub(crate) fn method_sig(host: &syn::Item, name: &str) -> Option<String> {
+    use quote::ToTokens;
+    match host {
+        syn::Item::Impl(block) => block.items.iter().find_map(|i| match i {
+            syn::ImplItem::Fn(f) if f.sig.ident == name => {
+                Some(f.sig.to_token_stream().to_string())
+            }
+            _ => None,
+        }),
+        syn::Item::Trait(block) => block.items.iter().find_map(|i| match i {
+            syn::TraitItem::Fn(f) if f.sig.ident == name => {
+                Some(f.sig.to_token_stream().to_string())
+            }
+            _ => None,
+        }),
+        _ => None,
+    }
+}
+
+/// The byte span of one named method inside its host, docs and attributes
+/// included — the same span rule items follow, one grain down: what `show`
+/// prints is what `edit` replaces, byte for byte.
+#[crate::mutate]
+pub(crate) fn method_span(module: &str, host: &syn::Item, name: &str) -> Option<(usize, usize)> {
+    let span = match host {
+        syn::Item::Impl(block) => block.items.iter().find_map(|i| match i {
+            syn::ImplItem::Fn(f) if f.sig.ident == name => Some(i.span()),
+            _ => None,
+        }),
+        syn::Item::Trait(block) => block.items.iter().find_map(|i| match i {
+            syn::TraitItem::Fn(f) if f.sig.ident == name => Some(i.span()),
+            _ => None,
+        }),
+        _ => None,
+    }?;
+    Some((
+        byte_offset(module, span.start()),
+        byte_offset(module, span.end()),
+    ))
+}

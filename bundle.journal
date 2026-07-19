@@ -236,3 +236,14 @@ recast src/discover/store.rs — impl Replay#1 @c2bd7664c0ef6de5
 seal envelope — 2 row(s) across 1 file(s) @00de9d8fb65926c9
 edit src/discover/squash.rs — impl SquashRules @9a4f9118ef7e2d8e
 edit src/discover/squash.rs — probes @231f5c467e1baf5c
+add src/discover/bundle.rs — enum Addressed, fn is_bare_ident, fn method_sig, fn method_span @cbcb5a39f49c5eb3
+recast src/discover/bundle.rs — select_addressed @690861dc4f0164c9
+edit src/discover/bundle.rs — splice @df792cdf15e3301c
+recast src/discover/bundle.rs — impl Bundle @d38251d3626d8cc0
+edit src/discover/bundle.rs — probes @5fbec30a52a62f2f
+edit src/discover/envelope.rs — probes @f4eae406a8cdad2e
+seal envelope — 6 row(s) across 2 file(s) @19818f2b4aa5607e
+edit src/discover/bundle.rs — impl Bundle @be6e59d522be4a3e
+edit src/discover/bundle.rs — select_addressed @832c7816a7723c30
+collect src/discover/bundle.rs — is_bare_ident
+edit src/discover/bundle.rs — probes @5e4e234048796eb9
