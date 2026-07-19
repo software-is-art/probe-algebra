@@ -1,0 +1,35 @@
+/// Walk items, tracking whether we are inside a test surface (a `#[cfg(test)]`
+/// mod); visit every function that is a test or lives inside one.
+#[crate::mutate]
+fn walk_items(
+    items: &[syn::Item],
+    in_test_mod: bool,
+    visit: &mut dyn FnMut(&str, proc_macro2::TokenStream),
+) {
+    use quote::ToTokens;
+    for item in items {
+        match item {
+            syn::Item::Fn(f) => {
+                let is_test = in_test_mod
+                    || f.attrs.iter().any(|a| a.path().is_ident("test"))
+                    || f.attrs
+                        .iter()
+                        .any(|a| a.path().segments.last().is_some_and(|s| s.ident == "test"));
+                if is_test {
+                    visit(&f.sig.ident.to_string(), f.to_token_stream());
+                }
+            }
+            syn::Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    let test_mod = in_test_mod
+                        || m.attrs.iter().any(|a| {
+                            a.path().is_ident("cfg")
+                                && a.to_token_stream().to_string().contains("test")
+                        });
+                    walk_items(inner, test_mod, visit);
+                }
+            }
+            _ => {}
+        }
+    }
+}

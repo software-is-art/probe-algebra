@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 1003 sites.
+# 1059 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -77,17 +77,18 @@
 - boundary_spec::discover::attest::Evidence::carry:3: != -> ==
 - boundary_spec::discover::attest::Evidence::carry:4: && -> ||
 - boundary_spec::discover::attest::Evidence::carry:deaf -> None
+- boundary_spec::discover::attest::Evidence::evidence_text:deaf -> None
 - boundary_spec::discover::attest::Evidence::label:0: > -> <=
 - boundary_spec::discover::attest::Evidence::label:1: == -> !=
 - boundary_spec::discover::attest::Evidence::label:2: && -> ||
 - boundary_spec::discover::attest::Evidence::label:deaf -> None
-- boundary_spec::discover::attest::Evidence::module_text:0: ! -> (deleted)
-- boundary_spec::discover::attest::Evidence::module_text:1: && -> ||
-- boundary_spec::discover::attest::Evidence::module_text:2: == -> !=
-- boundary_spec::discover::attest::Evidence::module_text:3: ! -> (deleted)
-- boundary_spec::discover::attest::Evidence::module_text:4: ! -> (deleted)
-- boundary_spec::discover::attest::Evidence::module_text:deaf -> None
 - boundary_spec::discover::attest::Evidence::of:deaf -> String::new()
+- boundary_spec::discover::attest::Evidence::resolve:0: ! -> (deleted)
+- boundary_spec::discover::attest::Evidence::resolve:1: && -> ||
+- boundary_spec::discover::attest::Evidence::resolve:2: == -> !=
+- boundary_spec::discover::attest::Evidence::resolve:3: ! -> (deleted)
+- boundary_spec::discover::attest::Evidence::resolve:4: ! -> (deleted)
+- boundary_spec::discover::attest::Evidence::resolve:deaf -> None
 - boundary_spec::discover::attest::attest::parse:0: || -> &&
 - boundary_spec::discover::attest::attest::parse:1: ! -> (deleted)
 - boundary_spec::discover::attest::attest::parse:deaf -> Err(String::new())
@@ -96,6 +97,27 @@
 - boundary_spec::discover::attest::attest::sample:0: == -> !=
 - boundary_spec::discover::attest::attest::sample:1: < -> >=
 - boundary_spec::discover::attest::attest::sample:deaf -> vec![]
+- boundary_spec::discover::attest::item_closure:0: ! -> (deleted)
+- boundary_spec::discover::attest::item_closure:1: != -> ==
+- boundary_spec::discover::attest::item_closure:2: && -> ||
+- boundary_spec::discover::attest::item_closure:3: ! -> (deleted)
+- boundary_spec::discover::attest::item_closure:4: ! -> (deleted)
+- boundary_spec::discover::attest::item_closure:5: && -> ||
+- boundary_spec::discover::attest::item_closure:deaf -> None
+- boundary_spec::discover::attest::mutate_label:0: == -> !=
+- boundary_spec::discover::attest::mutate_label:1: ! -> (deleted)
+- boundary_spec::discover::attest::mutate_label:deaf -> None
+- boundary_spec::discover::attest::select_chain:0: == -> !=
+- boundary_spec::discover::attest::select_chain:1: == -> !=
+- boundary_spec::discover::attest::select_chain:2: || -> &&
+- boundary_spec::discover::attest::select_chain:3: == -> !=
+- boundary_spec::discover::attest::select_chain:4: == -> !=
+- boundary_spec::discover::attest::select_chain:5: == -> !=
+- boundary_spec::discover::attest::select_chain:6: || -> &&
+- boundary_spec::discover::attest::select_chain:7: == -> !=
+- boundary_spec::discover::attest::select_chain:8: == -> !=
+- boundary_spec::discover::attest::select_chain:9: == -> !=
+- boundary_spec::discover::attest::select_chain:deaf -> None
 - boundary_spec::discover::bite::BiteVerdicts::gate:deaf -> Err(String::new())
 - boundary_spec::discover::bite::BiteVerdicts::gate:deaf -> Ok(String::new())
 - boundary_spec::discover::bite::Corpus::bites:0: ! -> (deleted)
@@ -314,6 +336,13 @@
 - boundary_spec::discover::depend::locks::text:0: == -> !=
 - boundary_spec::discover::depend::locks::text:1: == -> !=
 - boundary_spec::discover::depend::locks::text:deaf -> None
+- boundary_spec::discover::desk::desk::holding:0: == -> !=
+- boundary_spec::discover::desk::desk::holding:1: == -> !=
+- boundary_spec::discover::desk::desk::holding:2: && -> ||
+- boundary_spec::discover::desk::desk::holding:deaf -> None
+- boundary_spec::discover::desk::desk::parse:deaf -> Err(String::new())
+- boundary_spec::discover::desk::desk::render:deaf -> String::new()
+- boundary_spec::discover::desk::desk::sheet_file:deaf -> String::new()
 - boundary_spec::discover::eduction::Circuit<K>::admit:0: == -> !=
 - boundary_spec::discover::eduction::Circuit<K>::admit:1: == -> !=
 - boundary_spec::discover::eduction::Circuit<K>::admit:2: || -> &&
@@ -468,6 +497,11 @@
 - boundary_spec::discover::envelope::judgment::composite_of:deaf -> None
 - boundary_spec::discover::envelope::judgment::landable:deaf -> false
 - boundary_spec::discover::envelope::judgment::landable:deaf -> true
+- boundary_spec::discover::envelope::judgment::preflight:0: == -> !=
+- boundary_spec::discover::envelope::judgment::preflight:1: ! -> (deleted)
+- boundary_spec::discover::envelope::judgment::preflight:2: && -> ||
+- boundary_spec::discover::envelope::judgment::preflight:deaf -> Err(String::new())
+- boundary_spec::discover::envelope::judgment::preflight:deaf -> Ok(String::new())
 - boundary_spec::discover::envelope::judgment::render:0: == -> !=
 - boundary_spec::discover::envelope::judgment::render:deaf -> String::new()
 - boundary_spec::discover::envelope::judgment::residue:deaf -> vec![]
@@ -730,6 +764,19 @@
 - boundary_spec::discover::items::ItemRelation::uses_report:0: == -> !=
 - boundary_spec::discover::items::ItemRelation::uses_report:deaf -> Err(String::new())
 - boundary_spec::discover::items::ItemRelation::uses_report:deaf -> Ok(String::new())
+- boundary_spec::discover::join::join::fork:0: == -> !=
+- boundary_spec::discover::join::join::plan:0: == -> !=
+- boundary_spec::discover::join::join::plan:1: != -> ==
+- boundary_spec::discover::join::join::plan:deaf -> Err(String::new())
+- boundary_spec::discover::join::join::plan:deaf -> Ok(vec![])
+- boundary_spec::discover::join::join::split_conflicted:0: ! -> (deleted)
+- boundary_spec::discover::join::join::split_conflicted:1: == -> !=
+- boundary_spec::discover::join::join::split_conflicted:2: && -> ||
+- boundary_spec::discover::join::join::split_conflicted:3: != -> ==
+- boundary_spec::discover::join::join::split_conflicted:4: != -> ==
+- boundary_spec::discover::join::join::split_conflicted:deaf -> None
+- boundary_spec::discover::join::name_of:deaf -> String::new()
+- boundary_spec::discover::join::split_row:deaf -> None
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Err(vec![])
 - boundary_spec::discover::judgment::LiveDent<L>::drill:deaf -> Ok(vec![])
 - boundary_spec::discover::layering::ComponentLayering::is_atomic:deaf -> false
@@ -805,6 +852,15 @@
 - boundary_spec::discover::mutation::same_conduct:deaf -> true
 - boundary_spec::discover::mutation::surgical_eval:0: == -> !=
 - boundary_spec::discover::mutation::surgical_eval:deaf -> None
+- boundary_spec::discover::pins::literals_carry:deaf -> false
+- boundary_spec::discover::pins::literals_carry:deaf -> true
+- boundary_spec::discover::pins::pins::in_module:deaf -> Err(String::new())
+- boundary_spec::discover::pins::pins::in_module:deaf -> Ok(vec![])
+- boundary_spec::discover::pins::pins::render:deaf -> String::new()
+- boundary_spec::discover::pins::walk_items:0: == -> !=
+- boundary_spec::discover::pins::walk_items:1: || -> &&
+- boundary_spec::discover::pins::walk_items:2: && -> ||
+- boundary_spec::discover::pins::walk_items:3: || -> &&
 - boundary_spec::discover::protocol::approve:0: >= -> <
 - boundary_spec::discover::protocol::approve:deaf -> None
 - boundary_spec::discover::protocol::draft_seeds:deaf -> vec![]

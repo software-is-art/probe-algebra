@@ -1,0 +1,5 @@
+edit src/discover/cli.rs — impl CliSpec::bundle @5e1cb15e7e2e0c18
+edit src/discover/cli.rs — probes @730f193b55bd72bd
+edit examples/bundle.rs — run @3191b4e3d255993c
+add src/discover/join.rs — enum Planned, struct Join, fn touched, fn split_row, fn name_of, mod probes @90025f5ff3492c37
+add src/discover/mod.rs — mod join @8fd6fe9c54f2d931

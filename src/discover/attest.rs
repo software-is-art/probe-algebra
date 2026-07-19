@@ -195,21 +195,22 @@ impl Evidence {
         }
     }
 
-    /// The site's evidence key: FNV-64 (the verdict store's fold) over the module
-    /// file the site resolves to and the module file of every covering test, names
-    /// mixed in, tests in sorted order. Empty when anything fails to resolve.
+    /// The site's evidence key: FNV-64 (the verdict store's fold) over the text
+    /// the site is evidence about and the text of every covering test — at
+    /// ITEM-CLOSURE grain (see `evidence_text`) — names mixed in, tests in
+    /// sorted order. Empty when anything fails to resolve.
     pub fn of(&mut self, site: &str, tests: &[String]) -> String {
         let Some(label) = Evidence::label(site) else {
             return String::new();
         };
-        let Some(own) = self.module_text(&label, true) else {
+        let Some(own) = self.evidence_text(&label, true) else {
             return String::new();
         };
         let mut parts = vec![(label, own)];
         let mut sorted: Vec<&String> = tests.iter().collect();
         sorted.sort();
         for test in sorted {
-            let Some(text) = self.module_text(test, false) else {
+            let Some(text) = self.evidence_text(test, false) else {
                 return String::new();
             };
             parts.push((test.clone(), text));
@@ -267,14 +268,28 @@ impl Evidence {
         None
     }
 
-    /// Resolve a `::`-path to the module file it lives in: segments walk
-    /// directories under `src/` until one names a `.rs` file — or until a segment
-    /// that is neither a file nor a directory, which names an item (an inline mod
-    /// included) in the CURRENT module's own file: `mod.rs` here, `lib.rs` at the
-    /// crate root. At least one segment must remain beyond the file (the item
-    /// chain). Sites are crate-rooted (the leading crate name is dropped);
-    /// nextest's test names are not. A name that resolves to nothing yields None.
-    fn module_text(&mut self, name: &str, crate_rooted: bool) -> Option<String> {
+    /// The text a name is evidence about, at ITEM-CLOSURE grain: the resolved
+    /// item's tokens plus every same-file item its tokens speak of, transitively
+    /// (a helper the item calls is evidence about it; a sibling it never names is
+    /// not — the grain the method-grain rung made honest). Comments and
+    /// formatting fall out of the reading: tokens are the behaviour. Falls back
+    /// to the WHOLE FILE when the item chain does not resolve — coarser is the
+    /// safe direction — and to nothing only when the file itself does not
+    /// resolve, because an empty key is never carried.
+    fn evidence_text(&mut self, name: &str, crate_rooted: bool) -> Option<String> {
+        let (text, chain) = self.resolve(name, crate_rooted)?;
+        Some(item_closure(&text, &chain).unwrap_or(text))
+    }
+
+    /// Resolve a `::`-path to its module FILE and the item chain beyond it:
+    /// segments walk directories under `src/` until one names a `.rs` file — or
+    /// until a segment that is neither a file nor a directory, which names an
+    /// item (an inline mod included) in the CURRENT module's own file: `mod.rs`
+    /// here, `lib.rs` at the crate root. At least one segment must remain beyond
+    /// the file (the item chain). Sites are crate-rooted (the leading crate name
+    /// is dropped); nextest's test names are not. A name that resolves to
+    /// nothing yields None.
+    fn resolve(&mut self, name: &str, crate_rooted: bool) -> Option<(String, Vec<String>)> {
         let mut segs: Vec<&str> = name.split("::").collect();
         if crate_rooted && !segs.is_empty() {
             segs.remove(0);
@@ -316,11 +331,181 @@ impl Evidence {
             self.files.insert(file.clone(), text);
         }
         let text = self.files.get(&file).and_then(|t| t.clone())?;
-        match own_item {
-            Some(seg) if !text.contains(seg) => None,
-            _ => Some(text),
+        if let Some(seg) = own_item {
+            if !text.contains(seg) {
+                return None;
+            }
+        }
+        let chain = segs[idx..].iter().map(|s| s.to_string()).collect();
+        Some((text, chain))
+    }
+}
+
+/// The item-closure reading: resolve the chain to an item in the parsed file,
+/// then close over every same-file item whose name the closure's tokens speak,
+/// transitively — sorted, deterministic, whitespace-free. `None` when the chain
+/// resolves to nothing; the caller falls back to file grain, never to silence.
+#[crate::mutate]
+fn item_closure(file_text: &str, chain: &[String]) -> Option<String> {
+    let file = syn::parse_file(file_text).ok()?;
+    let mut inventory: Vec<(String, String)> = Vec::new();
+    collect_items(&file.items, &mut inventory);
+    let seed = select_chain(&file.items, chain)?;
+    let mut included: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
+    let mut text = seed;
+    loop {
+        let words: std::collections::BTreeSet<&str> = text
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .filter(|w| !w.is_empty())
+            .collect();
+        let grown: Vec<usize> = inventory
+            .iter()
+            .enumerate()
+            .filter(|(i, (name, _))| !included.contains(i) && words.contains(name.as_str()))
+            .map(|(i, _)| i)
+            .collect();
+        if grown.is_empty() {
+            break;
+        }
+        for i in grown {
+            included.insert(i);
+            text.push('\n');
+            text.push_str(&inventory[i].1);
         }
     }
+    Some(text)
+}
+
+/// Every named item in the file, at the grain references speak: functions and
+/// impl/trait methods by their own name, type definitions by theirs, inline
+/// mods walked through. Same-name collisions all stay — a reference includes
+/// every bearer, and coarser is the safe direction.
+#[crate::mutate]
+fn collect_items(items: &[syn::Item], inventory: &mut Vec<(String, String)>) {
+    use quote::ToTokens;
+    for item in items {
+        match item {
+            syn::Item::Fn(f) => {
+                inventory.push((f.sig.ident.to_string(), f.to_token_stream().to_string()))
+            }
+            syn::Item::Struct(s) => {
+                inventory.push((s.ident.to_string(), s.to_token_stream().to_string()))
+            }
+            syn::Item::Enum(e) => {
+                inventory.push((e.ident.to_string(), e.to_token_stream().to_string()))
+            }
+            syn::Item::Const(c) => {
+                inventory.push((c.ident.to_string(), c.to_token_stream().to_string()))
+            }
+            syn::Item::Static(s) => {
+                inventory.push((s.ident.to_string(), s.to_token_stream().to_string()))
+            }
+            syn::Item::Type(t) => {
+                inventory.push((t.ident.to_string(), t.to_token_stream().to_string()))
+            }
+            syn::Item::Trait(t) => {
+                inventory.push((t.ident.to_string(), t.to_token_stream().to_string()))
+            }
+            syn::Item::Impl(block) => {
+                for member in &block.items {
+                    if let syn::ImplItem::Fn(m) = member {
+                        inventory.push((m.sig.ident.to_string(), m.to_token_stream().to_string()));
+                    }
+                }
+            }
+            syn::Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    collect_items(inner, inventory);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Walk an item chain to its tokens: a bare segment names a function (by ident
+/// or `#[mutate]` label), a mod recurses, an impl matches by its label or its
+/// self-type (whitespace-stripped, so `Engine<T>` meets `Engine < T >`) and
+/// then selects one method, a trait likewise. Every hit joins — two bearers of
+/// one name are both evidence.
+#[crate::mutate]
+fn select_chain(items: &[syn::Item], chain: &[String]) -> Option<String> {
+    use quote::ToTokens;
+    let (seg, rest) = chain.split_first()?;
+    let mut hits = Vec::new();
+    for item in items {
+        match item {
+            syn::Item::Fn(f) if rest.is_empty() => {
+                let label = mutate_label(&f.attrs);
+                if f.sig.ident == seg.as_str() || label.as_deref() == Some(seg.as_str()) {
+                    hits.push(f.to_token_stream().to_string());
+                }
+            }
+            syn::Item::Mod(m) if m.ident == seg.as_str() => {
+                if let Some((_, inner)) = &m.content {
+                    if let Some(found) = select_chain(inner, rest) {
+                        hits.push(found);
+                    }
+                }
+            }
+            syn::Item::Impl(block) => {
+                if let [method] = rest {
+                    let self_ty = block.self_ty.to_token_stream().to_string().replace(' ', "");
+                    let label = mutate_label(&block.attrs);
+                    if label.as_deref() == Some(seg.as_str()) || self_ty == *seg {
+                        for member in &block.items {
+                            if let syn::ImplItem::Fn(m) = member {
+                                if m.sig.ident == method.as_str() {
+                                    hits.push(m.to_token_stream().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            syn::Item::Trait(t) => {
+                if let [method] = rest {
+                    if t.ident == seg.as_str() {
+                        for member in &t.items {
+                            if let syn::TraitItem::Fn(m) = member {
+                                if m.sig.ident == method.as_str() {
+                                    hits.push(m.to_token_stream().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if hits.is_empty() {
+        None
+    } else {
+        Some(hits.join("\n"))
+    }
+}
+
+/// The `#[mutate("label")]` string on an item, if any — the census's own path
+/// segment for a labeled block; a bare `#[mutate]` carries no label.
+#[crate::mutate]
+fn mutate_label(attrs: &[syn::Attribute]) -> Option<String> {
+    attrs.iter().find_map(|attr| {
+        if !attr
+            .path()
+            .segments
+            .last()
+            .is_some_and(|s| s.ident == "mutate")
+        {
+            return None;
+        }
+        match &attr.meta {
+            syn::Meta::List(list) => syn::parse2::<syn::LitStr>(list.tokens.clone())
+                .ok()
+                .map(|lit| lit.value()),
+            _ => None,
+        }
+    })
 }
 
 #[cfg(test)]
@@ -540,6 +725,182 @@ mod probes {
             Evidence::carry(&prior, "s3", ""),
             None,
             "an empty key earns nothing"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// THE ITEM-CLOSURE GRAIN: a sibling item the site never speaks of holds
+    /// the key (the win — an unrelated edit no longer voids the verdict), a
+    /// referenced helper's movement moves it (the honesty — evidence includes
+    /// what the item calls), a labeled impl resolves at method grain with its
+    /// sibling methods free, and an unresolvable chain falls back to FILE grain
+    /// rather than keying silence.
+    #[test]
+    fn evidence_is_item_closure_grained() {
+        let root = std::env::temp_dir().join(format!("attest-closure-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("temp src");
+        let write = |body: &str| std::fs::write(root.join("src/foo.rs"), body).expect("foo.rs");
+        write(
+            "fn helper() -> u32 { 1 }\nfn bar() -> u32 { helper() }\nfn unrelated() {}\n\
+             mod probes { fn t1() {} }\n",
+        );
+        let covering = vec!["foo::probes::t1".to_string()];
+        let base = Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering);
+        assert_eq!(base.len(), 16, "a key is minted: `{base}`");
+        write(
+            "fn helper() -> u32 { 1 }\nfn bar() -> u32 { helper() }\nfn unrelated() { let _ = 9; }\n\
+             mod probes { fn t1() {} }\n",
+        );
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering),
+            base,
+            "a sibling the item never speaks of is not evidence — the key holds"
+        );
+        write(
+            "fn helper() -> u32 { 2 }\nfn bar() -> u32 { helper() }\nfn unrelated() { let _ = 9; }\n\
+             mod probes { fn t1() {} }\n",
+        );
+        assert_ne!(
+            Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering),
+            base,
+            "a referenced helper IS evidence — the key moves"
+        );
+        let labeled = |other: &str| {
+            std::fs::write(
+                root.join("src/labeled.rs"),
+                format!(
+                    "pub struct Host;\n#[crate::mutate(\"host\")]\nimpl Host {{\n    \
+                     pub fn speak() -> u32 {{ 1 }}\n    pub fn other() -> u32 {{ {other} }}\n}}\n"
+                ),
+            )
+            .expect("labeled.rs")
+        };
+        labeled("2");
+        let method = Evidence::under(&root).of("crate_x::labeled::host::speak:0: == -> !=", &[]);
+        assert_eq!(method.len(), 16, "the labeled chain resolves: `{method}`");
+        labeled("3");
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::labeled::host::speak:0: == -> !=", &[]),
+            method,
+            "the sibling method holds the key at method grain"
+        );
+        let fallback = Evidence::under(&root).of("crate_x::labeled::ghost:0: == -> !=", &[]);
+        assert_eq!(
+            fallback.len(),
+            16,
+            "an unresolved chain keys the file: `{fallback}`"
+        );
+        labeled("4");
+        assert_ne!(
+            Evidence::under(&root).of("crate_x::labeled::ghost:0: == -> !=", &[]),
+            fallback,
+            "file-grain fallback still moves with the file"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The chain grammar's remaining speakers, pinned from the side that tells
+    /// item grain from file-grain fallback: a labeled FN resolves by its
+    /// `#[mutate]` label (sibling trait edits hold its key), and a TRAIT hosts
+    /// method defaults at the same grain (sibling fn edits hold its key) — each
+    /// target's own movement moves its key, each sibling's movement does not.
+    #[test]
+    fn labeled_fns_and_traits_resolve_at_the_same_grain() {
+        let root = std::env::temp_dir().join(format!("attest-chain-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("temp src");
+        let write = |named: &str, deft: &str| {
+            std::fs::write(
+                root.join("src/host.rs"),
+                format!(
+                    "#[crate::mutate(\"alias\")]\nfn hidden() -> u32 {{ {named} }}\n\
+                     trait Voice {{\n    fn speak() -> u32 {{ {deft} }}\n    fn hold() -> u32 {{ 0 }}\n}}\n"
+                ),
+            )
+            .expect("host.rs")
+        };
+        write("1", "1");
+        let label_1 = Evidence::under(&root).of("crate_x::host::alias:0: == -> !=", &[]);
+        let trait_1 = Evidence::under(&root).of("crate_x::host::Voice::speak:0: == -> !=", &[]);
+        assert_eq!(label_1.len(), 16, "the label resolves: `{label_1}`");
+        assert_eq!(trait_1.len(), 16, "the trait method resolves: `{trait_1}`");
+        write("2", "1");
+        let label_2 = Evidence::under(&root).of("crate_x::host::alias:0: == -> !=", &[]);
+        let trait_2 = Evidence::under(&root).of("crate_x::host::Voice::speak:0: == -> !=", &[]);
+        assert_ne!(
+            label_2, label_1,
+            "the labeled fn's own movement moves its key"
+        );
+        assert_eq!(
+            trait_2, trait_1,
+            "a sibling fn's movement holds the trait key"
+        );
+        write("2", "2");
+        let label_3 = Evidence::under(&root).of("crate_x::host::alias:0: == -> !=", &[]);
+        let trait_3 = Evidence::under(&root).of("crate_x::host::Voice::speak:0: == -> !=", &[]);
+        assert_eq!(
+            label_3, label_2,
+            "a sibling default's movement holds the label key"
+        );
+        assert_ne!(
+            trait_3, trait_2,
+            "the trait default's own movement moves its key"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The two chain arms a labeled fixture short-circuits, pinned: a BARE impl
+    /// resolves by its self-type (the labeled path never asks), and the probes
+    /// MOD resolves by its own ident — an unrelated probe's movement holds a
+    /// covering test's key, which only the mod arm's item grain can say.
+    #[test]
+    fn bare_impls_and_probe_mods_resolve_at_item_grain() {
+        let root = std::env::temp_dir().join(format!("attest-bare-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("temp src");
+        let write_bare = |other: &str| {
+            std::fs::write(
+                root.join("src/bare.rs"),
+                format!(
+                    "pub struct Bare;\nimpl Bare {{\n    pub fn speak() -> u32 {{ 1 }}\n    \
+                     pub fn hold() -> u32 {{ {other} }}\n}}\n"
+                ),
+            )
+            .expect("bare.rs")
+        };
+        write_bare("2");
+        let by_self_ty = Evidence::under(&root).of("crate_x::bare::Bare::speak:0: == -> !=", &[]);
+        assert_eq!(
+            by_self_ty.len(),
+            16,
+            "the bare impl resolves: `{by_self_ty}`"
+        );
+        write_bare("3");
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::bare::Bare::speak:0: == -> !=", &[]),
+            by_self_ty,
+            "the sibling method holds the key through the self-type match"
+        );
+        let write_probes = |t2: &str| {
+            std::fs::write(
+                root.join("src/covered.rs"),
+                format!(
+                    "fn bar() -> u32 {{ 1 }}\nmod probes {{\n    fn t1() {{}}\n    \
+                     fn t2() {{ let _ = {t2}; }}\n}}\n"
+                ),
+            )
+            .expect("covered.rs")
+        };
+        write_probes("1");
+        let covering = vec!["covered::probes::t1".to_string()];
+        let keyed = Evidence::under(&root).of("crate_x::covered::bar:0: == -> !=", &covering);
+        assert_eq!(keyed.len(), 16, "the covering probe resolves: `{keyed}`");
+        write_probes("9");
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::covered::bar:0: == -> !=", &covering),
+            keyed,
+            "an unrelated probe's movement holds the key — the mod arm is item grain"
         );
         let _ = std::fs::remove_dir_all(&root);
     }

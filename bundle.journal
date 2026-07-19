@@ -247,3 +247,54 @@ edit src/discover/bundle.rs — impl Bundle @be6e59d522be4a3e
 edit src/discover/bundle.rs — select_addressed @832c7816a7723c30
 collect src/discover/bundle.rs — is_bare_ident
 edit src/discover/bundle.rs — probes @5e4e234048796eb9
+edit src/discover/cli.rs — Sort @8699dfc19e88dba0
+edit src/discover/cli.rs — impl CliSpec::bundle @89ece660b726bde8
+edit src/discover/cli.rs — probes @69091ee13631b808
+recast src/discover/envelope.rs — impl Judgment @d2b9cdf829e34dc1
+edit src/discover/envelope.rs — probes @da99ca2eec2ec053
+edit examples/bundle.rs — run @c66659d111c18509
+seal envelope — 6 row(s) across 3 file(s) @1d25582f9c612b47
+add src/discover/envelope.rs — struct Offer @9cf2fb62ba89a31a
+recast src/discover/envelope.rs — impl Judgment::preflight @42e9bdeae8904c50
+edit src/discover/envelope.rs — probes @e5699fa5d32c4257
+edit examples/bundle.rs — run @ca45be2e41eb666e
+seal envelope — 4 row(s) across 2 file(s) @75005dd38e83a3ed
+add src/discover/desk.rs — struct Sheet, struct Desk, mod probes @29678414896ff8f2
+add src/discover/mod.rs — mod desk @c37bd9fda272d854
+add examples/bundle.rs — fn desk_home @b015fc2c45ccdb86
+edit src/discover/cli.rs — impl CliSpec::bundle @880378adb8f55d73
+edit src/discover/cli.rs — probes @3746b7fbf0080f41
+edit examples/bundle.rs — run @4280137b42bb449b
+seal envelope — 6 row(s) across 4 file(s) @3cbe8aae46565808
+edit src/discover/cli.rs — impl CliSpec::bundle @5e1cb15e7e2e0c18
+edit src/discover/cli.rs — probes @730f193b55bd72bd
+edit examples/bundle.rs — run @3191b4e3d255993c
+add src/discover/join.rs — enum Planned, struct Join, fn touched, fn split_row, fn name_of, mod probes @90025f5ff3492c37
+add src/discover/mod.rs — mod join @8fd6fe9c54f2d931
+seal envelope — 5 row(s) across 4 file(s) @89ee696194fbf8ef
+edit src/discover/join.rs — name_of @3d610f45de8abe59
+seal envelope — 1 row(s) across 1 file(s) @37f8f10e7ad39e64
+edit src/discover/cli.rs — impl CliSpec::bundle @32c2634d7d678e1f
+edit src/discover/cli.rs — probes @01273f5efe2c8d5f
+edit examples/bundle.rs — run @82d78c76e0c9b559
+add src/discover/pins.rs — struct Pin, struct Pins, fn walk_items, fn literals_carry, mod probes @50ff6a2cc0652ac3
+add src/discover/mod.rs — mod pins @caafee475517ad05
+seal envelope — 5 row(s) across 4 file(s) @340e5c2649716ac7
+edit examples/bundle.rs — run @b93fb26640a51b8c
+seal envelope — 1 row(s) across 1 file(s) @3722f7126d3d3469
+edit src/discover/pins.rs — walk_items @ae0326c3bb66537a
+edit src/discover/pins.rs — literals_carry @5f61ad189b029bcf
+seal envelope — 2 row(s) across 1 file(s) @2fd9b664484946ed
+edit src/discover/pins.rs — walk_items @1bd0e718ee98ce60
+edit src/discover/pins.rs — probes @b4608347881488cc
+seal envelope — 2 row(s) across 1 file(s) @37f7ae4552ada5dc
+recast src/discover/attest.rs — impl Evidence @a32fff2c1dc184d4
+edit src/discover/attest.rs — probes @96398762b706442f
+add src/discover/attest.rs — fn item_closure, fn collect_items, fn select_chain, fn mutate_label @1908d9c1dc253535
+seal envelope — 3 row(s) across 1 file(s) @68012d176de71fe4
+edit src/discover/attest.rs — select_chain @37045734279aeaa1
+seal envelope — 1 row(s) across 1 file(s) @08fc413e494de7f4
+edit src/discover/attest.rs — probes @6204f9809afa7753
+seal envelope — 1 row(s) across 1 file(s) @072da279eba78f13
+edit src/discover/attest.rs — probes @677a7b7acabee949
+seal envelope — 1 row(s) across 1 file(s) @9a47850fe2f29f8d

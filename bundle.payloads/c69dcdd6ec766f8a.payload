@@ -1,0 +1,5 @@
+/// The sheet's file name on the desk — 1-based, stable across edits, never
+    /// renamed by later openings or withdrawals.
+    pub fn sheet_file(index: usize) -> String {
+        format!("sheet-{}.rs", index + 1)
+    }

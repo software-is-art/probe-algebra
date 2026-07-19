@@ -1,0 +1,5 @@
+edit src/discover/cli.rs — impl CliSpec::bundle @32c2634d7d678e1f
+edit src/discover/cli.rs — probes @01273f5efe2c8d5f
+edit examples/bundle.rs — run @82d78c76e0c9b559
+add src/discover/pins.rs — struct Pin, struct Pins, fn walk_items, fn literals_carry, mod probes @50ff6a2cc0652ac3
+add src/discover/mod.rs — mod pins @caafee475517ad05

@@ -4445,3 +4445,183 @@ preflight `bundle judge` (the perception face of judgment — its design is
 settled: reuse `Judgment::admits` against composite-or-committed, plus the
 fmt-normal half at offer time), and `uses` tagging test surfaces in its
 census line.
+
+## The preflight: judgment grows its perception face (BUILT)
+
+Built 2026-07-19, the wearability sprint's fourth brick — the residual the
+method-grain rung named for the next session, closed by it. `bundle judge`
+prefixes any offer verbatim: `bundle judge edit m.rs one fix.rs` re-binds the
+tail through the same declaration (`Sort` gained its eighth member, `Offer` —
+a slot whose value is itself an invocation — exactly the signed diff the
+seven-sorts probe said an eighth would be), judges it, and lands nothing.
+The library half is `Judgment::preflight` over a new `Offer` value (the offer
+as a domain object — the desk brick's carrier, arriving one brick early
+because clippy refused the eight-argument form): the same
+composite-or-committed lookup `admits` uses, but keeping the landed text long
+enough to run the fmt-normal half at offer time (`store::Normalize`, the
+replay differential's own hook), so a debt only `land` would have found is
+learned at authoring time. The report speaks in `land`'s voice — `would land
+as edit|add|declare|recast` green, `would refuse: …` red — with one teaching
+the settled design didn't name: an interface move judged WITHOUT an open
+envelope refuses AND says that an envelope would license it as `recast`
+(`bundle begin` is the teaching), instead of lying green about a standalone
+verb that would refuse. Nothing is staged, written, or journaled either way.
+
+The drill matrix ran live on the committed tree: a green edit reports its
+landing verb; a rename refuses in `edit`'s own voice; an unlicensed interface
+move teaches the envelope; the same move under an open envelope reports
+`would land as recast`; a perception verb offered to judge refuses by name
+("`show` carries no offer"); and the journal shows no judge rows — perception
+stays off the record. What this closes from the session retrospective: "I
+prepared a payload, staged it, and only then learned what would refuse" — the
+refusal now costs one read-only invocation while the payload is still being
+authored, which is also the seam the desk (the editor-loop brick) hooks:
+judge is the offer-time half of that loop.
+
+Reading, recorded per the instrument: designing the verb consulted three
+interiors (cli.rs, envelope.rs, the driver) for one question — "what shape is
+the dispatch/judgment seam" — which `show`'s table of contents answers only
+half of; the architecture-of-a-module question (who calls whom, where a new
+seam belongs) is still the fallback encyclopedia's, and no verb yet speaks it.
+
+## The desk: the editor loop's file half — the payload shuttle retires (BUILT)
+
+Built 2026-07-19, the wearability sprint's fifth brick, on the preflight's
+shoulders. The retrospective's biggest ergonomic hole was the shuttle: `show >
+scratch`, edit the scratch with your own tools, retype the offer argv from
+memory. Three verbs dissolve it. `bundle open <module> [address]` materializes
+the addressed bytes onto a SHEET (`.suit/desk/sheet-N.rs` — the same bytes
+`edit` will hold, composite under an open envelope exactly as `show` renders;
+no address means a fresh add sheet, born empty) and remembers the binding in
+the desk's bindings file — journal grammar, originals in the payload store, so
+"changed" is a comparison against remembered content, never a guess. `bundle
+desk` is the standing judgment: every sheet reports unchanged, withdrawn
+(deleting a sheet file IS withdrawal — the desk lives in the file world
+deliberately, so authoring gestures are desk gestures), or the preflight
+verdict `offer` will reach — judge-on-save without a resident watcher, because
+the judgment is a verb the author's loop calls, not a process that camps on
+the tree. `bundle offer` closes the loop: every changed sheet becomes its
+verb, staged into the open envelope or into one the offer BEGINS AND LANDS
+ITSELF (the desk lands what it begins — an offer is an envelope, so a licensed
+interface move works at the desk always), and the desk clears; a refusal drops
+only what the offer began and the desk keeps every sheet. The offer composes
+the existing verbs by recursion into the driver's own dispatch — begin, the
+staged rows, land — so there is no second landing path to drift.
+
+The drill matrix ran live: unchanged sheet, doc edit (`would land as edit`),
+signature move (`would land as recast` — licensed, since the offer is an
+envelope), garbage payload (refused in `edit`'s voice), withdrawal by
+deletion, and a clean offer that touches nothing. The landing path's
+production test is deliberately the NEXT brick: the join verb's own cli.rs
+edits go through the desk.
+
+Disclosed honestly: the desk is `.suit/`-scoped (gitignored, volatile — the
+tree and the store stay the only truth); a sheet's verdict can go stale the
+moment the tree moves under it (the preflight is a reading, not a lock); and
+`desk`'s tail counts changed sheets, not green ones — a desk of one refusing
+sheet still says the offer would stage it, and the offer is what refuses.
+
+## The join: the merge becomes a verb (BUILT)
+
+Built 2026-07-19, the wearability sprint's sixth brick — the missing
+transaction the concurrent-session field report named, built as that report's
+own reading said: the conflict was never in the items, it was in the renders,
+so `bundle join` never reads a render. The subject is the sibling's journal —
+or OUR OWN, still carrying git's conflict markers: the conflict block splits
+back into the two records it interleaved, so the one artifact git hands you
+is already join's input, zero hand-weaving. The records fork at their longest
+common prefix (order is the only clock, so shared history IS a shared
+prefix); the sibling segment plans against ours — commuting rows stage
+mechanically into an envelope the join begins (a sibling `recast` stages as
+`edit` and the envelope re-licenses it; `declare` always commutes, exactly as
+the frozen algebra says), a both-touched item surfaces as a DECISION naming
+the sibling's payload address so taking theirs is one staged verb away, seals
+skip as boundary, and the non-stageable verbs skip by name. `land` stays the
+judged step: the bill is the merge review, all or none, and a join that
+stages nothing drops the envelope it began. Payloads travel because the store
+is content-addressed and committed — git's union merge of `bundle.payloads/`
+is trivially conflict-free, which is the indirection instinct's payoff
+arriving early: the store already made the item universe grow-only; join
+concentrates all remaining conflict into the rows.
+
+The drill rebuilt the field report's exact scenario in two scratch crates —
+one base, one side editing `one` and adding `two`, the other editing `one`
+and adding `three` — and the join staged `three`, surfaced `one` as the named
+decision with the take-theirs teaching, landed as one sealed envelope, and
+the joined journal REPLAYS TO THE COMMITTED TEXT: tree == replay(journal)
+holds through a merge. The conflicted-file form drilled too: markers split,
+the colliding row refused as an honest debt in `add`'s own voice, and the
+empty envelope dropped itself.
+
+Deliberate keeps, disclosed: the fork is row-identity, nothing subtler; a
+block-grain edit on one side composes silently with a method-grain edit
+inside it from the other (the composite judgment still rules); the verb
+algebra's laws surface as stage-time refusals rather than being consulted as
+data for reordering — that rung (join licensing row commutation from
+`spec/verb-algebra.spec` the way squash licenses collapses) stays open; and
+`join` does not yet write a `join` journal row — the landed rows keep their
+own verbs so replay stays truthful, and the seal is the grouping mark.
+
+## Pins: the wording change learns what it owes (BUILT)
+
+Built 2026-07-19, the wearability sprint's seventh brick — the retrospective's
+named grep ("which probes pin this refusal text") become a reading. `bundle
+pins '<text>'` walks the crate from its root and reads STRING LITERALS inside
+test items (`#[test]` functions, everything under `#[cfg(test)]` mods), after
+Rust unescaping, and reports every probe carrying the fragment — the owed
+updates of a wording change, found before the red suite finds them, each one
+"a wording change owes each one, same commit" (the byte-pin convention, now
+with its reverse index). Drilled on the tree's own prose: `signature moved`
+answers six pinning probes across three modules — the exact answer the grep
+was hunting. Honesty in the report itself: prose assembled at runtime
+(`format!` with moving parts) is invisible to a literal reading, so an empty
+census says "the suite stays the oracle" rather than claiming freedom. Built
+through the desk end to end, including its own bug fix (the walk rooted at
+the empty path read nothing — caught by drilling the landed verb, fixed as a
+one-sheet offer).
+
+The deeper dissolution stays on the roadmap deliberately: refusal prose as a
+CATALOG (data, stated once, asserted by key) would make this census a lookup
+and the wording change a one-item edit — the standing question's shape, a
+representation change for a later rung. And `uses` tagging test surfaces in
+its census line — the other half of the perception-rung residue — remains
+open here, named again so it is not lost.
+
+## The evidence key goes item-closure grain: the site-keyed sweep's named sharpening (BUILT)
+
+Built 2026-07-19, the wearability sprint's eighth brick — the sharpening the
+site-keyed sweep named the day it landed ("item grain must wait for total impl
+addressing") and the method-grain rung unlocked. A site's evidence key now
+folds the TEXT THE VERDICT IS EVIDENCE ABOUT at item-closure grain: the
+resolved item's tokens plus every same-file item its tokens speak of,
+transitively — a helper the item calls is evidence about it (the gap naive
+item grain would have opened, closed before it existed); a sibling it never
+names is not. Covering tests key the same way, so editing one probe no longer
+voids verdicts the other probes warrant. Tokens, not bytes: comments and
+formatting fall out of the reading — a comment-only edit holds every key,
+which the module-grain fold could not say. Site paths resolve through the
+census's own grammar — a bare fn by ident, a labeled block by its `#[mutate]`
+label, a bare impl by its self-type (whitespace-stripped, so `Engine<T>`
+meets `Engine < T >`), inline mods walked — and every failure direction
+stays the founding discipline: an unresolvable chain falls back to FILE
+grain (coarser is safe), an unresolvable file keys empty, and an empty key
+is never carried. The elder module-grain probe passes unchanged at the new
+grain; the new probe pins the boundary from both sides (sibling holds,
+helper moves, method grain through a labeled impl, file-grain fallback).
+
+The bill and the payoff, stated honestly: landing this moves EVERY standing
+key once — one full sweep re-judges the census, and after it an ordinary
+edit's re-judgment drops from every-site-in-the-touched-module to the touched
+item's own closure. The honesty ladder is unchanged: a test's behaviour can
+still shift through code it calls across FILE boundaries without any keyed
+text moving — the weekly from-scratch shards remain that gap's backstop, now
+backstopping one more grain.
+
+Measured on the brick's own landing sequence: after a probes-mod-only edit,
+the sweep re-judged 28 of 1059 sites and carried the rest — the module-grain
+key would have voided every site the touched file hosts or covers. The
+survivors the sweep found while the brick landed were its own chain arms
+(labeled fn, trait, bare impl by self-type, the probes-mod guard) — each
+killed by a fixture that tells item grain from file-grain fallback, which is
+the only probe shape that can: a key that merely MINTS is indistinguishable
+from the fallback; the pin is a sibling's movement HOLDING it.

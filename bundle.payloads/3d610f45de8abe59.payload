@@ -1,0 +1,9 @@
+/// A detail head's item name with its kind word stripped — `fn one` and `one`
+/// are the same touch.
+#[crate::mutate]
+fn name_of(head: &str) -> String {
+    match head.split_once(' ') {
+        Some(("fn" | "struct" | "enum" | "trait" | "mod", rest)) => rest.to_string(),
+        _ => head.to_string(),
+    }
+}

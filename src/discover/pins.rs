@@ -1,0 +1,218 @@
+//! pins — the reverse index from pinned prose to the probes that pin it (the
+//! editor-reach census's next verb: "which probes pin this refusal text" was a
+//! grep, now a reading over the item relation). The subject is a text fragment;
+//! the answer is every test item whose string literals carry it — the probes a
+//! wording change owes an update, found before the red suite finds them.
+//!
+//! Honest bounds, stated in the report: this reads STRING LITERALS in test
+//! items (`#[test]` functions and everything inside `#[cfg(test)]` modules),
+//! after Rust unescaping. Prose assembled at runtime (`format!` with moving
+//! parts) is invisible to it — a miss here is not proof of freedom, and the
+//! suite stays the oracle.
+
+/// One pin: a test item holding the text, and the module file that holds it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pin {
+    /// The module file, as walked.
+    pub module: String,
+    /// The test item's name.
+    pub item: String,
+}
+
+/// The census: pure text arithmetic over parsed modules — the caller walks the
+/// tree and feeds files; nothing here touches a filesystem.
+pub struct Pins;
+
+#[crate::mutate("pins")]
+impl Pins {
+    /// Every test item in one module whose string literals carry the text.
+    /// Items are `#[test]` functions at any depth plus functions inside
+    /// `#[cfg(test)]` modules; literals are matched after unescaping.
+    pub fn in_module(module_path: &str, text: &str, needle: &str) -> Result<Vec<Pin>, String> {
+        let file = syn::parse_file(text)
+            .map_err(|e| format!("bundle pins: {module_path} does not parse ({e})"))?;
+        let mut pins = Vec::new();
+        walk_items(&file.items, false, &mut |name, tokens| {
+            if literals_carry(tokens.clone(), needle) {
+                pins.push(Pin {
+                    module: module_path.to_string(),
+                    item: name.to_string(),
+                });
+            }
+        });
+        Ok(pins)
+    }
+
+    /// The report: one line per pin, then the honest tail. An empty census says
+    /// so rather than saying nothing.
+    pub fn render(needle: &str, pins: &[Pin]) -> String {
+        let mut out = format!("pins of `{needle}` — a token reading over test literals:\n");
+        if pins.is_empty() {
+            out.push_str("  none found (format!-assembled prose is invisible here; the suite stays the oracle)\n");
+        } else {
+            for pin in pins {
+                out.push_str(&format!("  {} — {}\n", pin.module, pin.item));
+            }
+            out.push_str(&format!(
+                "{} pinning item(s) — a wording change owes each one, same commit\n",
+                pins.len()
+            ));
+        }
+        out
+    }
+}
+
+/// Walk items, tracking whether we are inside a test surface (a `#[cfg(test)]`
+/// mod); visit every function that is a test or lives inside one.
+#[crate::mutate]
+fn walk_items(
+    items: &[syn::Item],
+    in_test_mod: bool,
+    visit: &mut dyn FnMut(&str, proc_macro2::TokenStream),
+) {
+    use quote::ToTokens;
+    for item in items {
+        match item {
+            syn::Item::Fn(f) => {
+                let is_test = in_test_mod
+                    || f.attrs
+                        .iter()
+                        .any(|a| a.path().segments.last().is_some_and(|s| s.ident == "test"));
+                if is_test {
+                    visit(&f.sig.ident.to_string(), f.to_token_stream());
+                }
+            }
+            syn::Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    let test_mod = in_test_mod
+                        || m.attrs.iter().any(|a| {
+                            a.path().is_ident("cfg")
+                                && a.to_token_stream().to_string().contains("test")
+                        });
+                    walk_items(inner, test_mod, visit);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Whether any string literal in the token stream carries the needle, after
+/// unescaping — `syn::LitStr::value` is the unescaper.
+#[crate::mutate]
+fn literals_carry(tokens: proc_macro2::TokenStream, needle: &str) -> bool {
+    for token in tokens {
+        match token {
+            proc_macro2::TokenTree::Group(group) => {
+                if literals_carry(group.stream(), needle) {
+                    return true;
+                }
+            }
+            proc_macro2::TokenTree::Literal(lit) => {
+                if let Ok(syn::Lit::Str(s)) = syn::parse_str::<syn::Lit>(&lit.to_string()) {
+                    if s.value().contains(needle) {
+                        return true;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod probes {
+    use super::{Pin, Pins};
+
+    /// The census finds a pinning probe by its literal — through escapes, inside
+    /// a `#[cfg(test)]` mod — and stays silent where nothing pins.
+    #[test]
+    fn the_census_finds_the_pinning_probe_through_escapes() {
+        let module = r#"
+pub fn speak() -> String { "not a test".to_string() }
+
+#[cfg(test)]
+mod probes {
+    #[test]
+    fn the_refusal_is_pinned() {
+        assert_eq!(refuse(), "bundle add: `two` already exists\n in the module");
+    }
+
+    #[test]
+    fn another_probe_pins_nothing_related() {
+        assert_eq!(1 + 1, 2);
+    }
+}
+"#;
+        let pins = Pins::in_module("src/m.rs", module, "already exists").expect("parses");
+        assert_eq!(
+            pins,
+            vec![Pin {
+                module: "src/m.rs".to_string(),
+                item: "the_refusal_is_pinned".to_string(),
+            }]
+        );
+        assert_eq!(
+            Pins::in_module("src/m.rs", module, "\n in the module")
+                .expect("parses")
+                .len(),
+            1,
+            "matching runs on the unescaped value"
+        );
+        assert!(Pins::in_module("src/m.rs", module, "no such prose")
+            .expect("parses")
+            .is_empty());
+    }
+
+    /// The test-surface boundary, pinned from both sides: a top-level `#[test]`
+    /// and a `#[tokio::test]`-shaped attribute both count, a fn nested in a mod
+    /// INSIDE a `#[cfg(test)]` mod inherits the surface, and a `#[cfg(feature)]`
+    /// mod does NOT — a literal there is invisible, disclosed by the honesty
+    /// tail rather than miscounted.
+    #[test]
+    fn the_test_surface_boundary_holds_from_both_sides() {
+        let module = r#"
+#[test]
+fn top_level_probe() { assert_eq!(speak(), "pinned prose"); }
+
+#[tokio::test]
+async fn framework_probe() { assert_eq!(speak(), "pinned prose"); }
+
+#[cfg(test)]
+mod probes {
+    mod nested {
+        fn deep_probe() { assert_eq!(speak(), "pinned prose"); }
+    }
+}
+
+#[cfg(feature = "extra")]
+mod feature_gated {
+    fn not_a_probe() { let _ = "pinned prose"; }
+}
+"#;
+        let pins = Pins::in_module("src/m.rs", module, "pinned prose").expect("parses");
+        let items: Vec<&str> = pins.iter().map(|p| p.item.as_str()).collect();
+        assert_eq!(
+            items,
+            vec!["top_level_probe", "framework_probe", "deep_probe"],
+            "both attribute shapes and the nested mod count; the feature mod does not"
+        );
+    }
+
+    /// The report names each pinning item and owes-line; an empty census says
+    /// so with its honesty disclosure rather than saying nothing.
+    #[test]
+    fn the_report_names_the_pins_and_the_empty_census_discloses() {
+        let pins = vec![Pin {
+            module: "src/m.rs".to_string(),
+            item: "the_refusal_is_pinned".to_string(),
+        }];
+        let full = Pins::render("already exists", &pins);
+        assert!(full.contains("src/m.rs — the_refusal_is_pinned"), "{full}");
+        assert!(full.contains("1 pinning item(s)"), "{full}");
+        let empty = Pins::render("ghost prose", &[]);
+        assert!(empty.contains("none found"), "{empty}");
+        assert!(empty.contains("the suite stays the oracle"), "{empty}");
+    }
+}

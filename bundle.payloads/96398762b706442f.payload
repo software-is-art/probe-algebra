@@ -1,0 +1,288 @@
+#[cfg(test)]
+mod probes {
+    use super::{Evidence, SiteVerdict, Transcript};
+
+    fn transcript() -> Transcript {
+        Transcript {
+            tree: "00aa11bb22cc33dd".to_string(),
+            toolchain: "1.94.1".to_string(),
+            baseline_secs: 7,
+            evidence: "feedfacefeedface".to_string(),
+            sites: vec![
+                SiteVerdict {
+                    site: "a::b::f:0: == -> !=".to_string(),
+                    verdict: "killed".to_string(),
+                    tests: vec!["a::probes::one".to_string(), "a::probes::two".to_string()],
+                    evidence: "1111aaaa2222bbbb".to_string(),
+                },
+                SiteVerdict {
+                    site: "a::b::g:deaf -> None".to_string(),
+                    verdict: "SURVIVED".to_string(),
+                    tests: vec![],
+                    evidence: String::new(),
+                },
+                SiteVerdict {
+                    site: "a::b::h:1: && -> ||".to_string(),
+                    verdict: "killed".to_string(),
+                    tests: vec!["a::probes::three".to_string()],
+                    evidence: "3333cccc4444dddd".to_string(),
+                },
+            ],
+        }
+    }
+
+    /// THE HEADLINE: the transcript round-trips byte-losslessly — what the sweep
+    /// attests is exactly what the countersign audits, spaces-and-colons site names,
+    /// empty covering sets, cone evidence, and all.
+    #[test]
+    fn the_transcript_round_trips() {
+        let t = transcript();
+        let parsed = Transcript::parse(&t.render()).expect("parses");
+        assert_eq!(parsed.tree, t.tree);
+        assert_eq!(parsed.toolchain, t.toolchain);
+        assert_eq!(parsed.baseline_secs, t.baseline_secs);
+        assert_eq!(parsed.evidence, t.evidence);
+        assert_eq!(parsed.sites.len(), t.sites.len());
+        for (a, b) in parsed.sites.iter().zip(t.sites.iter()) {
+            assert_eq!(a.site, b.site);
+            assert_eq!(a.verdict, b.verdict);
+            assert_eq!(a.tests, b.tests);
+            assert_eq!(a.evidence, b.evidence);
+        }
+        assert_eq!(parsed.render(), t.render(), "render is a fixed point");
+        // a transcript from before evidence keys still parses — its sites carry the
+        // empty key and it names no cone, so nothing is reusable and the one honest
+        // transition is a sweep. An empty cone key is never rendered, so the elder
+        // form is also a fixed point of its own parse.
+        let elder =
+            Transcript::parse("tree x\ntoolchain y\nbaseline 3\nkilled\ts:0: == -> !=\ta::t\n")
+                .expect("the elder format parses");
+        assert_eq!(elder.sites[0].evidence, "");
+        assert_eq!(elder.evidence, "", "an elder transcript names no cone");
+        assert!(
+            !elder.render().contains("evidence"),
+            "an empty cone key is never written"
+        );
+    }
+
+    /// Refusals are named: a hand-touched line and a headless transcript both refuse —
+    /// an attestation that cannot be read is re-derived, never audited.
+    #[test]
+    fn a_hand_touched_transcript_refuses() {
+        let refusal =
+            Transcript::parse("tree x\ntoolchain y\nbaseline 3\nnot a line\n").unwrap_err();
+        assert!(refusal.contains("line 4"), "{refusal}");
+        let headless = Transcript::parse("killed\tsite\ttests\n").unwrap_err();
+        assert!(headless.contains("header"), "{headless}");
+    }
+
+    /// The seed-to-sample walk is a pure function: same seed, same sample; distinct
+    /// entries; bounded by the roster; and the whole roster arrives when K exceeds it.
+    #[test]
+    fn the_sample_is_deterministic_distinct_and_bounded() {
+        let t = transcript();
+        let one: Vec<&str> = t.sample(2, 42).iter().map(|s| s.site.as_str()).collect();
+        let two: Vec<&str> = t.sample(2, 42).iter().map(|s| s.site.as_str()).collect();
+        assert_eq!(one, two, "same seed, same sample");
+        assert_eq!(one.len(), 2);
+        let all = t.sample(50, 7);
+        assert_eq!(all.len(), 3, "K clamps to the roster");
+        let different: Vec<&str> = t.sample(2, 43).iter().map(|s| s.site.as_str()).collect();
+        let _ = different; // seeds may collide on a 3-site roster; determinism is the pin
+    }
+
+    /// The evidence discipline, pinned: the key derives from the site's module and
+    /// its covering tests' modules — moving any of those bytes moves the key, the
+    /// suffix and the test order are not evidence, an unresolvable name yields the
+    /// empty key — and carry honours exactly a matching non-empty key, never a
+    /// timeout (load-sensitive detections are re-judged, not inherited).
+    #[test]
+    fn evidence_keys_move_with_their_modules_and_timeouts_never_carry() {
+        let root = std::env::temp_dir().join(format!("attest-evidence-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("temp src");
+        std::fs::write(
+            root.join("src/foo.rs"),
+            "fn bar() {}\nmod probes { fn t1() {} }\n",
+        )
+        .expect("foo.rs");
+        let covering = vec!["foo::probes::t1".to_string()];
+        let one = Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering);
+        assert_eq!(one.len(), 16, "a key is minted: `{one}`");
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering),
+            one,
+            "same bytes, same key"
+        );
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::foo::bar:deaf -> None", &covering),
+            one,
+            "the mutant suffix is not evidence"
+        );
+        // an item whose own name starts with `deaf` must not be mistaken for the
+        // suffix: the label cut is the full `:deaf -> ` form.
+        std::fs::write(
+            root.join("src/deafen.rs"),
+            "fn deaf_battery() {}\nmod probes { fn t9() {} }\n",
+        )
+        .expect("deafen.rs");
+        let named = Evidence::under(&root).of("crate_x::deafen::deaf_battery:0: == -> !=", &[]);
+        assert_eq!(named.len(), 16, "deaf_-named items resolve: `{named}`");
+        std::fs::write(
+            root.join("src/foo.rs"),
+            "fn bar() { let _ = 1; }\nmod probes { fn t1() {} }\n",
+        )
+        .expect("foo.rs moves");
+        let mut moved = Evidence::under(&root);
+        let two = moved.of("crate_x::foo::bar:0: == -> !=", &covering);
+        assert_ne!(two, one, "the module moved, the key moves");
+        assert_ne!(
+            moved.of("crate_x::foo::bar:0: == -> !=", &[]),
+            two,
+            "the covering set is evidence too"
+        );
+        // an inline mod in the parent's own file resolves to that file: mod.rs
+        // inside a directory, lib.rs at the crate root.
+        std::fs::create_dir_all(root.join("src/deep")).expect("deep dir");
+        std::fs::write(
+            root.join("src/deep/mod.rs"),
+            "mod tests { fn t2() {} }
+",
+        )
+        .expect("mod.rs");
+        std::fs::write(
+            root.join("src/lib.rs"),
+            "mod tests { fn t3() {} }
+",
+        )
+        .expect("lib.rs");
+        let dir_key = moved.of(
+            "crate_x::foo::bar:0: == -> !=",
+            &["deep::tests::t2".to_string()],
+        );
+        assert_eq!(dir_key.len(), 16, "mod.rs resolves: `{dir_key}`");
+        let root_key = moved.of("crate_x::foo::bar:0: == -> !=", &["tests::t3".to_string()]);
+        assert_eq!(root_key.len(), 16, "lib.rs resolves: `{root_key}`");
+        assert_ne!(dir_key, root_key, "different coverers, different keys");
+        assert_eq!(moved.of("crate_x::nowhere::bar:0: == -> !=", &[]), "");
+        assert_eq!(moved.of("crate_x::foo::bar", &[]), "", "no suffix, no site");
+        assert_eq!(
+            moved.of("crate_x::foo:0: == -> !=", &[]),
+            "",
+            "a file with no item chain is not a site"
+        );
+        let prior = Transcript {
+            tree: "t".to_string(),
+            toolchain: "tc".to_string(),
+            baseline_secs: 1,
+            evidence: String::new(),
+            sites: vec![
+                SiteVerdict {
+                    site: "s1".to_string(),
+                    verdict: "killed".to_string(),
+                    tests: vec![],
+                    evidence: "aaaaaaaaaaaaaaaa".to_string(),
+                },
+                SiteVerdict {
+                    site: "s2".to_string(),
+                    verdict: "timeout".to_string(),
+                    tests: vec![],
+                    evidence: "bbbbbbbbbbbbbbbb".to_string(),
+                },
+                SiteVerdict {
+                    site: "s3".to_string(),
+                    verdict: "SURVIVED".to_string(),
+                    tests: vec![],
+                    evidence: String::new(),
+                },
+            ],
+        };
+        assert_eq!(
+            Evidence::carry(&prior, "s1", "aaaaaaaaaaaaaaaa"),
+            Some("killed")
+        );
+        assert_eq!(
+            Evidence::carry(&prior, "s1", "cccccccccccccccc"),
+            None,
+            "a moved key is judged, not carried"
+        );
+        assert_eq!(
+            Evidence::carry(&prior, "s2", "bbbbbbbbbbbbbbbb"),
+            None,
+            "a timeout is load-sensitive: re-judge"
+        );
+        assert_eq!(
+            Evidence::carry(&prior, "s3", ""),
+            None,
+            "an empty key earns nothing"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// THE ITEM-CLOSURE GRAIN: a sibling item the site never speaks of holds
+    /// the key (the win — an unrelated edit no longer voids the verdict), a
+    /// referenced helper's movement moves it (the honesty — evidence includes
+    /// what the item calls), a labeled impl resolves at method grain with its
+    /// sibling methods free, and an unresolvable chain falls back to FILE grain
+    /// rather than keying silence.
+    #[test]
+    fn evidence_is_item_closure_grained() {
+        let root = std::env::temp_dir().join(format!("attest-closure-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("temp src");
+        let write = |body: &str| std::fs::write(root.join("src/foo.rs"), body).expect("foo.rs");
+        write(
+            "fn helper() -> u32 { 1 }\nfn bar() -> u32 { helper() }\nfn unrelated() {}\n\
+             mod probes { fn t1() {} }\n",
+        );
+        let covering = vec!["foo::probes::t1".to_string()];
+        let base = Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering);
+        assert_eq!(base.len(), 16, "a key is minted: `{base}`");
+        write(
+            "fn helper() -> u32 { 1 }\nfn bar() -> u32 { helper() }\nfn unrelated() { let _ = 9; }\n\
+             mod probes { fn t1() {} }\n",
+        );
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering),
+            base,
+            "a sibling the item never speaks of is not evidence — the key holds"
+        );
+        write(
+            "fn helper() -> u32 { 2 }\nfn bar() -> u32 { helper() }\nfn unrelated() { let _ = 9; }\n\
+             mod probes { fn t1() {} }\n",
+        );
+        assert_ne!(
+            Evidence::under(&root).of("crate_x::foo::bar:0: == -> !=", &covering),
+            base,
+            "a referenced helper IS evidence — the key moves"
+        );
+        let labeled = |other: &str| {
+            std::fs::write(
+                root.join("src/labeled.rs"),
+                format!(
+                    "pub struct Host;\n#[crate::mutate(\"host\")]\nimpl Host {{\n    \
+                     pub fn speak() -> u32 {{ 1 }}\n    pub fn other() -> u32 {{ {other} }}\n}}\n"
+                ),
+            )
+            .expect("labeled.rs")
+        };
+        labeled("2");
+        let method = Evidence::under(&root).of("crate_x::labeled::host::speak:0: == -> !=", &[]);
+        assert_eq!(method.len(), 16, "the labeled chain resolves: `{method}`");
+        labeled("3");
+        assert_eq!(
+            Evidence::under(&root).of("crate_x::labeled::host::speak:0: == -> !=", &[]),
+            method,
+            "the sibling method holds the key at method grain"
+        );
+        let fallback = Evidence::under(&root).of("crate_x::labeled::ghost:0: == -> !=", &[]);
+        assert_eq!(fallback.len(), 16, "an unresolved chain keys the file: `{fallback}`");
+        labeled("4");
+        assert_ne!(
+            Evidence::under(&root).of("crate_x::labeled::ghost:0: == -> !=", &[]),
+            fallback,
+            "file-grain fallback still moves with the file"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

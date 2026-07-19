@@ -1,0 +1,22 @@
+/// Whether any string literal in the token stream carries the needle, after
+/// unescaping — `syn::LitStr::value` is the unescaper.
+fn literals_carry(tokens: proc_macro2::TokenStream, needle: &str) -> bool {
+    for token in tokens {
+        match token {
+            proc_macro2::TokenTree::Group(group) => {
+                if literals_carry(group.stream(), needle) {
+                    return true;
+                }
+            }
+            proc_macro2::TokenTree::Literal(lit) => {
+                if let Ok(syn::Lit::Str(s)) = syn::parse_str::<syn::Lit>(&lit.to_string()) {
+                    if s.value().contains(needle) {
+                        return true;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
