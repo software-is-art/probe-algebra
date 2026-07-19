@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 988 sites.
+# 1003 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -158,11 +158,15 @@
 - boundary_spec::discover::bundle::bundle::declare:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::declare:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::bundle::edit:0: == -> !=
-- boundary_spec::discover::bundle::bundle::edit:1: != -> ==
-- boundary_spec::discover::bundle::bundle::edit:2: != -> ==
-- boundary_spec::discover::bundle::bundle::edit:3: == -> !=
+- boundary_spec::discover::bundle::bundle::edit:1: == -> !=
+- boundary_spec::discover::bundle::bundle::edit:2: == -> !=
+- boundary_spec::discover::bundle::bundle::edit:3: != -> ==
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::edit:deaf -> Ok(String::new())
+- boundary_spec::discover::bundle::bundle::hold_interface:0: != -> ==
+- boundary_spec::discover::bundle::bundle::hold_interface:1: != -> ==
+- boundary_spec::discover::bundle::bundle::hold_interface:2: == -> !=
+- boundary_spec::discover::bundle::bundle::hold_interface:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::inventory:0: ! -> (deleted)
 - boundary_spec::discover::bundle::bundle::inventory:1: && -> ||
 - boundary_spec::discover::bundle::bundle::inventory:2: == -> !=
@@ -203,17 +207,28 @@
 - boundary_spec::discover::bundle::mentions:8: && -> ||
 - boundary_spec::discover::bundle::mentions:deaf -> false
 - boundary_spec::discover::bundle::mentions:deaf -> true
+- boundary_spec::discover::bundle::method_sig:0: == -> !=
+- boundary_spec::discover::bundle::method_sig:1: == -> !=
+- boundary_spec::discover::bundle::method_sig:deaf -> None
 - boundary_spec::discover::bundle::method_signatures:deaf -> vec![]
+- boundary_spec::discover::bundle::method_span:0: == -> !=
+- boundary_spec::discover::bundle::method_span:1: == -> !=
+- boundary_spec::discover::bundle::method_span:deaf -> None
 - boundary_spec::discover::bundle::pad_to_blank_line:0: ! -> (deleted)
 - boundary_spec::discover::bundle::pad_to_blank_line:1: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:0: ! -> (deleted)
 - boundary_spec::discover::bundle::parse_declaration:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::select_addressed:0: == -> !=
 - boundary_spec::discover::bundle::select_addressed:1: <= -> >
+- boundary_spec::discover::bundle::select_addressed:2: ! -> (deleted)
+- boundary_spec::discover::bundle::select_addressed:3: == -> !=
+- boundary_spec::discover::bundle::select_addressed:4: && -> ||
+- boundary_spec::discover::bundle::select_addressed:5: <= -> >
 - boundary_spec::discover::bundle::select_addressed:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::select_addressed:deaf -> Ok(None)
 - boundary_spec::discover::bundle::sibling_holdings:deaf -> String::new()
 - boundary_spec::discover::bundle::splice:0: != -> ==
+- boundary_spec::discover::bundle::splice:1: != -> ==
 - boundary_spec::discover::bundle::splice:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::splice:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::split_discriminator:0: ! -> (deleted)

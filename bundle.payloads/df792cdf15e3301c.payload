@@ -1,0 +1,89 @@
+/// The EFFECT half of a replacement — the judged splice `edit` and `recast` share.
+/// It holds everything about a replacement EXCEPT the interface: exactly one item
+/// (or, at method grain, exactly one method in the host's own grammar), naming the
+/// target (a replacement is not a rename), landing on an existing, unambiguously
+/// addressed subject (`select_addressed` resolves bare, `addr#N`, and
+/// `addr::method` forms alike — the resolution comes first, so the judgment
+/// speaks the grain the address named). The signature hold is deliberately absent
+/// — that judgment is `edit`'s alone, and the envelope's `land` licenses its
+/// absence as `recast`. `verb` names the caller in every refusal, so each voice
+/// teaches as itself.
+#[crate::mutate]
+pub(crate) fn splice(
+    verb: &str,
+    module: &str,
+    item_name_text: &str,
+    replacement: &str,
+) -> Result<String, String> {
+    let file =
+        syn::parse_file(module).map_err(|e| format!("bundle {verb}: module unparseable: {e}"))?;
+    let (base, _) = split_discriminator(item_name_text);
+    let target = select_addressed(verb, &file, item_name_text)?.ok_or_else(|| {
+        format!(
+            "bundle {verb}: no item named `{base}` in the module — `add` \
+             grows, `{verb}` changes; nothing here to change"
+        )
+    })?;
+
+    let (start, end) = match &target {
+        Addressed::Whole(target) => {
+            let new = syn::parse_file(replacement)
+                .map_err(|e| format!("bundle {verb}: replacement unparseable: {e}"))?;
+            let [new_item] = new.items.as_slice() else {
+                return Err(format!(
+                    "bundle {verb}: the replacement must be exactly one item, got {} — \
+                     one {verb}, one judged transaction",
+                    new.items.len()
+                ));
+            };
+            let Some(new_name) = item_address(new_item) else {
+                return Err(format!(
+                    "bundle {verb}: the replacement has no defining name — `{verb}` has \
+                     nothing to hold"
+                ));
+            };
+            if new_name != base {
+                return Err(format!(
+                    "bundle {verb}: the replacement names `{new_name}`, not `{base}` — \
+                     an edit is not a rename"
+                ));
+            }
+            (
+                byte_offset(module, target.span().start()),
+                byte_offset(module, target.span().end()),
+            )
+        }
+        Addressed::Method { host, name } => {
+            // the replacement speaks the host's own grammar: one method, docs and
+            // attributes riding its span exactly as items ride theirs.
+            let offered = match host {
+                syn::Item::Trait(_) => syn::parse_str::<syn::TraitItemFn>(replacement)
+                    .map(|f| f.sig.ident.to_string()),
+                _ => {
+                    syn::parse_str::<syn::ImplItemFn>(replacement).map(|f| f.sig.ident.to_string())
+                }
+            }
+            .map_err(|e| {
+                format!("bundle {verb}: the replacement is not one method: {e}")
+            })?;
+            if &offered != name {
+                return Err(format!(
+                    "bundle {verb}: the replacement names `{offered}`, not `{name}` — \
+                     an edit is not a rename"
+                ));
+            }
+            method_span(module, host, name).ok_or_else(|| {
+                format!("bundle {verb}: `{name}` vanished from its host mid-judgment")
+            })?
+        }
+    };
+
+    // the splice: the subject's TEXT is replaced in place (its position and its gap
+    // are the module's furniture and stay), then one parse∘render keeps the
+    // canonical guarantee.
+    let mut out = String::with_capacity(module.len());
+    out.push_str(&module[..start]);
+    out.push_str(replacement.trim_end());
+    out.push_str(&module[end..]);
+    Ok(Bundle::parse(&out)?.render())
+}
