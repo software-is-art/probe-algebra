@@ -99,10 +99,18 @@ impl Replay {
     /// Replay a journal against the tree it describes. Paths resolve exactly as the
     /// verbs recorded them (relative to the invoking directory). The one hard refusal
     /// is a line the journal grammar cannot read; everything else that cannot replay
-    /// is a NAMED verdict, not an error.
+    /// is a NAMED verdict, not an error. `normalize` is the driver's fmt-normal twin:
+    /// applied to each reconstructed FINAL before the committed-text comparison —
+    /// never to intermediates, whose only consumers are the verbs' own parsers — so
+    /// the symmetry `replay(journal) == tree` survives a landed render going
+    /// fmt-normal. `None` is the raw comparison the probes pin.
     ///
     /// Capability: Effectful — reads payload blobs and the tree it judges.
-    pub fn differential(journal: &str, store: &PayloadStore) -> Result<Replay, String> {
+    pub fn differential(
+        journal: &str,
+        store: &PayloadStore,
+        normalize: Normalize<'_>,
+    ) -> Result<Replay, String> {
         let mut states: BTreeMap<String, Result<String, String>> = BTreeMap::new();
         let mut order: Vec<String> = Vec::new();
         for (n, line) in journal.lines().enumerate() {
@@ -165,17 +173,30 @@ impl Replay {
             .map(|path| {
                 let verdict = match &states[&path] {
                     Err(reason) => reason.clone(),
-                    Ok(text) => match std::fs::read_to_string(&path) {
-                        Ok(committed) if &committed == text => {
-                            "replays to the committed text — the journal is a second \
-                             source for this file"
-                                .to_string()
+                    Ok(text) => {
+                        // a normalizer error is part of the verdict, never a refusal —
+                        // replay reports, it does not gate.
+                        let final_text = match normalize {
+                            None => Ok(text.clone()),
+                            Some(normalize) => normalize(text),
+                        };
+                        match final_text {
+                            Err(reason) => {
+                                format!("the normalizer refused the reconstruction ({reason})")
+                            }
+                            Ok(text) => match std::fs::read_to_string(&path) {
+                                Ok(committed) if committed == text => {
+                                    "replays to the committed text — the journal is a second \
+                                     source for this file"
+                                        .to_string()
+                                }
+                                Ok(_) => "DIVERGES from the committed text (hand edits, fmt, \
+                                          or a pre-journal birth the record never saw)"
+                                    .to_string(),
+                                Err(e) => format!("the tree has no file to compare against ({e})"),
+                            },
                         }
-                        Ok(_) => "DIVERGES from the committed text (hand edits, fmt, \
-                                  or a pre-journal birth the record never saw)"
-                            .to_string(),
-                        Err(e) => format!("the tree has no file to compare against ({e})"),
-                    },
+                    }
                 };
                 (path, verdict)
             })
@@ -321,6 +342,12 @@ impl Replay {
     }
 }
 
+/// The fmt-normal hook the replay differential applies to reconstructed FINALS —
+/// the driver's write-path normalization, mirrored on the read-back side so
+/// `replay(journal) == tree` survives the landed render going fmt-normal. `None`
+/// is the raw comparison.
+pub type Normalize<'a> = Option<&'a dyn Fn(&str) -> Result<String, String>>;
+
 #[cfg(test)]
 mod probes {
     use super::{PayloadStore, Replay};
@@ -389,7 +416,9 @@ mod probes {
             store.stash(birth).unwrap(),
             store.stash(revision).unwrap()
         );
-        let report = Replay::differential(&journal, &store).unwrap().render();
+        let report = Replay::differential(&journal, &store, None)
+            .unwrap()
+            .render();
         assert!(report.contains("replays to the committed text"), "{report}");
     }
 
@@ -406,7 +435,9 @@ mod probes {
         std::fs::write(&path, format!("{born}// touched by hand\n")).unwrap();
 
         let journal = format!("add {path} — fn one @{}\n", store.stash(birth).unwrap());
-        let report = Replay::differential(&journal, &store).unwrap().render();
+        let report = Replay::differential(&journal, &store, None)
+            .unwrap()
+            .render();
         assert!(report.contains("DIVERGES"), "{report}");
     }
 
@@ -416,7 +447,7 @@ mod probes {
     fn a_pre_store_entry_is_named_honestly() {
         let root = scratch("prestore");
         let store = PayloadStore::beside(&root);
-        let report = Replay::differential("add src/never.rs — fn x\n", &store)
+        let report = Replay::differential("add src/never.rs — fn x\n", &store, None)
             .unwrap()
             .render();
         assert!(report.contains("predates the payload store"), "{report}");
@@ -428,7 +459,7 @@ mod probes {
     fn a_judged_verb_names_the_effect_judgment_split() {
         let root = scratch("judged");
         let store = PayloadStore::beside(&root);
-        let report = Replay::differential("collect src/m.rs — fn x\n", &store)
+        let report = Replay::differential("collect src/m.rs — fn x\n", &store, None)
             .unwrap()
             .render();
         assert!(report.contains("effect/judgment split"), "{report}");
@@ -446,7 +477,7 @@ mod probes {
             "add src/m.rs — fn x @abcdef12345\n",
             "add src/m.rs — fn x @zzzzzzzzzzzzzzzz\n",
         ] {
-            let report = Replay::differential(stray, &store).unwrap().render();
+            let report = Replay::differential(stray, &store, None).unwrap().render();
             assert!(
                 report.contains("predates the payload store"),
                 "wrong-length or non-hex stays detail: {report}"
@@ -480,7 +511,9 @@ mod probes {
             store.stash(birth).unwrap(),
             store.stash(widened).unwrap()
         );
-        let report = Replay::differential(&journal, &store).unwrap().render();
+        let report = Replay::differential(&journal, &store, None)
+            .unwrap()
+            .render();
         assert!(report.contains("replays to the committed text"), "{report}");
     }
 
@@ -621,7 +654,9 @@ mod probes {
             store.stash(birth).unwrap(),
             store.stash("the bill\n").unwrap()
         );
-        let report = Replay::differential(&journal, &store).unwrap().render();
+        let report = Replay::differential(&journal, &store, None)
+            .unwrap()
+            .render();
         assert!(report.contains("replays to the committed text"), "{report}");
         assert!(
             !report.contains("envelope"),
@@ -631,6 +666,46 @@ mod probes {
         assert!(
             spoke.contains("0 of 1 entries beyond the horizon"),
             "the seal counts nowhere: {spoke}"
+        );
+    }
+    /// THE SYMMETRY PIN for the fmt-normal seam: a reconstruction that diverges RAW
+    /// but agrees under the normalizer replays — the differential judges the same
+    /// bytes the landing wrote — and a normalizer error is a VERDICT, never a
+    /// refusal (replay reports, it does not gate). Pure fake normalizers: no
+    /// process spawning in probes.
+    #[test]
+    fn the_normalizer_is_symmetric_and_its_error_is_a_verdict() {
+        let root = scratch("normal");
+        let store = PayloadStore::beside(&root);
+        let path = root.join("m.rs").to_string_lossy().into_owned();
+        let birth = "pub fn one() -> u32 {\n    1\n}\n";
+        let born = Bundle::add("", birth).unwrap();
+        // the committed tree carries the NORMALIZED render (a trailing banner the
+        // raw reconstruction lacks — a stand-in for rustfmt's whitespace moves).
+        std::fs::write(&path, format!("{born}// normal\n")).unwrap();
+        let journal = format!("add {path} — fn one @{}\n", store.stash(birth).unwrap());
+
+        let raw = Replay::differential(&journal, &store, None)
+            .unwrap()
+            .render();
+        assert!(raw.contains("DIVERGES"), "raw must diverge: {raw}");
+
+        let normalize = |text: &str| -> Result<String, String> { Ok(format!("{text}// normal\n")) };
+        let normalized = Replay::differential(&journal, &store, Some(&normalize))
+            .unwrap()
+            .render();
+        assert!(
+            normalized.contains("replays to the committed text"),
+            "normalizer-equal must replay: {normalized}"
+        );
+
+        let refusing = |_: &str| -> Result<String, String> { Err("no rustfmt here".to_string()) };
+        let verdict = Replay::differential(&journal, &store, Some(&refusing))
+            .unwrap()
+            .render();
+        assert!(
+            verdict.contains("the normalizer refused the reconstruction (no rustfmt here)"),
+            "{verdict}"
         );
     }
 }

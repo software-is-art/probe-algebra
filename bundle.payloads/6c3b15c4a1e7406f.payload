@@ -1,0 +1,147 @@
+/// The verb algebra's carrier and operators — a plain `#[algebra]` bag, like
+/// `modularize::soup`: the theory is synthesized from the functions below, nothing about
+/// the algebra is declared, and discovery finds the join rules and the conflicts itself.
+#[crate::algebra(VerbAlgebra, "verb algebra")]
+pub mod state {
+    use crate::Shaped;
+
+    /// One named item's state: absent, or present at a version (V1 is the saturation
+    /// bound — the miniature's disclosed edge).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
+    pub enum Slot {
+        Absent,
+        V0,
+        V1,
+    }
+
+    /// Whether the module carries a declared contract.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
+    pub enum Contract {
+        Open,
+        Declared,
+    }
+
+    /// Whether the envelope's LICENSE has been spent here: `recast` is `edit` whose
+    /// interface hold was licensed away, and the license is the state-level trace
+    /// that distinguishes them — without it the engine could not tell a recast from
+    /// an edit, and the mutation lock's edit/recast confusion mutants would survive.
+    /// The interface itself is not in the carrier — the disclosed transport seam,
+    /// as with the version bound. (`seal` is deliberately NOT an operator: as a
+    /// state map it would be the identity, which discovery would find commuting
+    /// with everything — licensing slides across the boundary, the opposite of
+    /// one; squash's unknown-verb opacity is the boundary's guarantee.)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
+    pub enum License {
+        Unused,
+        Used,
+    }
+
+    /// The miniature bundle state: two named items, the contract flag, and the
+    /// license trace — 36 inhabitants, every verb a total function over them.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Shaped)]
+    pub struct BundleState {
+        pub a: Slot,
+        pub b: Slot,
+        pub contract: Contract,
+        pub license: License,
+    }
+
+    /// The empty module — the state `bundle add` grows from (birth as the degenerate
+    /// case of continuation).
+    pub fn empty() -> BundleState {
+        BundleState {
+            a: Slot::Absent,
+            b: Slot::Absent,
+            contract: Contract::Open,
+            license: License::Unused,
+        }
+    }
+
+    /// `bundle add a`: lands only where `a` is absent — the collision refusal returns
+    /// the state unchanged, exactly as the CLI writes nothing.
+    pub fn add_a(s: BundleState) -> BundleState {
+        match s.a {
+            Slot::Absent => BundleState { a: Slot::V0, ..s },
+            _ => s,
+        }
+    }
+
+    /// `bundle add b` — `add_a`'s twin on the other name.
+    pub fn add_b(s: BundleState) -> BundleState {
+        match s.b {
+            Slot::Absent => BundleState { b: Slot::V0, ..s },
+            _ => s,
+        }
+    }
+
+    /// `bundle edit a`: moves a present item to the next version (saturating at the
+    /// miniature's bound); editing an absent item refuses — unchanged.
+    pub fn edit_a(s: BundleState) -> BundleState {
+        match s.a {
+            Slot::Absent => s,
+            Slot::V0 | Slot::V1 => BundleState { a: Slot::V1, ..s },
+        }
+    }
+
+    /// `bundle edit b` — `edit_a`'s twin.
+    pub fn edit_b(s: BundleState) -> BundleState {
+        match s.b {
+            Slot::Absent => s,
+            Slot::V0 | Slot::V1 => BundleState { b: Slot::V1, ..s },
+        }
+    }
+
+    /// `bundle collect a`: the sweep — a present item is un-materialized; collecting an
+    /// absent item is honestly nothing.
+    pub fn collect_a(s: BundleState) -> BundleState {
+        BundleState {
+            a: Slot::Absent,
+            ..s
+        }
+    }
+
+    /// `bundle collect b` — `collect_a`'s twin.
+    pub fn collect_b(s: BundleState) -> BundleState {
+        BundleState {
+            b: Slot::Absent,
+            ..s
+        }
+    }
+
+    /// `bundle declare`: the contract flag rises — monotone, item-blind, and therefore
+    /// expected to commute with everything (the declaration is the SHOULD half; it
+    /// touches no item).
+    pub fn declare(s: BundleState) -> BundleState {
+        BundleState {
+            contract: Contract::Declared,
+            ..s
+        }
+    }
+
+    /// `recast a` — an interface-moving edit landed under the envelope's license:
+    /// the same saturating move as `edit_a`, plus the license spent. On an absent
+    /// item it refuses UNCHANGED (the license is not spent by a refusal — the CLI
+    /// writes nothing, so the state remembers nothing).
+    pub fn recast_a(s: BundleState) -> BundleState {
+        match s.a {
+            Slot::Absent => s,
+            Slot::V0 | Slot::V1 => BundleState {
+                a: Slot::V1,
+                license: License::Used,
+                ..s
+            },
+        }
+    }
+
+    /// `recast b` — `recast_a`'s twin.
+    pub fn recast_b(s: BundleState) -> BundleState {
+        match s.b {
+            Slot::Absent => s,
+            Slot::V0 | Slot::V1 => BundleState {
+                b: Slot::V1,
+                license: License::Used,
+                ..s
+            },
+        }
+    }
+}

@@ -1,0 +1,5 @@
+/// The fmt-normal hook the replay differential applies to reconstructed FINALS —
+/// the driver's write-path normalization, mirrored on the read-back side so
+/// `replay(journal) == tree` survives the landed render going fmt-normal. `None`
+/// is the raw comparison.
+pub type Normalize<'a> = Option<&'a dyn Fn(&str) -> Result<String, String>>;
