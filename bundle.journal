@@ -288,3 +288,13 @@ seal envelope — 2 row(s) across 1 file(s) @2fd9b664484946ed
 edit src/discover/pins.rs — walk_items @1bd0e718ee98ce60
 edit src/discover/pins.rs — probes @b4608347881488cc
 seal envelope — 2 row(s) across 1 file(s) @37f7ae4552ada5dc
+recast src/discover/attest.rs — impl Evidence @a32fff2c1dc184d4
+edit src/discover/attest.rs — probes @96398762b706442f
+add src/discover/attest.rs — fn item_closure, fn collect_items, fn select_chain, fn mutate_label @1908d9c1dc253535
+seal envelope — 3 row(s) across 1 file(s) @68012d176de71fe4
+edit src/discover/attest.rs — select_chain @37045734279aeaa1
+seal envelope — 1 row(s) across 1 file(s) @08fc413e494de7f4
+edit src/discover/attest.rs — probes @6204f9809afa7753
+seal envelope — 1 row(s) across 1 file(s) @072da279eba78f13
+edit src/discover/attest.rs — probes @677a7b7acabee949
+seal envelope — 1 row(s) across 1 file(s) @9a47850fe2f29f8d

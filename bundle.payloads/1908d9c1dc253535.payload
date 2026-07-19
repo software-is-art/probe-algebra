@@ -1,0 +1,176 @@
+/// The item-closure reading: resolve the chain to an item in the parsed file,
+/// then close over every same-file item whose name the closure's tokens speak,
+/// transitively — sorted, deterministic, whitespace-free. `None` when the chain
+/// resolves to nothing; the caller falls back to file grain, never to silence.
+#[crate::mutate]
+fn item_closure(file_text: &str, chain: &[String]) -> Option<String> {
+    let file = syn::parse_file(file_text).ok()?;
+    let mut inventory: Vec<(String, String)> = Vec::new();
+    collect_items(&file.items, &mut inventory);
+    let seed = select_chain(&file.items, chain)?;
+    let mut included: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
+    let mut text = seed;
+    loop {
+        let words: std::collections::BTreeSet<&str> = text
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .filter(|w| !w.is_empty())
+            .collect();
+        let grown: Vec<usize> = inventory
+            .iter()
+            .enumerate()
+            .filter(|(i, (name, _))| !included.contains(i) && words.contains(name.as_str()))
+            .map(|(i, _)| i)
+            .collect();
+        if grown.is_empty() {
+            break;
+        }
+        for i in grown {
+            included.insert(i);
+            text.push('\n');
+            text.push_str(&inventory[i].1);
+        }
+    }
+    Some(text)
+}
+
+/// Every named item in the file, at the grain references speak: functions and
+/// impl/trait methods by their own name, type definitions by theirs, inline
+/// mods walked through. Same-name collisions all stay — a reference includes
+/// every bearer, and coarser is the safe direction.
+#[crate::mutate]
+fn collect_items(items: &[syn::Item], inventory: &mut Vec<(String, String)>) {
+    use quote::ToTokens;
+    for item in items {
+        match item {
+            syn::Item::Fn(f) => inventory.push((
+                f.sig.ident.to_string(),
+                f.to_token_stream().to_string(),
+            )),
+            syn::Item::Struct(s) => {
+                inventory.push((s.ident.to_string(), s.to_token_stream().to_string()))
+            }
+            syn::Item::Enum(e) => {
+                inventory.push((e.ident.to_string(), e.to_token_stream().to_string()))
+            }
+            syn::Item::Const(c) => {
+                inventory.push((c.ident.to_string(), c.to_token_stream().to_string()))
+            }
+            syn::Item::Static(s) => {
+                inventory.push((s.ident.to_string(), s.to_token_stream().to_string()))
+            }
+            syn::Item::Type(t) => {
+                inventory.push((t.ident.to_string(), t.to_token_stream().to_string()))
+            }
+            syn::Item::Trait(t) => {
+                inventory.push((t.ident.to_string(), t.to_token_stream().to_string()))
+            }
+            syn::Item::Impl(block) => {
+                for member in &block.items {
+                    if let syn::ImplItem::Fn(m) = member {
+                        inventory.push((
+                            m.sig.ident.to_string(),
+                            m.to_token_stream().to_string(),
+                        ));
+                    }
+                }
+            }
+            syn::Item::Mod(m) => {
+                if let Some((_, inner)) = &m.content {
+                    collect_items(inner, inventory);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Walk an item chain to its tokens: a bare segment names a function (by ident
+/// or `#[mutate]` label), a mod recurses, an impl matches by its label or its
+/// self-type (whitespace-stripped, so `Engine<T>` meets `Engine < T >`) and
+/// then selects one method, a trait likewise. Every hit joins — two bearers of
+/// one name are both evidence.
+#[crate::mutate]
+fn select_chain(items: &[syn::Item], chain: &[String]) -> Option<String> {
+    use quote::ToTokens;
+    let (seg, rest) = chain.split_first()?;
+    let mut hits = Vec::new();
+    for item in items {
+        match item {
+            syn::Item::Fn(f) if rest.is_empty() => {
+                if f.sig.ident == seg.as_str()
+                    || mutate_label(&f.attrs).as_deref() == Some(seg.as_str())
+                {
+                    hits.push(f.to_token_stream().to_string());
+                }
+            }
+            syn::Item::Mod(m) if m.ident == seg.as_str() => {
+                if let Some((_, inner)) = &m.content {
+                    if let Some(found) = select_chain(inner, rest) {
+                        hits.push(found);
+                    }
+                }
+            }
+            syn::Item::Impl(block) => {
+                if let [method] = rest {
+                    let self_ty = block
+                        .self_ty
+                        .to_token_stream()
+                        .to_string()
+                        .replace(' ', "");
+                    if mutate_label(&block.attrs).as_deref() == Some(seg.as_str())
+                        || self_ty == *seg
+                    {
+                        for member in &block.items {
+                            if let syn::ImplItem::Fn(m) = member {
+                                if m.sig.ident == method.as_str() {
+                                    hits.push(m.to_token_stream().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            syn::Item::Trait(t) => {
+                if let [method] = rest {
+                    if t.ident == seg.as_str() {
+                        for member in &t.items {
+                            if let syn::TraitItem::Fn(m) = member {
+                                if m.sig.ident == method.as_str() {
+                                    hits.push(m.to_token_stream().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if hits.is_empty() {
+        None
+    } else {
+        Some(hits.join("\n"))
+    }
+}
+
+/// The `#[mutate("label")]` string on an item, if any — the census's own path
+/// segment for a labeled block; a bare `#[mutate]` carries no label.
+#[crate::mutate]
+fn mutate_label(attrs: &[syn::Attribute]) -> Option<String> {
+    attrs.iter().find_map(|attr| {
+        if !attr
+            .path()
+            .segments
+            .last()
+            .is_some_and(|s| s.ident == "mutate")
+        {
+            return None;
+        }
+        match &attr.meta {
+            syn::Meta::List(list) => syn::parse2::<syn::LitStr>(list.tokens.clone())
+                .ok()
+                .map(|lit| lit.value()),
+            _ => None,
+        }
+    })
+}

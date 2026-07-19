@@ -1,0 +1,62 @@
+/// Walk an item chain to its tokens: a bare segment names a function (by ident
+/// or `#[mutate]` label), a mod recurses, an impl matches by its label or its
+/// self-type (whitespace-stripped, so `Engine<T>` meets `Engine < T >`) and
+/// then selects one method, a trait likewise. Every hit joins — two bearers of
+/// one name are both evidence.
+#[crate::mutate]
+fn select_chain(items: &[syn::Item], chain: &[String]) -> Option<String> {
+    use quote::ToTokens;
+    let (seg, rest) = chain.split_first()?;
+    let mut hits = Vec::new();
+    for item in items {
+        match item {
+            syn::Item::Fn(f) if rest.is_empty() => {
+                let label = mutate_label(&f.attrs);
+                if f.sig.ident == seg.as_str() || label.as_deref() == Some(seg.as_str()) {
+                    hits.push(f.to_token_stream().to_string());
+                }
+            }
+            syn::Item::Mod(m) if m.ident == seg.as_str() => {
+                if let Some((_, inner)) = &m.content {
+                    if let Some(found) = select_chain(inner, rest) {
+                        hits.push(found);
+                    }
+                }
+            }
+            syn::Item::Impl(block) => {
+                if let [method] = rest {
+                    let self_ty = block.self_ty.to_token_stream().to_string().replace(' ', "");
+                    let label = mutate_label(&block.attrs);
+                    if label.as_deref() == Some(seg.as_str()) || self_ty == *seg {
+                        for member in &block.items {
+                            if let syn::ImplItem::Fn(m) = member {
+                                if m.sig.ident == method.as_str() {
+                                    hits.push(m.to_token_stream().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            syn::Item::Trait(t) => {
+                if let [method] = rest {
+                    if t.ident == seg.as_str() {
+                        for member in &t.items {
+                            if let syn::TraitItem::Fn(m) = member {
+                                if m.sig.ident == method.as_str() {
+                                    hits.push(m.to_token_stream().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if hits.is_empty() {
+        None
+    } else {
+        Some(hits.join("\n"))
+    }
+}

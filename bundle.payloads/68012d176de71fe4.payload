@@ -1,0 +1,3 @@
+recast src/discover/attest.rs — impl Evidence @a32fff2c1dc184d4
+edit src/discover/attest.rs — probes @96398762b706442f
+add src/discover/attest.rs — fn item_closure, fn collect_items, fn select_chain, fn mutate_label @1908d9c1dc253535

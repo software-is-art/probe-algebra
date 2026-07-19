@@ -4586,3 +4586,42 @@ and the wording change a one-item edit — the standing question's shape, a
 representation change for a later rung. And `uses` tagging test surfaces in
 its census line — the other half of the perception-rung residue — remains
 open here, named again so it is not lost.
+
+## The evidence key goes item-closure grain: the site-keyed sweep's named sharpening (BUILT)
+
+Built 2026-07-19, the wearability sprint's eighth brick — the sharpening the
+site-keyed sweep named the day it landed ("item grain must wait for total impl
+addressing") and the method-grain rung unlocked. A site's evidence key now
+folds the TEXT THE VERDICT IS EVIDENCE ABOUT at item-closure grain: the
+resolved item's tokens plus every same-file item its tokens speak of,
+transitively — a helper the item calls is evidence about it (the gap naive
+item grain would have opened, closed before it existed); a sibling it never
+names is not. Covering tests key the same way, so editing one probe no longer
+voids verdicts the other probes warrant. Tokens, not bytes: comments and
+formatting fall out of the reading — a comment-only edit holds every key,
+which the module-grain fold could not say. Site paths resolve through the
+census's own grammar — a bare fn by ident, a labeled block by its `#[mutate]`
+label, a bare impl by its self-type (whitespace-stripped, so `Engine<T>`
+meets `Engine < T >`), inline mods walked — and every failure direction
+stays the founding discipline: an unresolvable chain falls back to FILE
+grain (coarser is safe), an unresolvable file keys empty, and an empty key
+is never carried. The elder module-grain probe passes unchanged at the new
+grain; the new probe pins the boundary from both sides (sibling holds,
+helper moves, method grain through a labeled impl, file-grain fallback).
+
+The bill and the payoff, stated honestly: landing this moves EVERY standing
+key once — one full sweep re-judges the census, and after it an ordinary
+edit's re-judgment drops from every-site-in-the-touched-module to the touched
+item's own closure. The honesty ladder is unchanged: a test's behaviour can
+still shift through code it calls across FILE boundaries without any keyed
+text moving — the weekly from-scratch shards remain that gap's backstop, now
+backstopping one more grain.
+
+Measured on the brick's own landing sequence: after a probes-mod-only edit,
+the sweep re-judged 28 of 1059 sites and carried the rest — the module-grain
+key would have voided every site the touched file hosts or covers. The
+survivors the sweep found while the brick landed were its own chain arms
+(labeled fn, trait, bare impl by self-type, the probes-mod guard) — each
+killed by a fixture that tells item grain from file-grain fallback, which is
+the only probe shape that can: a key that merely MINTS is indistinguishable
+from the fallback; the pin is a sibling's movement HOLDING it.

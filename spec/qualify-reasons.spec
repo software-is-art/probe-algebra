@@ -11,7 +11,7 @@
 src/discover/agenda.rs: REFUSES — borrowed types, effectful bodies, parameterised types, primitive signatures, unshaped types
 src/discover/architect.rs: REFUSES — borrowed types, effectful bodies, parameterised types, primitive signatures, zero-argument constants
 src/discover/arithmetic.rs: REFUSES — borrowed types, parameterised types, primitive signatures
-src/discover/attest.rs: REFUSES — borrowed types, effectful bodies, mutating receivers, parameterised types, primitive signatures
+src/discover/attest.rs: REFUSES — borrowed types, effectful bodies, mutating receivers, parameterised types, primitive signatures, unit returns
 src/discover/bite.rs: REFUSES — borrowed types, effectful bodies, parameterised types, unshaped types, zero-argument constants
 src/discover/bridge.rs: REFUSES — borrowed types, parameterised types, primitive signatures, zero-argument constants
 src/discover/bundle.rs: REFUSES — borrowed types, effectful bodies, parameterised types, primitive signatures, unit returns, unshaped types
