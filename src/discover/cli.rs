@@ -152,8 +152,8 @@ pub struct CliSpec {
 
 #[crate::mutate]
 impl CliSpec {
-    /// bundle's own twenty-two verbs, declared — the hand-built witness of the class
-    /// becomes its first instance. Eight sorts cover every slot; twenty usage rows
+    /// bundle's own twenty-five verbs, declared — the hand-built witness of the class
+    /// becomes its first instance. Eight sorts cover every slot; twenty-two usage rows
     /// (gates and owes share one, land and staged another, by declaration) render
     /// byte-identical to the text the first lock pins.
     pub fn bundle() -> CliSpec {
@@ -233,6 +233,15 @@ impl CliSpec {
                 VerbSpec::sibling("staged", vec![]),
                 VerbSpec::verb("drop", vec![]),
                 VerbSpec::verb("judge", vec![Slot::variadic(Offer, "offer")]),
+                VerbSpec::verb(
+                    "open",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::optional(Item, "address"),
+                    ],
+                ),
+                VerbSpec::verb("offer", vec![]),
+                VerbSpec::sibling("desk", vec![]),
             ],
         }
     }
@@ -364,7 +373,9 @@ mod probes {
              \x20      bundle begin\n\
              \x20      bundle land | bundle staged\n\
              \x20      bundle drop\n\
-             \x20      bundle judge [offer ...]"
+             \x20      bundle judge [offer ...]\n\
+             \x20      bundle open <module.rs> [address]\n\
+             \x20      bundle offer | bundle desk"
         );
     }
 
@@ -421,15 +432,15 @@ mod probes {
         assert_eq!(cli.parse(&[]).unwrap_err(), usage);
     }
 
-    /// The declaration's census, pinned: twenty-two verbs, and the slot vocabulary is
+    /// The declaration's census, pinned: twenty-five verbs, and the slot vocabulary is
     /// exactly the eight sorts — every sort earns its place by appearing, and a
     /// ninth would be a diff to this probe, i.e. a decision to sign. (The eighth,
     /// `Offer`, is the signed diff this probe invited: judge's slot is an entire
     /// invocation, re-bound by the same declaration.)
     #[test]
-    fn twenty_two_verbs_speak_exactly_the_eight_sorts() {
+    fn twenty_five_verbs_speak_exactly_the_eight_sorts() {
         let cli = CliSpec::bundle();
-        assert_eq!(cli.verbs.len(), 22);
+        assert_eq!(cli.verbs.len(), 25);
         let spoken: Vec<Sort> = cli
             .verbs
             .iter()

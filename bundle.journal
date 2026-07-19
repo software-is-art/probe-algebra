@@ -259,3 +259,10 @@ recast src/discover/envelope.rs — impl Judgment::preflight @42e9bdeae8904c50
 edit src/discover/envelope.rs — probes @e5699fa5d32c4257
 edit examples/bundle.rs — run @ca45be2e41eb666e
 seal envelope — 4 row(s) across 2 file(s) @75005dd38e83a3ed
+add src/discover/desk.rs — struct Sheet, struct Desk, mod probes @29678414896ff8f2
+add src/discover/mod.rs — mod desk @c37bd9fda272d854
+add examples/bundle.rs — fn desk_home @b015fc2c45ccdb86
+edit src/discover/cli.rs — impl CliSpec::bundle @880378adb8f55d73
+edit src/discover/cli.rs — probes @3746b7fbf0080f41
+edit examples/bundle.rs — run @4280137b42bb449b
+seal envelope — 6 row(s) across 4 file(s) @3cbe8aae46565808

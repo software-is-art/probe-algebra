@@ -603,6 +603,8 @@ pub mod items;
 
 pub mod envelope;
 
+pub mod desk;
+
 #[cfg(test)]
 mod tests {
     use super::*;

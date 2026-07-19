@@ -1,0 +1,93 @@
+/// bundle's own twenty-five verbs, declared — the hand-built witness of the class
+    /// becomes its first instance. Eight sorts cover every slot; twenty-two usage rows
+    /// (gates and owes share one, land and staged another, by declaration) render
+    /// byte-identical to the text the first lock pins.
+    pub fn bundle() -> CliSpec {
+        use Sort::*;
+        CliSpec {
+            name: "bundle",
+            verbs: vec![
+                VerbSpec::verb(
+                    "add",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Payload, "snippet.rs"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "edit",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Item, "item-name"),
+                        Slot::required(Payload, "replacement.rs"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "declare",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Declaration, "shape(op, ...)"),
+                    ],
+                ),
+                VerbSpec::verb("place", vec![Slot::required(Module, "module.rs")]),
+                VerbSpec::verb("check", vec![Slot::required(Module, "module.rs")]),
+                VerbSpec::verb(
+                    "show",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::optional(Item, "item-name"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "collect",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::optional(Item, "item-to-sweep"),
+                    ],
+                ),
+                VerbSpec::verb("squash", vec![Slot::required(Journal, "bundle.journal")]),
+                VerbSpec::verb("replay", vec![Slot::required(Journal, "bundle.journal")]),
+                VerbSpec::verb(
+                    "constrains",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Item, "operator"),
+                    ],
+                ),
+                VerbSpec::verb("uses", vec![Slot::required(Item, "item-name")]),
+                VerbSpec::verb("spoke", vec![Slot::required(Item, "item-name")]),
+                VerbSpec::verb(
+                    "trace",
+                    vec![
+                        Slot::required(Theory, "theory"),
+                        Slot::required(Term, "term"),
+                    ],
+                ),
+                VerbSpec::verb(
+                    "lift",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::required(Theory, "theory-name"),
+                        Slot::variadic(Declaration, "declaration"),
+                    ],
+                ),
+                VerbSpec::verb("gates", vec![]),
+                VerbSpec::sibling("owes", vec![]),
+                VerbSpec::verb("pin", vec![]),
+                VerbSpec::verb("begin", vec![]),
+                VerbSpec::verb("land", vec![]),
+                VerbSpec::sibling("staged", vec![]),
+                VerbSpec::verb("drop", vec![]),
+                VerbSpec::verb("judge", vec![Slot::variadic(Offer, "offer")]),
+                VerbSpec::verb(
+                    "open",
+                    vec![
+                        Slot::required(Module, "module.rs"),
+                        Slot::optional(Item, "address"),
+                    ],
+                ),
+                VerbSpec::verb("offer", vec![]),
+                VerbSpec::sibling("desk", vec![]),
+            ],
+        }
+    }

@@ -4483,3 +4483,40 @@ interiors (cli.rs, envelope.rs, the driver) for one question — "what shape is
 the dispatch/judgment seam" — which `show`'s table of contents answers only
 half of; the architecture-of-a-module question (who calls whom, where a new
 seam belongs) is still the fallback encyclopedia's, and no verb yet speaks it.
+
+## The desk: the editor loop's file half — the payload shuttle retires (BUILT)
+
+Built 2026-07-19, the wearability sprint's fifth brick, on the preflight's
+shoulders. The retrospective's biggest ergonomic hole was the shuttle: `show >
+scratch`, edit the scratch with your own tools, retype the offer argv from
+memory. Three verbs dissolve it. `bundle open <module> [address]` materializes
+the addressed bytes onto a SHEET (`.suit/desk/sheet-N.rs` — the same bytes
+`edit` will hold, composite under an open envelope exactly as `show` renders;
+no address means a fresh add sheet, born empty) and remembers the binding in
+the desk's bindings file — journal grammar, originals in the payload store, so
+"changed" is a comparison against remembered content, never a guess. `bundle
+desk` is the standing judgment: every sheet reports unchanged, withdrawn
+(deleting a sheet file IS withdrawal — the desk lives in the file world
+deliberately, so authoring gestures are desk gestures), or the preflight
+verdict `offer` will reach — judge-on-save without a resident watcher, because
+the judgment is a verb the author's loop calls, not a process that camps on
+the tree. `bundle offer` closes the loop: every changed sheet becomes its
+verb, staged into the open envelope or into one the offer BEGINS AND LANDS
+ITSELF (the desk lands what it begins — an offer is an envelope, so a licensed
+interface move works at the desk always), and the desk clears; a refusal drops
+only what the offer began and the desk keeps every sheet. The offer composes
+the existing verbs by recursion into the driver's own dispatch — begin, the
+staged rows, land — so there is no second landing path to drift.
+
+The drill matrix ran live: unchanged sheet, doc edit (`would land as edit`),
+signature move (`would land as recast` — licensed, since the offer is an
+envelope), garbage payload (refused in `edit`'s voice), withdrawal by
+deletion, and a clean offer that touches nothing. The landing path's
+production test is deliberately the NEXT brick: the join verb's own cli.rs
+edits go through the desk.
+
+Disclosed honestly: the desk is `.suit/`-scoped (gitignored, volatile — the
+tree and the store stay the only truth); a sheet's verdict can go stale the
+moment the tree moves under it (the preflight is a reading, not a lock); and
+`desk`'s tail counts changed sheets, not green ones — a desk of one refusing
+sheet still says the offer would stage it, and the offer is what refuses.

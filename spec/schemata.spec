@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 1008 sites.
+# 1015 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -314,6 +314,13 @@
 - boundary_spec::discover::depend::locks::text:0: == -> !=
 - boundary_spec::discover::depend::locks::text:1: == -> !=
 - boundary_spec::discover::depend::locks::text:deaf -> None
+- boundary_spec::discover::desk::desk::holding:0: == -> !=
+- boundary_spec::discover::desk::desk::holding:1: == -> !=
+- boundary_spec::discover::desk::desk::holding:2: && -> ||
+- boundary_spec::discover::desk::desk::holding:deaf -> None
+- boundary_spec::discover::desk::desk::parse:deaf -> Err(String::new())
+- boundary_spec::discover::desk::desk::render:deaf -> String::new()
+- boundary_spec::discover::desk::desk::sheet_file:deaf -> String::new()
 - boundary_spec::discover::eduction::Circuit<K>::admit:0: == -> !=
 - boundary_spec::discover::eduction::Circuit<K>::admit:1: == -> !=
 - boundary_spec::discover::eduction::Circuit<K>::admit:2: || -> &&

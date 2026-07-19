@@ -1,0 +1,6 @@
+/// The desk address: `.suit/desk` beside the envelope's crate root — the
+/// suit's workbench, scoped like the record it feeds. Sheets and the bindings
+/// file live here; `offer` clears it.
+fn desk_home() -> std::path::PathBuf {
+    nearest_crate_root("bundle.envelope").join(".suit/desk")
+}

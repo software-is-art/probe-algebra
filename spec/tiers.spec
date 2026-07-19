@@ -5,7 +5,7 @@
 # reachability's tier. KERNEL is a decision, never derived: it is ratified in the
 # consumer's own tree (the build.rs allowlist, or a register it parses).
 # Regenerate with `BLESS_TIERS=1 cargo build`.
-# 69 files: 3 boundary, 5 interior, 51 algebra, 10 kernel.
+# 70 files: 3 boundary, 5 interior, 52 algebra, 10 kernel.
 # rule KERNEL: the trusted floor — exempt from the structural rules; a ratified privilege
 # rule BOUNDARY: tier 1 — a domain's strict value-object surface; no loose `pub fn`
 # rule INTERIOR: tier 2 — the workshop; mutation and raw collections allowed; no loose `pub fn`
@@ -27,6 +27,7 @@
 - src/discover/date.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/depend.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/derived.rs: ALGEBRA (glue — module declarations and re-exports only; tier by reachability)
+- src/discover/desk.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/eduction.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
 - src/discover/engine.rs: KERNEL (registered — a decision, never derived)
 - src/discover/envelope.rs: ALGEBRA (pub-reachable, no production edges, fronts nothing)
