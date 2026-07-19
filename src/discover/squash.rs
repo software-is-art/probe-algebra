@@ -395,4 +395,19 @@ mod probes {
             );
         }
     }
+    /// The SEAL is deliberately outside the verb algebra: as a state operator it
+    /// would be the identity, which discovery would find commuting with
+    /// everything — licensing slides across the boundary, the opposite of one.
+    /// Unknown-verb opacity is the correct semantics for free: nothing slides
+    /// past a seal, and two seals never collapse.
+    #[test]
+    fn a_seal_row_is_opaque_to_squash() {
+        let journal = "edit src/m.rs — fn x\n\
+                       seal envelope — 1 row(s) across 1 file(s) @00112233aabbccdd\n\
+                       edit src/m.rs — fn x\n";
+        assert_eq!(rules().compact(journal).unwrap(), journal);
+        let twins = "seal envelope — 1 row(s) across 1 file(s) @00112233aabbccdd\n\
+                     seal envelope — 1 row(s) across 1 file(s) @00112233aabbccdd\n";
+        assert_eq!(rules().compact(twins).unwrap(), twins);
+    }
 }

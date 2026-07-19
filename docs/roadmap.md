@@ -4318,3 +4318,41 @@ renders. A journal-level merge — replaying two sessions' judged rows onto one
 tree and judging the composite, the envelope's `land` pointed at a sibling
 history — is the missing verb, and it is the journal-as-environment candidate's
 first concrete consumer. Until then, concurrent sessions cost a hand merge.
+
+## The seal and the composite show: envelope residuals 1 and 2 closed (BUILT)
+
+Built 2026-07-19, the wearability sprint's first brick after the two concurrent
+lines met. The journal gains its GROUPING MARK: `land` now writes one closing
+`seal` row — `seal envelope — <n> row(s) across <m> file(s) @<address>` — whose
+trailing token is a content address holding THE BILL, the landed rows exactly as
+recorded, `lands_as` verbs and all. One closing row, not a pair: envelope rows
+land contiguously, so the previous seal (or the journal's start) is the open.
+The bill survives squash compaction by construction, so change-locality mining
+(the journal-as-environment candidate's consumer) reads the exact grouped rows
+instead of counting back lines. The seal is deliberately OUTSIDE the verb
+algebra: as a state operator it would be the identity, which discovery would
+find commuting with everything — licensing slides across the boundary, the
+exact opposite of one. Unknown-verb opacity is the correct semantics for free,
+pinned by probes (nothing slides past a seal; twin seals never collapse).
+Replay and spoke read THROUGH the boundary — a seal claims nothing about any
+file and counts nowhere, neither total nor horizon (a boundary is not
+blindness) — and a hand cannot stage one (`apply("seal", …)` refuses by name).
+
+And perception caught up with the composite: `show` under an open envelope now
+renders the STAGED state when a row touches the subject — the state `land` will
+judge — with the disclosure on stderr (`an envelope is open — showing the
+composite`) so stdout stays the exact bytes the next edit holds. The lookup is
+one shared function (`Judgment::composite_of`, hoisted from `admits`), so the
+stage-time judgment and the perception verb cannot drift apart. Deliberate
+keeps, recorded: `check`/`constrains`/the collect census stay tree-facing —
+their subjects are the committed record — and the seal lands in the INVOKING
+crate's journal (rows touching another crate journal there; the seal marks the
+invoker's record).
+
+The build itself was the acceptance test: staged as one envelope of seven rows
+— `impl Judgment`'s growth landing as the recast it licenses, the driver, both
+`impl Replay` siblings addressed by their `addr#N` teaching forms, three probe
+mods — landed as one, then drilled live (composite show mid-envelope, the seal
+row, replay and spoke reading through it). Residuals 3 (the verb algebra models
+recast) and 5 (fmt-normal payloads) are the next brick; 4 and 6 keep their
+dispositions.

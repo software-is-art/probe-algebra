@@ -213,3 +213,11 @@ edit src/discover/bundle.rs — impl Bundle @63c030064eb84569
 edit src/discover/envelope.rs — probes @a584017d91774fcc
 edit src/discover/envelope.rs — probes @59a1b9ef01a72ec4
 edit src/discover/envelope.rs — impl Judgment @d0216007bccde494
+recast src/discover/envelope.rs — impl Judgment @cc488f1957e97f8c
+edit examples/bundle.rs — run @2cdcf91dff6eccf6
+edit src/discover/store.rs — impl Replay#1 @9d563d57498f10f2
+edit src/discover/store.rs — impl Replay#2 @df58d58cb339a929
+edit src/discover/envelope.rs — probes @3eb0e8ebcee2d276
+edit src/discover/store.rs — probes @f04c978daee95562
+edit src/discover/squash.rs — probes @b12a7690ca764390
+edit src/discover/envelope.rs — probes @71573c9b59004a7b

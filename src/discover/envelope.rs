@@ -180,6 +180,17 @@ impl Judgment {
             .collect()
     }
 
+    /// The COMPOSITE text of one module under this judgment — the staged state if
+    /// a row touched it, `None` otherwise. This is the one lookup `admits`, the
+    /// composite-aware `show`, and any future composite perception share; module
+    /// paths compare by the string as given, the rule the rows already live by.
+    pub fn composite_of(&self, module: &str) -> Option<&str> {
+        self.files
+            .iter()
+            .find(|(touched, _)| touched == module)
+            .map(|(_, text)| text.as_str())
+    }
+
     /// Judge ONE MORE row against this judgment's composite — the stage-time
     /// instant-teaching path: the candidate is judged exactly as `land` will judge
     /// it, against the tree plus every already-staged row. Returns the verb the
@@ -193,13 +204,33 @@ impl Judgment {
         payload: Option<&str>,
     ) -> Result<String, String> {
         let current = self
-            .files
-            .iter()
-            .find(|(touched, _)| touched == module)
-            .map(|(_, text)| text.clone())
+            .composite_of(module)
+            .map(str::to_string)
             .or(committed)
             .unwrap_or_default();
         apply(verb, &current, name, payload).map(|(lands_as, _)| lands_as)
+    }
+
+    /// THE BILL — the landed rows exactly as the journal records them, `lands_as`
+    /// verbs and all, one entry per verdict. Stashed content-addressed at land so
+    /// the seal row's address survives squash compaction: change-locality mining
+    /// reads the exact grouped rows instead of counting back lines.
+    pub fn bill(&self) -> String {
+        self.verdicts
+            .iter()
+            .map(|v| Bundle::journal_entry(&v.lands_as, &v.module, &v.detail))
+            .collect()
+    }
+
+    /// The SEAL row's detail: the envelope's shape and the bill's address — the
+    /// journal boundary the change-locality dataset reads. The trailing token is a
+    /// payload address under the same ` @` grammar every effect row speaks.
+    pub fn seal_detail(&self, address: &str) -> String {
+        format!(
+            "{} row(s) across {} file(s) @{address}",
+            self.verdicts.len(),
+            self.files.len()
+        )
     }
 
     /// Render the bill for perception (`bundle staged`): one line per row — what
@@ -486,5 +517,73 @@ mod probes {
             split_address("commutative(join)"),
             ("commutative(join)", None)
         );
+    }
+
+    /// THE SEAL's raw material: the bill is the landed rows exactly as the journal
+    /// records them — `lands_as` verbs and all, so a licensed interface move bills
+    /// as `recast` — and the seal detail's trailing token parses as an address
+    /// under the same ` @` grammar every effect row speaks.
+    #[test]
+    fn the_bill_records_lands_as_verbs_and_the_seal_detail_parses() {
+        let module = "/// One.\npub fn one() -> u32 {\n    1\n}\n";
+        let moved = "/// One, widened.\npub fn one() -> u64 {\n    1\n}\n";
+        let tree = BTreeMap::from([("src/m.rs".to_string(), module.to_string())]);
+        let shelf = BTreeMap::from([("cccccccccccccccc".to_string(), moved.to_string())]);
+        let read = |module: &str| tree.get(module).cloned();
+        let fetch = |_module: &str, address: &str| {
+            shelf
+                .get(address)
+                .cloned()
+                .ok_or_else(|| format!("payload store: nothing at @{address}"))
+        };
+        let envelope = Envelope::parse("edit src/m.rs — one @cccccccccccccccc\n").unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert_eq!(
+            judgment.bill(),
+            "recast src/m.rs — one @cccccccccccccccc\n",
+            "the bill speaks the landed verb, not the offered one"
+        );
+        let detail = judgment.seal_detail("0123456789abcdef");
+        assert_eq!(detail, "1 row(s) across 1 file(s) @0123456789abcdef");
+        assert_eq!(
+            split_address(&detail),
+            ("1 row(s) across 1 file(s)", Some("0123456789abcdef"))
+        );
+    }
+
+    /// A hand cannot stage a boundary: `seal` is journal grammar the LANDING
+    /// writes, never a stageable verb — the envelope refuses it by name.
+    #[test]
+    fn a_seal_cannot_be_staged() {
+        let refusal = super::apply("seal", "", "envelope", None).unwrap_err();
+        assert_eq!(
+            refusal,
+            "bundle envelope: `seal` is not a stageable verb (add, edit, declare)"
+        );
+    }
+
+    /// The composite lookup is ONE function: a touched module renders its staged
+    /// text, an untouched one renders `None` — the seam `admits` and the
+    /// composite-aware `show` share.
+    #[test]
+    fn composite_of_speaks_only_for_touched_modules() {
+        let tree = BTreeMap::from([("src/m.rs".to_string(), "pub fn one() {}\n".to_string())]);
+        let shelf = BTreeMap::from([(
+            "dddddddddddddddd".to_string(),
+            "/// Told.\npub fn one() {}\n".to_string(),
+        )]);
+        let read = |module: &str| tree.get(module).cloned();
+        let fetch = |_module: &str, address: &str| {
+            shelf
+                .get(address)
+                .cloned()
+                .ok_or_else(|| format!("payload store: nothing at @{address}"))
+        };
+        let envelope = Envelope::parse("edit src/m.rs — one @dddddddddddddddd\n").unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(judgment
+            .composite_of("src/m.rs")
+            .is_some_and(|text| text.contains("Told")));
+        assert_eq!(judgment.composite_of("src/other.rs"), None);
     }
 }
