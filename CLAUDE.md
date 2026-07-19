@@ -13,7 +13,11 @@ add|edit|declare|place|check|show|collect|squash|replay|constrains|uses|spoke|tr
 judged transaction — a refusal writes nothing), plus gates|owes (green as a fact about a
 tree hash: `bundle owes` derives what the current tree still owes, `bundle gates` runs
 the owed every-change gates and records content-keyed verdicts — never trust a
-remembered green). Prefer the pinned binary `.suit/bundle`
+remembered green), plus begin|land|staged|drop (THE ENVELOPE, the atomic multi-item
+transaction: while one is open, add/edit/declare stage rows instead of touching the
+tree; `land` judges the composite and lands all or none — an interface-moving edit is
+licensed there and journals as `recast` — and a refusal carries the full residue). A
+change spanning items is an envelope, never a sequence of broken intermediate states. Prefer the pinned binary `.suit/bundle`
 when it exists (`bundle pin` installs it) — it does not rebuild behind the gate of the
 tree it is changing. A change the verbs cannot express is a FIELD
 REPORT: name the missing verb in docs/roadmap.md ("The aim, adopted: zero file patching")

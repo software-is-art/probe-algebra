@@ -1,0 +1,76 @@
+#[crate::mutate("judgment")]
+impl Judgment {
+    /// The all-or-none gate: true exactly when no row owes anything.
+    pub fn landable(&self) -> bool {
+        self.verdicts.iter().all(|verdict| verdict.owes.is_none())
+    }
+
+    /// The FULL residue — one line per owing row. The whole bill, so a refusal
+    /// teaches everything the envelope still owes, not just the first error.
+    pub fn residue(&self) -> Vec<String> {
+        self.verdicts
+            .iter()
+            .filter_map(|verdict| {
+                verdict.owes.as_ref().map(|why| {
+                    format!(
+                        "owes: {} {} — {} ({why})",
+                        verdict.lands_as, verdict.module, verdict.detail
+                    )
+                })
+            })
+            .collect()
+    }
+
+    /// Judge ONE MORE row against this judgment's composite — the stage-time
+    /// instant-teaching path: the candidate is judged exactly as `land` will judge
+    /// it, against the tree plus every already-staged row. Returns the verb the
+    /// row would land as; a refusal stages nothing.
+    pub fn admits(
+        &self,
+        committed: Option<String>,
+        verb: &str,
+        module: &str,
+        name: &str,
+        payload: Option<&str>,
+    ) -> Result<String, String> {
+        let current = self
+            .files
+            .iter()
+            .find(|(touched, _)| touched == module)
+            .map(|(_, text)| text.clone())
+            .or(committed)
+            .unwrap_or_default();
+        apply(verb, &current, name, payload).map(|(lands_as, _)| lands_as)
+    }
+
+    /// Render the bill for perception (`bundle staged`): one line per row — what
+    /// it lands as, or what it owes — then the landability verdict.
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        for verdict in &self.verdicts {
+            match &verdict.owes {
+                None => out.push_str(&format!(
+                    "lands as {}: {} — {}\n",
+                    verdict.lands_as, verdict.module, verdict.detail
+                )),
+                Some(why) => out.push_str(&format!(
+                    "owes: {} {} — {} ({why})\n",
+                    verdict.lands_as, verdict.module, verdict.detail
+                )),
+            }
+        }
+        let owing = self.verdicts.iter().filter(|v| v.owes.is_some()).count();
+        if owing == 0 {
+            out.push_str(&format!(
+                "landable: {} row(s), all green — `bundle land` writes them as one\n",
+                self.verdicts.len()
+            ));
+        } else {
+            out.push_str(&format!(
+                "NOT landable: {owing} of {} row(s) owe — every debt listed above\n",
+                self.verdicts.len()
+            ));
+        }
+        out
+    }
+}

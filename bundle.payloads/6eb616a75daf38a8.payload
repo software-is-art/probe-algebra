@@ -1,0 +1,91 @@
+/// Append one line to the journal beside the module's crate — the record half every
+/// landing shares, single verbs and envelope rows alike. The caller has already
+/// written (or is about to write) the module; a journal failure is reported, never
+/// swallowed — a change the record missed is what the record exists to prevent.
+fn record(verb: &str, module_path: &str, detail: &str) -> Result<(), String> {
+    let root = nearest_crate_root(module_path);
+    let journal = root.join("bundle.journal");
+    let entry = Bundle::journal_entry(verb, module_path, detail);
+    use std::io::Write;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&journal)
+        .and_then(|mut f| f.write_all(entry.as_bytes()))
+        .map_err(|e| format!("bundle {verb}: wrote the module but NOT the journal ({e})"))
+}
+
+/// The open envelope's address: `bundle.envelope` beside the journal of the crate
+/// the suit is invoked from — one envelope at a time, scoped like the record it
+/// feeds. Its existence is the mode switch: while it exists, `add`/`edit`/`declare`
+/// stage into it instead of landing.
+fn envelope_home() -> std::path::PathBuf {
+    nearest_crate_root("bundle.envelope").join("bundle.envelope")
+}
+
+/// Read and judge the open envelope against the tree: rows from the envelope file,
+/// payloads from each module's own crate store, modules from the tree. Refuses when
+/// no envelope is open — `begin` is the teaching.
+fn judged_envelope(
+    verb: &str,
+    path: &std::path::Path,
+) -> Result<
+    (
+        boundary_spec::discover::envelope::Envelope,
+        boundary_spec::discover::envelope::Judgment,
+    ),
+    String,
+> {
+    use boundary_spec::discover::envelope::Envelope;
+    use boundary_spec::discover::store::PayloadStore;
+    let text = std::fs::read_to_string(path)
+        .map_err(|_| format!("bundle {verb}: no envelope open — `bundle begin` starts one"))?;
+    let envelope = Envelope::parse(&text)?;
+    let read = |module: &str| std::fs::read_to_string(module).ok();
+    let fetch = |module: &str, address: &str| {
+        PayloadStore::beside(&nearest_crate_root(module)).fetch(address)
+    };
+    let judgment = envelope.judge(&read, &fetch);
+    Ok((envelope, judgment))
+}
+
+/// Stage one verb into the open envelope instead of the tree: the candidate is
+/// judged against the COMPOSITE (tree plus every already-staged row) exactly as
+/// `land` will judge it — a red row refuses instantly, so single-item teaching
+/// survives the envelope — then the payload is stashed and the row appended. The
+/// tree is untouched until `bundle land`.
+fn stage(
+    verb: &str,
+    module_path: &str,
+    head: &str,
+    payload: Option<&str>,
+) -> Result<String, String> {
+    use boundary_spec::discover::store::PayloadStore;
+    let path = envelope_home();
+    let (envelope, judgment) = judged_envelope(verb, &path)?;
+    let committed = std::fs::read_to_string(module_path).ok();
+    let lands_as = judgment.admits(committed, verb, module_path, head, payload)?;
+    let detail = match payload {
+        Some(content) => {
+            let address = PayloadStore::beside(&nearest_crate_root(module_path)).stash(content)?;
+            format!("{head} @{address}")
+        }
+        None => head.to_string(),
+    };
+    let row = Bundle::journal_entry(verb, module_path, &detail);
+    use std::io::Write;
+    std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| f.write_all(row.as_bytes()))
+        .map_err(|e| format!("bundle {verb}: judged green but the envelope did not take the row ({e})"))?;
+    let voice = if lands_as == "recast" {
+        " — the interface moves; lands as recast"
+    } else {
+        ""
+    };
+    Ok(format!(
+        "staged ({} row(s) held): {verb} {module_path} — {detail}{voice}",
+        envelope.rows.len() + 1
+    ))
+}

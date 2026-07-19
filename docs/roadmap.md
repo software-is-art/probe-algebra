@@ -4240,3 +4240,81 @@ the transcript was three trees stale, and the countersign tier now judges in
 minutes. Also confirmed at cost, again: red checks must carry their diagnosis —
 this hunt burned four local sweep attempts across container deaths because the
 runner's knowledge died with it.
+
+## The envelope: the atomic multi-item transaction (BUILT)
+
+Built 2026-07-18, closing the field report directly above, same day it was filed.
+Four verbs join the declaration (nineteen now): `begin` opens an ENVELOPE
+(`bundle.envelope` beside the journal, its existence the mode switch), and while
+one is open `add`/`edit`/`declare` STAGE rows there — journal grammar, payloads
+in the same content-addressed store — instead of touching the tree. `land` judges
+every row in order against the COMPOSITE (tree plus staged rows, re-derived at
+land time so the tree may move under an open envelope) and either lands the whole
+bill — every file written, every row journaled, every maintained census following
+— or refuses with the FULL residue and writes nothing. `staged` is `land`'s
+perception sibling (the bill as it would judge right now); `drop` discards. Both
+asymmetries the field report demanded hold: staging refuses a red row instantly
+(single-item teaching survives — the candidate is judged by `Judgment::admits`
+against the same composite `land` will use), and a red landing names every debt,
+never just the first.
+
+The brick beneath the verbs is the EFFECT/JUDGMENT SPLIT made real in the
+library: `Bundle::edit` decomposed into its own judgment (the interface hold) and
+a shared effect half (`splice` — one item, names the target, exists unambiguously,
+byte-splice, canonical re-render). Inside an envelope an edit whose interface
+MOVED is licensed — "field + initializers + observers" in one judged breath is
+exactly what the envelope is for — and lands honestly under its own journal verb,
+`recast`. The record distinguishes the held edit from the licensed one; `replay`
+re-applies a recast through the same splice it landed with (no signature
+re-judgment — the ratification already happened); the squash algebra treats
+`recast` as an unknown verb, which its conservatism makes safe: opaque, nothing
+slides past it, no collapse licensed.
+
+Acceptance, both altitudes: lib-side probes drill the field report's exact shape
+(struct grows a field + its reader moves, two rows, one write), the
+recast-only-under-license law, the whole-bill residue with a skipped red row, and
+rows composing (a module born by row one edited by row two). Live, in a scratch
+crate: the same shape staged, perceived, landed as one; a recast landed and
+REPLAYED byte-exact; a landing against a tree that moved under the envelope
+refused with the bill, wrote nothing, and left the envelope open. The three
+every-change gates plus the schemata sweep (23 new census lines: envelope,
+judgment, splice) ran at the tip.
+
+Readings from the build, kept per the instrument rule: the recon that designed
+this was mostly `show` (rosters and interiors of run/commit/differential — the
+perception verb carried it), but two greps had no verb to answer them: "which
+refusal texts are byte-pinned" (what the probes hold is invisible until read) and
+"which journal verbs replay" — both census-shaped questions about the probes'
+own reach. And one refusal taught mid-build: two `#[mutate]` impls sharing the
+`envelope` label collided at `render` and the schemata freeze REFUSED the census
+rather than mint an ambiguous key — the label census judging its own inputs.
+
+Residuals, named with the brick: (1) a landed envelope leaves no grouping mark in
+the journal — rows land contiguously and order is the only clock, but the
+change-locality dataset (the journal-as-environment candidate) would want the
+boundary; a demarcation row is future grammar for squash and replay to learn
+together. (2) `show` under an open envelope renders the TREE, not the composite —
+perception of the staged state is `bundle staged` only; a composite-aware `show`
+is the next perception rung. (3) The verb algebra does not yet model
+`recast`/the envelope, so squash near one is conservative silence rather than
+licensed collapse. (4) `place` and `collect` stay direct while an envelope is
+open — landing re-derives against the moved tree, so interleaving is judged, not
+forbidden; a deliberate keep. (5) Payloads land verbatim and rustfmt afterwards
+is the known replay-divergence class; fmt-normal payloads at stage time would
+retire it. (6) Generated crates (genesis's `Pipeline::locks_in`) do not yet ship
+the envelope's floor — the consumer twin, owed when a genesis crate first needs
+it.
+
+FIELD REPORT from the landing (2026-07-19): two suited sessions built
+concurrently from the same base — one grew the envelope, the other grew `uses`,
+`spoke`, and `addr#N` — and the reconciliation had NO VERB: the merge was file
+patching end to end, conflict markers resolved by hand in the same files both
+sessions had only ever touched through judged transactions. The synthesis
+itself was mechanical in exactly the way the method likes (`splice` absorbed
+`select_addressed`; the effect/judgment split and the discriminator compose
+cleanly — two verbs' worth of judgment met in one function with no residue),
+which sharpens the reading: the CONFLICT was never in the items, it was in the
+renders. A journal-level merge — replaying two sessions' judged rows onto one
+tree and judging the composite, the envelope's `land` pointed at a sibling
+history — is the missing verb, and it is the journal-as-environment candidate's
+first concrete consumer. Until then, concurrent sessions cost a hand merge.

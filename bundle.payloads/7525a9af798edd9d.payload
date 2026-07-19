@@ -1,0 +1,91 @@
+#[crate::mutate("store")]
+impl Replay {
+    /// Replay a journal against the tree it describes. Paths resolve exactly as the
+    /// verbs recorded them (relative to the invoking directory). The one hard refusal
+    /// is a line the journal grammar cannot read; everything else that cannot replay
+    /// is a NAMED verdict, not an error.
+    ///
+    /// Capability: Effectful — reads payload blobs and the tree it judges.
+    pub fn differential(journal: &str, store: &PayloadStore) -> Result<Replay, String> {
+        let mut states: BTreeMap<String, Result<String, String>> = BTreeMap::new();
+        let mut order: Vec<String> = Vec::new();
+        for (n, line) in journal.lines().enumerate() {
+            let parsed = line
+                .split_once(' ')
+                .and_then(|(verb, rest)| rest.split_once(" — ").map(|(m, d)| (verb, m, d)));
+            let Some((verb, module, detail)) = parsed else {
+                return Err(format!(
+                    "bundle replay: line {} is not `<verb> <module> — <detail>`: `{line}`",
+                    n + 1
+                ));
+            };
+            let current = match states.get(module) {
+                Some(Ok(text)) => text.clone(),
+                Some(Err(_)) => continue,
+                None => {
+                    order.push(module.to_string());
+                    String::new()
+                }
+            };
+            let (name, address) = crate::discover::envelope::split_address(detail);
+            let next = match verb {
+                "add" | "edit" | "recast" => match address {
+                    None => Err(format!(
+                        "line {} (`{verb}` of `{name}`) predates the payload store — \
+                         no address to replay",
+                        n + 1
+                    )),
+                    Some(addr) => store.fetch(addr).and_then(|payload| match verb {
+                        "add" => Bundle::add(&current, &payload),
+                        "edit" => Bundle::edit(&current, name, &payload),
+                        // a recast landed under an envelope's license: the interface
+                        // moved by ratified decision, so replay re-applies the effect
+                        // half alone — the same splice it landed with.
+                        _ => crate::discover::bundle::splice("recast", &current, name, &payload),
+                    }),
+                },
+                "declare" => Bundle::declare(&current, name),
+                "place" => Bundle::parse(&current).map(|b| b.render()),
+                other => Err(format!(
+                    "line {} — replaying `{other}` needs the effect/judgment split \
+                     (a disclosed gap: the journal records the judged decision, and \
+                     replay must re-apply the effect without re-judging)",
+                    n + 1
+                )),
+            };
+            states.insert(
+                module.to_string(),
+                next.map_err(|reason| format!("unreplayable — {reason}")),
+            );
+        }
+        let verdicts = order
+            .into_iter()
+            .map(|path| {
+                let verdict = match &states[&path] {
+                    Err(reason) => reason.clone(),
+                    Ok(text) => match std::fs::read_to_string(&path) {
+                        Ok(committed) if &committed == text => {
+                            "replays to the committed text — the journal is a second \
+                             source for this file"
+                                .to_string()
+                        }
+                        Ok(_) => "DIVERGES from the committed text (hand edits, fmt, \
+                                  or a pre-journal birth the record never saw)"
+                            .to_string(),
+                        Err(e) => format!("the tree has no file to compare against ({e})"),
+                    },
+                };
+                (path, verdict)
+            })
+            .collect();
+        Ok(Replay { verdicts })
+    }
+
+    /// Render the differential report, one file per line.
+    pub fn render(&self) -> String {
+        self.verdicts
+            .iter()
+            .map(|(path, verdict)| format!("{path}: {verdict}\n"))
+            .collect()
+    }
+}

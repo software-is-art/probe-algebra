@@ -601,6 +601,8 @@ pub mod eduction;
 
 pub mod items;
 
+pub mod envelope;
+
 #[cfg(test)]
 mod tests {
     use super::*;

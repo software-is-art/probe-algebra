@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 969 sites.
+# 982 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -157,7 +157,7 @@
 - boundary_spec::discover::bundle::bundle::declare:3: && -> ||
 - boundary_spec::discover::bundle::bundle::declare:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::bundle::declare:deaf -> Ok(String::new())
-- boundary_spec::discover::bundle::bundle::edit:0: != -> ==
+- boundary_spec::discover::bundle::bundle::edit:0: == -> !=
 - boundary_spec::discover::bundle::bundle::edit:1: != -> ==
 - boundary_spec::discover::bundle::bundle::edit:2: != -> ==
 - boundary_spec::discover::bundle::bundle::edit:3: == -> !=
@@ -213,6 +213,9 @@
 - boundary_spec::discover::bundle::select_addressed:deaf -> Err(String::new())
 - boundary_spec::discover::bundle::select_addressed:deaf -> Ok(None)
 - boundary_spec::discover::bundle::sibling_holdings:deaf -> String::new()
+- boundary_spec::discover::bundle::splice:0: != -> ==
+- boundary_spec::discover::bundle::splice:deaf -> Err(String::new())
+- boundary_spec::discover::bundle::splice:deaf -> Ok(String::new())
 - boundary_spec::discover::bundle::split_discriminator:0: ! -> (deleted)
 - boundary_spec::discover::bundle::split_discriminator:1: >= -> <
 - boundary_spec::discover::cli::CliSpec::parse:0: == -> !=
@@ -439,6 +442,20 @@
 - boundary_spec::discover::engine::is_binary_on:deaf -> false
 - boundary_spec::discover::engine::is_binary_on:deaf -> true
 - boundary_spec::discover::engine::shadow_grid:deaf -> vec![]
+- boundary_spec::discover::envelope::apply:deaf -> Err(String::new())
+- boundary_spec::discover::envelope::envelope::judge:0: ! -> (deleted)
+- boundary_spec::discover::envelope::envelope::parse:deaf -> Err(String::new())
+- boundary_spec::discover::envelope::envelope::render:deaf -> String::new()
+- boundary_spec::discover::envelope::judgment::admits:0: == -> !=
+- boundary_spec::discover::envelope::judgment::admits:deaf -> Err(String::new())
+- boundary_spec::discover::envelope::judgment::admits:deaf -> Ok(String::new())
+- boundary_spec::discover::envelope::judgment::landable:deaf -> false
+- boundary_spec::discover::envelope::judgment::landable:deaf -> true
+- boundary_spec::discover::envelope::judgment::render:0: == -> !=
+- boundary_spec::discover::envelope::judgment::render:deaf -> String::new()
+- boundary_spec::discover::envelope::judgment::residue:deaf -> vec![]
+- boundary_spec::discover::envelope::split_address:0: == -> !=
+- boundary_spec::discover::envelope::split_address:1: && -> ||
 - boundary_spec::discover::expect::Distance::is_met:deaf -> false
 - boundary_spec::discover::expect::Distance::is_met:deaf -> true
 - boundary_spec::discover::expect::Distance::of:0: ! -> (deleted)
@@ -843,9 +860,6 @@
 - boundary_spec::discover::squash::squash::split_verb:0: == -> !=
 - boundary_spec::discover::squash::squash::unordered:0: <= -> >
 - boundary_spec::discover::store::store::differential:0: == -> !=
-- boundary_spec::discover::store::store::differential:1: && -> ||
-- boundary_spec::discover::store::store::differential:2: == -> !=
-- boundary_spec::discover::store::store::differential:3: == -> !=
 - boundary_spec::discover::store::store::differential:deaf -> Err(String::new())
 - boundary_spec::discover::store::store::fetch:deaf -> Err(String::new())
 - boundary_spec::discover::store::store::fetch:deaf -> Ok(String::new())
@@ -853,10 +867,9 @@
 - boundary_spec::discover::store::store::render:deaf -> String::new()
 - boundary_spec::discover::store::store::spoke:0: == -> !=
 - boundary_spec::discover::store::store::spoke:1: && -> ||
-- boundary_spec::discover::store::store::spoke:2: == -> !=
+- boundary_spec::discover::store::store::spoke:2: ! -> (deleted)
 - boundary_spec::discover::store::store::spoke:3: ! -> (deleted)
 - boundary_spec::discover::store::store::spoke:4: ! -> (deleted)
-- boundary_spec::discover::store::store::spoke:5: ! -> (deleted)
 - boundary_spec::discover::store::store::spoke:deaf -> Err(String::new())
 - boundary_spec::discover::store::store::spoke:deaf -> Ok(String::new())
 - boundary_spec::discover::store::store::stash:0: == -> !=

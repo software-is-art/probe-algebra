@@ -123,27 +123,21 @@ impl Replay {
                     String::new()
                 }
             };
-            let (name, address) = match detail.rsplit_once(" @") {
-                Some((head, addr))
-                    if addr.len() == 16 && addr.chars().all(|c| c.is_ascii_hexdigit()) =>
-                {
-                    (head, Some(addr))
-                }
-                _ => (detail, None),
-            };
+            let (name, address) = crate::discover::envelope::split_address(detail);
             let next = match verb {
-                "add" | "edit" => match address {
+                "add" | "edit" | "recast" => match address {
                     None => Err(format!(
                         "line {} (`{verb}` of `{name}`) predates the payload store — \
                          no address to replay",
                         n + 1
                     )),
-                    Some(addr) => store.fetch(addr).and_then(|payload| {
-                        if verb == "add" {
-                            Bundle::add(&current, &payload)
-                        } else {
-                            Bundle::edit(&current, name, &payload)
-                        }
+                    Some(addr) => store.fetch(addr).and_then(|payload| match verb {
+                        "add" => Bundle::add(&current, &payload),
+                        "edit" => Bundle::edit(&current, name, &payload),
+                        // a recast landed under an envelope's license: the interface
+                        // moved by ratified decision, so replay re-applies the effect
+                        // half alone — the same splice it landed with.
+                        _ => crate::discover::bundle::splice("recast", &current, name, &payload),
                     }),
                 },
                 "declare" => Bundle::declare(&current, name),
@@ -250,15 +244,19 @@ impl Replay {
                 _ => (detail, None),
             };
             let next = match verb {
-                "add" | "edit" => match address {
+                "add" | "edit" | "recast" => match address {
                     None => Err(()),
                     Some(addr) => store
                         .fetch(addr)
-                        .and_then(|payload| {
-                            if verb == "add" {
-                                Bundle::add(&current, &payload)
-                            } else {
-                                Bundle::edit(&current, head, &payload)
+                        .and_then(|payload| match verb {
+                            "add" => Bundle::add(&current, &payload),
+                            "edit" => Bundle::edit(&current, head, &payload),
+                            // a recast landed under the envelope's license replays
+                            // through the effect half alone, exactly as the
+                            // differential does — journal time must not go dark on
+                            // a licensed interface move.
+                            _ => {
+                                crate::discover::bundle::splice("recast", &current, head, &payload)
                             }
                         })
                         .map_err(|_| ()),
@@ -444,6 +442,36 @@ mod probes {
         }
     }
 
+    /// A `recast` row — an interface move landed under an envelope's license —
+    /// replays through the effect half alone: the same splice it landed with, no
+    /// signature re-judgment, byte-exact against the committed tree.
+    #[test]
+    fn a_recast_row_replays_the_interface_move() {
+        let root = scratch("recast");
+        let store = PayloadStore::beside(&root);
+        let path = root.join("m.rs").to_string_lossy().into_owned();
+
+        let birth = "/// One.\npub fn one() -> u32 {\n    1\n}\n";
+        let widened = "/// One, widened.\npub fn one() -> u64 {\n    1\n}\n";
+        let born = Bundle::add("", birth).unwrap();
+        assert!(
+            Bundle::edit(&born, "one", widened)
+                .unwrap_err()
+                .contains("signature moved"),
+            "the single verb still refuses the move"
+        );
+        let landed = crate::discover::bundle::splice("recast", &born, "one", widened).unwrap();
+        std::fs::write(&path, &landed).unwrap();
+
+        let journal = format!(
+            "add {path} — fn one @{}\nrecast {path} — one @{}\n",
+            store.stash(birth).unwrap(),
+            store.stash(widened).unwrap()
+        );
+        let report = Replay::differential(&journal, &store).unwrap().render();
+        assert!(report.contains("replays to the committed text"), "{report}");
+    }
+
     /// JOURNAL TIME, the headline: a miniature history where a speaker of
     /// `double` arrives at birth and stops speaking in a later edit — the report
     /// names the exact transactions, byte-pinned, and speakers are read with the
@@ -508,6 +536,33 @@ mod probes {
         );
         assert!(
             report.contains("2 of 3 entries beyond the horizon"),
+            "{report}"
+        );
+    }
+
+    /// JOURNAL TIME does not go dark on a licensed interface move: a `recast` row
+    /// replays through the effect half (the same splice the differential trusts), so
+    /// `spoke` reads speakers straight through it — the horizon counts nothing and
+    /// the module stays lit.
+    #[test]
+    fn spoke_reads_through_a_recast_row() {
+        let root = scratch("spoke-recast");
+        let store = PayloadStore::beside(&root);
+        let birth =
+            "/// One.\npub fn one() -> u32 {\n    1\n}\n\npub fn caller() -> u32 {\n    one()\n}\n";
+        let widened = "/// One, widened.\npub fn one() -> u64 {\n    1\n}\n";
+        let journal = format!(
+            "add m.rs — fn one, fn caller @{}\nrecast m.rs — one @{}\n",
+            store.stash(birth).unwrap(),
+            store.stash(widened).unwrap()
+        );
+        let report = Replay::spoke(&journal, &store, "one").expect("reports");
+        assert!(
+            report.contains("0 of 2 entries beyond the horizon"),
+            "the recast must not count beyond the horizon: {report}"
+        );
+        assert!(
+            report.contains("entry 1 (add m.rs — fn one, fn caller): + caller, + one"),
             "{report}"
         );
     }

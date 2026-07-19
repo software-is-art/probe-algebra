@@ -1,0 +1,460 @@
+//! envelope — the atomic multi-item transaction (the missing verb the auto-merge
+//! build's field report named): a change whose smallest honest unit spans items
+//! ("field + initializers + observers") is staged row by row OUTSIDE the tree,
+//! judged as ONE RESULT, and landed all or none. The tree never exhibits an
+//! intermediate state — the suit stays reachable from inside its own change — and
+//! a refusal carries the FULL residue (every row still owed), never just the
+//! first error.
+//!
+//! The rows speak the journal's own grammar (`<verb> <module> — <detail>`), so
+//! landing is an append the record already reads. One row kind exists only at
+//! land: an `edit` whose interface moved lands as `recast` — the envelope is the
+//! license an interface change needs, and the record says honestly which edits
+//! used it. `recast` is opaque to the squash algebra (nothing slides past it) and
+//! replays through the same effect half (`splice`) it landed with.
+
+use std::collections::BTreeMap;
+
+use crate::discover::bundle::Bundle;
+
+/// One staged row: a verb, its module, and the detail the journal will carry —
+/// `name @address` for the payload verbs, the declaration itself for `declare`.
+#[derive(Debug, Clone)]
+pub struct EnvelopeRow {
+    /// The staged verb — `add`, `edit`, or `declare`.
+    pub verb: String,
+    /// The module path exactly as the verb was given it.
+    pub module: String,
+    /// The journal detail: item name(s), payload address suffixed where one exists.
+    pub detail: String,
+}
+
+/// The staged transaction: rows in staging order. Order is the only clock, here
+/// exactly as in the journal the rows are destined for.
+#[derive(Debug, Clone)]
+pub struct Envelope {
+    /// The staged rows, oldest first.
+    pub rows: Vec<EnvelopeRow>,
+}
+
+/// One row's verdict under the composite judgment: the verb it would LAND as
+/// (`edit` resolves to `recast` when the interface moved), and what it still
+/// owes — `None` exactly when the row is green.
+#[derive(Debug, Clone)]
+pub struct RowVerdict {
+    /// The verb the journal would record — `add`, `edit`, `recast`, or `declare`.
+    pub lands_as: String,
+    /// The row's module.
+    pub module: String,
+    /// The row's journal detail.
+    pub detail: String,
+    /// What the row still owes — `None` exactly when it would land.
+    pub owes: Option<String>,
+}
+
+/// The whole envelope judged against a tree: per-row verdicts plus the composite
+/// text each touched module would land with. `landable` is the all-or-none gate.
+#[derive(Debug)]
+pub struct Judgment {
+    /// Per-row verdicts, in staging order.
+    pub verdicts: Vec<RowVerdict>,
+    /// Each touched module's final composite text, green rows applied in order.
+    pub files: Vec<(String, String)>,
+}
+
+#[crate::mutate("envelope")]
+impl Envelope {
+    /// Parse the staged rows from the envelope file's text — the journal grammar,
+    /// refused line by line: the file is machine-written, so a line the grammar
+    /// cannot read means a hand touched it.
+    pub fn parse(text: &str) -> Result<Envelope, String> {
+        let mut rows = Vec::new();
+        for (n, line) in text.lines().enumerate() {
+            let parsed = line
+                .split_once(' ')
+                .and_then(|(verb, rest)| rest.split_once(" — ").map(|(m, d)| (verb, m, d)));
+            let Some((verb, module, detail)) = parsed else {
+                return Err(format!(
+                    "bundle envelope: staged line {} is not `<verb> <module> — <detail>`: \
+                     `{line}`",
+                    n + 1
+                ));
+            };
+            rows.push(EnvelopeRow {
+                verb: verb.to_string(),
+                module: module.to_string(),
+                detail: detail.to_string(),
+            });
+        }
+        Ok(Envelope { rows })
+    }
+
+    /// Render the rows back to the envelope file's text — `parse`'s inverse.
+    pub fn render(&self) -> String {
+        self.rows
+            .iter()
+            .map(|row| format!("{} {} — {}\n", row.verb, row.module, row.detail))
+            .collect()
+    }
+
+    /// THE COMPOSITE JUDGMENT: apply every row in order to an in-memory copy of
+    /// the tree (`read` supplies a module's committed text, `fetch` a payload by
+    /// module and address) and judge the RESULT. A red row is skipped — later rows
+    /// judge against the composite without it — and every failure is KEPT: the
+    /// residue is the whole bill, never just the first error. An `edit` whose
+    /// interface held lands as `edit`; one whose interface moved lands as
+    /// `recast` — the envelope is the license. Read-only: nothing is written here.
+    pub fn judge(
+        &self,
+        read: &dyn Fn(&str) -> Option<String>,
+        fetch: &dyn Fn(&str, &str) -> Result<String, String>,
+    ) -> Judgment {
+        let mut composite: BTreeMap<String, String> = BTreeMap::new();
+        let mut order: Vec<String> = Vec::new();
+        let mut verdicts = Vec::new();
+        for row in &self.rows {
+            let current = composite
+                .get(&row.module)
+                .cloned()
+                .or_else(|| read(&row.module))
+                .unwrap_or_default();
+            let (name, address) = split_address(&row.detail);
+            let payload = match address {
+                Some(addr) => fetch(&row.module, addr).map(Some),
+                None => Ok(None),
+            };
+            let judged = payload
+                .and_then(|payload| apply(&row.verb, &current, name, payload.as_deref()));
+            match judged {
+                Ok((lands_as, text)) => {
+                    if !composite.contains_key(&row.module) {
+                        order.push(row.module.clone());
+                    }
+                    composite.insert(row.module.clone(), text);
+                    verdicts.push(RowVerdict {
+                        lands_as,
+                        module: row.module.clone(),
+                        detail: row.detail.clone(),
+                        owes: None,
+                    });
+                }
+                Err(reason) => verdicts.push(RowVerdict {
+                    lands_as: row.verb.clone(),
+                    module: row.module.clone(),
+                    detail: row.detail.clone(),
+                    owes: Some(reason),
+                }),
+            }
+        }
+        let files = order
+            .into_iter()
+            .map(|module| {
+                let text = composite[&module].clone();
+                (module, text)
+            })
+            .collect();
+        Judgment { verdicts, files }
+    }
+}
+
+#[crate::mutate("envelope")]
+impl Judgment {
+    /// The all-or-none gate: true exactly when no row owes anything.
+    pub fn landable(&self) -> bool {
+        self.verdicts.iter().all(|verdict| verdict.owes.is_none())
+    }
+
+    /// The FULL residue — one line per owing row. The whole bill, so a refusal
+    /// teaches everything the envelope still owes, not just the first error.
+    pub fn residue(&self) -> Vec<String> {
+        self.verdicts
+            .iter()
+            .filter_map(|verdict| {
+                verdict.owes.as_ref().map(|why| {
+                    format!("owes: {} {} — {} ({why})", verdict.lands_as, verdict.module, verdict.detail)
+                })
+            })
+            .collect()
+    }
+
+    /// Judge ONE MORE row against this judgment's composite — the stage-time
+    /// instant-teaching path: the candidate is judged exactly as `land` will judge
+    /// it, against the tree plus every already-staged row. Returns the verb the
+    /// row would land as; a refusal stages nothing.
+    pub fn admits(
+        &self,
+        committed: Option<String>,
+        verb: &str,
+        module: &str,
+        name: &str,
+        payload: Option<&str>,
+    ) -> Result<String, String> {
+        let current = self
+            .files
+            .iter()
+            .find(|(touched, _)| touched == module)
+            .map(|(_, text)| text.clone())
+            .or(committed)
+            .unwrap_or_default();
+        apply(verb, &current, name, payload).map(|(lands_as, _)| lands_as)
+    }
+
+    /// Render the bill for perception (`bundle staged`): one line per row — what
+    /// it lands as, or what it owes — then the landability verdict.
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        for verdict in &self.verdicts {
+            match &verdict.owes {
+                None => out.push_str(&format!(
+                    "lands as {}: {} — {}\n",
+                    verdict.lands_as, verdict.module, verdict.detail
+                )),
+                Some(why) => out.push_str(&format!(
+                    "owes: {} {} — {} ({why})\n",
+                    verdict.lands_as, verdict.module, verdict.detail
+                )),
+            }
+        }
+        let owing = self.verdicts.iter().filter(|v| v.owes.is_some()).count();
+        if owing == 0 {
+            out.push_str(&format!(
+                "landable: {} row(s), all green — `bundle land` writes them as one\n",
+                self.verdicts.len()
+            ));
+        } else {
+            out.push_str(&format!(
+                "NOT landable: {owing} of {} row(s) owe — every debt listed above\n",
+                self.verdicts.len()
+            ));
+        }
+        out
+    }
+}
+
+/// One row's application — the shared core of `judge` and `admits`: the verb, the
+/// module's current composite text, the item name (or, for `declare`, the
+/// declaration), and the payload where the verb carries one. Returns the verb the
+/// row lands as and the module's next text. An `edit` is tried under its own hold
+/// first; when only the interface moved, the effect half (`splice`) licenses it as
+/// `recast` — any other failure keeps `edit`'s refusal, the familiar voice.
+#[crate::mutate]
+fn apply(
+    verb: &str,
+    current: &str,
+    name: &str,
+    payload: Option<&str>,
+) -> Result<(String, String), String> {
+    match (verb, payload) {
+        ("add", Some(snippet)) => Bundle::add(current, snippet).map(|text| ("add".to_string(), text)),
+        ("edit", Some(replacement)) => match Bundle::edit(current, name, replacement) {
+            Ok(text) => Ok(("edit".to_string(), text)),
+            Err(held) => super::bundle::splice("edit", current, name, replacement)
+                .map(|text| ("recast".to_string(), text))
+                .map_err(|_| held),
+        },
+        ("declare", None) => {
+            Bundle::declare(current, name).map(|text| ("declare".to_string(), text))
+        }
+        ("add" | "edit", None) => Err(format!(
+            "bundle {verb}: staged row carries no payload address — nothing to land"
+        )),
+        _ => Err(format!(
+            "bundle envelope: `{verb}` is not a stageable verb (add, edit, declare)"
+        )),
+    }
+}
+
+/// A journal detail's trailing ` @<16 hex>` payload address, split off — the same
+/// conjunction guard the replay differential holds: a trailing `@` token of the
+/// wrong length or alphabet is DETAIL, not an address.
+#[crate::mutate]
+pub(crate) fn split_address(detail: &str) -> (&str, Option<&str>) {
+    match detail.rsplit_once(" @") {
+        Some((head, addr)) if addr.len() == 16 && addr.chars().all(|c| c.is_ascii_hexdigit()) => {
+            (head, Some(addr))
+        }
+        _ => (detail, None),
+    }
+}
+
+#[cfg(test)]
+mod probes {
+    use std::collections::BTreeMap;
+
+    use super::{split_address, Envelope};
+
+    /// A miniature tree and payload shelf for fs-free judging.
+    fn closures(
+        tree: &BTreeMap<String, String>,
+        shelf: &BTreeMap<String, String>,
+    ) -> (
+        impl Fn(&str) -> Option<String>,
+        impl Fn(&str, &str) -> Result<String, String>,
+    ) {
+        let tree = tree.clone();
+        let shelf = shelf.clone();
+        (
+            move |module: &str| tree.get(module).cloned(),
+            move |_module: &str, address: &str| {
+                shelf
+                    .get(address)
+                    .cloned()
+                    .ok_or_else(|| format!("payload store: nothing at @{address}"))
+            },
+        )
+    }
+
+    /// The staging grammar round-trips, and a hand-mangled line refuses by number —
+    /// the envelope file is machine-written, so a strange line means a hand.
+    #[test]
+    fn the_grammar_round_trips_and_a_strange_line_refuses() {
+        let text = "add src/m.rs — fn one @0123456789abcdef\n\
+                    edit src/m.rs — one @fedcba9876543210\n\
+                    declare src/m.rs — commutative(join)\n";
+        let envelope = Envelope::parse(text).expect("parses");
+        assert_eq!(envelope.rows.len(), 3);
+        assert_eq!(envelope.render(), text, "parse∘render is the identity");
+        let err = Envelope::parse("add src/m.rs fn one\n").unwrap_err();
+        assert!(err.contains("staged line 1"), "{err}");
+    }
+
+    /// THE HEADLINE — the field report's exact shape lands whole: a struct grows a
+    /// field (an interface move on the type) and the function reading it moves in
+    /// the SAME breath. Singly, the tree would exhibit a broken intermediate state;
+    /// under the envelope both rows judge against the composite and land as one.
+    #[test]
+    fn the_field_reports_shape_lands_whole() {
+        let module = "pub struct Perimeter {\n    pub merge: bool,\n}\n\n\
+                      /// The declared floor.\n\
+                      pub fn declared() -> Perimeter {\n    Perimeter { merge: true }\n}\n";
+        let grown_struct =
+            "pub struct Perimeter {\n    pub merge: bool,\n    pub auto: bool,\n}\n";
+        let grown_reader = "/// The declared floor.\n\
+                            pub fn declared() -> Perimeter {\n    Perimeter { merge: true, auto: true }\n}\n";
+        let tree = BTreeMap::from([("src/perimeter.rs".to_string(), module.to_string())]);
+        let shelf = BTreeMap::from([
+            ("aaaaaaaaaaaaaaaa".to_string(), grown_struct.to_string()),
+            ("bbbbbbbbbbbbbbbb".to_string(), grown_reader.to_string()),
+        ]);
+        let (read, fetch) = closures(&tree, &shelf);
+        let envelope = Envelope::parse(
+            "edit src/perimeter.rs — Perimeter @aaaaaaaaaaaaaaaa\n\
+             edit src/perimeter.rs — declared @bbbbbbbbbbbbbbbb\n",
+        )
+        .unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(judgment.landable(), "{:?}", judgment.residue());
+        let (_, landed) = &judgment.files[0];
+        assert!(landed.contains("pub auto: bool"), "{landed}");
+        assert!(landed.contains("auto: true"), "{landed}");
+        assert_eq!(judgment.files.len(), 1, "one file, two rows, one write");
+    }
+
+    /// An edit whose INTERFACE moved is refused alone but lands as `recast` inside
+    /// the envelope — the license is the envelope itself, and the record says so.
+    #[test]
+    fn an_interface_move_lands_as_recast_only_under_the_envelope() {
+        let module = "/// One.\npub fn one() -> u32 {\n    1\n}\n";
+        let moved = "/// One, widened.\npub fn one() -> u64 {\n    1\n}\n";
+        assert!(
+            crate::discover::bundle::Bundle::edit(module, "one", moved)
+                .unwrap_err()
+                .contains("signature moved"),
+            "the single verb still refuses"
+        );
+        let tree = BTreeMap::from([("src/m.rs".to_string(), module.to_string())]);
+        let shelf = BTreeMap::from([("cccccccccccccccc".to_string(), moved.to_string())]);
+        let (read, fetch) = closures(&tree, &shelf);
+        let envelope = Envelope::parse("edit src/m.rs — one @cccccccccccccccc\n").unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(judgment.landable(), "{:?}", judgment.residue());
+        assert_eq!(judgment.verdicts[0].lands_as, "recast");
+        assert!(judgment.files[0].1.contains("u64"));
+    }
+
+    /// A red envelope refuses with the WHOLE bill: every owing row is named, the
+    /// green row stays green, and a red row is skipped — the rows after it judge
+    /// against the composite without it.
+    #[test]
+    fn the_residue_is_the_whole_bill_and_a_red_row_is_skipped() {
+        let module = "pub fn one() -> u32 {\n    1\n}\n";
+        let tree = BTreeMap::from([("src/m.rs".to_string(), module.to_string())]);
+        let shelf = BTreeMap::from([
+            ("dddddddddddddddd".to_string(), "pub struct Two;\n".to_string()),
+            (
+                "eeeeeeeeeeeeeeee".to_string(),
+                "pub fn one() -> u32 {\n    2\n}\n".to_string(),
+            ),
+        ]);
+        let (read, fetch) = closures(&tree, &shelf);
+        let envelope = Envelope::parse(
+            "edit src/m.rs — ghost @dddddddddddddddd\n\
+             add src/m.rs — struct Two @dddddddddddddddd\n\
+             edit src/m.rs — one @0000000000000000\n\
+             edit src/m.rs — one @eeeeeeeeeeeeeeee\n",
+        )
+        .unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(!judgment.landable());
+        let residue = judgment.residue();
+        assert_eq!(residue.len(), 2, "both debts named: {residue:?}");
+        assert!(residue[0].contains("ghost"), "{residue:?}");
+        assert!(residue[1].contains("@0000000000000000"), "{residue:?}");
+        // the red rows did not poison the rest: the add landed, the last edit
+        // landed against the composite carrying it.
+        assert_eq!(judgment.verdicts[1].owes, None);
+        assert_eq!(judgment.verdicts[3].owes, None);
+        assert!(judgment.files[0].1.contains("struct Two"));
+        assert!(judgment.files[0].1.contains("    2\n"));
+        assert!(judgment.render().contains("NOT landable: 2 of 4 row(s) owe"));
+    }
+
+    /// Rows COMPOSE: a module born by the envelope's first row is editable by its
+    /// second — birth is the degenerate continuation here exactly as in `add` —
+    /// and `admits` judges a candidate against that same composite.
+    #[test]
+    fn rows_compose_and_admits_judges_against_the_composite() {
+        let tree = BTreeMap::new();
+        let shelf = BTreeMap::from([
+            ("ffffffffffffffff".to_string(), "pub fn one() -> u32 {\n    1\n}\n".to_string()),
+            (
+                "abababababababab".to_string(),
+                "/// One, told.\npub fn one() -> u32 {\n    1\n}\n".to_string(),
+            ),
+        ]);
+        let (read, fetch) = closures(&tree, &shelf);
+        let envelope = Envelope::parse(
+            "add src/new.rs — fn one @ffffffffffffffff\n\
+             edit src/new.rs — one @abababababababab\n",
+        )
+        .unwrap();
+        let judgment = envelope.judge(&read, &fetch);
+        assert!(judgment.landable(), "{:?}", judgment.residue());
+        assert!(judgment.files[0].1.starts_with("/// One, told."));
+        // admits: a colliding add refuses instantly; a fresh add is admitted.
+        let err = judgment
+            .admits(None, "add", "src/new.rs", "fn one", Some("pub fn one() {}\n"))
+            .unwrap_err();
+        assert!(err.contains("already exists"), "{err}");
+        let lands_as = judgment
+            .admits(None, "add", "src/new.rs", "fn two", Some("pub fn two() {}\n"))
+            .unwrap();
+        assert_eq!(lands_as, "add");
+    }
+
+    /// The address guard is the same conjunction replay holds: wrong length or
+    /// non-hex trailing `@` tokens are detail, not addresses.
+    #[test]
+    fn a_stray_at_token_is_detail_not_an_address() {
+        assert_eq!(
+            split_address("one @0123456789abcdef"),
+            ("one", Some("0123456789abcdef"))
+        );
+        assert_eq!(split_address("one @abc"), ("one @abc", None));
+        assert_eq!(
+            split_address("one @zzzzzzzzzzzzzzzz"),
+            ("one @zzzzzzzzzzzzzzzz", None)
+        );
+        assert_eq!(split_address("commutative(join)"), ("commutative(join)", None));
+    }
+}

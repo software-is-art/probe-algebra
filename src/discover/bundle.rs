@@ -177,8 +177,9 @@ impl Bundle {
     /// THE EDIT VERB — the largest gap named at the second rule's adoption, closed: replace
     /// one named item's TEXT while its SIGNATURE holds. Change is mutation, not only
     /// addition — but a signature move is an interface change wearing an edit's clothes, so
-    /// it is REFUSED here by name (retire the item and `add` its successor; a future
-    /// `resign` verb may earn the combined form). What an edit may change is the body, the
+    /// it is REFUSED here by name (retire the item and `add` its successor — or stage the
+    /// change in an ENVELOPE, where an interface move lands as `recast` beside the rows
+    /// that absorb it). What an edit may change is the body, the
     /// docs, and the attributes: the meaning and its prose — everything a caller cannot
     /// observe through the signature. Everything that names the item re-judges downstream
     /// exactly because the signature held: the laws re-run at the next judgment, the lift
@@ -187,94 +188,72 @@ impl Bundle {
     /// Refusals, named: an unparseable replacement, a replacement that is not exactly ONE
     /// item, an address the module does not carry, a replacement whose address differs
     /// (an edit is not a rename), an AMBIGUOUS address (two impl blocks may legally share
-    /// one — refused by count, never guessed between), a FUNCTION whose signature moved
+    /// one — refused teaching the `addr#N` discriminated forms, never guessed between), a
+    /// FUNCTION whose signature moved
     /// (token-for-token), and an IMPL or TRAIT whose METHOD-SIGNATURE SET moved — the
     /// interface-hold at whole-item grain, which is what lets `edit` reach the host's own
     /// item kinds (the self-hosting disposition's rung-2 gap, closed). Non-function items
     /// (types, consts) hold their name and kind.
     pub fn edit(module: &str, item_name_text: &str, replacement: &str) -> Result<String, String> {
-        let new = syn::parse_file(replacement)
-            .map_err(|e| format!("bundle edit: replacement unparseable: {e}"))?;
-        let [new_item] = new.items.as_slice() else {
-            return Err(format!(
-                "bundle edit: the replacement must be exactly one item, got {} — one edit, \
-                 one judged transaction",
-                new.items.len()
-            ));
-        };
-        let Some(new_name) = item_address(new_item) else {
-            return Err(
-                "bundle edit: the replacement has no defining name — nothing to hold an \
-                 edit to"
-                    .to_string(),
-            );
-        };
-        let (base, _) = split_discriminator(item_name_text);
-        if new_name != base {
-            return Err(format!(
-                "bundle edit: the replacement names `{new_name}`, not `{base}` — \
-                 an edit is not a rename"
-            ));
-        }
-
-        let file =
-            syn::parse_file(module).map_err(|e| format!("bundle edit: module unparseable: {e}"))?;
-        let target = select_addressed("edit", &file, item_name_text)?.ok_or_else(|| {
-            format!(
-                "bundle edit: no item named `{base}` in the module — `add` \
-                 grows, `edit` changes; nothing here to change"
-            )
-        })?;
-
-        // the signature hold: for functions, token-for-token equality of the signature; for
-        // everything else, the kind must match (a struct stays a struct) — reshaping is
-        // interface change either way, and interface change is not an edit.
-        match (target, new_item) {
-            (syn::Item::Fn(old), syn::Item::Fn(new)) => {
-                use quote::ToTokens;
-                let held = old.sig.to_token_stream().to_string();
-                let offered = new.sig.to_token_stream().to_string();
-                if held != offered {
-                    return Err(format!(
-                        "bundle edit: `{item_name_text}`'s signature moved (`{held}` -> \
-                         `{offered}`) — an interface change is not an edit; retire the item \
-                         and add its successor"
-                    ));
+        // edit's OWN judgment is the interface hold; every shared judgment (one item,
+        // naming, existence, ambiguity — now discriminator-aware through
+        // `select_addressed`) and the effect itself live in `splice`, the half `recast`
+        // re-applies without this hold. The hold runs only when the pair it compares
+        // binds cleanly — one parsed replacement naming the one addressed target —
+        // otherwise it is vacuous here and `splice` speaks the refusal.
+        if let (Ok(new), Ok(file)) = (syn::parse_file(replacement), syn::parse_file(module)) {
+            if let ([new_item], Ok(Some(target))) = (
+                new.items.as_slice(),
+                select_addressed("edit", &file, item_name_text),
+            ) {
+                let (base, _) = split_discriminator(item_name_text);
+                let offered = item_address(new_item);
+                if offered.as_deref() == Some(base) {
+                    // the signature hold: for functions, token-for-token equality of the
+                    // signature; for impls and traits, the method-signature set; for
+                    // everything else, the kind must match (a struct stays a struct) —
+                    // reshaping is interface change either way, and interface change is
+                    // not an edit.
+                    match (target, new_item) {
+                        (syn::Item::Fn(old), syn::Item::Fn(new)) => {
+                            use quote::ToTokens;
+                            let held = old.sig.to_token_stream().to_string();
+                            let offered = new.sig.to_token_stream().to_string();
+                            if held != offered {
+                                return Err(format!(
+                                    "bundle edit: `{item_name_text}`'s signature moved (`{held}` -> \
+                                     `{offered}`) — an interface change is not an edit; retire the item \
+                                     and add its successor"
+                                ));
+                            }
+                        }
+                        (old @ syn::Item::Impl(_), new @ syn::Item::Impl(_))
+                        | (old @ syn::Item::Trait(_), new @ syn::Item::Trait(_)) => {
+                            let held = method_signatures(old);
+                            let offered = method_signatures(new);
+                            if held != offered {
+                                return Err(format!(
+                                    "bundle edit: `{item_name_text}`'s method-signature set moved \
+                                     ({} held, {} offered) — an interface change is not an edit; \
+                                     bodies and docs are free, the surface holds",
+                                    held.len(),
+                                    offered.len()
+                                ));
+                            }
+                        }
+                        (old, new)
+                            if std::mem::discriminant(old) == std::mem::discriminant(new) => {}
+                        _ => {
+                            return Err(format!(
+                                "bundle edit: `{item_name_text}` changed item kind — an interface \
+                                 change is not an edit"
+                            ));
+                        }
+                    }
                 }
             }
-            (old @ syn::Item::Impl(_), new @ syn::Item::Impl(_))
-            | (old @ syn::Item::Trait(_), new @ syn::Item::Trait(_)) => {
-                let held = method_signatures(old);
-                let offered = method_signatures(new);
-                if held != offered {
-                    return Err(format!(
-                        "bundle edit: `{item_name_text}`'s method-signature set moved \
-                         ({} held, {} offered) — an interface change is not an edit; \
-                         bodies and docs are free, the surface holds",
-                        held.len(),
-                        offered.len()
-                    ));
-                }
-            }
-            (old, new) if std::mem::discriminant(old) == std::mem::discriminant(new) => {}
-            _ => {
-                return Err(format!(
-                    "bundle edit: `{item_name_text}` changed item kind — an interface \
-                     change is not an edit"
-                ));
-            }
         }
-
-        // the splice: the target's TEXT is replaced in place (its position and its gap are
-        // the module's furniture and stay), then one parse∘render keeps the canonical
-        // guarantee.
-        let start = byte_offset(module, target.span().start());
-        let end = byte_offset(module, target.span().end());
-        let mut out = String::with_capacity(module.len());
-        out.push_str(&module[..start]);
-        out.push_str(replacement.trim_end());
-        out.push_str(&module[end..]);
-        Ok(Bundle::parse(&out)?.render())
+        splice("edit", module, item_name_text, replacement)
     }
 
     /// THE CONTINUATION VERB, library form (rung 2): add a snippet to a module, purely
@@ -1154,6 +1133,65 @@ pub(crate) fn select_addressed<'a>(
             ))
         }
     }
+}
+
+/// The EFFECT half of an item replacement — the judged splice `edit` and `recast`
+/// share. It holds everything about a replacement EXCEPT the interface: exactly one
+/// item, naming the target (a replacement is not a rename), landing on an existing,
+/// unambiguously addressed item (`select_addressed` resolves bare and `addr#N`
+/// discriminated forms alike). The signature hold is deliberately absent — that
+/// judgment is `edit`'s alone, and the envelope's `land` licenses its absence as
+/// `recast`. `verb` names the caller in every refusal, so each voice teaches as
+/// itself.
+#[crate::mutate]
+pub(crate) fn splice(
+    verb: &str,
+    module: &str,
+    item_name_text: &str,
+    replacement: &str,
+) -> Result<String, String> {
+    let new = syn::parse_file(replacement)
+        .map_err(|e| format!("bundle {verb}: replacement unparseable: {e}"))?;
+    let [new_item] = new.items.as_slice() else {
+        return Err(format!(
+            "bundle {verb}: the replacement must be exactly one item, got {} — one {verb}, \
+             one judged transaction",
+            new.items.len()
+        ));
+    };
+    let Some(new_name) = item_address(new_item) else {
+        return Err(format!(
+            "bundle {verb}: the replacement has no defining name — `{verb}` has nothing \
+             to hold"
+        ));
+    };
+    let (base, _) = split_discriminator(item_name_text);
+    if new_name != base {
+        return Err(format!(
+            "bundle {verb}: the replacement names `{new_name}`, not `{base}` — \
+             an edit is not a rename"
+        ));
+    }
+
+    let file =
+        syn::parse_file(module).map_err(|e| format!("bundle {verb}: module unparseable: {e}"))?;
+    let target = select_addressed(verb, &file, item_name_text)?.ok_or_else(|| {
+        format!(
+            "bundle {verb}: no item named `{base}` in the module — `add` \
+             grows, `{verb}` changes; nothing here to change"
+        )
+    })?;
+
+    // the splice: the target's TEXT is replaced in place (its position and its gap are
+    // the module's furniture and stay), then one parse∘render keeps the canonical
+    // guarantee.
+    let start = byte_offset(module, target.span().start());
+    let end = byte_offset(module, target.span().end());
+    let mut out = String::with_capacity(module.len());
+    out.push_str(&module[..start]);
+    out.push_str(replacement.trim_end());
+    out.push_str(&module[end..]);
+    Ok(Bundle::parse(&out)?.render())
 }
 
 #[cfg(test)]

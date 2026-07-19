@@ -198,3 +198,18 @@ edit examples/perimeter.rs — probes @795e343cf167ddb5
 edit src/discover/store.rs — probes @5109ee5f85e6d561
 edit src/discover/store.rs — probes @8064e30c54babbaa
 edit examples/schemata.rs — outcome @352eaac80081d879
+add src/discover/bundle.rs — fn splice @fb5eee6a6afbd92e
+edit src/discover/bundle.rs — impl Bundle @db37d36aea06f858
+add src/discover/envelope.rs — struct EnvelopeRow, struct Envelope, struct RowVerdict, struct Judgment, fn apply, fn split_address, mod probes @cc714a54d7bdc311
+add src/discover/mod.rs — mod envelope @9791964667d7e1ed
+edit src/discover/store.rs — impl Replay @7525a9af798edd9d
+edit src/discover/store.rs — probes @85eddaf2fa6b7214
+edit src/discover/cli.rs — impl CliSpec @588043589cdf09de
+edit src/discover/cli.rs — probes @f8b461a1c7cbecfd
+add examples/bundle.rs — fn record, fn envelope_home, fn judged_envelope, fn stage @6eb616a75daf38a8
+edit examples/bundle.rs — run @daad4cea054c308b
+edit examples/bundle.rs — commit @667dd44fe5d8c9cc
+edit src/discover/bundle.rs — impl Bundle @63c030064eb84569
+edit src/discover/envelope.rs — probes @a584017d91774fcc
+edit src/discover/envelope.rs — probes @59a1b9ef01a72ec4
+edit src/discover/envelope.rs — impl Judgment @d0216007bccde494
