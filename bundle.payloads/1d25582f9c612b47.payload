@@ -1,0 +1,6 @@
+edit src/discover/cli.rs — Sort @8699dfc19e88dba0
+edit src/discover/cli.rs — impl CliSpec::bundle @89ece660b726bde8
+edit src/discover/cli.rs — probes @69091ee13631b808
+recast src/discover/envelope.rs — impl Judgment @d2b9cdf829e34dc1
+edit src/discover/envelope.rs — probes @da99ca2eec2ec053
+edit examples/bundle.rs — run @c66659d111c18509

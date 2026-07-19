@@ -1,0 +1,45 @@
+/// THE PREFLIGHT — the perception face of judgment: judge one offer against
+    /// composite-or-committed and report the verdict `land` would reach, staging no
+    /// row, writing no byte, journaling nothing. `licensed` says whether an
+    /// envelope is open — an interface move judges to `recast`, which unlicensed
+    /// WOULD refuse, so the preflight teaches `bundle begin` instead of lying
+    /// green. `normalize` is the fmt-normal half at offer time (the
+    /// `Replay::differential` precedent): a payload that judges green but whose
+    /// landed render the normalizer refuses is a debt learned here, not at land.
+    pub fn preflight(
+        &self,
+        committed: Option<String>,
+        offer: &Offer<'_>,
+        licensed: bool,
+        normalize: crate::discover::store::Normalize<'_>,
+    ) -> Result<String, String> {
+        let Offer {
+            verb,
+            module,
+            name,
+            payload,
+        } = *offer;
+        let current = self
+            .composite_of(module)
+            .map(str::to_string)
+            .or(committed)
+            .unwrap_or_default();
+        let (lands_as, text) = apply(verb, &current, name, payload)
+            .map_err(|why| format!("would refuse: {verb} {module} — {name} ({why})"))?;
+        if lands_as == "recast" && !licensed {
+            return Err(format!(
+                "would refuse: edit {module} — {name} (the interface moves — the \
+                 standalone verb refuses; under an envelope it lands as `recast`: \
+                 `bundle begin` licenses it)"
+            ));
+        }
+        if let Some(normal) = normalize {
+            normal(&text).map_err(|why| {
+                format!(
+                    "would refuse at land: {lands_as} {module} — {name} (the offer \
+                     judges green but fmt-normal refuses the landed render: {why})"
+                )
+            })?;
+        }
+        Ok(format!("would land as {lands_as}: {module} — {name}"))
+    }

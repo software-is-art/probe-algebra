@@ -6,7 +6,7 @@
 # (or moving its sites) is a ratified diff to this file. Regenerate with
 # `cargo run --example freeze_gates`.
 #
-# 1003 sites.
+# 1008 sites.
 
 - boundary_spec::discover::agenda::GuardVoices::for_edit:0: == -> !=
 - boundary_spec::discover::agenda::GuardVoices::for_edit:1: || -> &&
@@ -468,6 +468,11 @@
 - boundary_spec::discover::envelope::judgment::composite_of:deaf -> None
 - boundary_spec::discover::envelope::judgment::landable:deaf -> false
 - boundary_spec::discover::envelope::judgment::landable:deaf -> true
+- boundary_spec::discover::envelope::judgment::preflight:0: == -> !=
+- boundary_spec::discover::envelope::judgment::preflight:1: ! -> (deleted)
+- boundary_spec::discover::envelope::judgment::preflight:2: && -> ||
+- boundary_spec::discover::envelope::judgment::preflight:deaf -> Err(String::new())
+- boundary_spec::discover::envelope::judgment::preflight:deaf -> Ok(String::new())
 - boundary_spec::discover::envelope::judgment::render:0: == -> !=
 - boundary_spec::discover::envelope::judgment::render:deaf -> String::new()
 - boundary_spec::discover::envelope::judgment::residue:deaf -> vec![]

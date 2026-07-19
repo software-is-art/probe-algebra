@@ -1,0 +1,15 @@
+/// One offer, as a value: the verb, its module, the item name (or, for
+/// `declare`, the declaration itself), and the payload where the verb carries
+/// one — the argument shape `preflight` judges. An offer is a question until
+/// something stages or lands it; nothing here touches a tree.
+#[derive(Debug, Clone, Copy)]
+pub struct Offer<'a> {
+    /// The offer verb — `add`, `edit`, or `declare`.
+    pub verb: &'a str,
+    /// The module path exactly as the verb was given it.
+    pub module: &'a str,
+    /// The item name — or, for `declare`, the declaration itself.
+    pub name: &'a str,
+    /// The payload where the verb carries one (`add`, `edit`).
+    pub payload: Option<&'a str>,
+}

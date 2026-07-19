@@ -4445,3 +4445,41 @@ preflight `bundle judge` (the perception face of judgment — its design is
 settled: reuse `Judgment::admits` against composite-or-committed, plus the
 fmt-normal half at offer time), and `uses` tagging test surfaces in its
 census line.
+
+## The preflight: judgment grows its perception face (BUILT)
+
+Built 2026-07-19, the wearability sprint's fourth brick — the residual the
+method-grain rung named for the next session, closed by it. `bundle judge`
+prefixes any offer verbatim: `bundle judge edit m.rs one fix.rs` re-binds the
+tail through the same declaration (`Sort` gained its eighth member, `Offer` —
+a slot whose value is itself an invocation — exactly the signed diff the
+seven-sorts probe said an eighth would be), judges it, and lands nothing.
+The library half is `Judgment::preflight` over a new `Offer` value (the offer
+as a domain object — the desk brick's carrier, arriving one brick early
+because clippy refused the eight-argument form): the same
+composite-or-committed lookup `admits` uses, but keeping the landed text long
+enough to run the fmt-normal half at offer time (`store::Normalize`, the
+replay differential's own hook), so a debt only `land` would have found is
+learned at authoring time. The report speaks in `land`'s voice — `would land
+as edit|add|declare|recast` green, `would refuse: …` red — with one teaching
+the settled design didn't name: an interface move judged WITHOUT an open
+envelope refuses AND says that an envelope would license it as `recast`
+(`bundle begin` is the teaching), instead of lying green about a standalone
+verb that would refuse. Nothing is staged, written, or journaled either way.
+
+The drill matrix ran live on the committed tree: a green edit reports its
+landing verb; a rename refuses in `edit`'s own voice; an unlicensed interface
+move teaches the envelope; the same move under an open envelope reports
+`would land as recast`; a perception verb offered to judge refuses by name
+("`show` carries no offer"); and the journal shows no judge rows — perception
+stays off the record. What this closes from the session retrospective: "I
+prepared a payload, staged it, and only then learned what would refuse" — the
+refusal now costs one read-only invocation while the payload is still being
+authored, which is also the seam the desk (the editor-loop brick) hooks:
+judge is the offer-time half of that loop.
+
+Reading, recorded per the instrument: designing the verb consulted three
+interiors (cli.rs, envelope.rs, the driver) for one question — "what shape is
+the dispatch/judgment seam" — which `show`'s table of contents answers only
+half of; the architecture-of-a-module question (who calls whom, where a new
+seam belongs) is still the fallback encyclopedia's, and no verb yet speaks it.

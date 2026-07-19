@@ -1,0 +1,150 @@
+#[crate::mutate("judgment")]
+impl Judgment {
+    /// The all-or-none gate: true exactly when no row owes anything.
+    pub fn landable(&self) -> bool {
+        self.verdicts.iter().all(|verdict| verdict.owes.is_none())
+    }
+
+    /// The FULL residue — one line per owing row. The whole bill, so a refusal
+    /// teaches everything the envelope still owes, not just the first error.
+    pub fn residue(&self) -> Vec<String> {
+        self.verdicts
+            .iter()
+            .filter_map(|verdict| {
+                verdict.owes.as_ref().map(|why| {
+                    format!(
+                        "owes: {} {} — {} ({why})",
+                        verdict.lands_as, verdict.module, verdict.detail
+                    )
+                })
+            })
+            .collect()
+    }
+
+    /// The COMPOSITE text of one module under this judgment — the staged state if
+    /// a row touched it, `None` otherwise. This is the one lookup `admits`, the
+    /// composite-aware `show`, and any future composite perception share; module
+    /// paths compare by the string as given, the rule the rows already live by.
+    pub fn composite_of(&self, module: &str) -> Option<&str> {
+        self.files
+            .iter()
+            .find(|(touched, _)| touched == module)
+            .map(|(_, text)| text.as_str())
+    }
+
+    /// Judge ONE MORE row against this judgment's composite — the stage-time
+    /// instant-teaching path: the candidate is judged exactly as `land` will judge
+    /// it, against the tree plus every already-staged row. Returns the verb the
+    /// row would land as; a refusal stages nothing.
+    pub fn admits(
+        &self,
+        committed: Option<String>,
+        verb: &str,
+        module: &str,
+        name: &str,
+        payload: Option<&str>,
+    ) -> Result<String, String> {
+        let current = self
+            .composite_of(module)
+            .map(str::to_string)
+            .or(committed)
+            .unwrap_or_default();
+        apply(verb, &current, name, payload).map(|(lands_as, _)| lands_as)
+    }
+
+    /// THE PREFLIGHT — the perception face of judgment: judge one offer against
+    /// composite-or-committed and report the verdict `land` would reach, staging no
+    /// row, writing no byte, journaling nothing. `licensed` says whether an
+    /// envelope is open — an interface move judges to `recast`, which unlicensed
+    /// WOULD refuse, so the preflight teaches `bundle begin` instead of lying
+    /// green. `normalize` is the fmt-normal half at offer time (the
+    /// `Replay::differential` precedent): a payload that judges green but whose
+    /// landed render the normalizer refuses is a debt learned here, not at land.
+    pub fn preflight(
+        &self,
+        committed: Option<String>,
+        verb: &str,
+        module: &str,
+        name: &str,
+        payload: Option<&str>,
+        licensed: bool,
+        normalize: Option<&dyn Fn(&str) -> Result<String, String>>,
+    ) -> Result<String, String> {
+        let current = self
+            .composite_of(module)
+            .map(str::to_string)
+            .or(committed)
+            .unwrap_or_default();
+        let (lands_as, text) = apply(verb, &current, name, payload)
+            .map_err(|why| format!("would refuse: {verb} {module} — {name} ({why})"))?;
+        if lands_as == "recast" && !licensed {
+            return Err(format!(
+                "would refuse: edit {module} — {name} (the interface moves — the \
+                 standalone verb refuses; under an envelope it lands as `recast`: \
+                 `bundle begin` licenses it)"
+            ));
+        }
+        if let Some(normal) = normalize {
+            normal(&text).map_err(|why| {
+                format!(
+                    "would refuse at land: {lands_as} {module} — {name} (the offer \
+                     judges green but fmt-normal refuses the landed render: {why})"
+                )
+            })?;
+        }
+        Ok(format!("would land as {lands_as}: {module} — {name}"))
+    }
+
+    /// THE BILL — the landed rows exactly as the journal records them, `lands_as`
+    /// verbs and all, one entry per verdict. Stashed content-addressed at land so
+    /// the seal row's address survives squash compaction: change-locality mining
+    /// reads the exact grouped rows instead of counting back lines.
+    pub fn bill(&self) -> String {
+        self.verdicts
+            .iter()
+            .map(|v| Bundle::journal_entry(&v.lands_as, &v.module, &v.detail))
+            .collect()
+    }
+
+    /// The SEAL row's detail: the envelope's shape and the bill's address — the
+    /// journal boundary the change-locality dataset reads. The trailing token is a
+    /// payload address under the same ` @` grammar every effect row speaks.
+    pub fn seal_detail(&self, address: &str) -> String {
+        format!(
+            "{} row(s) across {} file(s) @{address}",
+            self.verdicts.len(),
+            self.files.len()
+        )
+    }
+
+    /// Render the bill for perception (`bundle staged`): one line per row — what
+    /// it lands as, or what it owes — then the landability verdict.
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        for verdict in &self.verdicts {
+            match &verdict.owes {
+                None => out.push_str(&format!(
+                    "lands as {}: {} — {}\n",
+                    verdict.lands_as, verdict.module, verdict.detail
+                )),
+                Some(why) => out.push_str(&format!(
+                    "owes: {} {} — {} ({why})\n",
+                    verdict.lands_as, verdict.module, verdict.detail
+                )),
+            }
+        }
+        let owing = self.verdicts.iter().filter(|v| v.owes.is_some()).count();
+        if owing == 0 {
+            out.push_str(&format!(
+                "landable: {} row(s), all green — `bundle land` writes them as one\n",
+                self.verdicts.len()
+            ));
+        } else {
+            out.push_str(&format!(
+                "NOT landable: {owing} of {} row(s) owe — every debt listed above\n",
+                self.verdicts.len()
+            ));
+        }
+        out
+    }
+}

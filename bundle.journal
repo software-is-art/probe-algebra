@@ -247,3 +247,15 @@ edit src/discover/bundle.rs — impl Bundle @be6e59d522be4a3e
 edit src/discover/bundle.rs — select_addressed @832c7816a7723c30
 collect src/discover/bundle.rs — is_bare_ident
 edit src/discover/bundle.rs — probes @5e4e234048796eb9
+edit src/discover/cli.rs — Sort @8699dfc19e88dba0
+edit src/discover/cli.rs — impl CliSpec::bundle @89ece660b726bde8
+edit src/discover/cli.rs — probes @69091ee13631b808
+recast src/discover/envelope.rs — impl Judgment @d2b9cdf829e34dc1
+edit src/discover/envelope.rs — probes @da99ca2eec2ec053
+edit examples/bundle.rs — run @c66659d111c18509
+seal envelope — 6 row(s) across 3 file(s) @1d25582f9c612b47
+add src/discover/envelope.rs — struct Offer @9cf2fb62ba89a31a
+recast src/discover/envelope.rs — impl Judgment::preflight @42e9bdeae8904c50
+edit src/discover/envelope.rs — probes @e5699fa5d32c4257
+edit examples/bundle.rs — run @ca45be2e41eb666e
+seal envelope — 4 row(s) across 2 file(s) @75005dd38e83a3ed

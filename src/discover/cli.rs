@@ -1,4 +1,4 @@
-/// The argument-type vocabulary: seven sorts cover all seventeen of bundle's verbs. A
+/// The argument-type vocabulary: eight sorts cover all of bundle's verbs. A
 /// sort is what the harness knows about a slot before any judgment runs — how the
 /// token renders in usage (its shell-quoting discipline included) and, when dispatch
 /// migrates here, how its value is fetched. The sort is the type; the label on each
@@ -21,6 +21,9 @@ pub enum Sort {
     Theory,
     /// `'<term>'` — a ground term over a theory's operators; single-quoted.
     Term,
+    /// `[offer ...]` — an entire offer (a verb and its arguments), re-bound by the
+    /// same declaration: `judge`'s slot — the offer is judged, never landed.
+    Offer,
 }
 
 /// How many values a slot binds: exactly one, at most one, or the rest of the line.
@@ -149,8 +152,8 @@ pub struct CliSpec {
 
 #[crate::mutate]
 impl CliSpec {
-    /// bundle's own twenty-one verbs, declared — the hand-built witness of the class
-    /// becomes its first instance. Seven sorts cover every slot; nineteen usage rows
+    /// bundle's own twenty-two verbs, declared — the hand-built witness of the class
+    /// becomes its first instance. Eight sorts cover every slot; twenty usage rows
     /// (gates and owes share one, land and staged another, by declaration) render
     /// byte-identical to the text the first lock pins.
     pub fn bundle() -> CliSpec {
@@ -229,6 +232,7 @@ impl CliSpec {
                 VerbSpec::verb("land", vec![]),
                 VerbSpec::sibling("staged", vec![]),
                 VerbSpec::verb("drop", vec![]),
+                VerbSpec::verb("judge", vec![Slot::variadic(Offer, "offer")]),
             ],
         }
     }
@@ -359,7 +363,8 @@ mod probes {
              \x20      bundle pin\n\
              \x20      bundle begin\n\
              \x20      bundle land | bundle staged\n\
-             \x20      bundle drop"
+             \x20      bundle drop\n\
+             \x20      bundle judge [offer ...]"
         );
     }
 
@@ -392,6 +397,12 @@ mod probes {
             .expect("binds");
         assert_eq!(none.values[2], Vec::<String>::new());
 
+        let offer = cli
+            .parse(&argv(&["judge", "edit", "m.rs", "x", "-"]))
+            .expect("binds");
+        assert_eq!(offer.verb.name, "judge");
+        assert_eq!(offer.values[0], vec!["edit", "m.rs", "x", "-"]);
+
         assert_eq!(cli.parse(&argv(&["pin"])).expect("binds").values.len(), 0);
         assert_eq!(
             cli.parse(&argv(&["land"])).expect("binds").verb.name,
@@ -410,13 +421,15 @@ mod probes {
         assert_eq!(cli.parse(&[]).unwrap_err(), usage);
     }
 
-    /// The declaration's census, pinned: twenty-one verbs, and the slot vocabulary is
-    /// exactly the seven sorts — every sort earns its place by appearing, and an
-    /// eighth would be a diff to this probe, i.e. a decision to sign.
+    /// The declaration's census, pinned: twenty-two verbs, and the slot vocabulary is
+    /// exactly the eight sorts — every sort earns its place by appearing, and a
+    /// ninth would be a diff to this probe, i.e. a decision to sign. (The eighth,
+    /// `Offer`, is the signed diff this probe invited: judge's slot is an entire
+    /// invocation, re-bound by the same declaration.)
     #[test]
-    fn twenty_one_verbs_speak_exactly_the_seven_sorts() {
+    fn twenty_two_verbs_speak_exactly_the_eight_sorts() {
         let cli = CliSpec::bundle();
-        assert_eq!(cli.verbs.len(), 21);
+        assert_eq!(cli.verbs.len(), 22);
         let spoken: Vec<Sort> = cli
             .verbs
             .iter()
@@ -430,6 +443,7 @@ mod probes {
             Sort::Journal,
             Sort::Theory,
             Sort::Term,
+            Sort::Offer,
         ] {
             assert!(spoken.contains(&sort), "{sort:?} is never spoken");
         }
