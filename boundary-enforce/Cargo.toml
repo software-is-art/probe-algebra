@@ -10,4 +10,4 @@ keywords = ["boundary", "architecture", "lint", "build-script", "verification"]
 categories = ["development-tools::build-utils", "rust-patterns"]
 
 [dependencies]
-syn = { version = "2", features = ["full", "visit"] }
+syn = { version = "3", features = ["full", "visit"] }

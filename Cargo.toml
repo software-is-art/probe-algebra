@@ -57,7 +57,7 @@ linkme = "0.3"
 # GENESIS (`discover::scaffold::genesis`) PARSES the blank-slate `system! { ... }` declaration
 # from its token stream — the declaration is Rust surface syntax, never a bespoke DSL — and the
 # generator's tests hold every emitted `.rs` body to `syn::parse_file` (syn-clean output).
-syn = { version = "2", features = ["full"] }
+syn = { version = "3", features = ["full"] }
 # Genesis renders a declared raw TYPE (any `syn::Type`, not just a plain path) back to text
 # for the generated newtypes. Already transitive via syn; named so the render is first-class.
 quote = "1"
@@ -79,7 +79,7 @@ boundary-enforce = { path = "boundary-enforce", version = "0.2.0" }
 fire-drill = { path = "fire-drill" }
 proptest = "1"
 # the instrumentation-completeness census parses the tree (schemata builds only).
-syn = { version = "2", features = ["full"] }
+syn = { version = "3", features = ["full"] }
 trybuild = "1.0.117"
 # Only the `suite_audit` example uses these — to parse cargo-mutants' `outcomes.json`
 # and feed the real kill matrix into `select`. Not a library dependency.
